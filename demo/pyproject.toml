@@ -14,6 +14,7 @@ typer = "^0.16.1"
 grpcio = "^1.74.0"
 grpcio-tools = "^1.74.0"
 fastapi = {extras = ["standard"], version = "^0.116.1"}
+openai = "^1.102.0"
 
 [build-system]
 requires = ["poetry-core"]
