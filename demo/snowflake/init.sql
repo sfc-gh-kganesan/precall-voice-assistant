@@ -6,10 +6,15 @@ create warehouse if not exists demowh with
   auto_suspend = 10
   auto_resume = true
   comment = 'warehouse for light queries.';
+
 grant usage on warehouse demowh to role demoadmin;
 grant create database on account to role demoadmin;
+
 grant role demoadmin to user setli;
+alter user setli set default role = demoadmin;
+
 grant role demoadmin to user nwiegand;
+alter user nwiegand set default role = demoadmin;
 
 use role demoadmin;
 select current_user();

@@ -8,5 +8,7 @@ snow sql -x \
   --account $SNOWFLAKE_ACCOUNT \
   --user $SNOWFLAKE_USER \
   --mfa-passcode $SNOWFLAKE_OTP \
-  --warehouse demowh \
+  --warehouse $SNOWFLAKE_WAREHOUSE \
+  --role $SNOWFLAKE_ROLE \
+  --enable-templating none \
   --query "$1"

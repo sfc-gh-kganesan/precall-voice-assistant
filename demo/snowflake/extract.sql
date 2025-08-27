@@ -149,5 +149,5 @@ insert into invoices (
         'prepaid_flag': 'Is the invoice marked as prepaid or paid in advance?'
       }) as extracted_data 
     from directory(@demo.m1.test_data) 
-    where relative_path like 'snowflake_invoices_golden/%.pdf'
+    where relative_path like 'golden_invoices/%.pdf'
   );
