@@ -11,9 +11,9 @@ m1_data:
 golden: golden_invoices golden_purchase_orders
 
 golden_invoices: m1_data
-	python ../scripts/manifest.py golden_invoices.manifest check
-	python ../scripts/manifest.py golden_invoices.manifest materialize
+	python3 ../scripts/manifest.py golden_invoices.manifest check
+	python3 ../scripts/manifest.py golden_invoices.manifest materialize
 
 golden_purchase_orders: m1_data
-	python ../scripts/manifest.py golden_purchase_orders.manifest check
-	python ../scripts/manifest.py golden_purchase_orders.manifest materialize
+	python3 ../scripts/manifest.py golden_purchase_orders.manifest check
+	python3 ../scripts/manifest.py golden_purchase_orders.manifest materialize
