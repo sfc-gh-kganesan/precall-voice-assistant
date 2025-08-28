@@ -1,33 +1,7 @@
-# Quick start
+# Quick start -- Run UI
 
-From the `./demo` directory, run:
+Refer to ./demoui/README.md for instructions.
 
-```sh
-# install python dependencies
-poetry install
+# Quick start -- Data pipeline
 
-# generate code from protos
-make proto_gen
-
-# initalize sqlite database
-make db_init
-```
-
-In terminal A, run:
-
-```sh
-# start database grpc service
-make db_run
-```
-
-In terminal B, run:
-
-```sh
-make uiapi_run
-```
-
-Finally, to test the uiapi service, run:
-
-```sh
-curl localhost:8010/workflows
-```
+Coming soon.
