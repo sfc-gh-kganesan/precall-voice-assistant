@@ -74,7 +74,14 @@ const ExceptionQueue = () => {
             <TableBody>
               {mockExceptions.map((exception) => (
                 <TableRow key={exception.id}>
-                  <TableCell className="font-medium">{exception.invoiceNumber}</TableCell>
+                  <TableCell className="font-medium">
+                    <button 
+                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      onClick={() => window.open(exception.pdfUrl, '_blank')}
+                    >
+                      {exception.invoiceNumber}
+                    </button>
+                  </TableCell>
                   <TableCell>{exception.vendorName}</TableCell>
                   <TableCell>{formatCurrency(exception.amount)}</TableCell>
                   <TableCell>{getExceptionTypeDisplay(exception.exceptionType)}</TableCell>
@@ -87,7 +94,13 @@ const ExceptionQueue = () => {
                   <TableCell>{exception.assignedTo || 'Unassigned'}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">Review</Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => window.open(exception.pdfUrl, '_blank')}
+                      >
+                        Review
+                      </Button>
                       <Button variant="outline" size="sm">Assign</Button>
                     </div>
                   </TableCell>

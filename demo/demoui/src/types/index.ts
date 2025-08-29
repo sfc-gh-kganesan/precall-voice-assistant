@@ -7,6 +7,7 @@ export interface InvoiceException {
   dateReceived: string;
   priority: 'HIGH' | 'MEDIUM' | 'LOW';
   assignedTo?: string;
+  pdfUrl: string;
 }
 
 export interface InvoiceMetrics {
