@@ -9,6 +9,14 @@ create warehouse if not exists demowh with
 
 grant usage on warehouse demowh to role demoadmin;
 grant create database on account to role demoadmin;
+grant bind service endpoint on account to role demoadmin;
+
+create compute pool if not exists demo_compute_pool
+  min_nodes = 1
+  max_nodes = 1
+  instance_family = cpu_x64_xs;
+
+grant usage, monitor on compute pool demo_compute_pool to role demoadmin;
 
 grant role demoadmin to user setli;
 grant role demoadmin to user nwiegand;
@@ -22,4 +30,8 @@ create schema if not exists demo.m1;
 create stage if not exists demo.m1.test_data 
   directory=(enable=true auto_refresh=true) 
   encryption=(type='SNOWFLAKE_SSE');
+
+use database demo;
+use schema m1;
+create image repository if not exists images;
 
