@@ -4,6 +4,7 @@ package filestore;
 
 service FileStore {
   rpc UploadFile(stream FileChunk) returns (UploadResponse);
+  rpc DownloadFile(DownloadRequest) returns (stream FileChunk);
 }
 
 message FileChunk {
@@ -16,4 +17,8 @@ message UploadResponse {
   bool success = 1;
   string message = 2;
   string file_id = 3;
+}
+
+message DownloadRequest {
+  string file_id = 1;
 }

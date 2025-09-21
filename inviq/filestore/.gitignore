@@ -1,1 +1,2 @@
-uploads/
+local-storage/
+*.db

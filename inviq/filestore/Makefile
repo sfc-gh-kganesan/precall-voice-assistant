@@ -1,6 +1,17 @@
-.phony: check format formatcheck install lint dev test typecheck
+.phony: check dbclean dbinit dbshell format formatcheck install lint dev test typecheck
+
+dbfile=./filestore.db
 
 check: formatcheck lint typecheck
+
+dbclean:
+	rm $(dbfile)
+
+dbinit:
+	sqlite3 $(dbfile) < ./sql/init.sql -echo -bail
+
+dbshell:
+	sqlite3 $(dbfile)
 
 format: install
 	uv run ruff format
