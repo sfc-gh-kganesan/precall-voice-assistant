@@ -1,6 +1,6 @@
 import pytest
-
 from py_protos import filestore_pb2
+
 from app.main import FileStoreServicer
 
 

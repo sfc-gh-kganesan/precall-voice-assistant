@@ -1,11 +1,11 @@
-name: collector-ci
+name: filestore-ci
 
 on:
   push:
     branches:
       - "**"
     paths:
-      - "inviq/collector/**/*"
+      - "inviq/filestore/**/*"
       - "inviq/protos/**/*"
       - "inviq/py-protos/**/*"
 
@@ -31,5 +31,5 @@ jobs:
         run: make gen
 
       - name: Run checks
-        working-directory: inviq/collector
+        working-directory: inviq/filestore
         run: make check
