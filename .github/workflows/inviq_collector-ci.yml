@@ -4,12 +4,12 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "inviq/collector/**"
+      - "inviq/collector/**/*"
   push:
     branches:
       - "**"
     paths:
-      - "inviq/collector/**"
+      - "inviq/collector/**/*"
 
 jobs:
   check:
