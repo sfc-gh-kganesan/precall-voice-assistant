@@ -1,4 +1,6 @@
-.phony: format formatcheck install lint dev test typecheck
+.phony: check format formatcheck install lint dev test typecheck
+
+check: formatcheck lint typecheck
 
 format: install
 	uv run ruff format

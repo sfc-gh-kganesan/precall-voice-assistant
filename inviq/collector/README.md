@@ -66,3 +66,11 @@ Type check:
 ```bash
 make typecheck
 ```
+
+### Github actions
+
+Install [`act`](https://nektosact.com/installation/gh.html) to test actions locally:
+
+```bash
+gh extension install https://github.com/nektos/gh-act
+```
