@@ -1,0 +1,5 @@
+Invoice #INV-2024-002
+Date: 2024-01-20
+Amount: $2,500.00
+Vendor: Tech Solutions LLC
+Description: Software licensing and support
