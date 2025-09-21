@@ -28,6 +28,10 @@ jobs:
         with:
           version: "latest"
 
+      - name: Generate code from protos
+        working-directory: inviq/py-protos
+        run: make gen
+
       - name: Run checks
         working-directory: inviq/collector
         run: make check

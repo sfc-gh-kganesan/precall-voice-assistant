@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package filestore;
+
+service FileStore {
+  rpc UploadFile(stream FileChunk) returns (UploadResponse);
+}
+
+message FileChunk {
+  string filename = 1;
+  bytes content = 2;
+  bool is_last = 3;
+}
+
+message UploadResponse {
+  bool success = 1;
+  string message = 2;
+  string file_id = 3;
+}

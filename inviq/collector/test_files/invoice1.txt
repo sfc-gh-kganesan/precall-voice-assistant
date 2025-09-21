@@ -1,5 +1,0 @@
-Invoice #INV-2024-001
-Date: 2024-01-15
-Amount: $1,234.56
-Vendor: ACME Corp
-Description: Office supplies and equipment

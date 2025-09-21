@@ -6,15 +6,14 @@ build-backend = "hatchling.build"
 packages = ["app"]
 
 [project]
-name = "collector"
+name = "filestore"
 version = "0.1.0"
-description = "Ingress service to process invoice tickets"
+description = "gRPC file upload service"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.4.0",
-    "python-multipart>=0.0.20",
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
+    "protobuf>=4.25.0",
     "py-protos", # local dependency
 ]
 
@@ -23,7 +22,7 @@ dev = [
     "ruff>=0.13.1",
     "pyright>=1.1.0",
     "pytest>=7.4.0",
-    "httpx>=0.25.0",
+    "pytest-asyncio>=0.23.0",
 ]
 
 [tool.uv.sources]
@@ -45,6 +44,9 @@ select = [
 ]
 ignore = []
 
+[tool.ruff.lint.per-file-ignores]
+"app/*_pb2.py" = ["E501"]  # Ignore line length for generated protobuf files
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
@@ -56,3 +58,5 @@ pythonVersion = "3.12"
 typeCheckingMode = "basic"
 reportMissingImports = true
 reportMissingTypeStubs = false
+include = ["app", "tests"]
+exclude = ["app/*_pb2.py", "app/*_pb2_grpc.py"]
