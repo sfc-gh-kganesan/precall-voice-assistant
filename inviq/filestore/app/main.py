@@ -1,6 +1,5 @@
 import asyncio
 import hashlib
-import sqlite3
 import uuid
 from concurrent import futures
 from pathlib import Path
@@ -8,14 +7,18 @@ from pathlib import Path
 import grpc
 from py_protos import filestore_pb2, filestore_pb2_grpc
 
+from .db import Db, DbFile
+
 
 class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
     def __init__(self):
         self.upload_dir = Path("local-storage")
         self.upload_dir.mkdir(exist_ok=True)
-        self.db_path = "filestore.db"
+        self.db = Db(db_path="filestore.db")
 
     def UploadFile(self, request_iterator, context):
+        namespace = "local-storage"
+
         try:
             file_id = str(uuid.uuid4())
             filename = None
@@ -35,15 +38,26 @@ class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
                     success=False, message="No filename provided", file_id=""
                 )
 
+            # Calculate SHA256 hash
+            sha256_hash = hashlib.sha256(file_content).hexdigest()
+
+            # Check if file already exists in DB
+            existing_file = self.db.lookup_file_by_sha256(sha256_hash, namespace)
+
+            if existing_file is not None:
+                return filestore_pb2.UploadResponse(
+                    success=True,
+                    message="File with matching hash and namespace already exists",
+                    file_id=existing_file.id,
+                )
+
+            # Save file to local storage
             file_path = self.upload_dir / f"{file_id}_{filename}"
             with open(file_path, "wb") as f:
                 f.write(file_content)
 
-            # Calculate SHA256 hash
-            sha256_hash = hashlib.sha256(file_content).hexdigest()
-
             # Write to database
-            self.insert_file_record(file_id, sha256_hash, str(file_path), "default")
+            self.db.insert_file(DbFile(file_id, sha256_hash, str(file_path), namespace))
 
             return filestore_pb2.UploadResponse(
                 success=True,
@@ -55,22 +69,6 @@ class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
             return filestore_pb2.UploadResponse(
                 success=False, message=f"Upload failed: {str(e)}", file_id=""
             )
-
-    def insert_file_record(self, file_id, sha256_hash, file_path, namespace):
-        """Insert a new file record into the database."""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    """INSERT INTO file (id, sha256, path, namespace)
-                       VALUES (?, ?, ?, ?)""",
-                    (file_id, sha256_hash, file_path, namespace),
-                )
-                conn.commit()
-                print(
-                    f'Inserted file "{file_path}" record into database under namespace {namespace}'  # noqa: E501
-                )
-        except Exception as e:
-            print(f"Warning: Could not insert file record: {e}")
 
 
 async def serve():

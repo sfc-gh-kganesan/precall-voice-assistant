@@ -1,9 +1,12 @@
+import logging
 from typing import Annotated
 
 import grpc
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from py_protos import filestore_pb2, filestore_pb2_grpc
 from pydantic import BaseModel
+
+from .logging import initialize_logging
 
 
 class UploadResponse(BaseModel):
@@ -27,6 +30,8 @@ class UploadInvoiceResponse(BaseModel):
 
 
 app = FastAPI(title="Collector API", version="0.1.0")
+initialize_logging()
+logger = logging.getLogger(__name__)
 
 
 @app.get("/")
@@ -73,6 +78,7 @@ async def upload_file_to_filestore(file) -> FileUploadResponse:
         )
 
     except Exception as e:
+        logger.error(f"Error uploading file: {str(e)}")
         return FileUploadResponse(
             success=False, message=f"Failed to upload file: {str(e)}", file_id=""
         )
@@ -96,13 +102,21 @@ async def upload_file(
     if len(files) > 0:
         file = files[0]
         if not file.filename:
+            logger.debug("No filename provided in the uploaded file.")
             raise HTTPException(status_code=400, detail="No filename provided")
 
         results: list[FileUploadResponse] = []
         for file in files:
             result = await upload_file_to_filestore(file)
             if not result.success:
+                logger.error(
+                    f"File upload failed for ticket {ticket_number}: {result.message}"
+                )
                 raise HTTPException(status_code=500, detail=result.message)
+            logger.info(
+                f"File uploaded successfully for ticket {ticket_number}:"
+                + f"{file.filename} with ID {result.file_id} ({result.message})"
+            )
             results.append(result)
         return UploadInvoiceResponse(
             ticket_number=ticket_number,
