@@ -11,12 +11,8 @@ def servicer():
 
 def test_upload_file_success(servicer):
     def request_iterator():
-        yield filestore_pb2.FileChunk(
-            filename="test.txt", content=b"Hello, ", is_last=False
-        )
-        yield filestore_pb2.FileChunk(
-            filename="test.txt", content=b"World!", is_last=True
-        )
+        yield filestore_pb2.FileChunk(filename="test.txt", content=b"Hello, ", is_last=False)
+        yield filestore_pb2.FileChunk(filename="test.txt", content=b"World!", is_last=True)
 
     response = servicer.UploadFile(request_iterator(), None)
 

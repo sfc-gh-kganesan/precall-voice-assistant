@@ -3,17 +3,10 @@ from typing import Annotated
 
 import grpc
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from py_protos import filestore_pb2, filestore_pb2_grpc
+from py_protos import filestore_pb2, filestore_pb2_grpc, invoicestore_pb2, invoicestore_pb2_grpc
 from pydantic import BaseModel
 
 from .logging import initialize_logging
-
-
-class UploadResponse(BaseModel):
-    message: str
-    ticket_number: str
-    files_received: int
-    filenames: list[str]
 
 
 class FileUploadResponse(BaseModel):
@@ -22,8 +15,13 @@ class FileUploadResponse(BaseModel):
     file_id: str
 
 
-class UploadInvoiceResponse(BaseModel):
-    ticket_number: str
+class SubmissionResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class UploadResponse(BaseModel):
+    lift_ticket: str
     success: bool
     message: str
     file_ids: list[str]
@@ -44,8 +42,16 @@ async def health_check():
     return {"status": "healthy"}
 
 
-async def upload_file_to_filestore(file) -> FileUploadResponse:
-    """Upload a file to the filestore service via gRPC."""
+async def upload_file_to_filestore(file: UploadFile) -> FileUploadResponse:
+    """
+    Upload a file to the filestore service via gRPC.
+
+    Args:
+        file: The file to upload
+
+    Returns:
+        FileUploadResponse indicating success or failure
+    """
     try:
         # Create gRPC channel
         channel = grpc.insecure_channel("localhost:50051")
@@ -63,9 +69,7 @@ async def upload_file_to_filestore(file) -> FileUploadResponse:
                 chunk_data = content[i : i + chunk_size]
                 is_last = (i + chunk_size) >= len(content)
 
-                yield filestore_pb2.FileChunk(
-                    filename=filename, content=chunk_data, is_last=is_last
-                )
+                yield filestore_pb2.FileChunk(filename=filename, content=chunk_data, is_last=is_last)
 
         # Upload file
         response = stub.UploadFile(chunk_generator())
@@ -73,27 +77,52 @@ async def upload_file_to_filestore(file) -> FileUploadResponse:
         # Close channel
         channel.close()
 
-        return FileUploadResponse(
-            success=response.success, message=response.message, file_id=response.file_id
-        )
+        return FileUploadResponse(success=response.success, message=response.message, file_id=response.file_id)
 
     except Exception as e:
         logger.error(f"Error uploading file: {str(e)}")
-        return FileUploadResponse(
-            success=False, message=f"Failed to upload file: {str(e)}", file_id=""
-        )
+        return FileUploadResponse(success=False, message=f"Failed to upload file: {str(e)}", file_id="")
 
 
-@app.post("/upload", response_model=UploadInvoiceResponse)
-async def upload_file(
-    ticket_number: Annotated[str, Form()],
+async def write_to_invoicestore(lift_ticket: str, file_ids: list[str]) -> SubmissionResponse:
+    """
+    Write a submission to the invoicestore service via gRPC.
+
+    Args:
+        lift_ticket: Service Now ticket number
+        file_ids: List of file IDs to associate with the submission
+
+    Returns:
+        SubmissionResponse indicating success or failure
+    """
+    try:
+        # Create gRPC channel
+        channel = grpc.insecure_channel("localhost:50052")
+        stub = invoicestore_pb2_grpc.InvoiceStoreStub(channel)
+
+        # Upload submission
+        response = stub.Submit(invoicestore_pb2.SubmissionRequest(lift_ticket=lift_ticket, file_ids=file_ids))
+
+        # Close channel
+        channel.close()
+
+        return SubmissionResponse(success=response.success, message=response.message)
+
+    except Exception as e:
+        logger.error(f"Error with submission: {str(e)}")
+        return SubmissionResponse(success=False, message=f"Failed to send submission: {str(e)}")
+
+
+@app.post("/upload", response_model=UploadResponse)
+async def upload(
+    lift_ticket: Annotated[str, Form()],
     files: Annotated[list[UploadFile], File()],
-) -> UploadInvoiceResponse:
+) -> UploadResponse:
     """
     Upload invoice files for processing.
 
     Args:
-        ticket_number: Service Now ticket number
+        lift_ticket: Service Now ticket number
         files: List of files attached to the original email
 
     Returns:
@@ -109,19 +138,19 @@ async def upload_file(
         for file in files:
             result = await upload_file_to_filestore(file)
             if not result.success:
-                logger.error(
-                    f"File upload failed for ticket {ticket_number}: {result.message}"
-                )
+                logger.error(f"File upload failed for ticket {lift_ticket}: {result.message}")
                 raise HTTPException(status_code=500, detail=result.message)
             logger.info(
-                f"File uploaded successfully for ticket {ticket_number}:"
+                f"File uploaded successfully for ticket {lift_ticket}:"
                 + f"{file.filename} with ID {result.file_id} ({result.message})"
             )
             results.append(result)
-        return UploadInvoiceResponse(
-            ticket_number=ticket_number,
-            success=True,
-            message="All files uploaded successfully",
+
+        submission_result = await write_to_invoicestore(lift_ticket, [r.file_id for r in results])
+        return UploadResponse(
+            lift_ticket=lift_ticket,
+            success=submission_result.success,
+            message=submission_result.message,
             file_ids=[result.file_id for result in results],
         )
     else:

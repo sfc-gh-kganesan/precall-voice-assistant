@@ -30,7 +30,7 @@ py_protos = { path="../py-protos", editable=true }
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88
+line-length = 120
 
 [tool.ruff.lint]
 select = [
@@ -44,9 +44,6 @@ select = [
 ]
 ignore = []
 
-[tool.ruff.lint.per-file-ignores]
-"app/*_pb2.py" = ["E501"]  # Ignore line length for generated protobuf files
-
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
@@ -59,4 +56,3 @@ typeCheckingMode = "basic"
 reportMissingImports = true
 reportMissingTypeStubs = false
 include = ["app", "tests"]
-exclude = ["app/*_pb2.py", "app/*_pb2_grpc.py"]

@@ -34,9 +34,7 @@ class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
                     break
 
             if not filename:
-                return filestore_pb2.UploadResponse(
-                    success=False, message="No filename provided", file_id=""
-                )
+                return filestore_pb2.UploadResponse(success=False, message="No filename provided", file_id="")
 
             # Calculate SHA256 hash
             sha256_hash = hashlib.sha256(file_content).hexdigest()
@@ -66,9 +64,7 @@ class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
             )
 
         except Exception as e:
-            return filestore_pb2.UploadResponse(
-                success=False, message=f"Upload failed: {str(e)}", file_id=""
-            )
+            return filestore_pb2.UploadResponse(success=False, message=f"Upload failed: {str(e)}", file_id="")
 
 
 async def serve():

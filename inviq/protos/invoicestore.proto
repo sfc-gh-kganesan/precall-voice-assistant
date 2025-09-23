@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package invoicestore;
+
+service InvoiceStore {
+  rpc Submit(SubmissionRequest) returns (SubmissionResponse);
+}
+
+message SubmissionRequest {
+  string lift_ticket = 1;
+  repeated string file_ids = 2;
+}
+
+message SubmissionResponse {
+  bool success = 1;
+  string message = 2;
+  SubmissionStatus status = 3;
+}
+
+enum SubmissionStatus {
+  SUBMISSION_STATUS_UNKNOWN = 0;
+  SUBMISSION_STATUS_PENDING = 1;
+  SUBMISSION_STATUS_PROCESSING = 2;
+  SUBMISSION_STATUS_COMPLETED = 3;
+  SUBMISSION_STATUS_REJECTED = 4;
+}

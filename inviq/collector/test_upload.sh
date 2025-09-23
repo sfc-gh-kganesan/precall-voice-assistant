@@ -13,7 +13,7 @@ echo "============================================"
 echo "Test 2: Upload single file"
 echo "---------------------------"
 response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-  -F "ticket_number=INC0789012" \
+  -F "lift_ticket=INC0789012" \
   -F "files=@test_files/certificate.pdf" \
   -F "files=@test_files/example.pdf" \
   "$UPLOAD_URL")

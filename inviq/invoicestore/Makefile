@@ -1,6 +1,17 @@
-.phony: check fix format formatcheck install lint dev test typecheck
+.phony: check dbclean dbinit dbshell fix format formatcheck install lint dev test typecheck
+
+dbfile=./invoicestore.db
 
 check: formatcheck lint typecheck
+
+dbclean:
+	rm $(dbfile)
+
+dbinit:
+	sqlite3 $(dbfile) < ./sql/init.sql -echo -bail
+
+dbshell:
+	sqlite3 $(dbfile)
 
 fix: format
 	uv run ruff check --fix
@@ -18,7 +29,7 @@ lint: install
 	uv run ruff check
 
 dev: install
-	uv run uvicorn app.main:app --reload
+	uv run python -m app.main
 
 test: install
 	uv run pytest
