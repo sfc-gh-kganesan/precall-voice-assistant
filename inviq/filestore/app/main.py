@@ -74,7 +74,7 @@ async def serve():
     listen_addr = "[::]:50051"
     server.add_insecure_port(listen_addr)
 
-    print(f"Starting gRPC server on {listen_addr}")
+    print(f"Starting filestore gRPC server on {listen_addr}")
     await server.start()
 
     try:

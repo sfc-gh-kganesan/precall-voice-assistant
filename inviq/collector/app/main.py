@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Hello World..."}
 
 
 @app.get("/health")
@@ -54,7 +54,7 @@ async def upload_file_to_filestore(file: UploadFile) -> FileUploadResponse:
     """
     try:
         # Create gRPC channel
-        channel = grpc.insecure_channel("localhost:50051")
+        channel = grpc.insecure_channel("filestore:50051")
         stub = filestore_pb2_grpc.FileStoreStub(channel)
 
         # Read file content
@@ -97,7 +97,7 @@ async def write_to_invoicestore(lift_ticket: str, file_ids: list[str]) -> Submis
     """
     try:
         # Create gRPC channel
-        channel = grpc.insecure_channel("localhost:50052")
+        channel = grpc.insecure_channel("invoicestore:50051")
         stub = invoicestore_pb2_grpc.InvoiceStoreStub(channel)
 
         # Upload submission

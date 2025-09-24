@@ -11,7 +11,7 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
     def __init__(self):
         self.db = Db(db_path="invoicestore.db")
 
-    def Upload(self, request, context):
+    def Submit(self, request, context):
         try:
             # Validate request
             if not request.lift_ticket:
@@ -45,10 +45,10 @@ async def serve():
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
     invoicestore_pb2_grpc.add_InvoiceStoreServicer_to_server(InvoiceStoreServicer(), server)
 
-    listen_addr = "[::]:50052"
+    listen_addr = "[::]:50051"
     server.add_insecure_port(listen_addr)
 
-    print(f"Starting gRPC server on {listen_addr}")
+    print(f"Starting invoicestore gRPC server on {listen_addr}")
     await server.start()
 
     try:

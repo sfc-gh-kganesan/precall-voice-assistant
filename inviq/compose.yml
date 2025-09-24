@@ -1,0 +1,36 @@
+services:
+  collector:
+    build:
+      context: .
+      dockerfile: ./collector/Dockerfile
+    ports:
+      - "8000:8000"
+    develop:
+      watch:
+        - action: sync
+          path: ./collector
+          target: /inviq/collector
+        - action: rebuild
+          path: ./collector/uv.lock
+  filestore:
+    build:
+      context: .
+      dockerfile: ./filestore/Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: ./filestore
+          target: /inviq/filestore
+        - action: rebuild
+          path: ./filestore/uv.lock
+  invoicestore:
+    build:
+      context: .
+      dockerfile: ./invoicestore/Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: ./invoicestore
+          target: /inviq/invoicestore
+        - action: rebuild
+          path: ./invoicestore/uv.lock
