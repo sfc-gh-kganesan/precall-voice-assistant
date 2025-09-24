@@ -1,8 +1,9 @@
-.phony: check dbclean dbinit dbshell fix format formatcheck install lint dev test typecheck
+.phony: check dbclean dbinit dbshell fix format install lint dev test typecheck
 
 dbfile=./filestore.db
 
-check: formatcheck lint typecheck
+check: lint typecheck
+	uv run ruff format --diff
 
 dbclean:
 	rm $(dbfile)
@@ -19,9 +20,6 @@ fix: format
 format: install
 	uv run ruff format
 
-formatcheck: install
-	uv run ruff format --diff
-
 install:
 	uv sync
 
@@ -29,7 +27,7 @@ lint: install
 	uv run ruff check
 
 dev: install
-	uv run python -m app.main
+	uv run python run_dev.py
 
 test: install
 	uv run pytest

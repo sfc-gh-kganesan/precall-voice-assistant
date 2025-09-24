@@ -45,7 +45,7 @@ class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
             if existing_file is not None:
                 return filestore_pb2.UploadResponse(
                     success=True,
-                    message="File with matching hash and namespace already exists",
+                    message="File with matching hash and namespace already exists.",
                     file_id=existing_file.id,
                 )
 

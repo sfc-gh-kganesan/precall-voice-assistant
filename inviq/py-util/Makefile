@@ -1,4 +1,4 @@
-.phony: check fix format install lint dev test typecheck
+.phony: check fix format install lint typecheck
 
 check: lint typecheck
 	uv run ruff format --diff
@@ -14,12 +14,6 @@ install:
 
 lint: install
 	uv run ruff check
-
-dev: install
-	uv run uvicorn app.main:app --reload
-
-test: install
-	uv run pytest
 
 typecheck: install
 	uv run pyright
