@@ -1,5 +1,6 @@
 import sqlite3
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -14,6 +15,16 @@ class DbFile:
 class Db:
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        """Initialize the database using the init.sql script."""
+        sql_file = Path(__file__).parent.parent / "sql" / "init.sql"
+
+        with sqlite3.connect(self.db_path) as conn:
+            with open(sql_file) as f:
+                sql_script = f.read()
+            conn.executescript(sql_script)
 
     def insert_file(self, file: DbFile):
         """Initialize the database with the required tables."""

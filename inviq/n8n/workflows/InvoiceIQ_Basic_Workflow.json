@@ -1,0 +1,123 @@
+{
+    "name": "InvoiceIQ Workflow",
+    "nodes": [
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "Your goal is to figure out if the given lift ticket contains a valid invoice. As a part of that, you need to create a fake submission into the invoice store. ",
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 2.2,
+        "position": [
+          240,
+          0
+        ],
+        "id": "8fed8c11-8f9b-44ee-8f16-d7a241ae89e0",
+        "name": "AI Agent"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "mode": "list",
+            "value": "gpt-4.1-mini"
+          },
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+        "typeVersion": 1.2,
+        "position": [
+          -208,
+          288
+        ],
+        "id": "9aa6cc36-2c7c-4b49-aa5e-62790c70bbda",
+        "name": "OpenAI Chat Model",
+        "credentials": {
+          "openAiApi": {
+            "id": "HeFawj2XtrYc6FjU",
+            "name": "OpenAi account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "toolDescription": "Allows you to create a fake submission into the invoice store. \n",
+          "method": "POST",
+          "url": "http://gateway/test-invoicestore-failure",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequestTool",
+        "typeVersion": 4.2,
+        "position": [
+          736,
+          288
+        ],
+        "id": "a3648e02-5fc1-4938-bf5a-758997613a89",
+        "name": "Submit Invoice"
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "default",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "7be0c984-28a8-46fd-9cb0-a3742055e9d6",
+        "name": "Webhook",
+        "webhookId": "0759b6b7-7677-452f-b2ef-247c4739e1dd"
+      }
+    ],
+    "pinData": {},
+    "connections": {
+      "OpenAI Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Submit Invoice": {
+        "ai_tool": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": true,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "versionId": "c7e3be45-4469-4ddc-8b94-fe5843ea3706",
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "e14738955f90e09da133b5777e8a0f4f61826c5cf8b0b458b01b0b0ebf9c4012"
+    },
+    "id": "yVa9ymtwcnVKrYLA",
+    "tags": []
+  }

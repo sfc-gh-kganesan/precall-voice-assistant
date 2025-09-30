@@ -2,6 +2,7 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 
 from py_protos import invoicestore_pb2
 
@@ -47,6 +48,16 @@ def status_from_enum(status: invoicestore_pb2.SubmissionStatus) -> str:
 class Db:
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        """Initialize the database using the init.sql script."""
+        sql_file = Path(__file__).parent.parent / "sql" / "init.sql"
+
+        with get_db_connection(self.db_path) as conn:
+            with open(sql_file) as f:
+                sql_script = f.read()
+            conn.executescript(sql_script)
 
     def insert_submission(
         self, file_ids: list[str], lift_ticket: str, status: invoicestore_pb2.SubmissionStatus

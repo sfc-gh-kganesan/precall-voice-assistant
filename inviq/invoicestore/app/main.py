@@ -1,10 +1,13 @@
 import asyncio
+import logging
 from concurrent import futures
 
 import grpc
 from py_protos import invoicestore_pb2, invoicestore_pb2_grpc
 
 from .db import Db
+
+logger = logging.getLogger(__name__)
 
 
 class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
@@ -13,20 +16,27 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
 
     def Submit(self, request, context):
         try:
+            logger.info(f"Received submission request for lift ticket: {request.lift_ticket}")
             # Validate request
             if not request.lift_ticket:
                 return invoicestore_pb2.SubmissionResponse(
-                    success=False, message="Lift ticket is required", status="INVALID_REQUEST"
+                    success=False,
+                    message="Lift ticket is required",
+                    status=invoicestore_pb2.SUBMISSION_STATUS_REJECTED,
                 )
 
             if not request.file_ids:
                 return invoicestore_pb2.SubmissionResponse(
-                    success=False, message="At least one file ID is required", status="INVALID_REQUEST"
+                    success=False,
+                    message="At least one file ID is required",
+                    status=invoicestore_pb2.SUBMISSION_STATUS_REJECTED,
                 )
 
             # Insert submission into database
             submission = self.db.insert_submission(
-                list(request.file_ids), request.lift_ticket, invoicestore_pb2.SUBMISSION_STATUS_PENDING
+                list(request.file_ids),
+                request.lift_ticket,
+                invoicestore_pb2.SUBMISSION_STATUS_PENDING,
             )
 
             if submission is None:
@@ -35,10 +45,16 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
             return invoicestore_pb2.SubmissionResponse(
                 success=True,
                 message=f"Successfully processed {len(request.file_ids)} file(s) for lift ticket {request.lift_ticket}",
+                status=invoicestore_pb2.SUBMISSION_STATUS_PENDING,
             )
 
         except Exception as e:
-            return invoicestore_pb2.SubmissionResponse(success=False, message=f"Upload failed: {str(e)}")
+            logger.error(f"Upload failed: {e}")
+            return invoicestore_pb2.SubmissionResponse(
+                success=False,
+                message=f"Upload failed: {str(e)}",
+                status=invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
+            )
 
 
 async def serve():
@@ -59,4 +75,5 @@ async def serve():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(serve())

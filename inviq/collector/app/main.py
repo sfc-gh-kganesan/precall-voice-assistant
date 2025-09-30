@@ -1,14 +1,24 @@
 import logging
+import os
 from typing import Annotated
 
 import grpc
+import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from py_protos import filestore_pb2, filestore_pb2_grpc, invoicestore_pb2, invoicestore_pb2_grpc
+
+# Import gRPC stubs for both filestore and invoicestore
+from py_protos import (
+    filestore_pb2,
+    filestore_pb2_grpc,
+    invoicestore_pb2,
+    invoicestore_pb2_grpc,
+)
 from pydantic import BaseModel
 
 from .logging import initialize_logging
 
 
+# --- Pydantic Models for HTTP API ---
 class FileUploadResponse(BaseModel):
     success: bool
     message: str
@@ -27,6 +37,9 @@ class UploadResponse(BaseModel):
     file_ids: list[str]
 
 
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
+
+# --- FastAPI Application Setup ---
 app = FastAPI(title="Collector API", version="0.1.0")
 initialize_logging()
 logger = logging.getLogger(__name__)
@@ -53,7 +66,6 @@ async def upload_file_to_filestore(file: UploadFile) -> FileUploadResponse:
         FileUploadResponse indicating success or failure
     """
     try:
-        # Create gRPC channel
         channel = grpc.insecure_channel("filestore:50051")
         stub = filestore_pb2_grpc.FileStoreStub(channel)
 
@@ -110,7 +122,21 @@ async def write_to_invoicestore(lift_ticket: str, file_ids: list[str]) -> Submis
 
     except Exception as e:
         logger.error(f"Error with submission: {str(e)}")
-        return SubmissionResponse(success=False, message=f"Failed to send submission: {str(e)}")
+        return SubmissionResponse(success=False, message=f"Failed to submit submission: {str(e)}")
+
+
+async def trigger_n8n_workflow(lift_ticket: str):
+    """Triggers the n8n workflow by sending the submission ID to a webhook."""
+    if not N8N_WEBHOOK_URL:
+        logger.warning("N8N_WEBHOOK_URL not set. Skipping workflow trigger.")
+        return
+
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(N8N_WEBHOOK_URL, json={"submission_id": lift_ticket})
+            logger.info(f"Successfully triggered n8n workflow for ticket {lift_ticket}")
+        except httpx.HTTPError as e:
+            logger.error(f"Failed to trigger n8n workflow for ticket {lift_ticket}: {e}")
 
 
 @app.post("/upload", response_model=UploadResponse)
@@ -146,7 +172,12 @@ async def upload(
             )
             results.append(result)
 
+        # Step 2: Create the submission record in InvoiceStore via gRPC
         submission_result = await write_to_invoicestore(lift_ticket, [r.file_id for r in results])
+
+        # Step 3: Trigger the n8n workflow (fire and forget)
+        await trigger_n8n_workflow(lift_ticket)
+
         return UploadResponse(
             lift_ticket=lift_ticket,
             success=submission_result.success,
