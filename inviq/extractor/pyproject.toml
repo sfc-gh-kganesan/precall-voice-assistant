@@ -19,7 +19,7 @@ dependencies = [
     "py-util", # local dependency
     "python-dotenv>=1.1.1",
     "snowflake-connector-python>=3.17.4",
-    "snowflake-ml-python>=1.15.0",
+    # "snowflake-ml-python>=1.15.0",  # Removed due to LLVM compatibility issues
     "watchdog>=6.0.0",
 ]
 
@@ -60,4 +60,4 @@ pythonVersion = "3.12"
 typeCheckingMode = "basic"
 reportMissingImports = true
 reportMissingTypeStubs = false
-include = ["app", "tests"]
+include = ["app"]

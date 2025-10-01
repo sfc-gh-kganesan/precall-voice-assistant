@@ -64,10 +64,10 @@ class ExtractorService(extractor_pb2_grpc.ExtractorServicer):
                 if filename is None:
                     filename = chunk.filename
 
-                    file_content += chunk.content
+                file_content += chunk.content
 
-                    if chunk.is_last:
-                        break
+                if chunk.is_last:
+                    break
 
             # Save file to local storage
             file_path = self.upload_dir.joinpath(f"{file_id}_{filename}").resolve()
@@ -101,11 +101,11 @@ class ExtractorService(extractor_pb2_grpc.ExtractorServicer):
             success=True,
             message="File extracted successfully",
             file_id=file_id,
-            furl=str(fields["FILE_URL"]),
-            purchase_order_number=str(fields["PURCHASE_ORDER_NUMBER"]),
-            payment_terms=str(fields["PAYMENT_TERMS"]),
-            total_amount=str(fields["TOTAL_AMOUNT"]),
-            vendor_name=str(fields["VENDOR_NAME"]),
+            furl=str(fields.get("FILE_URL", "")),
+            purchase_order_number=str(fields.get("PURCHASE_ORDER_NUMBER", "")),
+            payment_terms=str(fields.get("PAYMENT_TERMS", "")),
+            total_amount=str(fields.get("TOTAL_AMOUNT", "")),
+            vendor_name=str(fields.get("VENDOR_NAME", "")),
         )
 
 
