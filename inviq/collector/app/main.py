@@ -133,7 +133,7 @@ async def trigger_n8n_workflow(lift_ticket: str):
 
     async with httpx.AsyncClient() as client:
         try:
-            await client.post(N8N_WEBHOOK_URL, json={"submission_id": lift_ticket})
+            await client.post(N8N_WEBHOOK_URL, json={"lift_ticket_id": lift_ticket})
             logger.info(f"Successfully triggered n8n workflow for ticket {lift_ticket}")
         except httpx.HTTPError as e:
             logger.error(f"Failed to trigger n8n workflow for ticket {lift_ticket}: {e}")

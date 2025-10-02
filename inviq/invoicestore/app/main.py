@@ -56,6 +56,47 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
                 status=invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
             )
 
+    def GetSubmission(self, request, context):
+        try:
+            logger.info(f"Received get submission request for lift ticket: {request.lift_ticket}")
+
+            # Validate request
+            if not request.lift_ticket:
+                return invoicestore_pb2.GetSubmissionResponse(
+                    success=False,
+                    message="Lift ticket is required",
+                    file_ids=[],
+                    status=invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
+                )
+
+            # Get submission from database
+            submission = self.db.get_submission_by_lift_ticket(request.lift_ticket)
+
+            if submission is None:
+                return invoicestore_pb2.GetSubmissionResponse(
+                    success=False,
+                    message=f"No submission found for lift ticket: {request.lift_ticket}",
+                    file_ids=[],
+                    status=invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
+                )
+
+            return invoicestore_pb2.GetSubmissionResponse(
+                success=True,
+                message=f"Found submission for lift ticket {request.lift_ticket} "
+                f"with {len(submission.file_ids)} file(s)",
+                file_ids=submission.file_ids,
+                status=submission.status or invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
+            )
+
+        except Exception as e:
+            logger.error(f"Get submission failed: {e}")
+            return invoicestore_pb2.GetSubmissionResponse(
+                success=False,
+                message=f"Get submission failed: {str(e)}",
+                file_ids=[],
+                status=invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
+            )
+
 
 async def serve():
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))

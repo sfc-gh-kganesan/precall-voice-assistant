@@ -66,6 +66,49 @@ class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
         except Exception as e:
             return filestore_pb2.UploadResponse(success=False, message=f"Upload failed: {str(e)}", file_id="")
 
+    def DownloadFile(self, request, context):
+        try:
+            # Get file info from database
+            file_info = self.db.get_file_by_id(request.file_id)
+
+            if file_info is None:
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details(f"File with ID {request.file_id} not found")
+                return
+
+            # Read file from local storage
+            file_path = Path(file_info.path)
+            if not file_path.exists():
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details(f"File {file_path} not found on disk")
+                return
+
+            # Stream file content in chunks
+            chunk_size = 1024 * 1024  # 1MB chunks
+            filename = file_path.name
+
+            with open(file_path, "rb") as f:
+                while True:
+                    chunk_data = f.read(chunk_size)
+                    if not chunk_data:
+                        break
+
+                    # Check if this is the last chunk
+                    next_chunk = f.read(1)
+                    is_last = len(next_chunk) == 0
+                    if next_chunk:
+                        f.seek(-1, 1)  # Go back one byte
+
+                    yield filestore_pb2.FileChunk(filename=filename, content=chunk_data, is_last=is_last)
+
+                    if is_last:
+                        break
+
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Download failed: {str(e)}")
+            return
+
 
 async def serve():
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))

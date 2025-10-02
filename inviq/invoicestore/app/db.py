@@ -13,7 +13,7 @@ class SubmissionSchema:
     lift_ticket: str
     id: int | None = None
     created_at: str | None = None
-    status: int | None = None
+    status: invoicestore_pb2.SubmissionStatus | None = None
 
 
 @contextmanager
@@ -84,4 +84,22 @@ class Db:
             row = cursor.fetchone()
             if row:
                 return SubmissionSchema(*row)
+            return None
+
+    def get_submission_by_lift_ticket(self, lift_ticket: str) -> SubmissionSchema | None:
+        """Retrieve a submission record by its lift ticket."""
+        with get_db_connection(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT id, file_ids, lift_ticket, created_at, status FROM submission WHERE lift_ticket = ?",
+                (lift_ticket,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return SubmissionSchema(
+                    id=row[0],
+                    file_ids=json.loads(row[1]),
+                    lift_ticket=row[2],
+                    created_at=row[3],
+                    status=status_to_enum(row[4]) if row[4] else invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
+                )
             return None
