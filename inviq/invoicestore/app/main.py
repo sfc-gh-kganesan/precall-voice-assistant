@@ -5,7 +5,7 @@ from concurrent import futures
 import grpc
 from py_protos import invoicestore_pb2, invoicestore_pb2_grpc
 
-from .db import Db
+from .db import Db, InvoiceSchema, submission_status_to_enum
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
                 message=f"Found submission for lift ticket {request.lift_ticket} "
                 f"with {len(submission.file_ids)} file(s)",
                 file_ids=submission.file_ids,
-                status=submission.status or invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
+                status=submission_status_to_enum(submission.status or "unknown"),
             )
 
         except Exception as e:
@@ -96,6 +96,116 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
                 file_ids=[],
                 status=invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
             )
+
+    def CreateInvoice(self, request, context):
+        try:
+            logger.info(f"Received CreateInvoice request for lift ticket: {request.lift_ticket}")
+
+            # Validate required fields
+            if not request.lift_ticket:
+                return invoicestore_pb2.CreateInvoiceResponse(
+                    success=False, message="Lift ticket is required", invoice_id=0
+                )
+
+            if not request.file_id:
+                return invoicestore_pb2.CreateInvoiceResponse(
+                    success=False, message="File ID is required", invoice_id=0
+                )
+
+            invoice = InvoiceSchema(
+                lift_ticket=request.lift_ticket,
+                file_id=request.file_id,
+                vendor_name=request.vendor_name or None,
+                invoice_number=request.invoice_number or None,
+                invoice_date=request.invoice_date or None,
+                total_amount=request.total_amount or None,
+                purchase_order_number=request.purchase_order_number or None,
+                banking_details=request.banking_details or None,
+                payment_terms=request.payment_terms or None,
+                memo_description=request.memo_description or None,
+                shipped_to_address=request.shipped_to_address or None,
+                service_start_date=request.service_start_date or None,
+                service_end_date=request.service_end_date or None,
+                quantity=request.quantity or None,
+                unit_price=request.unit_price or None,
+                payment_type=request.payment_type or None,
+                due_date=request.due_date or None,
+                vendor_tax_id=request.vendor_tax_id or None,
+                snowflake_tax_id=request.snowflake_tax_id or None,
+                prepaid_flag=request.prepaid_flag or None,
+            )
+
+            # Insert invoice into database
+            created_invoice = self.db.create_invoice(invoice)
+
+            if created_invoice is None:
+                return invoicestore_pb2.CreateInvoiceResponse(
+                    success=False, message="Failed to create invoice", invoice_id=0
+                )
+
+            return invoicestore_pb2.CreateInvoiceResponse(
+                success=True,
+                message=f"Successfully created invoice for {request.lift_ticket}",
+                invoice_id=created_invoice.id,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to create invoice: {e}")
+            return invoicestore_pb2.CreateInvoiceResponse(
+                success=False, message=f"Failed to create invoice: {e}", invoice_id=0
+            )
+
+    def ApproveInvoice(self, request, context):
+        try:
+            logger.info(f"Received ApproveInvoice request for invoice ID: {request.invoice_id}")
+
+            # Validate invoice_id
+            if not request.invoice_id or request.invoice_id <= 0:
+                return invoicestore_pb2.ApproveInvoiceResponse(succes=False, message="Valid invoice ID is required")
+
+            # Approve the invoice
+            result = self.db.approve_invoice(request.invoice_id)
+
+            if not result:
+                return invoicestore_pb2.ApproveInvoiceResponse(
+                    succes=False, message=f"Failed to approve invoice {request.invoice_id}"
+                )
+
+            return invoicestore_pb2.ApproveInvoiceResponse(
+                succes=True, message=f"Successfully approved invoice {request.invoice_id}"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to approve invoice: {e}")
+            return invoicestore_pb2.ApproveInvoiceResponse(succes=False, message=f"Failed to approve invoice: {e}")
+
+    def RejectInvoice(self, request, context):
+        try:
+            logger.info(f"Received RejectInvoice request for invoice ID: {request.invoice_id}")
+
+            # Validate invoice_id
+            if not request.invoice_id or request.invoice_id <= 0:
+                return invoicestore_pb2.RejectInvoiceResponse(succes=False, message="Valid invoice ID is required")
+
+            # Validate reason
+            if not request.reason:
+                return invoicestore_pb2.RejectInvoiceResponse(succes=False, message="Rejection reason is required")
+
+            # Reject the invoice
+            result = self.db.reject_invoice(request.invoice_id, request.reason)
+
+            if not result:
+                return invoicestore_pb2.RejectInvoiceResponse(
+                    succes=False, message=f"Failed to reject invoice {request.invoice_id}"
+                )
+
+            return invoicestore_pb2.RejectInvoiceResponse(
+                succes=True, message=f"Successfully rejected invoice {request.invoice_id}"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to reject invoice: {e}")
+            return invoicestore_pb2.RejectInvoiceResponse(succes=False, message=f"Failed to reject invoice: {e}")
 
 
 async def serve():
