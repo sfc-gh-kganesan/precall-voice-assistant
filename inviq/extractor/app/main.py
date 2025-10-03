@@ -10,7 +10,6 @@ import snowflake.connector
 from dotenv import load_dotenv
 from loguru import logger
 from py_protos import extractor_pb2, extractor_pb2_grpc
-from py_util import fs
 
 load_dotenv()
 
@@ -31,9 +30,8 @@ def get_sfconn():
 
 
 def upload_file_to_stage(cur, fp):
-    file_path = fs.get_repo_abs_path(fp)
-    logger.info(f"uploading file {file_path}")
-    cur.execute(f"put file://{file_path} @inviq.service.tmpfiles auto_compress=false")
+    logger.info(f"uploading file {fp}")
+    cur.execute(f"put file://{fp} @inviq.service.tmpfiles auto_compress=false")
     logger.info("success! Now refreshing the @inviq.service.tmpfiles stage...")
     cur.execute("alter stage inviq.service.tmpfiles refresh")
 
@@ -50,7 +48,7 @@ def extract_fields(cur, fp):
 
 class ExtractorService(extractor_pb2_grpc.ExtractorServicer):
     def __init__(self):
-        self.upload_dir = Path("local-storage")
+        self.upload_dir = Path(os.getenv("EXTRACTOR_UPLOAD_PATH", "uploads"))
         self.upload_dir.mkdir(exist_ok=True)
 
     def Extract(self, request_iterator, context):
@@ -88,7 +86,7 @@ class ExtractorService(extractor_pb2_grpc.ExtractorServicer):
                 logger.info(f"Snowflake user: {result[0]}")
                 logger.info(f"Snowflake role: {result[1]}")
                 logger.info(f"Snowflake warehouse: {result[2]}")
-            upload_file_to_stage(cur, file_path)
+            upload_file_to_stage(cur, file_path.absolute())
             fields = extract_fields(cur, file_path.name)
             cur.close()
             conn.close()

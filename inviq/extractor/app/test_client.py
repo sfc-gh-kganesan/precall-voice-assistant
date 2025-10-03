@@ -5,8 +5,8 @@ import grpc
 from py_protos import extractor_pb2, extractor_pb2_grpc
 
 
-def extract_file(path: str) -> None:
-    channel = grpc.insecure_channel("localhost:50051")
+def extract_file(path: str, grpc_url: str) -> None:
+    channel = grpc.insecure_channel(grpc_url)
     stub = extractor_pb2_grpc.ExtractorStub(channel)
 
     file = Path(path)
@@ -33,6 +33,9 @@ def extract_file(path: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test client to exercise the extractor service")
-    parser.add_argument("filename", help="Path to input file")
+    parser.add_argument(
+        "--filename", type=str, default="../collector/test_files/invoice_01.pdf", help="Path to input file"
+    )
+    parser.add_argument("--grpc_url", type=str, default="localhost:50052", help="extractor grpc url")
     args = parser.parse_args()
-    extract_file(args.filename)
+    extract_file(args.filename, args.grpc_url)

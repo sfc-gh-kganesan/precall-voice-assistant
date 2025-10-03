@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import os
 import uuid
 from concurrent import futures
 from pathlib import Path
@@ -12,9 +13,11 @@ from .db import Db, DbFile
 
 class FileStoreServicer(filestore_pb2_grpc.FileStoreServicer):
     def __init__(self):
-        self.upload_dir = Path("local-storage")
+        self.upload_dir = Path(os.getenv("FILESTORE_UPLOAD_PATH", "uploads"))
         self.upload_dir.mkdir(exist_ok=True)
-        self.db = Db(db_path="filestore.db")
+        data_dir = Path(os.getenv("FILESTORE_DATA_PATH", "db"))
+        db_path = data_dir.joinpath("filestore.db")
+        self.db = Db(db_path=db_path)
 
     def UploadFile(self, request_iterator, context):
         namespace = "local-storage"

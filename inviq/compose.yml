@@ -69,6 +69,12 @@ services:
     build:
       context: .
       dockerfile: ./filestore/Dockerfile
+    environment:
+      - FILESTORE_UPLOAD_PATH=/uploads
+      - FILESTORE_DATA_PATH=/db
+    volumes:
+      - ./filestore/uploads:/uploads
+      - ./filestore/db:/db
     develop:
       watch:
         - action: sync
@@ -86,6 +92,10 @@ services:
     build:
       context: .
       dockerfile: ./invoicestore/Dockerfile
+    environment:
+      - INVOICESTORE_DATA_PATH=/db
+    volumes:
+      - ./invoicestore/db:/db
     develop:
       watch:
         - action: sync
@@ -111,8 +121,10 @@ services:
       - SNOWFLAKE_DATABASE=${SNOWFLAKE_DATABASE}
       - SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA}
       - SNOWFLAKE_KEY=${SNOWFLAKE_KEY}
+      - EXTRACTOR_UPLOAD_PATH=/uploads
     volumes:
       - ${SNOWFLAKE_KEY}:${SNOWFLAKE_KEY}:ro
+      - ./extractor/uploads:/uploads
     develop:
       watch:
         - action: sync
@@ -124,6 +136,8 @@ services:
         - action: sync
           path: ./py-util/src
           target: /inviq/py-util/src
+    ports:
+        - "50052:50051"
 
 volumes:
   n8n_data:

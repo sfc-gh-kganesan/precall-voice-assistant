@@ -1,10 +1,10 @@
-import logging
 import os
 from typing import Annotated
 
 import grpc
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from loguru import logger
 
 # Import gRPC stubs for both filestore and invoicestore
 from py_protos import (
@@ -14,8 +14,6 @@ from py_protos import (
     invoicestore_pb2_grpc,
 )
 from pydantic import BaseModel
-
-from .logging import initialize_logging
 
 
 # --- Pydantic Models for HTTP API ---
@@ -39,11 +37,11 @@ class UploadResponse(BaseModel):
 
 
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
+FILESTORE_URL = os.getenv("FILESTORE_GRPC_URL", "localhost:50051")
+INVOICESTORE_URL = os.getenv("INVOICESTORE_GRPC_URL", "localhost:50051")
 
 # --- FastAPI Application Setup ---
 app = FastAPI(title="Collector API", version="0.1.0")
-initialize_logging()
-logger = logging.getLogger(__name__)
 
 
 @app.get("/")
@@ -67,7 +65,8 @@ async def upload_file_to_filestore(file: UploadFile) -> FileUploadResponse:
         FileUploadResponse indicating success or failure
     """
     try:
-        channel = grpc.insecure_channel("filestore:50051")
+        logger.info(f"📶 Connecting to filestore grpc service {FILESTORE_URL}")
+        channel = grpc.insecure_channel(FILESTORE_URL)
         stub = filestore_pb2_grpc.FileStoreStub(channel)
 
         # Read file content
@@ -126,18 +125,20 @@ async def write_to_invoicestore(lift_ticket: str, file_ids: list[str]) -> Submis
         return SubmissionResponse(success=False, message=f"Failed to submit submission: {str(e)}")
 
 
-async def trigger_n8n_workflow(lift_ticket: str):
+async def trigger_n8n_workflow(lift_ticket: str) -> bool:
     """Triggers the n8n workflow by sending the submission ID to a webhook."""
     if not N8N_WEBHOOK_URL:
         logger.warning("N8N_WEBHOOK_URL not set. Skipping workflow trigger.")
-        return
+        return False
 
     async with httpx.AsyncClient() as client:
         try:
             await client.post(N8N_WEBHOOK_URL, json={"lift_ticket_id": lift_ticket})
             logger.info(f"Successfully triggered n8n workflow for ticket {lift_ticket}")
+            return True
         except httpx.HTTPError as e:
             logger.error(f"Failed to trigger n8n workflow for ticket {lift_ticket}: {e}")
+            return False
 
 
 @app.post("/upload", response_model=UploadResponse)
@@ -181,8 +182,7 @@ async def upload(
         # Step 3: Trigger the n8n workflow (fire and forget)
         n8n_triggered = False
         if enable_n8n:
-            await trigger_n8n_workflow(lift_ticket)
-            n8n_triggered = True
+            n8n_triggered = await trigger_n8n_workflow(lift_ticket)
 
         return UploadResponse(
             lift_ticket=lift_ticket,

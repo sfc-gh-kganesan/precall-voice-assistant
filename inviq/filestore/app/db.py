@@ -13,8 +13,8 @@ class DbFile:
 
 
 class Db:
-    def __init__(self, db_path: str):
-        self.db_path = db_path
+    def __init__(self, db_path: Path):
+        self.db_path = db_path.absolute()
         self._init_db()
 
     def _init_db(self):

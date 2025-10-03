@@ -1,18 +1,21 @@
 import asyncio
 import logging
+import os
 from concurrent import futures
+from pathlib import Path
 
 import grpc
+from loguru import logger
 from py_protos import invoicestore_pb2, invoicestore_pb2_grpc
 
 from .db import Db, InvoiceSchema, submission_status_to_enum
 
-logger = logging.getLogger(__name__)
-
 
 class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
     def __init__(self):
-        self.db = Db(db_path="invoicestore.db")
+        data_dir = Path(os.getenv("INVOICESTORE_DATA_PATH", "db"))
+        db_path = data_dir.joinpath("invoicestore.db")
+        self.db = Db(db_path=db_path)
 
     def Submit(self, request, context):
         try:

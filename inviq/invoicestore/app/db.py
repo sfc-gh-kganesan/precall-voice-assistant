@@ -45,8 +45,8 @@ class InvoiceSchema:
 
 
 @contextmanager
-def get_db_connection(db_path: str):
-    conn = sqlite3.connect(db_path)
+def get_db_connection(db_path: Path):
+    conn = sqlite3.connect(db_path.absolute())
     try:
         yield conn
     finally:
@@ -92,7 +92,7 @@ def invoice_status_from_enum(status: invoicestore_pb2.InvoiceStatus) -> str:
 
 
 class Db:
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: Path):
         self.db_path = db_path
         self._init_db()
 
