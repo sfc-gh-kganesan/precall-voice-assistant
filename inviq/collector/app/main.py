@@ -35,6 +35,7 @@ class UploadResponse(BaseModel):
     success: bool
     message: str
     file_ids: list[str]
+    n8n_triggered: bool = False
 
 
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
@@ -143,6 +144,7 @@ async def trigger_n8n_workflow(lift_ticket: str):
 async def upload(
     lift_ticket: Annotated[str, Form()],
     files: Annotated[list[UploadFile], File()],
+    enable_n8n: bool = False,
 ) -> UploadResponse:
     """
     Upload invoice files for processing.
@@ -150,6 +152,7 @@ async def upload(
     Args:
         lift_ticket: Service Now ticket number
         files: List of files attached to the original email
+        enable_n8n: (optional) Trigger n8n workflow after submission
 
     Returns:
         Upload confirmation with ticket number and file details
@@ -176,13 +179,17 @@ async def upload(
         submission_result = await write_to_invoicestore(lift_ticket, [r.file_id for r in results])
 
         # Step 3: Trigger the n8n workflow (fire and forget)
-        await trigger_n8n_workflow(lift_ticket)
+        n8n_triggered = False
+        if enable_n8n:
+            await trigger_n8n_workflow(lift_ticket)
+            n8n_triggered = True
 
         return UploadResponse(
             lift_ticket=lift_ticket,
             success=submission_result.success,
             message=submission_result.message,
             file_ids=[result.file_id for result in results],
+            n8n_triggered=n8n_triggered,
         )
     else:
         raise HTTPException(status_code=400, detail="No file provided")
