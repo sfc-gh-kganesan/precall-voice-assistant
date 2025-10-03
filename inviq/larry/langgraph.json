@@ -1,0 +1,12 @@
+{
+    "dockerfile_lines": [],
+    "graphs": {
+      "larry": "./larry.py:graph"
+    },
+    "env": "./.env",
+    "python_version": "3.12",
+    "dependencies": [
+      "./"
+    ]
+}
+
