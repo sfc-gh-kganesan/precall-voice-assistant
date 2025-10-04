@@ -1,29 +1,27 @@
-from langchain_core.messages import SystemMessage
-from langgraph.graph import MessagesState
-from langgraph.graph import StateGraph, START
-from langgraph.prebuilt import ToolNode
-from langgraph.prebuilt import tools_condition
-from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-from .tools import get_next_submission, extract_fields_from_file, create_invoice, approve_invoice, reject_invoice
+from langchain_core.messages import SystemMessage
+from langchain_openai import ChatOpenAI
+from langgraph.graph import START, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode, tools_condition
+
+from .tools import approve_invoice, create_invoice, extract_fields_from_file, get_next_submission, reject_invoice
 
 load_dotenv()
 
 
 def create_graph():
-  model = ChatOpenAI(model="gpt-4o", temperature=0)
+    model = ChatOpenAI(model="gpt-4o", temperature=0)
 
-  tools = [get_next_submission, extract_fields_from_file, create_invoice, approve_invoice, reject_invoice]
-  llm = model.bind_tools(tools)
+    tools = [get_next_submission, extract_fields_from_file, create_invoice, approve_invoice, reject_invoice]
+    llm = model.bind_tools(tools)
 
-  # State class to store messages and summary
-  class State(MessagesState):
-    pass
+    # State class to store messages and summary
+    class State(MessagesState):
+        pass
 
-  # Define the logic to call the model
-  def call_model(state: State):
-
-    system_message = """
+    # Define the logic to call the model
+    def call_model(state: State):
+        system_message = """
       You are a skilled finance analyst and your task is to process and reconcile vendor invoices.
       Vendors submit invoices to your company, and you can use the get_next_submission tool to retrieve the
       next submission you should process.
@@ -49,20 +47,19 @@ def create_graph():
 
       Let's get to work on processing the next submission!
       """
-    messages = [SystemMessage(content=system_message)] + state["messages"]
-    response = llm.invoke(messages)
-    return {"messages": response}
+        messages = [SystemMessage(content=system_message)] + state["messages"]
+        response = llm.invoke(messages)
+        return {"messages": response}
 
+    # Define a new graph
+    workflow = StateGraph(State)
+    workflow.add_node("assistant", call_model)
+    workflow.add_node("tools", ToolNode(tools))
 
-  # Define a new graph
-  workflow = StateGraph(State)
-  workflow.add_node("assistant", call_model)
-  workflow.add_node("tools", ToolNode(tools))
+    # Set the entrypoint as conversation
+    workflow.add_edge(START, "assistant")
+    workflow.add_conditional_edges("assistant", tools_condition)
+    workflow.add_edge("tools", "assistant")
 
-  # Set the entrypoint as conversation
-  workflow.add_edge(START, "assistant")
-  workflow.add_conditional_edges("assistant", tools_condition)
-  workflow.add_edge("tools", "assistant")
-
-  # Compile
-  return workflow.compile()
+    # Compile
+    return workflow.compile()

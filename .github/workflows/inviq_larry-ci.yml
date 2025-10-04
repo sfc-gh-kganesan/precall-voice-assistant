@@ -1,0 +1,35 @@
+name: larry-ci
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "inviq/larry/**/*"
+      - "inviq/protos/**/*"
+      - "inviq/py-protos/**/*"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Generate code from protos
+        working-directory: inviq/py-protos
+        run: make gen
+
+      - name: Run checks
+        working-directory: inviq/larry
+        run: make check
