@@ -1,7 +1,7 @@
 {
     "dockerfile_lines": [],
     "graphs": {
-      "larry": "./larry.py:graph"
+      "larry": "./app/main.py:graph"
     },
     "env": "./.env",
     "python_version": "3.12",
