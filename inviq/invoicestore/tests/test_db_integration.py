@@ -11,7 +11,7 @@ from app.db import Db, InvoiceSchema
 def db():
     """Create a temporary database for testing."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_db:
-        db_path = temp_db.name
+        db_path = Path(temp_db.name)
 
     test_db = Db(db_path)
     yield test_db

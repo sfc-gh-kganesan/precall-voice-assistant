@@ -15,7 +15,7 @@ async def grpc_server():
     """Start a gRPC server for testing."""
     # Create temporary database for testing
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_db:
-        db_path = temp_db.name
+        db_path = Path(temp_db.name)
 
     # Create servicer with test database
     servicer = InvoiceStoreServicer()
@@ -413,3 +413,60 @@ async def test_reject_invoice_missing_reason(grpc_stub):
 
     assert reject_response.succes is False
     assert "Rejection reason is required" in reject_response.message
+
+
+@pytest.mark.asyncio
+async def test_get_oldest_pending_submission_single(grpc_stub):
+    """Test getting the oldest pending submission when there is one."""
+    # Create a single submission
+    submit_request = invoicestore_pb2.SubmissionRequest(
+        lift_ticket="LT-OLDEST-001", file_ids=["file1.pdf", "file2.pdf"]
+    )
+
+    submit_response = await grpc_stub.Submit(submit_request)
+    assert submit_response.success is True
+
+    # Get the oldest pending submission
+    get_request = invoicestore_pb2.GetOldestPendingSubmissionRequest()
+
+    get_response = await grpc_stub.GetOldestPendingSubmission(get_request)
+
+    assert get_response.success is True
+    assert get_response.lift_ticket == "LT-OLDEST-001"
+    assert len(get_response.file_ids) == 2
+    assert "file1.pdf" in get_response.file_ids
+    assert "file2.pdf" in get_response.file_ids
+
+
+@pytest.mark.asyncio
+async def test_get_oldest_pending_submission_multiple(grpc_stub):
+    """Test getting the oldest pending submission when there are multiple."""
+    # Create multiple submissions
+    for i in range(3):
+        submit_request = invoicestore_pb2.SubmissionRequest(lift_ticket=f"LT-OLDEST-{i:03d}", file_ids=[f"file{i}.pdf"])
+
+        submit_response = await grpc_stub.Submit(submit_request)
+        assert submit_response.success is True
+
+    # Get the oldest pending submission (should be the first one)
+    get_request = invoicestore_pb2.GetOldestPendingSubmissionRequest()
+
+    get_response = await grpc_stub.GetOldestPendingSubmission(get_request)
+
+    assert get_response.success is True
+    assert get_response.lift_ticket == "LT-OLDEST-000"
+    assert len(get_response.file_ids) == 1
+    assert "file0.pdf" in get_response.file_ids
+
+
+@pytest.mark.asyncio
+async def test_get_oldest_pending_submission_none(grpc_stub):
+    """Test getting oldest pending submission when there are none."""
+    get_request = invoicestore_pb2.GetOldestPendingSubmissionRequest()
+
+    get_response = await grpc_stub.GetOldestPendingSubmission(get_request)
+
+    assert get_response.success is False
+    assert get_response.lift_ticket == ""
+    assert len(get_response.file_ids) == 0
+    assert "No pending submissions found" in get_response.message

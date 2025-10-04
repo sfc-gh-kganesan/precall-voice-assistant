@@ -5,6 +5,7 @@ package invoicestore;
 service InvoiceStore {
   rpc Submit(SubmissionRequest) returns (SubmissionResponse);
   rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse);
+  rpc GetOldestPendingSubmission(GetOldestPendingSubmissionRequest) returns (GetOldestPendingSubmissionResponse);
   rpc CreateInvoice(CreateInvoiceRequest) returns (CreateInvoiceResponse);
   rpc RejectInvoice(RejectInvoiceRequest) returns (RejectInvoiceResponse);
   rpc ApproveInvoice(ApproveInvoiceRequest) returns (ApproveInvoiceResponse);
@@ -30,6 +31,16 @@ message GetSubmissionResponse {
   string message = 2;
   repeated string file_ids = 3;
   SubmissionStatus status = 4;
+}
+
+message GetOldestPendingSubmissionRequest {
+}
+
+message GetOldestPendingSubmissionResponse {
+  bool success = 1;
+  string message = 2;
+  string lift_ticket = 3;
+  repeated string file_ids = 4;
 }
 
 enum SubmissionStatus {

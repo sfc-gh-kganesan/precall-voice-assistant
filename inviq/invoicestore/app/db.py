@@ -150,6 +150,28 @@ class Db:
                 )
             return None
 
+    def get_oldest_pending_submission(self) -> SubmissionSchema | None:
+        """Retrieve the oldest submission with PENDING status."""
+        with get_db_connection(self.db_path) as conn:
+            cursor = conn.execute(
+                """SELECT file_ids, lift_ticket, created_at, id, status
+                   FROM submission
+                   WHERE status = ?
+                   ORDER BY created_at ASC
+                   LIMIT 1""",
+                ("PENDING",),
+            )
+            row = cursor.fetchone()
+            if row:
+                return SubmissionSchema(
+                    file_ids=json.loads(row[0]),
+                    lift_ticket=row[1],
+                    created_at=row[2],
+                    id=row[3],
+                    status=row[4],
+                )
+            return None
+
     def create_invoice(self, invoice: InvoiceSchema) -> InvoiceSchema | None:
         with get_db_connection(self.db_path) as conn:
             cursor = conn.execute(

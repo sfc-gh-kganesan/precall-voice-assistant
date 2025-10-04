@@ -100,6 +100,37 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
                 status=invoicestore_pb2.SUBMISSION_STATUS_UNKNOWN,
             )
 
+    def GetOldestPendingSubmission(self, request, context):
+        try:
+            logger.info("Received get oldest pending submission request")
+
+            # Get oldest pending submission from database
+            submission = self.db.get_oldest_pending_submission()
+
+            if submission is None:
+                return invoicestore_pb2.GetOldestPendingSubmissionResponse(
+                    success=False,
+                    message="No pending submissions found",
+                    lift_ticket="",
+                    file_ids=[],
+                )
+
+            return invoicestore_pb2.GetOldestPendingSubmissionResponse(
+                success=True,
+                message=f"Found pending submission for lift ticket {submission.lift_ticket}",
+                lift_ticket=submission.lift_ticket,
+                file_ids=submission.file_ids,
+            )
+
+        except Exception as e:
+            logger.error(f"Get oldest pending submission failed: {e}")
+            return invoicestore_pb2.GetOldestPendingSubmissionResponse(
+                success=False,
+                message=f"Get oldest pending submission failed: {str(e)}",
+                lift_ticket="",
+                file_ids=[],
+            )
+
     def CreateInvoice(self, request, context):
         try:
             logger.info(f"Received CreateInvoice request for lift ticket: {request.lift_ticket}")
