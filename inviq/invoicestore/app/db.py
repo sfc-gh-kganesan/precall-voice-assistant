@@ -259,3 +259,74 @@ class Db:
             )
             conn.commit()
             return True
+
+    def list_invoices(self, status_filter=None, limit=100, offset=0) -> tuple[list[InvoiceSchema], int]:
+        """
+        List invoices with optional filtering and pagination.
+
+        Returns:
+            tuple: (list of invoices, total count)
+        """
+        with get_db_connection(self.db_path) as conn:
+            # Build the query with optional status filter
+            where_clause = ""
+            params = []
+
+            if status_filter:
+                where_clause = "WHERE status = ?"
+                params.append(status_filter)
+
+            # Get total count
+            count_query = f"SELECT COUNT(*) FROM invoice {where_clause}"
+            cursor = conn.execute(count_query, params)
+            total_count = cursor.fetchone()[0]
+
+            # Get paginated results
+            query = f"""
+                SELECT id, created_at, lift_ticket, file_id, status, status_desc,
+                       vendor_name, invoice_number, invoice_date, total_amount,
+                       purchase_order_number, banking_details, payment_terms,
+                       memo_description, shipped_to_address, service_start_date,
+                       service_end_date, quantity, unit_price, payment_type,
+                       due_date, vendor_tax_id, snowflake_tax_id, prepaid_flag
+                FROM invoice
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """
+
+            cursor = conn.execute(query, params + [limit, offset])
+            rows = cursor.fetchall()
+
+            invoices = []
+            for row in rows:
+                invoices.append(
+                    InvoiceSchema(
+                        id=row[0],
+                        created_at=row[1],
+                        lift_ticket=row[2],
+                        file_id=row[3],
+                        status=row[4],
+                        status_desc=row[5],
+                        vendor_name=row[6],
+                        invoice_number=row[7],
+                        invoice_date=row[8],
+                        total_amount=row[9],
+                        purchase_order_number=row[10],
+                        banking_details=row[11],
+                        payment_terms=row[12],
+                        memo_description=row[13],
+                        shipped_to_address=row[14],
+                        service_start_date=row[15],
+                        service_end_date=row[16],
+                        quantity=row[17],
+                        unit_price=row[18],
+                        payment_type=row[19],
+                        due_date=row[20],
+                        vendor_tax_id=row[21],
+                        snowflake_tax_id=row[22],
+                        prepaid_flag=row[23],
+                    )
+                )
+
+            return invoices, total_count

@@ -30,8 +30,10 @@ def get_sfconn():
 
 
 def upload_file_to_stage(cur, fp):
-    logger.info(f"uploading file {fp}")
-    cur.execute(f"put file://{fp} @inviq.service.tmpfiles auto_compress=false")
+    # Use file path directly since it's already absolute in the container
+    file_path = Path(fp).resolve()
+    logger.info(f"uploading file {file_path}")
+    cur.execute(f"put file://{file_path} @inviq.service.tmpfiles auto_compress=false")
     logger.info("success! Now refreshing the @inviq.service.tmpfiles stage...")
     cur.execute("alter stage inviq.service.tmpfiles refresh")
 
@@ -104,6 +106,25 @@ class ExtractorService(extractor_pb2_grpc.ExtractorServicer):
             payment_terms=str(fields.get("PAYMENT_TERMS", "")),
             total_amount=str(fields.get("TOTAL_AMOUNT", "")),
             vendor_name=str(fields.get("VENDOR_NAME", "")),
+            banking_details=str(fields.get("BANKING_DETAILS", "")),
+            due_date=str(fields.get("DUE_DATE", "")),
+            freight_shipping_amount=str(fields.get("FREIGHT_SHIPPING_AMOUNT", "")),
+            invoice_currency=str(fields.get("INVOICE_CURRENCY", "")),
+            invoice_date=str(fields.get("INVOICE_DATE", "")),
+            invoice_number=str(fields.get("INVOICE_NUMBER", "")),
+            memo_description=str(fields.get("MEMO_DESCRIPTION", "")),
+            payment_type=str(fields.get("PAYMENT_TYPE", "")),
+            prepaid_flag=bool(fields.get("PREPAID_FLAG", False)),
+            quantity=str(fields.get("QUANTITY", "")),
+            service_end_date=str(fields.get("SERVICE_END_DATE", "")),
+            service_start_date=str(fields.get("SERVICE_START_DATE", "")),
+            shipped_to_address=str(fields.get("SHIPPED_TO_ADDRESS", "")),
+            snowflake_entity=str(fields.get("SNOWFLAKE_ENTITY", "")),
+            snowflake_tax_id=str(fields.get("SNOWFLAKE_TAX_ID", "")),
+            tax_amount=str(fields.get("TAX_AMOUNT", "")),
+            unit_price=str(fields.get("UNIT_PRICE", "")),
+            vendor_address=str(fields.get("VENDOR_ADDRESS", "")),
+            vendor_tax_id=str(fields.get("VENDOR_TAX_ID", "")),
         )
 
 

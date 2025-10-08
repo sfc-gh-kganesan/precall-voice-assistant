@@ -4,16 +4,16 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=You are an invoice processing agent. Your goal is to:\n\n1. **Retrieve all files' IDs** for the given lift ticket: {{ $json.lift_ticket_id }} \n2. **Process each file**: Using the file's fileId, you need to actually retrieve the contents of the file. \n3. ** Extract data from the file ** Using the file's contents, you need to extract the important data from the file.   \n3. **Apply business rules** to validate and route the invoices\n4. **Return a decision** with reasoning\n\n\n\nBusiness Rules:\n- Invoices > $10,000 require manager approval\n- Missing PO numbers need procurement review\n- Duplicate vendors within 24hrs need verification\n\nIMPORTANT: The lift ticket ID is: {{ $json.lift_ticket_id }}\n",
+        "text": "=You are an invoice processing agent. Your goal is to:\n\n1. **Retrieve all files' IDs** for the given lift ticket: {{ $json.lift_ticket_id }} \n2. **Process each file**: Using the file's fileId, you need to actually retrieve the contents of the file. \n3. **Extract data from the file**: Using the file's contents, you need to extract the important data from the file.   \n4. **Apply business rules** to validate and route the invoices\n5. **Return a decision** with reasoning\n\nBusiness Rules:\n- Invoices > $10,000 require manager approval\n- Missing PO numbers need procurement review\n- Duplicate vendors within 24hrs need verification\n\nIMPORTANT: The lift ticket ID is: {{ $json.lift_ticket_id }}\n\n**CRITICAL**: You must return your response as a valid JSON object with this exact structure:\n\n```json\n{\n  \"lift_ticket\": \"{{ $json.lift_ticket_id }}\",\n  \"file_id\": \"extracted_file_id\",\n  \"vendor_name\": \"extracted_vendor_name\",\n  \"invoice_number\": \"extracted_invoice_number\", \n  \"invoice_date\": \"extracted_date\",\n  \"total_amount\": \"extracted_amount\",\n  \"purchase_order_number\": \"extracted_po_number\",\n  \"banking_details\": \"extracted_banking_info\",\n  \"payment_terms\": \"extracted_payment_terms\",\n  \"memo_description\": \"extracted_description\",\n  \"shipped_to_address\": \"extracted_shipping_address\",\n  \"service_start_date\": \"extracted_service_start\",\n  \"service_end_date\": \"extracted_service_end\",\n  \"quantity\": \"extracted_quantity\",\n  \"unit_price\": \"extracted_unit_price\",\n  \"payment_type\": \"extracted_payment_type\",\n  \"due_date\": \"calculated_due_date\",\n  \"vendor_tax_id\": \"extracted_vendor_tax_id\",\n  \"snowflake_tax_id\": \"extracted_snowflake_tax_id\",\n  \"prepaid_flag\": \"extracted_prepaid_flag\",\n  \"action\": \"approve|reject|pending\",\n  \"rejection_reason\": \"reason_if_rejected\",\n  \"business_rules_analysis\": {\n    \"amount_threshold_check\": \"passed|failed\",\n    \"po_number_check\": \"passed|failed\", \n    \"duplicate_vendor_check\": \"passed|failed|unable_to_verify\"\n  },\n  \"decision_reasoning\": \"detailed explanation of the decision\"\n}\n```\n\nDo not include any text before or after the JSON. Return only the JSON object.",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        240,
-        0
+        976,
+        -64
       ],
-      "id": "8fed8c11-8f9b-44ee-8f16-d7a241ae89e0",
+      "id": "d3f2e5f4-f1f5-49f4-a896-41e7e9dfaadf",
       "name": "AI Agent"
     },
     {
@@ -29,14 +29,14 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        0,
-        224
+        736,
+        160
       ],
-      "id": "9aa6cc36-2c7c-4b49-aa5e-62790c70bbda",
+      "id": "1fd782e8-6cb7-4b14-8111-8ee5da6d2026",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
-          "id": "HeFawj2XtrYc6FjU",
+          "id": "16HQbADPcGyhAlTC",
           "name": "OpenAi account"
         }
       }
@@ -50,10 +50,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -192,
-        0
+        544,
+        -64
       ],
-      "id": "7be0c984-28a8-46fd-9cb0-a3742055e9d6",
+      "id": "fd14257c-7b37-4c93-bb74-ab359a53aa3a",
       "name": "Webhook",
       "webhookId": "0759b6b7-7677-452f-b2ef-247c4739e1dd"
     },
@@ -75,10 +75,10 @@
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.2,
       "position": [
-        576,
-        256
+        1312,
+        192
       ],
-      "id": "a3648e02-5fc1-4938-bf5a-758997613a89",
+      "id": "aabc95f6-6b2a-4688-9ff4-bb8cdff67983",
       "name": "Extract Invoice Data"
     },
     {
@@ -99,10 +99,10 @@
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.2,
       "position": [
-        208,
-        224
+        944,
+        160
       ],
-      "id": "9861901b-3b6b-4b18-8242-3481b80954d9",
+      "id": "700ec32b-a7fb-453f-a8ba-29d2d45fba57",
       "name": "List Files"
     },
     {
@@ -122,11 +122,42 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        48,
-        0
+        784,
+        -64
       ],
-      "id": "73e3bd03-816f-4ce9-adc2-0634332dec2b",
+      "id": "a5683bd4-2812-45af-86a1-38e335a3c814",
       "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract JSON from agent response\nconst agentResponse = $input.first().json.output;\n\n// Try to extract JSON from the response text\nlet invoiceData;\n\ntry {\n  // Look for JSON in the response\n  const jsonMatch = agentResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    invoiceData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error(\"No JSON found in response\");\n  }\n} catch (error) {\n  // Fallback: try to parse the entire response as JSON\n  try {\n    invoiceData = JSON.parse(agentResponse);\n  } catch (parseError) {\n    throw new Error(`Failed to parse JSON from agent response: ${parseError.message}`);\n  }\n}\n\n// Validate required fields\nconst requiredFields = ['lift_ticket', 'file_id', 'vendor_name', 'invoice_number', 'total_amount'];\nfor (const field of requiredFields) {\n  if (!invoiceData[field]) {\n    throw new Error(`Missing required field: ${field}`);\n  }\n}\n\n// Ensure action is valid\nif (!['approve', 'reject', 'pending'].includes(invoiceData.action)) {\n  invoiceData.action = 'pending';\n}\n\n// Add rejection_reason if action is reject but no reason provided\nif (invoiceData.action === 'reject' && !invoiceData.rejection_reason) {\n  invoiceData.rejection_reason = 'Rejected by business rules';\n}\n\nreturn [{\n  json: invoiceData\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        -64
+      ],
+      "id": "4c2c91dc-9854-41f5-b153-4c95e37560af",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://gateway/create-invoice",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lift_ticket\": \"{{ $json.lift_ticket }}\",\n  \"file_id\": \"{{ $json.file_id }}\",\n  \"vendor_name\": \"{{ $json.vendor_name }}\",\n  \"invoice_number\": \"{{ $json.invoice_number }}\",\n  \"invoice_date\": \"{{ $json.invoice_date }}\",\n  \"total_amount\": \"{{ $json.total_amount }}\",\n  \"purchase_order_number\": \"{{ $json.purchase_order_number }}\",\n  \"banking_details\": \"{{ $json.banking_details }}\",\n  \"payment_terms\": \"{{ $json.payment_terms }}\",\n  \"memo_description\": \"{{ $json.memo_description }}\",\n  \"shipped_to_address\": \"{{ $json.shipped_to_address }}\",\n  \"service_start_date\": \"{{ $json.service_start_date }}\",\n  \"service_end_date\": \"{{ $json.service_end_date }}\",\n  \"quantity\": \"{{ $json.quantity }}\",\n  \"unit_price\": \"{{ $json.unit_price }}\",\n  \"payment_type\": \"{{ $json.payment_type }}\",\n  \"due_date\": \"{{ $json.due_date }}\",\n  \"vendor_tax_id\": \"{{ $json.vendor_tax_id }}\",\n  \"snowflake_tax_id\": \"{{ $json.snowflake_tax_id }}\",\n  \"prepaid_flag\": \"{{ $json.prepaid_flag }}\",\n  \"action\": \"{{ $json.action }}\",\n  \"rejection_reason\": \"{{ $json.rejection_reason }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        -64
+      ],
+      "id": "d2dcee07-efad-4847-942e-68bce8e71779",
+      "name": "HTTP Request"
     }
   ],
   "pinData": {},
@@ -185,17 +216,39 @@
           }
         ]
       ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "aa9f3c9f-368d-4bce-94d4-8dbdf5a8bb73",
+  "versionId": "83ae0881-bfa9-488b-b697-49821ebe41ff",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "e14738955f90e09da133b5777e8a0f4f61826c5cf8b0b458b01b0b0ebf9c4012"
+    "instanceId": "b4d3479a94fc6cabf60777a3712bdfcd656375e653d1c04ff6208b91b123bf9d"
   },
-  "id": "yVa9ymtwcnVKrYLA",
+  "id": "Cxi8S6J6FNQw7MS9",
   "tags": []
 }

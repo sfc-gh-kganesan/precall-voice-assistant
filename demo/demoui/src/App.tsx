@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
+import RealDataDashboard from './components/RealDataDashboard';
 import InvoiceProcessor from './components/InvoiceProcessor';
 import ExceptionQueue from './components/ExceptionQueue';
 import Tasks from './components/Tasks';
@@ -11,7 +12,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<RealDataDashboard />} />
+          <Route path="mock-dashboard" element={<Dashboard />} />
           <Route path="invoice-processor" element={<InvoiceProcessor />} />
           <Route path="exception-queue" element={<ExceptionQueue />} />
           <Route path="tasks" element={<Tasks />} />

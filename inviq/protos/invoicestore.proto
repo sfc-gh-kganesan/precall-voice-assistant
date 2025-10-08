@@ -9,6 +9,7 @@ service InvoiceStore {
   rpc CreateInvoice(CreateInvoiceRequest) returns (CreateInvoiceResponse);
   rpc RejectInvoice(RejectInvoiceRequest) returns (RejectInvoiceResponse);
   rpc ApproveInvoice(ApproveInvoiceRequest) returns (ApproveInvoiceResponse);
+  rpc ListInvoices(ListInvoicesRequest) returns (ListInvoicesResponse);
 }
 
 message SubmissionRequest {
@@ -104,6 +105,47 @@ enum InvoiceStatus {
   INVOICE_STATUS_PENDING = 1;
   INVOICE_STATUS_APPROVED = 2;
   INVOICE_STATUS_REJECTED = 3;
+}
+
+message ListInvoicesRequest {
+  // Optional filters
+  string status = 1;  // Filter by status: "PENDING", "APPROVED", "REJECTED"
+  int32 limit = 2;    // Limit number of results (default: 100)
+  int32 offset = 3;   // Offset for pagination
+}
+
+message ListInvoicesResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Invoice invoices = 3;
+  int32 total_count = 4;  // Total number of invoices (for pagination)
+}
+
+message Invoice {
+  int32 id = 1;
+  string created_at = 2;
+  string lift_ticket = 3;
+  string file_id = 4;
+  string status = 5;
+  string status_desc = 6;
+  string vendor_name = 7;
+  string invoice_number = 8;
+  string invoice_date = 9;
+  string total_amount = 10;
+  string purchase_order_number = 11;
+  string banking_details = 12;
+  string payment_terms = 13;
+  string memo_description = 14;
+  string shipped_to_address = 15;
+  string service_start_date = 16;
+  string service_end_date = 17;
+  string quantity = 18;
+  string unit_price = 19;
+  string payment_type = 20;
+  string due_date = 21;
+  string vendor_tax_id = 22;
+  string snowflake_tax_id = 23;
+  string prepaid_flag = 24;
 }
 
 

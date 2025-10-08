@@ -241,6 +241,71 @@ class InvoiceStoreServicer(invoicestore_pb2_grpc.InvoiceStoreServicer):
             logger.error(f"Failed to reject invoice: {e}")
             return invoicestore_pb2.RejectInvoiceResponse(succes=False, message=f"Failed to reject invoice: {e}")
 
+    def ListInvoices(self, request, context):
+        """List invoices with optional filtering and pagination."""
+        try:
+            logger.info(
+                f"Listing invoices with status filter: {request.status}, "
+                f"limit: {request.limit}, offset: {request.offset}"
+            )
+
+            # Set defaults
+            limit = request.limit if request.limit > 0 else 100
+            offset = request.offset if request.offset >= 0 else 0
+            status_filter = request.status if request.status else None
+
+            # Get invoices from database
+            invoices, total_count = self.db.list_invoices(status_filter=status_filter, limit=limit, offset=offset)
+
+            # Convert to protobuf messages
+            pb_invoices = []
+            for invoice in invoices:
+                pb_invoice = invoicestore_pb2.Invoice(
+                    id=invoice.id or 0,
+                    created_at=invoice.created_at or "",
+                    lift_ticket=invoice.lift_ticket or "",
+                    file_id=invoice.file_id or "",
+                    status=invoice.status or "",
+                    status_desc=invoice.status_desc or "",
+                    vendor_name=invoice.vendor_name or "",
+                    invoice_number=invoice.invoice_number or "",
+                    invoice_date=invoice.invoice_date or "",
+                    total_amount=invoice.total_amount or "",
+                    purchase_order_number=invoice.purchase_order_number or "",
+                    banking_details=invoice.banking_details or "",
+                    payment_terms=invoice.payment_terms or "",
+                    memo_description=invoice.memo_description or "",
+                    shipped_to_address=invoice.shipped_to_address or "",
+                    service_start_date=invoice.service_start_date or "",
+                    service_end_date=invoice.service_end_date or "",
+                    quantity=invoice.quantity or "",
+                    unit_price=invoice.unit_price or "",
+                    payment_type=invoice.payment_type or "",
+                    due_date=invoice.due_date or "",
+                    vendor_tax_id=invoice.vendor_tax_id or "",
+                    snowflake_tax_id=invoice.snowflake_tax_id or "",
+                    prepaid_flag=invoice.prepaid_flag or "",
+                )
+                pb_invoices.append(pb_invoice)
+
+            logger.info(f"Successfully retrieved {len(pb_invoices)} invoices (total: {total_count})")
+
+            return invoicestore_pb2.ListInvoicesResponse(
+                success=True,
+                message=f"Successfully retrieved {len(pb_invoices)} invoices",
+                invoices=pb_invoices,
+                total_count=total_count,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to list invoices: {e}")
+            return invoicestore_pb2.ListInvoicesResponse(
+                success=False,
+                message=f"Failed to list invoices: {e}",
+                invoices=[],
+                total_count=0,
+            )
+
 
 async def serve():
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))

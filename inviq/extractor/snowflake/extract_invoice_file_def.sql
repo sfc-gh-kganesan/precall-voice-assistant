@@ -43,7 +43,7 @@ begin
                     'vendor_name': 'What is the name of the vendor or supplier?',
                     'invoice_number': 'What is the invoice number?',
                     'invoice_date': 'What is the date of the invoice?',
-                    'total_amount': 'What is the total amount due on the invoice?',      
+                    'total_amount': 'What is the total amount, total charges, amount due, balance due, or final amount to be paid on this invoice? Look for currency symbols like $ and numerical values.',      
                     'purchase_order_number': 'What is the Purchase Order (PO) number?',
                     'banking_details': 'What are the banking details or payment instructions provided?',
                     'payment_terms': 'What are the payment terms (e.g., Net 30, Due on receipt)?',
