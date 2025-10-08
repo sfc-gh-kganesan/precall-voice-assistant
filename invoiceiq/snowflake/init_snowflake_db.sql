@@ -9,7 +9,7 @@ grant role invoiceiq_admin to user vsrinivas;
 
 use role invoiceiq_admin;
 create schema if not exists invoiceiq.service;
-create stage if not exists invoiceiq.service.ticket_attachments;
+create stage if not exists invoiceiq.service.ticket_attachments
   directory=(enable=true auto_refresh=true) 
   encryption=(type='SNOWFLAKE_SSE');
 
