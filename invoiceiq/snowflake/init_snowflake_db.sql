@@ -59,3 +59,6 @@ create table if not exists invoiceiq.service.ticket_metadata (
     ai_decision varchar,
     ai_reasoning varchar
 );
+
+create stream if not exists invoiceiq.service.ticket_stream 
+  on table invoiceiq.service.ticket_metadata;
