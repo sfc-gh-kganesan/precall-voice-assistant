@@ -1,14 +1,14 @@
 # main.py
+
+import logging
 import uvicorn
 from fastapi import FastAPI, Request
 from langchain_core.messages import HumanMessage
-from pydantic import BaseModel
-from typing import Any, Dict
 
-from .graph import create_graph
+from .graph import run_workflow
 
-# class ProcessTicketRequest(BaseModel):
-#     ticket_number: str
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -36,27 +36,25 @@ async def process_ticket(request: Request):
             row_index = input_rows[0][0]  # Preserve the row index
             is_snowflake_format = True
 
-        elif "ticket_number" in body:
-            # Direct API call format: {"ticket_number": "value"}
-            ticket_number = body["ticket_number"]
+        elif body: # If Direct API call is sent we expect the body to be the ticket number or the LLM to extract it
+            ticket_number = body
             row_index = 0
 
         else:
-            return {"data": [[0, "Error: Invalid request format. Expected 'ticket_number' or 'data' field."]]}
-        
-        # Process the ticket (common logic)
-        graph = create_graph()
-        inputs = {"messages": [HumanMessage(content=f"Process ticket: {ticket_number}")]}
-        result = graph.invoke(inputs)
-        ai_response = result["messages"][-1].content
+            return {"data": [[0, "Error: Invalid request. Either input is empty or doesn't follow Snowflake service function format."]]}
+
+
+        ai_response = run_workflow(f"Process ticket: {ticket_number}")
         
         # Return response in appropriate format
         if is_snowflake_format:
             return {"data": [[row_index, ai_response]]}
         else:
             return {"response": ai_response}
+
         
     except Exception as e:
+        logger.error(f"Failed to process ticket: {str(e)}")
         # Try to preserve row index if available, otherwise use 0
         try:
             if "data" in body and isinstance(body["data"], list) and len(body["data"]) > 0:

@@ -1,5 +1,12 @@
 ## To run FastAPI app locally:
 
+Ensure required env vars are captured in .env
+```
+SNOWFLAKE_ACCOUNT=<account-identifier>
+SNOWFLAKE_USER=<snowflake-username>
+SNOWFLAKE_PAT=<SNOWFLAKE_PAT>
+```
+
 ```bash
 # From agent_app directory
 uv run python -m app.main
@@ -44,7 +51,7 @@ curl -X POST "http://localhost:8000/process" \
 Build the image
 ```bash
 cd agent_app
-docker build --rm --platform linux/amd64 -t pm-fde.registry.snowflakecomputing.com/invoiceiq/invoiceiq/image_repository/invoiceiq-agent:latest .
+docker build --rm --platform linux/amd64 -t sfengineering-aifde.registry.snowflakecomputing.com/invoiceiq/service/image_repository/invoiceiq-agent:latest .
 ```
 
 Login to Snowflake image registry
@@ -54,5 +61,5 @@ snow spcs image-registry login -c "<connection-name>"
 
 Upload the docker image to Snowflake image repository
 ```bash
-docker push pm-fde.registry.snowflakecomputing.com/invoiceiq/invoiceiq/image_repository/invoiceiq-agent:latest
+docker push sfengineering-aifde.registry.snowflakecomputing.com/invoiceiq/service/image_repository/invoiceiq-agent:latest
 ```

@@ -1,5 +1,6 @@
 use role accountadmin;
 create role if not exists invoiceiq_admin;
+grant role invoiceiq_admin to role accountadmin;
 create database if not exists invoiceiq;
 grant ownership on database invoiceiq to role invoiceiq_admin;
 
