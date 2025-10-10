@@ -1,30 +1,122 @@
+import React, { useState, useEffect } from "react";
 import { InvoiceCard, Invoice } from "./InvoiceCard";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
-import { CheckSquare, Square } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { fetchInvoices } from "../services/api";
+import { mapInvoiceResponses } from "../services/mapper";
+import { Alert, AlertDescription } from "./ui/alert";
 
 interface InvoiceColumnsProps {
-  invoices: Invoice[];
   onViewPdf: (invoice: Invoice) => void;
   selectedInvoiceIds: Set<string>;
   onSelectInvoice: (invoiceId: string, selected: boolean) => void;
   onSelectAll: (invoiceIds: string[]) => void;
   onClearSelection: () => void;
+  refreshTrigger?: number; // Optional prop to trigger refresh
 }
 
 export function InvoiceColumns({ 
-  invoices, 
   onViewPdf, 
   selectedInvoiceIds, 
   onSelectInvoice, 
   onSelectAll, 
-  onClearSelection 
+  onClearSelection,
+  refreshTrigger = 0
 }: InvoiceColumnsProps) {
-  const approvedInvoices = invoices.filter(invoice => invoice.status === 'approved');
-  const pendingInvoices = invoices.filter(invoice => invoice.status === 'pending');
-  const rejectedInvoices = invoices.filter(invoice => invoice.status === 'rejected');
+  const [approvedInvoices, setApprovedInvoices] = useState<Invoice[]>([]);
+  const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>([]);
+  const [rejectedInvoices, setRejectedInvoices] = useState<Invoice[]>([]);
+  
+  const [loadingApproved, setLoadingApproved] = useState(true);
+  const [loadingPending, setLoadingPending] = useState(true);
+  const [loadingRejected, setLoadingRejected] = useState(true);
+  
+  const [errorApproved, setErrorApproved] = useState<string | null>(null);
+  const [errorPending, setErrorPending] = useState<string | null>(null);
+  const [errorRejected, setErrorRejected] = useState<string | null>(null);
+
+  // Fetch approved invoices
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function loadApprovedInvoices() {
+      try {
+        setLoadingApproved(true);
+        setErrorApproved(null);
+        const response = await fetchInvoices('approved', 100, 0);
+        if (isMounted) {
+          setApprovedInvoices(mapInvoiceResponses(response.invoices));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorApproved(error instanceof Error ? error.message : 'Failed to load approved invoices');
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingApproved(false);
+        }
+      }
+    }
+    
+    loadApprovedInvoices();
+    return () => { isMounted = false; };
+  }, [refreshTrigger]);
+
+  // Fetch pending invoices
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function loadPendingInvoices() {
+      try {
+        setLoadingPending(true);
+        setErrorPending(null);
+        const response = await fetchInvoices('pending', 100, 0);
+        if (isMounted) {
+          setPendingInvoices(mapInvoiceResponses(response.invoices));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorPending(error instanceof Error ? error.message : 'Failed to load pending invoices');
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingPending(false);
+        }
+      }
+    }
+    
+    loadPendingInvoices();
+    return () => { isMounted = false; };
+  }, [refreshTrigger]);
+
+  // Fetch rejected invoices
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function loadRejectedInvoices() {
+      try {
+        setLoadingRejected(true);
+        setErrorRejected(null);
+        const response = await fetchInvoices('rejected', 100, 0);
+        if (isMounted) {
+          setRejectedInvoices(mapInvoiceResponses(response.invoices));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorRejected(error instanceof Error ? error.message : 'Failed to load rejected invoices');
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingRejected(false);
+        }
+      }
+    }
+    
+    loadRejectedInvoices();
+    return () => { isMounted = false; };
+  }, [refreshTrigger]);
 
   const getColumnInvoiceIds = (columnInvoices: Invoice[]) => 
     columnInvoices.map(inv => inv.id);
@@ -104,7 +196,17 @@ export function InvoiceColumns({
         />
         <CardContent>
           <div className="space-y-4 max-h-[600px] overflow-y-auto">
-            {approvedInvoices.length === 0 ? (
+            {loadingApproved ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading...</span>
+              </div>
+            ) : errorApproved ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorApproved}</AlertDescription>
+              </Alert>
+            ) : approvedInvoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No approved invoices</p>
             ) : (
               approvedInvoices.map(invoice => (
@@ -132,7 +234,17 @@ export function InvoiceColumns({
         />
         <CardContent>
           <div className="space-y-4 max-h-[600px] overflow-y-auto">
-            {pendingInvoices.length === 0 ? (
+            {loadingPending ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading...</span>
+              </div>
+            ) : errorPending ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorPending}</AlertDescription>
+              </Alert>
+            ) : pendingInvoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No pending invoices</p>
             ) : (
               pendingInvoices.map(invoice => (
@@ -160,7 +272,17 @@ export function InvoiceColumns({
         />
         <CardContent>
           <div className="space-y-4 max-h-[600px] overflow-y-auto">
-            {rejectedInvoices.length === 0 ? (
+            {loadingRejected ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading...</span>
+              </div>
+            ) : errorRejected ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorRejected}</AlertDescription>
+              </Alert>
+            ) : rejectedInvoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No rejected invoices</p>
             ) : (
               rejectedInvoices.map(invoice => (

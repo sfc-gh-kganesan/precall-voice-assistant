@@ -1,38 +1,53 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { InvoiceStatistics } from "./components/InvoiceStatistics";
 import { InvoiceFilters } from "./components/InvoiceFilters";
 import { GroupedInvoiceView } from "./components/GroupedInvoiceView";
 import { PDFViewer } from "./components/PDFViewer";
 import { BulkActionsBar } from "./components/BulkActionsBar";
 import { Invoice } from "./components/InvoiceCard";
-import { mockInvoices } from "./data/mockInvoices";
 import { toast } from "sonner@2.0.3";
 import { Toaster } from "./components/ui/sonner";
+import { fetchInvoices } from "./services/api";
+import { mapInvoiceResponses } from "./services/mapper";
 
 export default function App() {
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(new Set());
   const [groupBy, setGroupBy] = useState<string>("none");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  
+  // Statistics state
+  const [approvedCount, setApprovedCount] = useState<number>(0);
+  const [pendingCount, setPendingCount] = useState<number>(0);
+  const [rejectedCount, setRejectedCount] = useState<number>(0);
+  const [totalCount, setTotalCount] = useState<number>(0);
 
-  // Filter invoices based on search term
-  const filteredInvoices = useMemo(() => {
-    if (!searchTerm) return invoices;
-    
-    const term = searchTerm.toLowerCase();
-    return invoices.filter(invoice =>
-      invoice.invoiceNumber.toLowerCase().includes(term) ||
-      invoice.liftTicketNumber.toLowerCase().includes(term) ||
-      invoice.purchaseOrderNumber.toLowerCase().includes(term) ||
-      invoice.vendor.toLowerCase().includes(term)
-    );
-  }, [searchTerm, invoices]);
+  // Fetch statistics on mount
+  useEffect(() => {
+    async function loadStatistics() {
+      try {
+        const [approvedResponse, pendingResponse, rejectedResponse] = await Promise.all([
+          fetchInvoices('approved', 1000, 0),
+          fetchInvoices('pending', 1000, 0),
+          fetchInvoices('rejected', 1000, 0),
+        ]);
 
-  // Calculate statistics
-  const approvedCount = filteredInvoices.filter(inv => inv.status === 'approved').length;
-  const pendingCount = filteredInvoices.filter(inv => inv.status === 'pending').length;
-  const rejectedCount = filteredInvoices.filter(inv => inv.status === 'rejected').length;
+        setApprovedCount(approvedResponse.total_count);
+        setPendingCount(pendingResponse.total_count);
+        setRejectedCount(rejectedResponse.total_count);
+        setTotalCount(
+          approvedResponse.total_count +
+          pendingResponse.total_count +
+          rejectedResponse.total_count
+        );
+      } catch (error) {
+        console.error('Error loading statistics:', error);
+        toast.error('Failed to load invoice statistics');
+      }
+    }
+
+    loadStatistics();
+  }, []);
 
   const handleViewPdf = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
@@ -48,13 +63,8 @@ export default function App() {
   };
 
   const handleUpdateInvoiceStatus = (invoiceId: string, newStatus: Invoice['status'], reason?: string) => {
-    setInvoices(prev => prev.map(invoice => 
-      invoice.id === invoiceId 
-        ? { ...invoice, status: newStatus, reason: newStatus === 'approved' ? undefined : reason }
-        : invoice
-    ));
-    
-    // Remove from selected invoices
+    // TODO: Implement API call to update invoice status in backend
+    // For now, just show a success message
     setSelectedInvoiceIds(prev => {
       const newSet = new Set(prev);
       newSet.delete(invoiceId);
@@ -62,20 +72,20 @@ export default function App() {
     });
 
     toast.success(`Invoice ${invoiceId} moved to ${newStatus}`);
+    
+    // Note: In production, this would trigger a refresh of the invoice data
   };
 
   const handleBulkStatusUpdate = (invoiceIds: string[], newStatus: Invoice['status']) => {
+    // TODO: Implement API call to bulk update invoice statuses in backend
     const count = invoiceIds.length;
-    setInvoices(prev => prev.map(invoice => 
-      invoiceIds.includes(invoice.id) 
-        ? { ...invoice, status: newStatus, reason: newStatus === 'approved' ? undefined : invoice.reason }
-        : invoice
-    ));
     
     // Clear selection
     setSelectedInvoiceIds(new Set());
     
     toast.success(`${count} invoice${count !== 1 ? 's' : ''} moved to ${newStatus}`);
+    
+    // Note: In production, this would trigger a refresh of the invoice data
   };
 
   const handleSelectInvoice = (invoiceId: string, selected: boolean) => {
@@ -122,7 +132,7 @@ export default function App() {
 
         {/* Statistics */}
         <InvoiceStatistics
-          totalInvoices={filteredInvoices.length}
+          totalInvoices={totalCount}
           approvedCount={approvedCount}
           pendingCount={pendingCount}
           rejectedCount={rejectedCount}
@@ -148,8 +158,9 @@ export default function App() {
         />
 
         {/* Invoice Columns */}
+        {/* Note: Invoices are now fetched within InvoiceColumns component */}
         <GroupedInvoiceView
-          invoices={filteredInvoices}
+          invoices={[]}
           groupBy={groupBy}
           onViewPdf={handleViewPdf}
           selectedInvoiceIds={selectedInvoiceIds}

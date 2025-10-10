@@ -30,7 +30,6 @@ export function GroupedInvoiceView({
   if (groupBy === 'none') {
     return (
       <InvoiceColumns 
-        invoices={invoices} 
         onViewPdf={onViewPdf}
         selectedInvoiceIds={selectedInvoiceIds}
         onSelectInvoice={onSelectInvoice}
@@ -143,7 +142,6 @@ export function GroupedInvoiceView({
               <CollapsibleContent>
                 <CardContent>
                   <InvoiceColumns 
-                    invoices={groupInvoices} 
                     onViewPdf={onViewPdf}
                     selectedInvoiceIds={selectedInvoiceIds}
                     onSelectInvoice={onSelectInvoice}

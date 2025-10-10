@@ -15,6 +15,9 @@ export interface Invoice {
   vendor: string;
   date: string;
   pdfUrl: string;
+  createdAt?: string;
+  updatedAt?: string;
+  emailFrom?: string;
 }
 
 interface InvoiceCardProps {
