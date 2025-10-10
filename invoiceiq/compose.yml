@@ -1,0 +1,12 @@
+services:
+  # The Collector service
+  collector:
+    build:
+      context: ./collector
+      dockerfile: Dockerfile
+    command: ["uv", "run", "fastapi", "dev", "./app/main.py", "--host", "0.0.0.0"]
+    ports:
+      - "8000:8000"
+    env_file: "./collector/.env"
+    volumes:
+      - ./collector/app:/app/app

@@ -13,8 +13,7 @@ load_dotenv()
 def connection():
     conn = snowflake.connector.connect(
         user=os.getenv("SNOWFLAKE_USER", "svc_invoiceiq"),
-        authenticator="SNOWFLAKE_JWT",
-        private_key_file=os.getenv("SNOWFLAKE_KEY"),
+        password=os.getenv("SNOWFLAKE_PAT"),
         account=os.getenv("SNOWFLAKE_ACCOUNT", "SFENGINEERING-AIFDE"),
         role=os.getenv("SNOWFLAKE_ROLE", "invoiceiq_admin"),
         warehouse=os.getenv("SNOWFLAKE_WAREHOUSE", "compute_wh"),
