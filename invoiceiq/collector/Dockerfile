@@ -13,14 +13,14 @@ COPY pyproject.toml uv.lock ./
 
 # Install dependencies in a separate layer for better caching
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project --no-dev
+    uv sync --locked
 
 # Copy application code
 COPY app/ ./app/
 
 # Install the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --locked
 
 # Set Python path and environment
 ENV PATH="/app/.venv/bin:$PATH"
@@ -31,4 +31,4 @@ ENV PYTHONPATH="/app"
 EXPOSE 8000
 
 # Run the FastAPI application with uvicorn
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -11,15 +11,34 @@ load_dotenv()
 
 @contextmanager
 def connection():
-    conn = snowflake.connector.connect(
-        user=os.getenv("SNOWFLAKE_USER", "svc_invoiceiq"),
-        password=os.getenv("SNOWFLAKE_PAT"),
-        account=os.getenv("SNOWFLAKE_ACCOUNT", "SFENGINEERING-AIFDE"),
-        role=os.getenv("SNOWFLAKE_ROLE", "invoiceiq_admin"),
-        warehouse=os.getenv("SNOWFLAKE_WAREHOUSE", "compute_wh"),
-        database=os.getenv("SNOWFLAKE_DATABASE", "invoiceiq"),
-        schema=os.getenv("SNOWFLAKE_SCHEMA", "service"),
-    )
+    if os.path.isfile("/snowflake/session/token"):
+        creds = {
+            "host": os.getenv("SNOWFLAKE_HOST"),
+            "port": os.getenv("SNOWFLAKE_PORT"),
+            "protocol": "https",
+            "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+            "authenticator": "oauth",
+            "token": open("/snowflake/session/token").read(),
+            "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
+            "database": os.getenv("SNOWFLAKE_DATABASE"),
+            "schema": os.getenv("SNOWFLAKE_SCHEMA"),
+            "role": os.getenv("SNOWFLAKE_ROLE", "invoiceiq_admin"),
+            "client_session_keep_alive": True,
+        }
+    else:
+        creds = {
+            "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+            "user": os.getenv("SNOWFLAKE_USER"),
+            "password": os.getenv("SNOWFLAKE_PAT"),
+            "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE", "compute_wh"),
+            "database": os.getenv("SNOWFLAKE_DATABASE", "invoiceiq"),
+            "schema": os.getenv("SNOWFLAKE_SCHEMA", "service"),
+            "role": os.getenv("SNOWFLAKE_ROLE", "invoiceiq_admin"),
+            "client_session_keep_alive": True,
+        }
+
+    conn = snowflake.connector.connect(**creds)
+
     try:
         yield conn
     finally:
@@ -45,7 +64,7 @@ def stage_put_files(local_dir: Path, file_glob: str) -> list[str]:
     Upload local files to remote Snowflake stage
 
     Args:
-        local_dir: absolute path to local directory on disk containing files
+      local_dir: absolute path to local directory on disk containing files
         file_glob: glob expression to select which files to upload
     """
     db = os.getenv("SNOWFLAKE_DATABASE", "invoiceiq")
@@ -69,10 +88,10 @@ def stage_put_files(local_dir: Path, file_glob: str) -> list[str]:
 def insert_ticket_metadata(submission_id: str, ticket_number: str, email: str):
     query = """
         insert into invoiceiq.service.ticket_metadata (
-                submission_id,
-                ticket_number,
-                email
-        )
+            submission_id,
+            ticket_number,
+            email
+            )
         select
             %s,
             %s,
@@ -91,9 +110,9 @@ def insert_ticket_metadata(submission_id: str, ticket_number: str, email: str):
 def insert_file_metadata(submission_id: str, relative_path: str):
     query = """
         insert into invoiceiq.service.file_metadata (
-                submission_id,
-                relative_path
-        )
+            submission_id,
+            relative_path
+            )
         select
             %s,
             %s

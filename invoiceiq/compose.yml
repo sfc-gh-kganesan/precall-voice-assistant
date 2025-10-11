@@ -4,7 +4,7 @@ services:
     build:
       context: ./collector
       dockerfile: Dockerfile
-    command: ["uv", "run", "fastapi", "dev", "./app/main.py", "--host", "0.0.0.0"]
+    command: ["uv", "run", "--locked", "--no-dev", "fastapi", "dev", "./app/main.py", "--host", "0.0.0.0"]
     ports:
       - "8000:8000"
     env_file: "./collector/.env"
