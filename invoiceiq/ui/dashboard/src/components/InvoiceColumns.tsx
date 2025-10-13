@@ -15,6 +15,8 @@ interface InvoiceColumnsProps {
   onSelectAll: (invoiceIds: string[]) => void;
   onClearSelection: () => void;
   refreshTrigger?: number; // Optional prop to trigger refresh
+  optimisticUpdate?: { invoiceIds: string[], newStatus: string, timestamp: number }; // For instant UI updates
+  silentRefresh?: boolean; // If true, refresh without showing loading state
 }
 
 export function InvoiceColumns({ 
@@ -22,8 +24,9 @@ export function InvoiceColumns({
   selectedInvoiceIds, 
   onSelectInvoice, 
   onSelectAll, 
-  onClearSelection,
-  refreshTrigger = 0
+  refreshTrigger = 0,
+  optimisticUpdate,
+  silentRefresh = false
 }: InvoiceColumnsProps) {
   const [approvedInvoices, setApprovedInvoices] = useState<Invoice[]>([]);
   const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>([]);
@@ -37,13 +40,48 @@ export function InvoiceColumns({
   const [errorPending, setErrorPending] = useState<string | null>(null);
   const [errorRejected, setErrorRejected] = useState<string | null>(null);
 
+  // Handle optimistic updates - move invoices instantly
+  useEffect(() => {
+    if (!optimisticUpdate) return;
+    
+    const { invoiceIds, newStatus } = optimisticUpdate;
+    const idSet = new Set(invoiceIds);
+    
+    // Collect invoices to move from all columns
+    const allInvoices = [...approvedInvoices, ...pendingInvoices, ...rejectedInvoices];
+    const toMove = allInvoices.filter(inv => idSet.has(inv.id));
+    
+    if (toMove.length === 0) return;
+    
+    // Update status of moved invoices
+    const movedInvoices = toMove.map(inv => ({ ...inv, status: newStatus as Invoice['status'] }));
+    
+    // Remove from all columns and add to target column
+    setApprovedInvoices(prev => {
+      const filtered = prev.filter(inv => !idSet.has(inv.id));
+      return newStatus === 'approved' ? [...filtered, ...movedInvoices.filter(i => i.status === 'approved')] : filtered;
+    });
+    
+    setPendingInvoices(prev => {
+      const filtered = prev.filter(inv => !idSet.has(inv.id));
+      return newStatus === 'pending' ? [...filtered, ...movedInvoices.filter(i => i.status === 'pending')] : filtered;
+    });
+    
+    setRejectedInvoices(prev => {
+      const filtered = prev.filter(inv => !idSet.has(inv.id));
+      return newStatus === 'rejected' ? [...filtered, ...movedInvoices.filter(i => i.status === 'rejected')] : filtered;
+    });
+  }, [optimisticUpdate]);
+
   // Fetch approved invoices
   useEffect(() => {
     let isMounted = true;
     
     async function loadApprovedInvoices() {
       try {
-        setLoadingApproved(true);
+        if (!silentRefresh) {
+          setLoadingApproved(true);
+        }
         setErrorApproved(null);
         const response = await fetchInvoices('approved', 100, 0);
         if (isMounted) {
@@ -54,7 +92,7 @@ export function InvoiceColumns({
           setErrorApproved(error instanceof Error ? error.message : 'Failed to load approved invoices');
         }
       } finally {
-        if (isMounted) {
+        if (isMounted && !silentRefresh) {
           setLoadingApproved(false);
         }
       }
@@ -62,7 +100,7 @@ export function InvoiceColumns({
     
     loadApprovedInvoices();
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, silentRefresh]);
 
   // Fetch pending invoices
   useEffect(() => {
@@ -70,7 +108,9 @@ export function InvoiceColumns({
     
     async function loadPendingInvoices() {
       try {
-        setLoadingPending(true);
+        if (!silentRefresh) {
+          setLoadingPending(true);
+        }
         setErrorPending(null);
         const response = await fetchInvoices('pending', 100, 0);
         if (isMounted) {
@@ -81,7 +121,7 @@ export function InvoiceColumns({
           setErrorPending(error instanceof Error ? error.message : 'Failed to load pending invoices');
         }
       } finally {
-        if (isMounted) {
+        if (isMounted && !silentRefresh) {
           setLoadingPending(false);
         }
       }
@@ -89,7 +129,7 @@ export function InvoiceColumns({
     
     loadPendingInvoices();
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, silentRefresh]);
 
   // Fetch rejected invoices
   useEffect(() => {

@@ -44,7 +44,6 @@ SNOWFLAKE_CONFIG = {
     "role": os.getenv("SNOWFLAKE_ROLE"),
 }
 
-
 # Pydantic models
 class Invoice(BaseModel):
     id: str  # TICKET_NUMBER
@@ -52,7 +51,7 @@ class Invoice(BaseModel):
     status: str  # approved, pending, rejected
     file_url: str
     relative_path: str
-    # Extracted fields from VARIANT column
+    # Invoice fields from INVOICES table
     vendor_name: Optional[str] = None
     invoice_number: Optional[str] = None
     invoice_date: Optional[str] = None
@@ -72,6 +71,17 @@ class InvoiceListResponse(BaseModel):
     total_count: int
     limit: int
     offset: int
+
+
+class UpdateStatusRequest(BaseModel):
+    ticket_numbers: List[str]
+    status: str  # approved, pending, rejected
+
+
+class UpdateStatusResponse(BaseModel):
+    success: bool
+    updated_count: int
+    message: str
 
 
 # ============================================================================
@@ -113,10 +123,9 @@ def parse_extracted_fields(variant_data) -> dict:
 def get_file_path_for_ticket(cursor, ticket_number: str) -> str:
     """Get the relative file path for a given ticket number."""
     query = """
-        SELECT f.RELATIVE_PATH
-        FROM TICKET_METADATA t
-        JOIN FILE_METADATA f ON t.SUBMISSION_ID = f.SUBMISSION_ID
-        WHERE t.TICKET_NUMBER = %s
+        SELECT RELATIVE_PATH
+        FROM INVOICES
+        WHERE TICKET_NUMBER = %s
         LIMIT 1
     """
     cursor.execute(query, (ticket_number,))
@@ -182,7 +191,7 @@ async def health_check():
 @app.get("/invoices", response_model=InvoiceListResponse)
 async def list_invoices(
     status: Optional[str] = Query(None, description="Filter by status"),
-    limit: int = Query(50, ge=1, le=500, description="Maximum results"),
+    limit: int = Query(50, ge=1, le=1000, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Results to skip"),
 ):
     """
@@ -190,7 +199,7 @@ async def list_invoices(
 
     Query Parameters:
     - status: Filter by 'approved', 'pending', or 'rejected' (optional)
-    - limit: Maximum invoices to return (default: 50, max: 500)
+    - limit: Maximum invoices to return (default: 50, max: 1000)
     - offset: Number of invoices to skip for pagination (default: 0)
     """
     logger.info(f"Listing invoices: status={status}, limit={limit}, offset={offset}")
@@ -199,24 +208,30 @@ async def list_invoices(
         with get_snowflake_connection() as conn:
             cursor = conn.cursor(DictCursor)
 
-            # Build query with optional status filter
             query = """
                 SELECT 
-                    t.TICKET_NUMBER,
-                    t.EMAIL,
-                    t.CREATED_AT,
-                    f.RELATIVE_PATH,
-                    f.STATUS,
-                    f.EXTRACTED_FIELDS,
-                    f.UPDATED_AT
-                FROM TICKET_METADATA t
-                LEFT JOIN FILE_METADATA f ON t.SUBMISSION_ID = f.SUBMISSION_ID
-                WHERE f.RELATIVE_PATH IS NOT NULL
+                    i.INVOICE_ID,
+                    i.TICKET_NUMBER,
+                    i.STATUS,
+                    i.RELATIVE_PATH,
+                    i.FILE_URL,
+                    i.VENDOR_NAME,
+                    i.INVOICE_NUMBER,
+                    i.INVOICE_DATE,
+                    i.TOTAL_AMOUNT,
+                    i.PURCHASE_ORDER_NUMBER,
+                    i.DUE_DATE,
+                    i.CREATED_AT,
+                    i.UPDATED_AT,
+                    t.EMAIL
+                FROM INVOICES i
+                LEFT JOIN TICKET_METADATA t ON i.TICKET_NUMBER = t.TICKET_NUMBER
+                WHERE i.RELATIVE_PATH IS NOT NULL
             """
 
             params = []
             if status:
-                query += " AND UPPER(f.STATUS) = %s"
+                query += " AND UPPER(i.STATUS) = %s"
                 params.append(status.upper())
 
             # Get total count
@@ -225,31 +240,30 @@ async def list_invoices(
             total_count = cursor.fetchone()["TOTAL"]
 
             # Add pagination and execute
-            query += " ORDER BY t.CREATED_AT DESC LIMIT %s OFFSET %s"
+            query += " ORDER BY i.CREATED_AT DESC LIMIT %s OFFSET %s"
             cursor.execute(query, params + [limit, offset])
             rows = cursor.fetchall()
 
             # Build invoice list
             invoices = []
             for row in rows:
-                extracted = parse_extracted_fields(row.get("EXTRACTED_FIELDS"))
                 relative_path = row.get("RELATIVE_PATH", "")
 
                 invoices.append(
                     Invoice(
-                        id=row["TICKET_NUMBER"],
-                        ticket_number=row["TICKET_NUMBER"],
+                        id=row.get("TICKET_NUMBER", ""),
+                        ticket_number=row.get("TICKET_NUMBER", ""),
                         status=row.get("STATUS", "unknown").lower(),
                         file_url=f"@INVOICEIQ.SERVICE.TICKET_ATTACHMENTS/{relative_path}"
                         if relative_path
                         else "",
                         relative_path=relative_path,
-                        vendor_name=extracted.get("vendor_name"),
-                        invoice_number=extracted.get("invoice_number"),
-                        invoice_date=extracted.get("invoice_date"),
-                        total_amount=extracted.get("total_amount"),
-                        purchase_order_number=extracted.get("purchase_order_number"),
-                        due_date=extracted.get("due_date"),
+                        vendor_name=row.get("VENDOR_NAME"),
+                        invoice_number=row.get("INVOICE_NUMBER"),
+                        invoice_date=str(row.get("INVOICE_DATE", "")) if row.get("INVOICE_DATE") else None,
+                        total_amount=str(row.get("TOTAL_AMOUNT", "")) if row.get("TOTAL_AMOUNT") else None,
+                        purchase_order_number=row.get("PURCHASE_ORDER_NUMBER"),
+                        due_date=str(row.get("DUE_DATE", "")) if row.get("DUE_DATE") else None,
                         created_at=str(row.get("CREATED_AT", "")),
                         updated_at=str(row.get("UPDATED_AT", "")),
                         email_from=row.get("EMAIL"),
@@ -332,6 +346,70 @@ async def download_invoice_pdf(ticket_number: str):
         raise
     except Exception as e:
         logger.error(f"Error downloading PDF: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/invoices/status", response_model=UpdateStatusResponse)
+async def update_invoice_status(request: UpdateStatusRequest):
+    """
+    Update the status of one or more invoices.
+    
+    Body:
+    - ticket_numbers: List of ticket numbers to update
+    - status: New status ('approved', 'pending', or 'rejected')
+    """
+    logger.info(
+        f"Updating status for {len(request.ticket_numbers)} invoices to '{request.status}'"
+    )
+
+    # Validate status
+    valid_statuses = ["approved", "pending", "rejected"]
+    if request.status.lower() not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
+        )
+
+    if not request.ticket_numbers:
+        raise HTTPException(
+            status_code=400, detail="ticket_numbers list cannot be empty"
+        )
+
+    try:
+        with get_snowflake_connection() as conn:
+            cursor = conn.cursor(DictCursor)
+
+            # Build UPDATE query with parameterized IN clause - now using INVOICES table
+            placeholders = ",".join(["%s"] * len(request.ticket_numbers))
+            update_query = f"""
+                UPDATE INVOICES
+                SET STATUS = %s,
+                    UPDATED_AT = CURRENT_TIMESTAMP()
+                WHERE TICKET_NUMBER IN ({placeholders})
+            """
+
+            # Execute update
+            params = [request.status.upper()] + request.ticket_numbers
+            cursor.execute(update_query, params)
+            updated_count = cursor.rowcount
+
+            # Commit the transaction
+            conn.commit()
+
+            logger.info(
+                f"Successfully updated {updated_count} invoices to status '{request.status}'"
+            )
+
+            return UpdateStatusResponse(
+                success=True,
+                updated_count=updated_count,
+                message=f"Updated {updated_count} invoice(s) to status '{request.status}'",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating invoice status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

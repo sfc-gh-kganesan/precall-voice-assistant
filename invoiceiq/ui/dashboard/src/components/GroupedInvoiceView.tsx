@@ -14,6 +14,8 @@ interface GroupedInvoiceViewProps {
   onSelectInvoice: (invoiceId: string, selected: boolean) => void;
   onSelectAll: (invoiceIds: string[]) => void;
   onClearSelection: () => void;
+  refreshTrigger?: number;
+  optimisticUpdate?: { invoiceIds: string[], newStatus: string, timestamp: number };
 }
 
 export function GroupedInvoiceView({ 
@@ -23,7 +25,9 @@ export function GroupedInvoiceView({
   selectedInvoiceIds,
   onSelectInvoice,
   onSelectAll,
-  onClearSelection
+  onClearSelection,
+  refreshTrigger = 0,
+  optimisticUpdate
 }: GroupedInvoiceViewProps) {
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
@@ -35,6 +39,8 @@ export function GroupedInvoiceView({
         onSelectInvoice={onSelectInvoice}
         onSelectAll={onSelectAll}
         onClearSelection={onClearSelection}
+        refreshTrigger={refreshTrigger}
+        optimisticUpdate={optimisticUpdate}
       />
     );
   }
@@ -147,6 +153,7 @@ export function GroupedInvoiceView({
                     onSelectInvoice={onSelectInvoice}
                     onSelectAll={onSelectAll}
                     onClearSelection={onClearSelection}
+                    refreshTrigger={refreshTrigger}
                   />
                 </CardContent>
               </CollapsibleContent>

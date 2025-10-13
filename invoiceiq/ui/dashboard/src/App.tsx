@@ -5,9 +5,9 @@ import { GroupedInvoiceView } from "./components/GroupedInvoiceView";
 import { PDFViewer } from "./components/PDFViewer";
 import { BulkActionsBar } from "./components/BulkActionsBar";
 import { Invoice } from "./components/InvoiceCard";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { Toaster } from "./components/ui/sonner";
-import { fetchInvoices } from "./services/api";
+import { fetchInvoices, updateInvoiceStatus } from "./services/api";
 import { mapInvoiceResponses } from "./services/mapper";
 
 export default function App() {
@@ -15,6 +15,8 @@ export default function App() {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(new Set());
   const [groupBy, setGroupBy] = useState<string>("none");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [optimisticUpdate, setOptimisticUpdate] = useState<{ invoiceIds: string[], newStatus: string, timestamp: number } | undefined>();
   
   // Statistics state
   const [approvedCount, setApprovedCount] = useState<number>(0);
@@ -76,16 +78,34 @@ export default function App() {
     // Note: In production, this would trigger a refresh of the invoice data
   };
 
-  const handleBulkStatusUpdate = (invoiceIds: string[], newStatus: Invoice['status']) => {
-    // TODO: Implement API call to bulk update invoice statuses in backend
+  const handleBulkStatusUpdate = async (invoiceIds: string[], newStatus: Invoice['status']) => {
     const count = invoiceIds.length;
     
-    // Clear selection
+    // Clear selection immediately for instant feedback
     setSelectedInvoiceIds(new Set());
     
-    toast.success(`${count} invoice${count !== 1 ? 's' : ''} moved to ${newStatus}`);
+    // Optimistic update: move invoices instantly in UI
+    setOptimisticUpdate({ invoiceIds, newStatus, timestamp: Date.now() });
     
-    // Note: In production, this would trigger a refresh of the invoice data
+    try {
+      // Call API to update status (in background)
+      const response = await updateInvoiceStatus(invoiceIds, newStatus);
+      
+      // Show success message
+      toast.success(`${response.updated_count} invoice${response.updated_count !== 1 ? 's' : ''} moved to ${newStatus}`);
+      
+      // After successful update, trigger refresh to sync with backend (eventual consistency)
+      setTimeout(() => {
+        setRefreshTrigger(prev => prev + 1);
+      }, 1000); // Refresh after 1 second to confirm state
+      
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update invoice status');
+      
+      // On error, immediately refresh to rollback optimistic update
+      setRefreshTrigger(prev => prev + 1);
+    }
   };
 
   const handleSelectInvoice = (invoiceId: string, selected: boolean) => {
@@ -167,6 +187,8 @@ export default function App() {
           onSelectInvoice={handleSelectInvoice}
           onSelectAll={handleSelectAll}
           onClearSelection={handleClearSelection}
+          refreshTrigger={refreshTrigger}
+          optimisticUpdate={optimisticUpdate}
         />
 
         {/* PDF Viewer */}
