@@ -1,0 +1,14 @@
+spec:
+    containers:
+        - name: backend
+          image: /invoiceiq/service/image_repository/invoiceiq-backend:latest
+          readinessProbe:
+              port: 8001
+              path: /health
+          env:
+              SNOWFLAKE_WAREHOUSE: compute_wh
+              SNOWFLAKE_ROLE: invoiceiq_admin
+    endpoints:
+        - name: backend
+          port: 8001
+          public: true

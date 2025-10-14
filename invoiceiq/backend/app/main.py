@@ -33,16 +33,37 @@ app.add_middleware(
 )
 
 # Snowflake connection config
-SNOWFLAKE_CONFIG = {
-    "account": os.getenv("SNOWFLAKE_ACCOUNT"),
-    "user": os.getenv("SNOWFLAKE_USER"),
-    "authenticator": "SNOWFLAKE_JWT",
-    "private_key_file": os.getenv("SNOWFLAKE_KEY"),
-    "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
-    "database": os.getenv("SNOWFLAKE_DATABASE", "INVOICEIQ"),
-    "schema": os.getenv("SNOWFLAKE_SCHEMA", "SERVICE"),
-    "role": os.getenv("SNOWFLAKE_ROLE"),
-}
+def get_snowflake_config():
+    """Get Snowflake connection config based on environment (SPCS vs local)."""
+    # When running in SPCS, use OAuth with session token
+    if os.path.isfile("/snowflake/session/token"):
+        logger.info("Using SPCS OAuth session token for Snowflake authentication")
+        return {
+            "host": os.getenv("SNOWFLAKE_HOST"),
+            "port": os.getenv("SNOWFLAKE_PORT"),
+            "protocol": "https",
+            "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+            "authenticator": "oauth",
+            "token": open("/snowflake/session/token").read(),
+            "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
+            "database": os.getenv("SNOWFLAKE_DATABASE", "INVOICEIQ"),
+            "schema": os.getenv("SNOWFLAKE_SCHEMA", "SERVICE"),
+            "role": os.getenv("SNOWFLAKE_ROLE"),
+            "client_session_keep_alive": True,
+        }
+    else:
+        # Local development with JWT key-pair authentication
+        logger.info("Using JWT key-pair authentication for Snowflake")
+        return {
+            "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+            "user": os.getenv("SNOWFLAKE_USER"),
+            "authenticator": "SNOWFLAKE_JWT",
+            "private_key_file": os.getenv("SNOWFLAKE_KEY"),
+            "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
+            "database": os.getenv("SNOWFLAKE_DATABASE", "INVOICEIQ"),
+            "schema": os.getenv("SNOWFLAKE_SCHEMA", "SERVICE"),
+            "role": os.getenv("SNOWFLAKE_ROLE"),
+        }
 
 # Pydantic models
 class Invoice(BaseModel):
@@ -94,7 +115,8 @@ def get_snowflake_connection():
     """Context manager for Snowflake connections."""
     conn = None
     try:
-        conn = snowflake.connector.connect(**SNOWFLAKE_CONFIG)
+        config = get_snowflake_config()
+        conn = snowflake.connector.connect(**config)
         logger.info("Successfully connected to Snowflake")
         yield conn
     except Exception as e:

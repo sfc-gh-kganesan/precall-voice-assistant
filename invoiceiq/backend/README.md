@@ -1,38 +1,50 @@
-# InvoiceIQ Dashboard
+# InvoiceIQ Backend API
 
-Frontend dashboard for InvoiceIQ - a React application for viewing and managing invoice processing.
+Backend API for InvoiceIQ - provides endpoints for invoice management and status updates.
 
 ## Development
+
+This project uses [uv](https://github.com/astral-sh/uv) for dependency management.
 
 ### Setup
 
 1. Install dependencies:
 
    ```bash
-   npm install
+   make install
    ```
 
 2. Run the development server:
    ```bash
-   npm run dev
+   make dev
    ```
 
-   The app will be available at `http://localhost:3000`
+   The API will be available at `http://localhost:8001`
+
+### Code Quality
+
+Format code:
+```bash
+make format
+```
+
+Lint code:
+```bash
+make lint
+```
+
+Type check:
+```bash
+make typecheck
+```
 
 ### Docker Development
 
-Run in Docker container for development (with hot reload):
+Run in Docker container:
 
 ```bash
-# From parent directory
-docker compose up --build dashboard
-```
-
-Or run the container directly:
-
-```bash
-docker build -t invoiceiq-dashboard .
-docker run -p 3000:3000 -v $(pwd)/src:/app/src invoiceiq-dashboard
+docker build -t invoiceiq-backend .
+docker run -p 8001:8001 -v $(pwd)/app:/app/app invoiceiq-backend
 ```
 
 ## Build and deploy to SPCS
@@ -74,3 +86,17 @@ Delete the service:
 ```bash
 ./release/drop_service.sh
 ```
+
+## API Documentation
+
+When running, interactive API documentation is available at:
+- Swagger UI: `http://localhost:8001/docs`
+- ReDoc: `http://localhost:8001/redoc`
+
+### Main Endpoints
+
+- `GET /invoices` - List invoices with filtering
+- `PATCH /invoices/status` - Update invoice status
+- `GET /invoices/{invoice_id}/download` - Download invoice file
+- `GET /health` - Health check endpoint
+

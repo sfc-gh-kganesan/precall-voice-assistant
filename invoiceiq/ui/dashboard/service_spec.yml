@@ -1,0 +1,14 @@
+spec:
+    containers:
+        - name: dashboard
+          image: /invoiceiq/service/image_repository/invoiceiq-dashboard:latest
+          readinessProbe:
+              port: 3000
+              path: /
+          env:
+              BACKEND_URL: http://backend.ivzu.svc.spcs.internal:8001
+    endpoints:
+        - name: dashboard
+          port: 3000
+          public: true
+

@@ -1,23 +1,36 @@
-FROM python:3.11-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
+# Set working directory
 WORKDIR /app
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+# Configure uv for optimal Docker builds
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV UV_TOOL_BIN_DIR=/usr/local/bin
 
-# Copy dependency files
-COPY pyproject.toml uv.lock* ./
+# Copy dependency files first for better layer caching
+COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies
-RUN uv sync --frozen --no-cache
+# Install dependencies in a separate layer for better caching
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
 
 # Copy application code
-COPY app ./app
+COPY app/ ./app/
 
-# Expose port
+# Install the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
+
+# Set Python path and environment
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH="/app"
+
+# Expose the port the app runs on
 EXPOSE 8001
 
-# Run the application
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Run the FastAPI application with uvicorn
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
 
 
