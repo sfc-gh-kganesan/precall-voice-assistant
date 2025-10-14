@@ -3,11 +3,10 @@ from typing import List
 
 from langgraph.graph import StateGraph, START, MessagesState, END
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode
 
-from .agent import Agent
-from .utils import ContextSchema, get_persistent_connection
-from .tools import return_final_result
+from app.agent import Agent
+from app.utils import ContextSchema, get_persistent_connection
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -116,3 +115,7 @@ def run_workflow(input: str) -> List[BaseMessage]|str:
     except Exception as e:
         logger.error(f"Error running workflow: {str(e)}")
         return f"Error: Failed to run workflow: {str(e)}"
+
+
+# Export graph for LangGraph Studio
+graph = create_graph()

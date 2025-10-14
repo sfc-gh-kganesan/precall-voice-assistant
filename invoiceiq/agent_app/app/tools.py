@@ -1,94 +1,94 @@
 import logging
 from typing import Dict
+import json
 
 from snowflake.connector import DictCursor
 from langgraph.runtime import get_runtime
 from langchain_core.tools import tool
 
-from .utils import ContextSchema
+from app.utils import ContextSchema
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def run_query(query: str) -> Dict[str, str]|None:
+def run_query(query: str, params: dict = None) -> Dict[str, str]|None:
     """
     Run a query against the database.
+    
+    Args:
+        query: SQL query string with %(name)s placeholders for parameters
+        params: Dictionary of parameters to bind to the query
     """
-    try: # Get connection from runtime
+    connection = None
+    close_connection = False
+    
+    # Try to get connection from runtime context
+    try:
         runtime = get_runtime(ContextSchema)
         connection = runtime.context.connection
+        logger.info("Using connection from runtime context")
     except Exception as e:
-        logger.error(f"Error getting connection from runtime: {str(e)}")
-        return f"Error getting Snowflake connection: {str(e)}"
+        logger.info(f"Could not get connection from runtime: {str(e)}")
+        connection = None
+    
+    # If no connection in context, create a temporary one (for LangGraph Studio)
     if not connection:
-        return f"Error getting Snowflake connection from runtime: No connection available"
+        logger.info("No connection in context, creating temporary connection")
+        try:
+            from app.utils import get_persistent_connection
+            connection = get_persistent_connection()
+            close_connection = True  # We created it, so we should close it
+        except Exception as e:
+            logger.error(f"Error creating connection: {str(e)}")
+            return f"Error creating Snowflake connection: {str(e)}"
     
     try:
         with connection.cursor(DictCursor) as cursor:
-            cursor.execute(query)
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
             rows = cursor.fetchall()
             return rows
     except Exception as e:
         logger.error(f"Error running query: {str(e)}")
         raise
+    finally:
+        # Close connection if we created it temporarily
+        if close_connection and connection:
+            connection.close()
 
-
+# TODO - Make table names dynamic and have agent ignore
 @tool
-def get_ticket_metadata(ticket_number: str) -> Dict[str, str] | str:
+def get_invoice_metadata(invoice_id: str) -> Dict[str, str] | str:
     """
-    Get metadata for a specific LIFT ticket number and corresponding email from the database.
+    Get invoice(s) metadata associated with a specific invoice ID from the database.
     
     Args:
-        ticket_number: The ticket number to look up
+        invoice_id: The invoice id to look up
         
     Returns:
-        A dictionary containing the ticket metadata
+        A dictionary containing the invoice metadata
     """
 
-    logger.info(f"Getting ticket metadata for ticket number: {ticket_number}")
 
-    query = f"""SELECT * EXCLUDE (ai_result, ai_decision, ai_reasoning) FROM invoiceiq.service.ticket_metadata 
-                WHERE ticket_number = '{ticket_number}'"""  
+    logger.info(f"Getting invoice metadata for invoice_id: {invoice_id}")
+
+    # Prior AI decisions may influence future decisions despite changes and need to revisit
+    query = """SELECT 
+        * 
+        EXCLUDE (AI_DECISION, AI_REASONING)
+        FROM INVOICEIQ.SERVICE.INVOICES
+        WHERE INVOICE_ID = %(invoice_id)s"""
     try:
-        rows = run_query(query)
+        rows = run_query(query, {"invoice_id": invoice_id})
 
         if rows:
-            return rows
-        else:
-            return {}
-
-    except Exception as e:
-        logger.error(f"Error getting ticket metadata: {str(e)}")
-        return f"Error getting ticket metadata: {str(e)}"
-
-
-@tool
-def get_invoice_metadata(ticket_number: str) -> Dict[str, str] | str:
-    """
-    Get invoice(s) metadata associated with a specific LIFT ticket number from the database.
-    
-    Args:
-        ticket_number: The ticket number to look up
-        
-    Returns:
-        A dictionary containing the invoice(s) metadata
-    """
-
-
-    logger.info(f"Getting invoice metadata for ticket number: {ticket_number}")
-
-    query = f"""SELECT 
-        inv.* 
-        FROM invoiceiq.service.file_metadata inv
-        join invoiceiq.service.ticket_metadata tick
-        using (submission_id)
-        where tick.ticket_number = '{ticket_number}'"""
-    try:
-        rows = run_query(query)
-
-        if rows:
+            if rows[0]["AI_PROCESSED_AT"] is not None:
+                logger.info(f"Invoice has already been processed. No further action is needed.")
+                return "Invoice has already been processed. No further action is needed."
             return rows
         else:
             return {}
@@ -96,26 +96,67 @@ def get_invoice_metadata(ticket_number: str) -> Dict[str, str] | str:
     except Exception as e:
         logger.error(f"Error getting invoice metadata: {str(e)}")
         return f"Error getting invoice metadata: {str(e)}"
+        
+# # Not implemented yet
+# @tool
+# def get_purchase_order_metadata(purchase_order_number: str) -> Dict[str, str] | str:
+#     """
+#     Get purchase order metadata associated with a specific invoice ID from the database.
+    
+#     Args:
+#         purchase_order_number: The purchase order number to look up
+        
+#     Returns:
+#         A dictionary containing the purchase order metadata
+#     """
+
+
+#     logger.info(f"Getting purchase order metadata for purchase_order_number: {purchase_order_number}")
+
+#     query = f"""SELECT 
+#         * 
+#         FROM INVOICEIQ.SERVICE.PURCHASE_ORDERS
+#         where PURCHASE_ORDER_NUMBER = '{purchase_order_number}'"""
+#     try:
+#         rows = run_query(query)
+
+#         if rows:
+#             return rows
+#         else:
+#             return {}
+
+#     except Exception as e:
+#         logger.error(f"Error getting purchase order metadata: {str(e)}")
+#         return f"Error getting purchase order metadata: {str(e)}"
+
 
 
 @tool
-def return_final_result(ticket_number: str, summary: str, relevant_details: str) -> Dict[str, str] | str:
+def return_final_result(invoice_id: str, ai_decision: str, ai_reasoning: str) -> Dict[str, str]:
     """
-    Return the final result based on the summary and relevant details.
+    Returns the final decision to approve or reject the invoice and corresponding reasoning behind the decision.
     
     Args:
-        ticket_number: The ticket number being processed
-        summary: The summary of the ticket being processed
-        relevant_details: The relevant details of the ticket being processed
+        invoice_id: The invoice_id being processed
+        ai_decision: The final decision to approve or reject the invoice. Value should be one of `approve` or `reject`.
+        ai_reasoning: The reasoning behind the final decision to approve or reject the invoice
         
     Returns:
-        A dictionary containing the final result
+        The final decision to approve or reject the invoice and corresponding reasoning behind the decision.
     """
 
-    logger.info(f"Returning final result for ticket number: {ticket_number}")
+    ai_decision = ai_decision.lower()
+
+    logger.info(f"Recording the final result for invoice_id: {invoice_id}")
+
+    logger.info(f"Final decision: {ai_decision}")
+    try:
+        logger.info(f"Final reasoning (truncated): {ai_reasoning[:20]}")
+    except IndexError:
+        logger.info(f"Final reasoning: {ai_reasoning}")
 
     return {
-        "ticket_number": ticket_number,
-        "summary": summary,
-        "relevant_details": relevant_details
+            "invoice_id": invoice_id,
+            "ai_decision": ai_decision,
+            "ai_reasoning": ai_reasoning
         }

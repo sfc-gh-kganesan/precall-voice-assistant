@@ -5,7 +5,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from langchain_core.messages import HumanMessage
 
-from .graph import run_workflow
+from app.graph import run_workflow
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,34 +17,34 @@ def readiness_probe():
     return {"status": "healthy"}
 
 @app.post("/process")
-async def process_ticket(request: Request):
+async def process_invoice(request: Request):
     """
-    Process ticket endpoint that handles both direct API calls and Snowflake service function calls.
-    Snowflake sends data in format: {"data": [[0, "ticket_number"]]}
-    Direct API calls send: {"ticket_number": "value"}
+    Process invoice endpoint that handles both direct API calls and Snowflake service function calls.
+    Snowflake sends data in format: {"data": [[0, "invoice_id"]]}
+    Direct API calls send: {"invoice_id": "value"}
     """
     try:
         # Get the raw request body
         body = await request.json()
         is_snowflake_format = False
         
-        # Extract ticket number and determine response format
+        # Extract invoice_id and determine response format
         if "data" in body and isinstance(body["data"], list) and len(body["data"]) > 0:
             # Snowflake service function format: {"data": [[0, "xyz"]]}
             input_rows = body["data"]
-            ticket_number = input_rows[0][1] if len(input_rows[0]) > 1 else input_rows[0][0]
+            invoice_id = input_rows[0][1] if len(input_rows[0]) > 1 else input_rows[0][0]
             row_index = input_rows[0][0]  # Preserve the row index
             is_snowflake_format = True
 
-        elif body: # If Direct API call is sent we expect the body to be the ticket number or the LLM to extract it
-            ticket_number = body
+        elif body: # If Direct API call is sent we expect the body to be the invoice_id or the LLM to extract it
+            invoice_id = body
             row_index = 0
 
         else:
             return {"data": [[0, "Error: Invalid request. Either input is empty or doesn't follow Snowflake service function format."]]}
 
 
-        ai_response = run_workflow(f"Process ticket: {ticket_number}")
+        ai_response = run_workflow(f"Process invoice: {invoice_id}")
         
         # Return response in appropriate format
         if is_snowflake_format:
@@ -54,7 +54,7 @@ async def process_ticket(request: Request):
 
         
     except Exception as e:
-        logger.error(f"Failed to process ticket: {str(e)}")
+        logger.error(f"Failed to process invoice_id: {str(e)}")
         # Try to preserve row index if available, otherwise use 0
         try:
             if "data" in body and isinstance(body["data"], list) and len(body["data"]) > 0:
@@ -64,7 +64,7 @@ async def process_ticket(request: Request):
         except:
             row_index = 0
         
-        return {"data": [[row_index, f"Error: Failed to process ticket: {str(e)}"]]}
+        return {"data": [[row_index, f"Error: Failed to process invoice_id: {str(e)}"]]}
 
 
 if __name__ == "__main__":

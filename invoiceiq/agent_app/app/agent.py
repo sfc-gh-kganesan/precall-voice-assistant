@@ -6,9 +6,12 @@ from langchain_core.tools import Tool
 from langchain_openai import ChatOpenAI
 
 
-from .prompts import SYSTEM_MESSAGE
-from .utils import is_running_in_spcs_container
-from .tools import get_ticket_metadata, get_invoice_metadata, return_final_result
+from app.prompts import SYSTEM_MESSAGE
+from app.utils import is_running_in_spcs_container, get_spcs_container_token
+from app.tools import (
+    # get_purchase_order_metadata, # Not implemented yet
+    get_invoice_metadata, 
+    return_final_result)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,11 +34,9 @@ class Agent:
         """Get the LLM chat object."""
 
         if self._is_spcs_container:
-            # api_key = get_spcs_container_token() # NOT CURRENTLY WORKING
-            api_key = os.getenv("SNOWFLAKE_PAT")
-            # Example SNOWFLAKE_HOST: "ssb77620.prod3.us-west-2.aws.snowflakecomputing.com"
-            # base_url = f"https://{os.getenv("SNOWFLAKE_HOST")}/api/v2/cortex/openai/" # NOT CURRENTLY WORKING FOR SFENGINEERING-AIFDE
-            base_url = f"https://{os.getenv("SNOWFLAKE_PSEUDO_ACCOUNT")}.snowflakecomputing.com/api/v2/cortex/openai" # Temporary fix for SFENGINEERING-AIFDE
+            snowflake_host = os.getenv('SNOWFLAKE_HOST')
+            base_url = f'https://{snowflake_host}/api/v2/cortex/openai'
+            api_key = get_spcs_container_token()
             
         else:
             api_key = os.getenv("SNOWFLAKE_PAT")
@@ -63,8 +64,8 @@ class Agent:
         """Get the tools."""
 
         tools = [
-            get_ticket_metadata,
             get_invoice_metadata,
+            # get_purchase_order_metadata, # Not implemented yet
             return_final_result,
             ]
 

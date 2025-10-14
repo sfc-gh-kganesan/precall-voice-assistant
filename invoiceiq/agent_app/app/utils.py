@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 import os
-from typing import Any
+from typing import Optional, Any
 from dataclasses import dataclass
 
 from snowflake.connector import connect
@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ContextSchema:
-    connection: connection
+    connection: Optional[Any] = None  # Use Any to avoid Pydantic serialization issues
+    thread_id: Optional[str] = None  # LangGraph Studio passes thread_id automatically
 
 
 def is_running_in_spcs_container() -> bool:
