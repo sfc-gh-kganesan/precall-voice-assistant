@@ -1,0 +1,458 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Dark theme colors */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-hover: #2a2d2e;
+  --bg-active: #094771;
+  --bg-selected: #37373d;
+  --bg-input: #3c3c3c;
+  --bg-button: #007acc;
+  --bg-button-hover: #005a9e;
+  --bg-button-disabled: #555;
+  
+  --text-primary: #d4d4d4;
+  --text-secondary: #cccccc;
+  --text-muted: #999;
+  
+  --border-primary: #3e3e42;
+  --border-focus: #007acc;
+}
+
+[data-theme="light"] {
+  /* Light theme colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f3f3;
+  --bg-tertiary: #e8e8e8;
+  --bg-hover: #e1e1e1;
+  --bg-active: #0078d4;
+  --bg-selected: #d0d0d0;
+  --bg-input: #ffffff;
+  --bg-button: #0078d4;
+  --bg-button-hover: #106ebe;
+  --bg-button-disabled: #a0a0a0;
+  
+  --text-primary: #323130;
+  --text-secondary: #605e5c;
+  --text-muted: #8a8886;
+  
+  --border-primary: #d1d1d1;
+  --border-focus: #0078d4;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.title-bar {
+  background-color: var(--bg-tertiary, #2d2d2d);
+  border-bottom: 1px solid var(--border-primary, #404040);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #ffffff);
+  height: 40px;
+  flex-shrink: 0;
+  z-index: 100;
+  position: relative;
+  min-height: 40px;
+}
+
+.title-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflow-name {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.1s;
+  user-select: none;
+}
+
+.workflow-name:hover {
+  background-color: var(--bg-hover, #3a3a3a);
+}
+
+.workflow-name-input {
+  background-color: var(--bg-input, #3c3c3c);
+  border: 1px solid var(--border-focus, #007acc);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--text-primary, #ffffff);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  min-width: 150px;
+}
+
+.workflow-name-input:focus {
+  border-color: var(--border-focus, #007acc);
+  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sidebar {
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100vh;
+}
+
+.file-browser {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.file-item {
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background-color 0.1s;
+}
+
+.file-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.file-item.active {
+  background-color: var(--bg-active);
+}
+
+.file-item.selected {
+  background-color: var(--bg-selected);
+}
+
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  height: calc(100vh - 40px);
+}
+
+.editor-section {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.code-editor {
+  background-color: var(--bg-primary);
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.graph-pane {
+  background-color: var(--bg-secondary);
+  border-left: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.graph-visualization {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.chat-pane {
+  background-color: var(--bg-tertiary);
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex-shrink: 0;
+}
+
+.chat-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 13px;
+  min-height: 0;
+}
+
+.chat-input-area {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input {
+  flex: 1;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.chat-input:focus {
+  border-color: var(--border-focus);
+}
+
+.send-button {
+  background-color: var(--bg-button);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.1s;
+}
+
+.send-button:hover {
+  background-color: var(--bg-button-hover);
+}
+
+.send-button:disabled {
+  background-color: var(--bg-button-disabled);
+  cursor: not-allowed;
+}
+
+.message {
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.message.user {
+  background-color: var(--bg-selected);
+  margin-left: 20px;
+}
+
+.message.assistant {
+  background-color: var(--bg-tertiary);
+  margin-right: 20px;
+}
+
+.graph-node {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.graph-node-title {
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.graph-node-description {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.monaco-editor {
+  height: 100% !important;
+  flex: 1;
+}
+
+.monaco-editor-container {
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Force Monaco Editor to take full height */
+.monaco-editor-container > div {
+  height: 100% !important;
+  flex: 1 !important;
+}
+
+.monaco-editor-container .monaco-editor {
+  height: 100% !important;
+  flex: 1 !important;
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.theme-toggle:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+/* Resizable Panes */
+.resizable-pane {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.resizable-vertical-pane {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.resize-handle {
+  position: absolute;
+  background-color: transparent;
+  z-index: 10;
+  transition: background-color 0.1s;
+}
+
+.resize-handle:hover {
+  background-color: var(--border-focus);
+}
+
+.resize-handle-horizontal {
+  top: 0;
+  right: -2px;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.resize-handle-vertical-top {
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  cursor: row-resize;
+}
+
+.resize-handle-vertical {
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  cursor: row-resize;
+}
+
+/* Resize handle visibility on hover */
+.resizable-pane:hover .resize-handle-horizontal {
+  background-color: var(--border-focus);
+  opacity: 0.3;
+}
+
+.resizable-vertical-pane:hover .resize-handle-vertical-top {
+  background-color: var(--border-focus);
+  opacity: 0.3;
+}
+
+.resizable-pane:hover .resize-handle-horizontal:hover,
+.resizable-vertical-pane:hover .resize-handle-vertical-top:hover {
+  opacity: 1;
+}
+
+/* Ensure resize handles are always visible on hover regardless of side */
+.resizable-pane .resize-handle:hover {
+  background-color: var(--border-focus) !important;
+  opacity: 1 !important;
+}
+
+/* Visual feedback during resize */
+body.resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.resizing-vertical {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+
+/* Smooth transitions for pane resizing */
+.resizable-pane,
+.resizable-vertical-pane {
+  transition: none; /* Disable transitions during resize for smooth dragging */
+}
+
+/* Resize handle active state */
+.resize-handle:active {
+  background-color: var(--border-focus) !important;
+  opacity: 1 !important;
+}
