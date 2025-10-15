@@ -1,0 +1,14 @@
+spec:
+  containers:
+    - name: web
+      image: /setli/core/image_repository/spcs-web-test:latest
+      readinessProbe:
+        port: 8000
+        path: /health
+      env:
+        SNOWFLAKE_WAREHOUSE: compute_wh
+        SNOWFLAKE_ROLE: invoiceiq_admin
+  endpoints:
+    - name: web
+      port: 8000
+      public: true
