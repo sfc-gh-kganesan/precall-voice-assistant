@@ -6,7 +6,7 @@ from snowflake.connector import DictCursor
 from langgraph.runtime import get_runtime
 from langchain_core.tools import tool
 
-from app.utils import ContextSchema
+from app.utils import ContextSchema, get_persistent_connection
 
 
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +37,6 @@ def run_query(query: str, params: dict = None) -> Dict[str, str]|None:
     if not connection:
         logger.info("No connection in context, creating temporary connection")
         try:
-            from app.utils import get_persistent_connection
             connection = get_persistent_connection()
             close_connection = True  # We created it, so we should close it
         except Exception as e:
@@ -97,37 +96,68 @@ def get_invoice_metadata(invoice_id: str) -> Dict[str, str] | str:
         logger.error(f"Error getting invoice metadata: {str(e)}")
         return f"Error getting invoice metadata: {str(e)}"
         
-# # Not implemented yet
-# @tool
-# def get_purchase_order_metadata(purchase_order_number: str) -> Dict[str, str] | str:
-#     """
-#     Get purchase order metadata associated with a specific invoice ID from the database.
+@tool
+def get_purchase_order_header_metadata(purchase_order_number: str) -> Dict[str, str] | str:
+    """
+    Get purchase order header metadata associated with a specific purchase order number from the database.
     
-#     Args:
-#         purchase_order_number: The purchase order number to look up
+    Args:
+        purchase_order_number: The purchase order number to look up
         
-#     Returns:
-#         A dictionary containing the purchase order metadata
-#     """
+    Returns:
+        A dictionary containing the purchase order header metadata
+    """
 
 
-#     logger.info(f"Getting purchase order metadata for purchase_order_number: {purchase_order_number}")
+    logger.info(f"Getting purchase order header metadata for purchase_order_number: {purchase_order_number}")
 
-#     query = f"""SELECT 
-#         * 
-#         FROM INVOICEIQ.SERVICE.PURCHASE_ORDERS
-#         where PURCHASE_ORDER_NUMBER = '{purchase_order_number}'"""
-#     try:
-#         rows = run_query(query)
+    query = f"""SELECT 
+        * 
+        FROM INVOICEIQ.SERVICE.PURCHASE_ORDER
+        where PO_HEADER_NUMBER = '{purchase_order_number}'"""
+    try:
+        rows = run_query(query)
 
-#         if rows:
-#             return rows
-#         else:
-#             return {}
+        if rows:
+            return rows
+        else:
+            return {}
 
-#     except Exception as e:
-#         logger.error(f"Error getting purchase order metadata: {str(e)}")
-#         return f"Error getting purchase order metadata: {str(e)}"
+    except Exception as e:
+        logger.error(f"Error getting purchase order header metadata: {str(e)}")
+        return f"Error getting purchase order header metadata: {str(e)}"
+
+
+@tool
+def get_purchase_order_line_item_metadata(purchase_order_number: str) -> Dict[str, str] | str:
+    """
+    Get purchase order line item metadata associated with a specific purchase order number from the database.
+    
+    Args:
+        purchase_order_number: The purchase order number to look up
+        
+    Returns:
+        A dictionary containing the purchase order line item metadata
+    """
+
+
+    logger.info(f"Getting purchase order line item metadata for purchase_order_number: {purchase_order_number}")
+
+    query = f"""SELECT 
+        * 
+        FROM INVOICEIQ.SERVICE.PURCHASE_ORDER_LINE_ITEM
+        where PO_HEADER_NUMBER = '{purchase_order_number}'"""
+    try:
+        rows = run_query(query)
+
+        if rows:
+            return rows
+        else:
+            return {}
+
+    except Exception as e:
+        logger.error(f"Error getting purchase order line item metadata: {str(e)}")
+        return f"Error getting purchase order line item metadata: {str(e)}"
 
 
 

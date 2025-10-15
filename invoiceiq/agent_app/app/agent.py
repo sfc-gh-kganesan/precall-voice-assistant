@@ -9,7 +9,8 @@ from langchain_openai import ChatOpenAI
 from app.prompts import SYSTEM_MESSAGE
 from app.utils import is_running_in_spcs_container, get_spcs_container_token
 from app.tools import (
-    # get_purchase_order_metadata, # Not implemented yet
+    get_purchase_order_header_metadata,
+    get_purchase_order_line_item_metadata,
     get_invoice_metadata, 
     return_final_result)
 
@@ -65,7 +66,8 @@ class Agent:
 
         tools = [
             get_invoice_metadata,
-            # get_purchase_order_metadata, # Not implemented yet
+            get_purchase_order_header_metadata,
+            get_purchase_order_line_item_metadata,
             return_final_result,
             ]
 
