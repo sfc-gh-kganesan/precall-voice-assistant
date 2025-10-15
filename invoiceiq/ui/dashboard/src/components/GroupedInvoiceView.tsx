@@ -16,6 +16,8 @@ interface GroupedInvoiceViewProps {
   onClearSelection: () => void;
   refreshTrigger?: number;
   optimisticUpdate?: { invoiceIds: string[], newStatus: string, timestamp: number };
+  isSearchMode?: boolean;
+  searchResults?: Invoice[];
 }
 
 export function GroupedInvoiceView({ 
@@ -27,7 +29,9 @@ export function GroupedInvoiceView({
   onSelectAll,
   onClearSelection,
   refreshTrigger = 0,
-  optimisticUpdate
+  optimisticUpdate,
+  isSearchMode = false,
+  searchResults = []
 }: GroupedInvoiceViewProps) {
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
@@ -41,6 +45,8 @@ export function GroupedInvoiceView({
         onClearSelection={onClearSelection}
         refreshTrigger={refreshTrigger}
         optimisticUpdate={optimisticUpdate}
+        isSearchMode={isSearchMode}
+        searchResults={searchResults}
       />
     );
   }

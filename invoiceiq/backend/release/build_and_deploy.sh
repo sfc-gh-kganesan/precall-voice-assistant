@@ -8,6 +8,9 @@ TAG=latest
 # Ensure we are logged in to remote registry
 snow spcs image-registry login -c $INVOICEIQ_SNOW_CONNECT
 
+# Change to backend directory where Dockerfile is located
+cd $ROOT/invoiceiq/backend
+
 # Build and push image to repository
 docker build --rm --platform linux/amd64 -t $REPO/$IMAGE:$TAG .
 docker push $REPO/$IMAGE:$TAG

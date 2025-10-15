@@ -9,17 +9,43 @@ export interface InvoiceResponse {
   ticket_number: string;
   status: 'approved' | 'pending' | 'rejected';
   relative_path: string | null;
+  file_url: string;
+  // Invoice fields
   vendor_name: string | null;
   invoice_number: string | null;
   invoice_date: string | null;
   total_amount: string | null;
   purchase_order_number: string | null;
   due_date: string | null;
+  banking_details: string | null;
+  freight_shipping_amount: string | null;
+  invoice_currency: string | null;
+  memo_description: string | null;
+  payment_terms: string | null;
+  payment_type: string | null;
+  prepaid_flag: boolean | null;
+  quantity: string | null;
+  service_end_date: string | null;
+  service_start_date: string | null;
+  shipped_to_address: string | null;
+  snowflake_entity: string | null;
+  snowflake_tax_id: string | null;
+  tax_amount: string | null;
+  unit_price: string | null;
+  vendor_address: string | null;
+  vendor_tax_id: string | null;
+  // AI fields
+  ai_reasoning: string | null;
+  ai_processed_at: string | null;
+  // Edit tracking
+  last_edited_by: string | null;
+  last_edited_at: string | null;
+  // Metadata
+  submission_id: string | null;
   created_at: string;
   updated_at: string;
   email_from: string | null;
   email_subject: string | null;
-  file_url: string;
 }
 
 export interface InvoiceListResponse {
@@ -63,6 +89,44 @@ export async function fetchInvoices(
     return data;
   } catch (error) {
     console.error('Error fetching invoices:', error);
+    throw error;
+  }
+}
+
+/**
+ * Search invoices by Lift Ticket # or Purchase Order #
+ * @param searchBy Field to search: 'liftTicket' or 'purchaseOrder'
+ * @param searchTerm Search term (exact match, case-insensitive)
+ * @param limit Number of invoices to fetch
+ * @param offset Pagination offset
+ */
+export async function searchInvoices(
+  searchBy: 'liftTicket' | 'purchaseOrder',
+  searchTerm: string,
+  limit: number = 1000,
+  offset: number = 0
+): Promise<InvoiceListResponse> {
+  const params = new URLSearchParams({
+    search_by: searchBy,
+    search_term: searchTerm,
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  const url = `${API_BASE_URL}/invoices/search?${params.toString()}`;
+
+  try {
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error searching invoices:', error);
     throw error;
   }
 }
@@ -146,6 +210,44 @@ export async function updateInvoiceStatus(
     return data;
   } catch (error) {
     console.error('Error updating invoice status:', error);
+    throw error;
+  }
+}
+
+export interface UpdateFieldsResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * Update invoice fields
+ * @param ticketNumber Ticket number of the invoice to update
+ * @param fields Object containing the fields to update
+ */
+export async function updateInvoiceFields(
+  ticketNumber: string,
+  fields: Record<string, any>
+): Promise<UpdateFieldsResponse> {
+  const url = `${API_BASE_URL}/invoices/${ticketNumber}/fields`;
+  
+  try {
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(fields),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const data: UpdateFieldsResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error updating invoice fields:', error);
     throw error;
   }
 }

@@ -8,16 +8,48 @@ export interface Invoice {
   id: string;
   invoiceNumber: string;
   liftTicketNumber: string;
+  ticketNumber: string; // Alias for liftTicketNumber
   purchaseOrderNumber: string;
   status: 'approved' | 'pending' | 'rejected';
   reason?: string;
   amount: number;
+  totalAmount: number; // Alias for amount
   vendor: string;
+  vendorName: string; // Alias for vendor
   date: string;
+  invoiceDate?: string; // Original invoice date
   pdfUrl: string;
   createdAt?: string;
   updatedAt?: string;
   emailFrom?: string;
+  // Additional invoice fields
+  dueDate?: string;
+  bankingDetails?: string;
+  freightShippingAmount?: number;
+  invoiceCurrency?: string;
+  memoDescription?: string;
+  paymentTerms?: string;
+  paymentType?: string;
+  prepaidFlag?: boolean;
+  quantity?: string;
+  serviceEndDate?: string;
+  serviceStartDate?: string;
+  shippedToAddress?: string;
+  snowflakeEntity?: string;
+  snowflakeTaxId?: string;
+  taxAmount?: number;
+  unitPrice?: number;
+  vendorAddress?: string;
+  vendorTaxId?: string;
+  // AI fields
+  aiReasoning?: string;
+  aiProcessedAt?: string;
+  // Edit tracking
+  lastEditedBy?: string;
+  lastEditedAt?: string;
+  // Metadata
+  submissionId?: string;
+  emailSubject?: string;
 }
 
 interface InvoiceCardProps {
