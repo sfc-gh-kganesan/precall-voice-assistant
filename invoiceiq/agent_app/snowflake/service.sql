@@ -37,8 +37,8 @@ CREATE OR REPLACE TASK consume_invoices_stream_task
   WAREHOUSE = COMPUTE_WH
   SCHEDULE = '5 MINUTE'
 AS
--- This single, atomic statement drains the stream and stages the data.
-INSERT INTO INVOICE_PROCESSING_STAGE (
+-- This single, atomic statement drains the stream and queues the data.
+INSERT INTO INVOICE_PROCESSING_QUEUE (
     INVOICE_ID,
     AI_PROCESSED_AT,
     METADATA$ACTION,
@@ -57,9 +57,9 @@ WHERE
     -- It ignores changes that were caused by our own processor task.
 AND AI_PROCESSED_AT IS NULL;
 
--- Create a TASK to process new rows in the INVOICE_PROCESSING_STAGE
+-- Create a TASK to process new rows in the INVOICE_PROCESSING_QUEUE
 -- Task will process one invoice at a time to avoid batched failures from one invoice error
--- Task has to delete the invoice from the staging table after processing to avoid infinite loop
+-- Task has to delete the invoice from the queue table after processing to avoid infinite loop
 CREATE OR REPLACE TASK process_and_cleanup_invoice_task
   WAREHOUSE = COMPUTE_WH
   SCHEDULE = '1 MINUTE'
@@ -72,13 +72,13 @@ BEGIN
         v_ai_reasoning VARCHAR;
     BEGIN
         -- Step 1: Find one invoice, process it, parse it, and store the results in variables.
-        -- NOTE: This reads from the STAGING TABLE, not the raw stream, for reliability.
+        -- NOTE: This reads from the QUEUE TABLE, not the raw stream, for reliability.
         WITH
             AGENT_RESULTS AS (
                 SELECT
-                    -- Call the function on the ID from the staging table
+                    -- Call the function on the ID from the queue table
                     PARSE_JSON(PROCESS_INVOICE(INVOICE_ID)) AS RAW_RESULTS
-                FROM INVOICE_PROCESSING_STAGE -- Reading from the safe staging table
+                FROM INVOICE_PROCESSING_QUEUE -- Reading from the safe queue table
                 LIMIT 1 -- Process only one record per task run
             ),
             PROCESSED_RESULTS AS (
@@ -117,13 +117,13 @@ BEGIN
                     T.AI_REASONING = S.AI_REASONING,
                     T.AI_PROCESSED_AT = CURRENT_TIMESTAMP();
 
-            -- Step 4: Atomically delete the processed record from the staging table
-            DELETE FROM INVOICE_PROCESSING_STAGE
+            -- Step 4: Atomically delete the processed record from the queue table
+            DELETE FROM INVOICE_PROCESSING_QUEUE
             WHERE INVOICE_ID = :v_invoice_id;
 
             RETURN 'Successfully processed and cleaned up invoice: ' || :v_invoice_id;
         ELSE
-            RETURN 'No invoices to process in the staging table.';
+            RETURN 'No invoices to process in the queue table.';
         END IF;
     END;
 END;
