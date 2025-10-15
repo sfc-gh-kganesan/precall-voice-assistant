@@ -3,7 +3,6 @@
 set -e
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
-SPCS_TOKEN="$($ROOT/invoiceiq/collector/scripts/get_spcs_token.sh)"
 SPCS_ENDPOINT="$($ROOT/invoiceiq/collector/scripts/get_spcs_endpoint.sh)"
 EMAIL=$(printf %q $(cat $ROOT/invoiceiq/collector/scripts/example_email.eml))
 FILE_DIR="$ROOT/invoiceiq/collector/test_files"
@@ -25,7 +24,7 @@ response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
   -F "ticket_number=LIFT-$(randomnum 1 10000)" \
   -F "files=@$FILE_DIR/invoice_01.pdf" \
   -F "email=\"$EMAIL\"" \
-  -H "Authorization: Snowflake Token=\"$SPCS_TOKEN\"" \
+  -H "Authorization: Snowflake Token=\"$SNOWFLAKE_PAT\"" \
   "$URL")
 
 http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)
