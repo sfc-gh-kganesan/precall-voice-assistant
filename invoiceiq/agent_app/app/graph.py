@@ -46,8 +46,9 @@ def create_graph():
     def call_model(state: MessagesState) -> MessagesState:
 
         try:
-
-            return {"messages": agent.model.invoke(state["messages"])}
+            response = agent.model.invoke(state["messages"])
+            logger.info(f"Model response received")
+            return {"messages": response}
         except Exception as e:
                 # Return an AI message with the error instead of crashing
             logger.error(f"Error in call_model: {str(e)}")

@@ -29,11 +29,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy application code
 COPY app/ ./app/
-# COPY snowflake/ ./snowflake/
-
-# Install the project
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+COPY README.md ./
 
 # Set Python path and environment
 ENV PATH="/app/.venv/bin:$PATH"
@@ -47,5 +43,5 @@ EXPOSE 8000
 # HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 #     CMD curl -f http://localhost:8000/healthcheck || exit 1
 
-# Run the FastAPI application with uvicorn
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the FastAPI application with uvicorn directly (no uv run to avoid runtime dependency resolution)
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

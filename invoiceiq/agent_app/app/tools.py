@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def run_query(query: str, params: dict = None) -> Dict[str, str]|None:
+def run_query(query: str, params: dict = None) -> list[Dict[str, str]]|str:
     """
     Run a query against the database.
     
@@ -45,15 +45,18 @@ def run_query(query: str, params: dict = None) -> Dict[str, str]|None:
     
     try:
         with connection.cursor(DictCursor) as cursor:
+ 
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
             rows = cursor.fetchall()
+
             return rows
     except Exception as e:
         logger.error(f"Error running query: {str(e)}")
-        raise
+        return f"Error running query: {str(e)}"
+
     finally:
         # Close connection if we created it temporarily
         if close_connection and connection:
@@ -90,6 +93,7 @@ def get_invoice_metadata(invoice_id: str) -> Dict[str, str] | str:
                 return "Invoice has already been processed. No further action is needed."
             return rows
         else:
+            logger.info(f"No invoice metadata found for invoice_id: {invoice_id}")
             return {}
 
     except Exception as e:
@@ -153,6 +157,7 @@ def get_purchase_order_line_item_metadata(purchase_order_number: str) -> Dict[st
         if rows:
             return rows
         else:
+            logger.info(f"No purchase order line item metadata found for purchase_order_number: {purchase_order_number}")
             return {}
 
     except Exception as e:

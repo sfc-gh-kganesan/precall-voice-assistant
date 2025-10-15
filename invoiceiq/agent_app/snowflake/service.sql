@@ -2,10 +2,9 @@ use role invoiceiq_admin;
 use invoiceiq.service;
 
 drop service if exists invoice_processing_service;
-// Env var is temporary fix for SNOWFLAKE_ACCOUNT due to SPCS container not having access to SNOWFLAKE_HOST endpoint
+
 CREATE SERVICE invoice_PROCESSING_SERVICE
   IN COMPUTE POOL COMPUTE_POOL_CPU
-  EXTERNAL_ACCESS_INTEGRATIONS = (cortex_access_integration)
   QUERY_WAREHOUSE = COMPUTE_WH
   MIN_INSTANCES=1
   MAX_INSTANCES=1
@@ -130,5 +129,5 @@ END;
 
 
 -- Tasks start in suspended state
--- ALTER TASK consume_invoices_stream_task RESUME;
--- ALTER TASK process_and_cleanup_invoice_task RESUME;
+ALTER TASK consume_invoices_stream_task RESUME;
+ALTER TASK process_and_cleanup_invoice_task RESUME;

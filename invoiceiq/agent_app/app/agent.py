@@ -48,8 +48,12 @@ class Agent:
             model = ChatOpenAI(
                 model="claude-3-5-sonnet", 
                 base_url=base_url,
+                request_timeout=30,
+                max_retries=4,
                 temperature=0,
+                # include_response_headers = True, # Allows us to capture the Snowflake request ID for debugging
                 api_key=api_key)
+            
             
             # Bind tools to the model
             if self.tools:
