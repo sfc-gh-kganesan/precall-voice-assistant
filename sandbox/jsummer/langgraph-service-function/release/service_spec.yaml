@@ -1,0 +1,8 @@
+spec:
+    containers:
+    - name: langgraph-service-function
+      image: /JSUMMER/SANDBOX/IMAGE_REPOSITORY/langgraph-service-function:latest
+    endpoints:
+    - name: function
+      port: 8000
+      public: true
