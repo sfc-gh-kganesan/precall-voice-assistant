@@ -784,6 +784,9 @@ async def update_invoice_fields(ticket_number: str, fields: dict):
     # Add UPDATED_AT timestamp
     set_clauses.append("UPDATED_AT = CURRENT_TIMESTAMP()")
 
+    # Null out AI_PROCESSED_AT to trigger re-processing by agent
+    set_clauses.append("AI_PROCESSED_AT = NULL")
+
     try:
         with get_snowflake_connection() as conn:
             cursor = conn.cursor()
@@ -795,6 +798,7 @@ async def update_invoice_fields(ticket_number: str, fields: dict):
                 WHERE TICKET_NUMBER = %s
             """
 
+            logger.info(update_query)
             params.append(ticket_number)
             cursor.execute(update_query, params)
             updated_count = cursor.rowcount

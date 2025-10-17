@@ -166,13 +166,6 @@ export default function App() {
                 {/* Header */}
                 <div className="mb-8">
                     <div className="flex items-center gap-4 mb-4">
-                        <div className="flex items-center justify-center">
-                            <img
-                                src="/snowflake.png"
-                                alt="Snowflake Logo"
-                                className="h-12 w-auto object-contain"
-                            />
-                        </div>
                         <div>
                             <h1 className="mb-1 bg-gradient-to-r from-[var(--snowflake-blue)] to-[var(--snowflake-teal)] bg-clip-text text-transparent">InvoiceIQ Dashboard</h1>
                             <p className="text-muted-foreground">
