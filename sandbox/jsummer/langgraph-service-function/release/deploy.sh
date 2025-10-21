@@ -6,10 +6,10 @@ TAG=latest
 SERVICE_NAME=langgraph
 
 echo "Creating database if not exists"
-snow object create database $DATABASE --if-not-exists
+snow object create database name=$DATABASE --if-not-exists
 
 echo "Creating schema if not exists"
-snow object create schema $SCHEMA --database $DATABASE --if-not-exists
+snow object create schema name=$SCHEMA --database $DATABASE --if-not-exists
 
 echo "Creating compute pool"
 snow spcs compute-pool deploy $SNOW_CONNECT || true
