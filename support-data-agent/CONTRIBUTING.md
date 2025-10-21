@@ -59,7 +59,7 @@ cd frontend && npm run lint && npm run format
 ```
 SNOWFLAKE_ACCOUNT=your_account
 SNOWFLAKE_USER=your_username
-SNOWFLAKE_AUTHENTICATOR=your_password
+SNOWFLAKE_PASSWORD=your_password
 SNOWFLAKE_DATABASE=your_database
 ```
 

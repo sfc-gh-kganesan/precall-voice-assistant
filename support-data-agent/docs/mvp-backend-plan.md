@@ -63,7 +63,7 @@ backend/
   class Settings(BaseSettings):
       snowflake_account: str
       snowflake_user: str
-      SNOWFLAKE_AUTHENTICATOR: str
+      snowflake_password: str
       snowflake_warehouse: str
       snowflake_database: str
       snowflake_schema: str

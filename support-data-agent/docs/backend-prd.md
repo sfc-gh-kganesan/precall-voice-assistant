@@ -1742,7 +1742,7 @@ GROUP BY DATE_TRUNC('week', CREATED_AT);
 class Settings(BaseSettings):
     snowflake_account: str
     snowflake_user: str
-    SNOWFLAKE_AUTHENTICATOR: str
+    snowflake_password: str
     snowflake_warehouse: str = "COMPUTE_WH"
     snowflake_database: str
     snowflake_schema: str
@@ -1765,7 +1765,7 @@ def get_session_pool():
     return Session.builder.configs({
         "account": settings.snowflake_account,
         "user": settings.snowflake_user,
-        "password": settings.SNOWFLAKE_AUTHENTICATOR,
+        "password": settings.snowflake_password,
         "warehouse": settings.snowflake_warehouse,
         "database": settings.snowflake_database,
         "schema": settings.snowflake_schema,
@@ -1828,7 +1828,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--worker
 # .env
 SNOWFLAKE_ACCOUNT=abc12345.us-west-2
 SNOWFLAKE_USER=service_user
-SNOWFLAKE_AUTHENTICATOR=***
+SNOWFLAKE_PASSWORD=***
 SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 SNOWFLAKE_DATABASE=SUPPORT_DB
 SNOWFLAKE_SCHEMA=TICKETS
@@ -1876,7 +1876,7 @@ spec:
             secretKeyRef:
               name: snowflake-creds
               key: user
-        - name: SNOWFLAKE_AUTHENTICATOR
+        - name: SNOWFLAKE_PASSWORD
           valueFrom:
             secretKeyRef:
               name: snowflake-creds
