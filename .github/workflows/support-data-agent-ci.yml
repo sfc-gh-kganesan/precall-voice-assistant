@@ -1,0 +1,44 @@
+name: support-data-agent-ci
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "support-data-agent/**/*"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: support-data-agent/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: support-data-agent/frontend
+        run: npm ci
+
+      - name: Lint backend
+        working-directory: support-data-agent/backend
+        run: uv run ruff check
+
+      - name: Lint frontend
+        working-directory: support-data-agent/frontend
+        run: npm run lint
