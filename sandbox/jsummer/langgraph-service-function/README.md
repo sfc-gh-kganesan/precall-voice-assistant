@@ -63,44 +63,56 @@ definition_version: 2
 entities:
   compute_pool:
     type: compute-pool
-    identifier:
-      name: compute_pool_cpu
+    identifier: <% ctx.env.COMPUTE_POOL %>
     min_nodes: 1
     max_nodes: 1
     instance_family: CPU_X64_XS
     auto_resume: true
     initially_suspended: true
     auto_suspend_seconds: 60
-    
   image_repository:
     type: image-repository
-    identifier: 
-      name: image_repository
-      database: JSUMMER
-      schema: SANDBOX
-      
+    identifier:
+      name: <% ctx.env.IMAGE_REPOSITORY %>
+      database: <% ctx.env.DATABASE %>
+      schema: <% ctx.env.SCHEMA %>
   langgraph:
     type: service
     identifier: 
       name: langgraph
-      database: JSUMMER
-      schema: SANDBOX
-    compute_pool: compute_pool_cpu
+      database: <% ctx.env.DATABASE %>
+      schema: <% ctx.env.SCHEMA %>
+    stage: <% ctx.env.STAGE %>
+    compute_pool: <% ctx.env.COMPUTE_POOL %>
     spec_file: service_spec.yaml
     min_instances: 1
     max_instances: 1
     auto_resume: true
+    artifacts:
+      - service_spec.yaml
+    comment: "LangGraph service"
 ```
-
-**Important:** Update the `database` and `schema` values in `snowflake.yml` to match your environment.
 
 ## Deployment
 
 ### Quick Start
 
+1) Edit the values at the top of `/release/deploy.sh` as you desire. We assume everything is contained in a single database + schema.
+```bash
+COMPUTE_POOL=sandbox_compute_pool_cpu
+DATABASE=JSUMMER
+SCHEMA=SANDBOX
+STAGE=DROPBOX
+IMAGE_REPOSITORY=image_repository
+IMAGE=langgraph-service-function
+TAG=latest
+SERVICE_NAME=langgraph
+```
+
+2) Run the script:
 ```bash
 cd release
-export SNOW_CONNECT="--connection default"
+export SNOW_CONNECT="--connection default" # Optional
 ./deploy.sh
 ```
 
@@ -112,6 +124,7 @@ The `deploy.sh` script automates the complete deployment:
 2. **Authenticates**: Logs into Snowflake container registry
 3. **Builds container**: Creates multi-platform Docker image (linux/amd64)
 4. **Pushes image**: Uploads to Snowflake image repository
+5. **Updates spec**: Sets the image URL in service spec
 5. **Deploys service**: Creates SPCS service from `service_spec.yaml`
 6. **Creates function**: Deploys `LANGGRAPH_FUNCTION` SQL wrapper
 

@@ -1,7 +1,7 @@
 spec:
     containers:
     - name: langgraph-service-function
-      image: /JSUMMER/SANDBOX/IMAGE_REPOSITORY/langgraph-service-function:latest
+      image: sfengineering-aifde.registry.snowflakecomputing.com/jsummer/sandbox/image_repository/langgraph-service-function:latest
     endpoints:
     - name: function
       port: 8000
