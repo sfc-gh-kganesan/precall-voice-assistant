@@ -12,6 +12,7 @@ from pydantic import BaseModel
 import snowflake.connector
 from snowflake.connector import DictCursor
 from dotenv import load_dotenv
+import httpx
 
 # Load environment variables
 load_dotenv()
@@ -63,6 +64,51 @@ def get_snowflake_config():
             "schema": os.getenv("SNOWFLAKE_SCHEMA", "SERVICE"),
             "role": os.getenv("SNOWFLAKE_ROLE"),
         }
+
+
+# Helper function to trigger agent review
+async def trigger_agent_review(invoice_id: str, relative_path: str):
+    """
+    Call the agent service to reprocess an invoice.
+    Uses existing metadata (doesn't re-extract from PDF).
+    """
+    # AGENT_SERVICE_URL varies per environment:
+    # - Local dev: http://localhost:8000
+    # - SPCS: invoice-processing-service.<compute-pool>.svc.spcs.internal:8000
+    #   (where <compute-pool> is the name of your SPCS compute pool, e.g., 'ivzu')
+    agent_service_url = os.getenv("AGENT_SERVICE_URL", "http://localhost:8000")
+    
+    # Prepare the payload for the agent service
+    payload = {
+        "target_table": "INVOICES",
+        "invoice_id": invoice_id,
+        "relative_path": relative_path,
+        "stage_name": "TICKET_ATTACHMENTS",
+        "use_existing_ai_extract": True  # Don't re-run AI_EXTRACT, use existing metadata
+    }
+    
+    try:
+        # Use longer timeout as agent processing can take 1-2 minutes
+        # TODO: Consider making this a background task with status polling in future iteration
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            logger.info(f"Calling agent service at {agent_service_url}/process for invoice {invoice_id}")
+            logger.info(f"Agent payload: {payload}")
+            response = await client.post(
+                f"{agent_service_url}/process",
+                json=payload
+            )
+            response.raise_for_status()
+            result = response.json()
+            logger.info(f"Agent service response: {result}")
+            return result
+    except httpx.TimeoutException:
+        logger.error(f"Timeout calling agent service for invoice {invoice_id}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to trigger agent review for invoice {invoice_id}: {str(e)}")
+        # Don't fail the field update if agent call fails
+        return None
+
 
 # Pydantic models
 class Invoice(BaseModel):
@@ -784,9 +830,6 @@ async def update_invoice_fields(ticket_number: str, fields: dict):
     # Add UPDATED_AT timestamp
     set_clauses.append("UPDATED_AT = CURRENT_TIMESTAMP()")
 
-    # Null out AI_PROCESSED_AT to trigger re-processing by agent
-    set_clauses.append("AI_PROCESSED_AT = NULL")
-
     try:
         with get_snowflake_connection() as conn:
             cursor = conn.cursor()
@@ -823,6 +866,59 @@ async def update_invoice_fields(ticket_number: str, fields: dict):
         raise
     except Exception as e:
         logger.error(f"Error updating invoice fields: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/invoices/{ticket_number}/reprocess")
+async def reprocess_invoice(ticket_number: str):
+    """
+    Manually trigger the agent to reprocess an invoice.
+    This endpoint is called after user edits to re-run the agent workflow.
+    
+    Path parameters:
+    - ticket_number: The ticket number of the invoice to reprocess
+    """
+    logger.info(f"Manual reprocess requested for invoice {ticket_number}")
+    
+    try:
+        with get_snowflake_connection() as conn:
+            cursor = conn.cursor(DictCursor)
+            
+            # Get the INVOICE_ID and RELATIVE_PATH for this ticket
+            query = "SELECT INVOICE_ID, RELATIVE_PATH FROM INVOICES WHERE TICKET_NUMBER = %s"
+            cursor.execute(query, [ticket_number])
+            result = cursor.fetchone()
+            
+            if not result:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Invoice with ticket number {ticket_number} not found"
+                )
+            
+            invoice_id = result['INVOICE_ID']
+            relative_path = result['RELATIVE_PATH']
+            logger.info(f"Found invoice_id {invoice_id} and relative_path {relative_path} for ticket {ticket_number}")
+            
+            # Trigger agent review with existing metadata
+            agent_result = await trigger_agent_review(invoice_id, relative_path)
+            
+            if agent_result:
+                return {
+                    "success": True,
+                    "message": f"Agent reprocessing triggered for invoice {ticket_number}",
+                    "invoice_id": invoice_id
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to trigger agent reprocessing for invoice {ticket_number}",
+                    "invoice_id": invoice_id
+                }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reprocessing invoice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

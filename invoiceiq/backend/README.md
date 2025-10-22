@@ -14,7 +14,27 @@ This project uses [uv](https://github.com/astral-sh/uv) for dependency managemen
    make install
    ```
 
-2. Run the development server:
+2. Create a `.env` file with required environment variables:
+
+   ```bash
+   # Snowflake Configuration
+   SNOWFLAKE_ACCOUNT=SFENGINEERING-AIFDE
+   SNOWFLAKE_USER=svc_invoiceiq
+   SNOWFLAKE_PAT=your_personal_access_token
+   SNOWFLAKE_WAREHOUSE=compute_wh
+   SNOWFLAKE_DATABASE=invoiceiq
+   SNOWFLAKE_SCHEMA=service
+   SNOWFLAKE_ROLE=invoiceiq_admin
+   
+   # Agent Service URL (langgraph_workflow service)
+   # Local dev: http://localhost:8000
+   # SPCS: invoice-processing-service.<compute-pool>.svc.spcs.internal:8000
+   AGENT_SERVICE_URL=http://localhost:8000
+   ```
+
+   **Note:** For local development, start the agent with `cd ../langgraph_workflow && make run`
+
+3. Run the development server:
    ```bash
    make dev
    ```

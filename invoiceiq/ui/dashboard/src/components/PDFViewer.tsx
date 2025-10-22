@@ -3,10 +3,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Input } from "./ui/input";
-import { Download, X, CheckCircle, Clock, XCircle, Loader2, AlertCircle, Pencil, Save, XCircle as XIcon } from "lucide-react";
+import { Download, X, CheckCircle, Clock, XCircle, Loader2, AlertCircle, Pencil, Save, XCircle as XIcon, RefreshCw } from "lucide-react";
 import { Invoice } from "./InvoiceCard";
 import { toast } from "sonner";
-import { updateInvoiceFields, updateInvoiceStatus } from "../services/api";
+import { updateInvoiceFields, updateInvoiceStatus, reprocessInvoice } from "../services/api";
 
 interface PDFViewerProps {
     invoice: Invoice | null;
@@ -26,6 +26,8 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
     const [editingSection, setEditingSection] = useState<string | null>(null);
     const [editedValues, setEditedValues] = useState<Partial<Invoice>>({});
     const [saving, setSaving] = useState(false);
+    const [hasUnsavedEdits, setHasUnsavedEdits] = useState(false);
+    const [reprocessing, setReprocessing] = useState(false);
 
     // Local invoice state for optimistic updates
     const [localInvoice, setLocalInvoice] = useState<Invoice | null>(invoice);
@@ -53,11 +55,20 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
         setLoading(false);
     }, [invoice, isOpen]);
 
-    // Reset edit state when invoice changes
+    // Reset edit state when invoice changes or modal closes
     useEffect(() => {
         setEditingSection(null);
         setEditedValues({});
+        setHasUnsavedEdits(false);
     }, [invoice?.id]);
+
+    // Reset state when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setHasUnsavedEdits(false);
+            setReprocessing(false);
+        }
+    }, [isOpen]);
 
     // Use localInvoice for display to support optimistic updates
     const displayInvoice = localInvoice || invoice;
@@ -153,6 +164,9 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
             await updateInvoiceFields(displayInvoice.ticketNumber, savedValues);
 
             toast.success(`${section} updated successfully`);
+            
+            // Mark that we have unsaved edits that need agent reprocessing
+            setHasUnsavedEdits(true);
 
             // Trigger a refresh to get the latest data from backend
             if (onRefresh) {
@@ -172,6 +186,33 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
             setEditedValues(savedValues);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleReprocessInvoice = async () => {
+        if (!displayInvoice) return;
+
+        setReprocessing(true);
+
+        try {
+            await reprocessInvoice(displayInvoice.ticketNumber);
+            
+            toast.success('Agent workflow restarted successfully');
+            
+            // Clear the unsaved edits flag
+            setHasUnsavedEdits(false);
+
+            // Trigger a refresh to get the latest data from backend
+            if (onRefresh) {
+                setTimeout(() => {
+                    onRefresh();
+                }, 1000); // Give agent a moment to process
+            }
+        } catch (error) {
+            console.error('Error reprocessing invoice:', error);
+            toast.error('Failed to restart agent workflow');
+        } finally {
+            setReprocessing(false);
         }
     };
 
@@ -306,6 +347,26 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                             </DialogDescription>
                         </div>
                         <div className="flex items-center gap-3">
+                            {hasUnsavedEdits && (
+                                <Button
+                                    size="sm"
+                                    onClick={handleReprocessInvoice}
+                                    disabled={reprocessing}
+                                    className="bg-gradient-to-r from-[var(--snowflake-blue)] to-[var(--snowflake-teal)] hover:from-[var(--snowflake-blue)]/90 hover:to-[var(--snowflake-teal)]/90 text-white shadow-md"
+                                >
+                                    {reprocessing ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Reprocessing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <RefreshCw className="w-4 h-4 mr-2" />
+                                            Rerun Agent Workflow
+                                        </>
+                                    )}
+                                </Button>
+                            )}
                             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                                 <SelectTrigger className="w-36">
                                     <SelectValue placeholder="Change status" />

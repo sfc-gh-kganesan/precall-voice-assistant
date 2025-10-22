@@ -252,3 +252,39 @@ export async function updateInvoiceFields(
   }
 }
 
+export interface ReprocessInvoiceResponse {
+  success: boolean;
+  message: string;
+  invoice_id: string;
+}
+
+/**
+ * Trigger agent to reprocess an invoice after user edits
+ * @param ticketNumber Ticket number of the invoice to reprocess
+ */
+export async function reprocessInvoice(
+  ticketNumber: string
+): Promise<ReprocessInvoiceResponse> {
+  const url = `${API_BASE_URL}/invoices/${ticketNumber}/reprocess`;
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const data: ReprocessInvoiceResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error reprocessing invoice:', error);
+    throw error;
+  }
+}
+
