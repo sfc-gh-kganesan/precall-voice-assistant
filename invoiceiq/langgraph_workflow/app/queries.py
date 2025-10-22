@@ -1,0 +1,119 @@
+CLASSIFY_QUERY = """with input_text as (
+            SELECT AI_PARSE_DOCUMENT (
+                TO_FILE(%(stage_name)s, %(relative_path)s),
+                {{'mode': 'LAYOUT', 'page_split': false}}) AS content)
+            select SNOWFLAKE.CORTEX.CLASSIFY_TEXT(content:"content", [{class_options_list}])
+            as classification
+            from input_text"""
+
+GET_AI_EXTRACT_METADATA_QUERY = """SELECT 
+            invoice_id
+            ,banking_details
+            ,due_date
+            ,freight_shipping_amount
+            ,invoice_currency
+            ,invoice_date
+            ,invoice_number
+            ,memo_description
+            ,payment_terms
+            ,payment_type
+            ,prepaid_flag
+            ,purchase_order_number
+            ,quantity
+            ,service_end_date
+            ,service_start_date
+            ,shipped_to_address
+            ,snowflake_entity
+            ,snowflake_tax_id
+            ,tax_amount
+            ,total_amount
+            ,unit_price
+            ,vendor_address
+            ,vendor_name
+            ,vendor_tax_id
+        FROM {target_table} WHERE INVOICE_ID = %(invoice_id)s LIMIT 1"""
+
+RUN_AI_EXTRACT_QUERY = """SELECT AI_EXTRACT(
+            file => TO_FILE(%(stage_name)s, %(relative_path)s),
+            responseFormat => PARSE_JSON(%(ai_extract_prompt)s)
+            ) AS INVOICE_METADATA"""
+
+RECORD_AI_EXTRACT_METADATA_QUERY = """
+            MERGE INTO {target_table} AS target
+            USING (
+                SELECT 
+                    %(invoice_id)s as invoice_id,
+                    extracted_data:banking_details::varchar as banking_details,
+                    case
+                        when extracted_data:payment_terms::string = 'net 30'
+                        then dateadd(day, 30, try_to_date(extracted_data:invoice_date::string, 'mm/dd/yyyy'))
+                        else try_to_date(nullif(extracted_data:due_date::string, 'none'))
+                    end as due_date,
+                    try_cast(nullif(extracted_data:freight_shipping_amount::string, 'none') as number(38, 2)) as freight_shipping_amount,
+                    case
+                        when extracted_data:invoice_currency::string = 'us currency' then 'usd'
+                        else left(extracted_data:invoice_currency::string, 10)
+                    end as invoice_currency,
+                    try_to_date(extracted_data:invoice_date::string, 'mm/dd/yyyy') as invoice_date,
+                    extracted_data:invoice_number::varchar as invoice_number,
+                    extracted_data:memo_description::varchar as memo_description,
+                    extracted_data:payment_terms::varchar as payment_terms,
+                    extracted_data:payment_type::varchar as payment_type,
+                    iff(lower(extracted_data:prepaid_flag::string) in ('yes', 'true'), true, false) as prepaid_flag,
+                    extracted_data:purchase_order_number::varchar as purchase_order_number,
+                    try_cast(nullif(extracted_data:quantity::string, 'none') as number(38, 4)) as quantity,
+                    try_to_date(nullif(extracted_data:service_end_date::string, 'none')) as service_end_date,
+                    try_to_date(nullif(extracted_data:service_start_date::string, 'none')) as service_start_date,
+                    extracted_data:shipped_to_address::varchar as shipped_to_address,
+                    extracted_data:snowflake_entity::varchar as snowflake_entity,
+                    nullif(extracted_data:snowflake_tax_id::string, 'none') as snowflake_tax_id,
+                    try_cast(nullif(extracted_data:tax_amount::string, 'none') as number(38, 2)) as tax_amount,
+                    try_cast(replace(extracted_data:total_amount::string, ',', '') as number(38, 2)) as total_amount,
+                    try_cast(nullif(extracted_data:unit_price::string, 'none') as number(38, 4)) as unit_price,
+                    extracted_data:vendor_address::varchar as vendor_address,
+                    extracted_data:vendor_name::varchar as vendor_name,
+                    nullif(extracted_data:vendor_tax_id::string, 'none') as vendor_tax_id,
+                FROM (SELECT PARSE_JSON(%(json_string)s) AS extracted_data)
+            )  AS source
+            ON target.invoice_id = source.invoice_id
+            WHEN MATCHED THEN
+                UPDATE SET
+                    target.banking_details = source.banking_details,
+                    target.due_date = source.due_date,
+                    target.freight_shipping_amount = source.freight_shipping_amount,
+                    target.invoice_currency = source.invoice_currency,
+                    target.invoice_date = source.invoice_date,
+                    target.invoice_number = source.invoice_number,
+                    target.memo_description = source.memo_description,
+                    target.payment_terms = source.payment_terms,
+                    target.payment_type = source.payment_type,
+                    target.prepaid_flag = source.prepaid_flag,
+                    target.purchase_order_number = source.purchase_order_number,
+                    target.quantity = source.quantity,
+                    target.service_end_date = source.service_end_date,
+                    target.service_start_date = source.service_start_date,
+                    target.shipped_to_address = source.shipped_to_address,
+                    target.snowflake_entity = source.snowflake_entity,
+                    target.snowflake_tax_id = source.snowflake_tax_id,
+                    target.tax_amount = source.tax_amount,
+                    target.total_amount = source.total_amount,
+                    target.unit_price = source.unit_price,
+                    target.vendor_address = source.vendor_address,
+                    target.vendor_name = source.vendor_name,
+                    target.vendor_tax_id = source.vendor_tax_id,
+                    target.updated_at = current_timestamp()"""
+
+GET_PURCHASE_ORDER_HEADER_METADATA_QUERY = """SELECT 
+        * 
+        FROM INVOICEIQ.SERVICE.PURCHASE_ORDER
+        where PO_HEADER_NUMBER = %(purchase_order_number)s"""
+
+GET_PURCHASE_ORDER_LINE_ITEM_METADATA_QUERY = """SELECT 
+        * 
+        FROM INVOICEIQ.SERVICE.PURCHASE_ORDER_LINE_ITEM
+        where PO_HEADER_NUMBER = %(purchase_order_number)s"""
+
+RECORD_AI_DECISION_QUERY = """
+        UPDATE {target_table}
+        SET AI_DECISION = %(ai_decision)s, AI_REASONING = %(ai_reasoning)s, AI_PROCESSED_AT = CURRENT_TIMESTAMP()
+        WHERE INVOICE_ID = %(invoice_id)s"""
