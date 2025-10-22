@@ -156,10 +156,38 @@ Once deployed, test the function in Snowflake:
 SELECT LANGGRAPH_FUNCTION('Alice');
 
 -- Use in a query
+with names as (
+select 
+    'ALICE' as name
+union
+select
+    'JASON' as name)
 SELECT 
-    name,
-    LANGGRAPH_FUNCTION(name) as greeting
-FROM users;
+LANGGRAPH_FUNCTION(NAME)
+FROM NAMES;
+```
+
+If >10 records are passed to the Service Function, it executes asynchronously.
+```sql
+SELECT 
+    LANGGRAPH_FUNCTION(NAME)
+FROM (
+    SELECT name FROM (
+        VALUES
+            ('ALICE'),
+            ('JASON'),
+            ('BOB'),
+            ('CAROL'),
+            ('JANE'),
+            ('STEVE'),
+            ('LAUREN'),
+            ('NICOLE'),
+            ('SETH'),
+            ('KIRK'),
+            ('TYLER'),
+            ('ALEJANDRO')
+    ) AS names (name)
+);
 ```
 
 Check service status:
