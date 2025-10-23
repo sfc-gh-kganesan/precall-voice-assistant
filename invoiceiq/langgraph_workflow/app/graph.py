@@ -26,7 +26,7 @@ def create_graph() -> StateGraph:
     workflow.add_node("run_ai_extract", nodes.run_ai_extract)
     workflow.add_node("classify_invoice", nodes.classify_invoice)
     workflow.add_node("get_ai_extract_metadata", nodes.get_ai_extract_metadata)
-    workflow.add_node("record_ai_extract_metadata", nodes.record_ai_extract_metadata)
+    workflow.add_node("record_to_table", nodes.record_to_table)
     workflow.add_node("get_purchase_order_header_metadata", nodes.get_purchase_order_header_metadata)
     workflow.add_node("get_purchase_order_line_item_metadata", nodes.get_purchase_order_line_item_metadata)
     workflow.add_node("call_model", nodes.call_model)
@@ -42,12 +42,12 @@ def create_graph() -> StateGraph:
     workflow.add_conditional_edges("classify_invoice", nodes.class_router)
     workflow.add_edge("run_ai_extract", "get_purchase_order_header_metadata")
     workflow.add_edge("run_ai_extract", "get_purchase_order_line_item_metadata")
-    workflow.add_edge("run_ai_extract", "record_ai_extract_metadata")
+    workflow.add_edge("run_ai_extract", "record_to_table")
     workflow.add_edge("get_purchase_order_header_metadata", "call_model")
     workflow.add_edge("get_purchase_order_line_item_metadata", "call_model")
     workflow.add_edge("call_model", "record_ai_decision")
     workflow.add_edge("record_ai_decision", END)
-    workflow.add_edge("record_ai_extract_metadata", END)
+    workflow.add_edge("record_to_table", END)
 
     # Rerun: Use existing data and skip classification
     workflow.add_edge("get_ai_extract_metadata", "get_purchase_order_header_metadata")
@@ -57,7 +57,7 @@ def create_graph() -> StateGraph:
 
 
 
-def run_workflow(target_table: str, invoice_id: str, relative_path: str, stage_name: str, use_existing_ai_extract: bool = False) -> AI_Decision_Output | str:
+async def run_workflow(target_table: str, invoice_id: str, relative_path: str, stage_name: str, use_existing_ai_extract: bool = False) -> AI_Decision_Output | str:
     """
     Run the workflow graph.
 
@@ -92,7 +92,7 @@ def run_workflow(target_table: str, invoice_id: str, relative_path: str, stage_n
         }
         logger.info(f"Invoking graph with inputs: {inputs}")
 
-        result = graph.invoke(inputs, context={"connection": connection})
+        result = await graph.ainvoke(inputs, context={"connection": connection})
         logger.info("Graph result received")
         return result
         

@@ -1,11 +1,12 @@
 # main.py
-
+import asyncio
 import logging
 import uvicorn
 from fastapi import FastAPI, Request
-from langchain_core.messages import HumanMessage
+
 
 from app.graph import run_workflow
+from app.utils import unpack_function_request, is_running_in_spcs_container
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,42 +27,36 @@ async def process_invoice(request: Request):
     try:
         # Get the raw request body
         body = await request.json()
-        is_snowflake_format = False
-        
-        # Extract invoice_id and determine response format
-        if "data" in body and isinstance(body["data"], list) and len(body["data"]) > 0:
-            # Snowflake service function format: {"data": [[0, "target_table", "invoice_id", "relative_path", "stage_name"]]}
-            input_rows = body["data"]
-            target_table = input_rows[0][1]
-            invoice_id = input_rows[0][2]
-            relative_path = input_rows[0][3]
-            stage_name = input_rows[0][4]
+        if is_running_in_spcs_container():
+            inputs = unpack_function_request(body)
+            if not inputs:
+                return {"data": [[0, "Error: Invalid request. Either input is empty or doesn't follow Snowflake service function format."]]}
+            response = []
+            n = len(inputs)
+            logger.info(f"Processing {n} rows")
             try:
-                use_existing_ai_extract = input_rows[0][5]
-            except IndexError:
-                use_existing_ai_extract = False
-            row_index = input_rows[0][0]  # Preserve the row index
-            is_snowflake_format = True
-
-        elif body: # If Direct API call is sent we expect the body to be the invoice_id or the LLM to extract it
-            target_table = body["target_table"]
-            invoice_id = body["invoice_id"]
-            relative_path = body["relative_path"]
-            stage_name = body["stage_name"]
-            use_existing_ai_extract = bool(body.get("use_existing_ai_extract", False))
-            row_index = 0
-
-        else:
-            return {"data": [[0, "Error: Invalid request. Either input is empty or doesn't follow Snowflake service function format."]]}
-
-
-        ai_response = run_workflow(target_table, invoice_id, relative_path, stage_name, use_existing_ai_extract)
+                if n > 2:
+                    tasks = [run_workflow(*input[1:]) for input in inputs]
+                    results = await asyncio.gather(*tasks)
+                    for i, input in enumerate(inputs):
+                        response.append([input[0], results[i]])
+                    return {"data": response}
+                else:
+                    for input in inputs:
+                        result = await run_workflow(*input[1:])
+                        response.append([input[0], result])
+                    return {"data": response}
+            except Exception as e:
+                return {"data": [[0, f"Error: Failed to process invoice_id: {str(e)}"]]}
         
-        # Return response in appropriate format
-        if is_snowflake_format:
-            return {"data": [[row_index, ai_response]]}
         else:
-            return {"response": ai_response}
+            if not body:
+                return "Error: Invalid request. Either input is empty or doesn't follow Snowflake service function format."
+            try:
+                result = await run_workflow(**body)
+                return result
+            except Exception as e:
+                return f"Error: Failed to process request: {str(e)}"
 
         
     except Exception as e:

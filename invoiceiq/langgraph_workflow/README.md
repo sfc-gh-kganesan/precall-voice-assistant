@@ -129,6 +129,18 @@ SELECT PARSE_JSON(PROCESS_INVOICE(
 	));
 ```
 
+Run the service function against table values:
+```sql
+SELECT 
+    PARSE_JSON(invoiceiq.service.PROCESS_INVOICE(
+        'invoiceiq.service.INVOICES',
+    	INVOICE_ID,
+    	RELATIVE_PATH,
+    	'INVOICEIQ.SERVICE.TICKET_ATTACHMENTS' -- Also accepts with '@'
+	))
+FROM invoiceiq.service.INVOICES limit 3;
+```
+
 ## LangGraph Studio
 
 LangGraph Studio provides interactive visualization to monitor full LangGraph workflow during invocation.

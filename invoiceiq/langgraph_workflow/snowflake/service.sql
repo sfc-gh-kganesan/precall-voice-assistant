@@ -1,9 +1,9 @@
 use role invoiceiq_admin;
 use invoiceiq.service;
 
-drop service if exists invoice_processing_service;
+drop service if exists INVOICE_PROCESSING_SERVICE;
 
-CREATE SERVICE invoice_PROCESSING_SERVICE
+CREATE SERVICE INVOICE_PROCESSING_SERVICE
   IN COMPUTE POOL COMPUTE_POOL_CPU
   QUERY_WAREHOUSE = COMPUTE_WH
   MIN_INSTANCES=1
@@ -32,3 +32,49 @@ CREATE OR REPLACE FUNCTION PROCESS_INVOICE (target_table VARCHAR, invoice_id VAR
   SERVICE=INVOICE_PROCESSING_SERVICE
   ENDPOINT=invoiceendpoint
   AS '/process';
+
+-- Stored  procedure used here instead of directly processing stream results because we need to consume the stream results.
+-- To do so, we create a temporary table to insert into.
+CREATE OR REPLACE PROCEDURE PROCESS_INVOICES_STREAM()
+RETURNS TABLE (
+  invoice_id VARCHAR,
+  processing_status VARIANT
+)
+LANGUAGE SQL
+AS
+$$
+DECLARE
+  STREAM_NAME VARCHAR DEFAULT 'INVOICEIQ.SERVICE.ATTACHMENT_STREAM';
+  TARGET_TABLE VARCHAR DEFAULT 'INVOICEIQ.SERVICE.INVOICES';
+  STAGE_NAME VARCHAR DEFAULT 'INVOICEIQ.SERVICE.TICKET_ATTACHMENTS';
+  
+BEGIN
+    CREATE OR REPLACE TEMPORARY TABLE temp_processed_results (
+      invoice_id VARCHAR,
+      processing_status VARIANT
+    );
+
+    INSERT INTO temp_processed_results (invoice_id, processing_status)
+    SELECT 
+      FM.SUBMISSION_ID,
+      PARSE_JSON(PROCESS_INVOICE(
+        :TARGET_TABLE, -- Target table with invoice data to retrieve and write
+        FM.SUBMISSION_ID, -- Becomes INVOICE_ID in the target table
+        STREAM.RELATIVE_PATH,
+        :STAGE_NAME -- Stage name for ticket attachments; Will also accept with '@'
+      ))
+    FROM IDENTIFIER(:STREAM_NAME) STREAM
+    JOIN FILE_METADATA FM ON FM.RELATIVE_PATH = STREAM.RELATIVE_PATH
+    WHERE STREAM.METADATA$ACTION = 'INSERT' AND NOT STREAM.METADATA$ISUPDATE; -- We only process net new attachments, not updates
+
+    LET res RESULTSET := (SELECT * FROM temp_processed_results);
+    RETURN TABLE(res);
+END;
+$$;
+
+CREATE OR REPLACE TASK process_invoices_stream_task
+  WAREHOUSE = COMPUTE_WH
+  SCHEDULE = '2 MINUTE' -- A single invocation can take roughly up to 2 minutes to complete
+  WHEN SYSTEM$STREAM_HAS_DATA(ATTACHMENT_STREAM)
+AS
+CALL PROCESS_INVOICES_STREAM();

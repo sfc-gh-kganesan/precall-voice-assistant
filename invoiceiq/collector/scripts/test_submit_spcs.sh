@@ -7,6 +7,11 @@ SPCS_ENDPOINT="$($ROOT/invoiceiq/collector/scripts/get_spcs_endpoint.sh)"
 EMAIL=$(printf %q $(cat $ROOT/invoiceiq/collector/scripts/example_email.eml))
 FILE_DIR="$ROOT/invoiceiq/collector/test_files"
 
+if [ -z "$SNOWFLAKE_PAT" ]; then
+    echo "Error: SNOWFLAKE_PAT environment variable is not set. Hint: you can find this in 1password." >&2
+    exit 1
+fi
+
 randomnum() {
   local min=$1
   local max=$2

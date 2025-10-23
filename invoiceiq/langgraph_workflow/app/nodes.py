@@ -170,9 +170,9 @@ def run_ai_extract(state: State) -> State:
         return {"ai_extract_metadata": {}}
 
 
-def record_ai_extract_metadata(state: State):
+def record_to_table(state: State):
     """
-    Record AI extract metadata into Snowflake target_table in state.
+    Record AI extract and invoice metadata into Snowflake target_table in state.
     """
 
     if state.get("use_existing_ai_extract", False): # # LangGraph Studio doesn't default a value for use_existing_ai_extract
@@ -189,13 +189,13 @@ def record_ai_extract_metadata(state: State):
             json_string = json.dumps(ai_extract_metadata)
 
             # Use string formatting for table name (identifier) but keep parameterized queries for data values
-            query = queries.RECORD_AI_EXTRACT_METADATA_QUERY.format(target_table=target_table)
+            query = queries.RECORD_METADATA_QUERY.format(target_table=target_table)
             rows = run_query(query, 
             {
                 "json_string": json_string,
                 "invoice_id": invoice_id
             })
-            logger.info(f"Number of rows updated with AI Extract: {rows[0].get('number of rows updated')}")
+            logger.info(f"Number of rows inserted with AI Extract: {rows[0].get('number of rows inserted')}")
             return None
     except Exception as e:
         logger.error(f"Error recording AI extract metadata: {str(e)}")

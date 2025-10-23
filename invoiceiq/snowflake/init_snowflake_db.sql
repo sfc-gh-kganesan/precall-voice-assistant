@@ -14,38 +14,13 @@ create stage if not exists invoiceiq.service.ticket_attachments
   directory=(enable=true auto_refresh=true) 
   encryption=(type='SNOWFLAKE_SSE');
 
+create stream if not exists attachment_stream on stage invoiceiq.service.ticket_attachments;
+
 create table if not exists invoiceiq.service.file_metadata (
     created_at timestamp_ntz default current_timestamp,
-    extracted_fields variant,
     relative_path varchar,
-    status varchar default 'PENDING',
     submission_id varchar, -- FK to ticket_metadata table
-    updated_at timestamp_ntz default current_timestamp
-    banking_details varchar,
-    due_date date,
-    file_url varchar,
-    freight_shipping_amount number(38, 2),
-    invoice_currency varchar,
-    invoice_date date,
-    invoice_number varchar,
-    memo_description varchar,
-    payment_terms varchar,
-    payment_type varchar,
-    prepaid_flag boolean,
-    purchase_order_number varchar,
-    quantity number(38, 4),
-    relative_path varchar,
-    service_end_date date,
-    service_start_date date,
-    shipped_to_address varchar,
-    snowflake_entity varchar,
-    snowflake_tax_id varchar,
-    tax_amount number(38, 2),
-    total_amount number(38, 2),
-    unit_price number(38, 4),
-    vendor_address varchar,
-    vendor_name varchar,
-    vendor_tax_id varchar
+    ticket_number varchar -- Maps to ticket_metadata table
 );
 
 create table if not exists invoiceiq.service.ticket_metadata (
@@ -54,20 +29,5 @@ create table if not exists invoiceiq.service.ticket_metadata (
     ticket_number varchar,
     submission_id varchar,
     updated_at timestamp_ntz default current_timestamp,
-    email varchar,
-    ai_result variant,
-    ai_decision varchar,
-    ai_reasoning varchar
-);
-
-create stream if not exists invoiceiq.service.ticket_stream 
-  on table invoiceiq.service.ticket_metadata;
-
--- log table tasks use to record status information (useful for debugging)
-create table if not exists invoiceiq.service.task_execution_log (
-    execution_time timestamp default current_timestamp(),
-    task_name string,
-    status string,
-    result variant,
-    error_message string
+    email varchar
 );

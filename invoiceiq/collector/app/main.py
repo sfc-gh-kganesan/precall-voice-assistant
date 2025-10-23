@@ -77,7 +77,7 @@ async def submit_ticket(
         # in the stage
         results = snowflake.stage_put_files(FILE_UPLOAD_DIR, f"{submission_id}_*")
         for r in results:
-            snowflake.insert_file_metadata(submission_id, r)
+            snowflake.insert_file_metadata(submission_id, r, ticket_number)
 
     return SubmitTicketResponse(
         submission_id=submission_id,

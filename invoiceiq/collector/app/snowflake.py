@@ -107,18 +107,20 @@ def insert_ticket_metadata(submission_id: str, ticket_number: str, email: str):
             logger.info(f"✅ Inserted metadata for ticket {ticket_number} in submission {submission_id}")
 
 
-def insert_file_metadata(submission_id: str, relative_path: str):
+def insert_file_metadata(submission_id: str, relative_path: str, ticket_number: str):
     query = """
         insert into invoiceiq.service.file_metadata (
             submission_id,
-            relative_path
+            relative_path,
+            ticket_number
             )
         select
+            %s,
             %s,
             %s
     """
 
-    data = (submission_id, relative_path)
+    data = (submission_id, relative_path, ticket_number)
 
     with connection() as conn:
         with conn.cursor() as cur:

@@ -38,7 +38,7 @@ RUN_AI_EXTRACT_QUERY = """SELECT AI_EXTRACT(
             responseFormat => PARSE_JSON(%(ai_extract_prompt)s)
             ) AS INVOICE_METADATA"""
 
-RECORD_AI_EXTRACT_METADATA_QUERY = """
+RECORD_METADATA_QUERY = """
             MERGE INTO {target_table} AS target
             USING (
                 SELECT 
@@ -73,7 +73,10 @@ RECORD_AI_EXTRACT_METADATA_QUERY = """
                     extracted_data:vendor_address::varchar as vendor_address,
                     extracted_data:vendor_name::varchar as vendor_name,
                     nullif(extracted_data:vendor_tax_id::string, 'none') as vendor_tax_id,
-                FROM (SELECT PARSE_JSON(%(json_string)s) AS extracted_data)
+                    fm.ticket_number as ticket_number,
+                    fm.relative_path as relative_path
+                FROM (SELECT PARSE_JSON(%(json_string)s) AS extracted_data) extract_data
+                JOIN invoiceiq.service.file_metadata fm ON fm.submission_id = %(invoice_id)s -- Need TICKET_NUMBER from file_metadata
             )  AS source
             ON target.invoice_id = source.invoice_id
             WHEN MATCHED THEN
@@ -101,7 +104,62 @@ RECORD_AI_EXTRACT_METADATA_QUERY = """
                     target.vendor_address = source.vendor_address,
                     target.vendor_name = source.vendor_name,
                     target.vendor_tax_id = source.vendor_tax_id,
-                    target.updated_at = current_timestamp()"""
+                    target.updated_at = current_timestamp()
+            WHEN NOT MATCHED THEN
+                INSERT (
+                    invoice_id, 
+                    ticket_number,
+                    relative_path,
+                    banking_details, 
+                    due_date, 
+                    freight_shipping_amount, 
+                    invoice_currency, 
+                    invoice_date, 
+                    invoice_number,
+                    memo_description, 
+                    payment_terms, 
+                    payment_type, 
+                    prepaid_flag, 
+                    purchase_order_number, 
+                    quantity, 
+                    service_end_date, 
+                    service_start_date, 
+                    shipped_to_address, 
+                    snowflake_entity, 
+                    snowflake_tax_id, 
+                    tax_amount, 
+                    total_amount, 
+                    unit_price, 
+                    vendor_address, 
+                    vendor_name, 
+                    vendor_tax_id)
+                VALUES (
+                    source.invoice_id, 
+                    source.ticket_number, 
+                    source.relative_path,
+                    source.banking_details, 
+                    source.due_date, 
+                    source.freight_shipping_amount, 
+                    source.invoice_currency, 
+                    source.invoice_date, 
+                    source.invoice_number, 
+                    source.memo_description, 
+                    source.payment_terms, 
+                    source.payment_type, 
+                    source.prepaid_flag, 
+                    source.purchase_order_number, 
+                    source.quantity, 
+                    source.service_end_date, 
+                    source.service_start_date, 
+                    source.shipped_to_address, 
+                    source.snowflake_entity, 
+                    source.snowflake_tax_id, 
+                    source.tax_amount, 
+                    source.total_amount, 
+                    source.unit_price, 
+                    source.vendor_address, 
+                    source.vendor_name, 
+                    source.vendor_tax_id)"""
 
 GET_PURCHASE_ORDER_HEADER_METADATA_QUERY = """SELECT 
         * 

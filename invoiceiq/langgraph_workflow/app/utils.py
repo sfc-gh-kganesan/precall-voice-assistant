@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 from typing import Optional, Any, Dict, Union, TypedDict, Literal
 from dataclasses import dataclass
+from fastapi import Request
 
 from snowflake.connector import connect, connection, DictCursor
 from langgraph.runtime import get_runtime
@@ -18,7 +19,7 @@ FRESH_OR_RERUN_OPTIONS = ["fresh", "rerun"] # TODO - Make ENUM
 class State(TypedDict):
     classification: Literal[CLASS_OPTIONS[0], CLASS_OPTIONS[1]]
     target_table: str
-    invoice_id: str
+    invoice_id: str # SUBMISSION_ID from ticket_metadata table
     relative_path: str
     stage_name: str
     ai_extract_metadata: dict
@@ -195,3 +196,37 @@ def run_query(query: str, params: dict = None) -> list[Dict[str, str]]|str:
         # Close connection if we created it temporarily
         if close_connection and connection:
             connection.close()
+
+
+def unpack_function_request(data: dict | Request) -> list[list]:
+    """
+    Unpack Snowflake Service Function request body and return the list of input arrays.
+
+    Snowflake sends data in format (example): {
+    "data": [
+                [0, 10, "Alex", "2014-01-01 16:00:00"],
+                [1, 20, "Steve", "2015-01-01 16:00:00"],
+                [2, 30, "Alice", "2016-01-01 16:00:00"],
+                [3, 40, "Adrian", "2017-01-01 16:00:00"]
+            ]
+    }
+
+    Returns (example):
+    [
+        [0, 10, "Alex", "2014-01-01 16:00:00"],
+        [1, 20, "Steve", "2015-01-01 16:00:00"],
+        [2, 30, "Alice", "2016-01-01 16:00:00"],
+        [3, 40, "Adrian", "2017-01-01 16:00:00"]
+    ]
+    """
+
+    if isinstance(data, Request):
+        response = data.json()
+
+    else:
+        response = data
+
+    if "data" in response and isinstance(response["data"], list) and len(response["data"]) > 0:
+        return response["data"]
+    else:
+        return response
