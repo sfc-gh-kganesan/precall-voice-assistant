@@ -73,7 +73,7 @@ setup-infra: check-env ## Create Snowflake resources
 	echo "Creating network rules and external access integration..."; \
 	cd release && snow sql -q "!source network_rules.sql" $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA || echo "⚠️  Network rules may already exist"; \
 	echo "Creating compute pool: $$COMPUTE_POOL"; \
-	cd release && snow spcs compute-pool deploy $(CONNECTION_FLAG) || echo "⚠️  Compute pool may already exist"; \
+	snow spcs compute-pool deploy $(CONNECTION_FLAG) || echo "⚠️  Compute pool may already exist"; \
 	echo "Creating image repository: $$IMAGE_REPOSITORY"; \
 	snow spcs image-repository deploy $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA || echo "⚠️  Image repository may already exist"; \
 	echo "✅ Infrastructure setup complete"
@@ -85,6 +85,7 @@ deploy: check-env registry-login setup-infra build push deploy-service deploy-fu
 	@echo "Next steps:"
 	@echo "  make service-status  - Check service status"
 	@echo "  make service-logs    - View service logs"
+	@echo "  make service-url     - Show public endpoint URL"
 	@echo ""
 	@echo "Test in Snowflake:"
 	@echo "  SELECT $$DATABASE.$$SCHEMA.sales_ai_greeting('Alice');"
