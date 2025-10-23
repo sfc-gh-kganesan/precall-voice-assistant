@@ -29,6 +29,8 @@ entities:
     min_instances: 1
     max_instances: 1
     auto_resume: true
+    external_access_integrations:
+      - sales_ai_external_access
     artifacts:
       - service_spec.yaml
     comment: "Sales AI Platform - LangGraph workflows for sales operations"

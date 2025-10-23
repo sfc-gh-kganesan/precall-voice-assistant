@@ -6,7 +6,7 @@ CONNECTION_FLAG = $(if $(filter-out default,$(SNOW_CONNECTION)),--connection $(S
 
 .DEFAULT_GOAL := help
 
-.PHONY: studio api dev help deploy deploy-service deploy-functions build push setup-infra service-status service-logs service-drop clean check-env registry-login
+.PHONY: studio api dev help deploy deploy-service deploy-functions build push setup-infra service-status service-logs service-drop service-url clean check-env registry-login
 
 help: ## Show this help message
 	@echo "Sales AI Platform"
@@ -70,6 +70,8 @@ setup-infra: check-env ## Create Snowflake resources
 	snow object create database name=$$DATABASE --if-not-exists $(CONNECTION_FLAG); \
 	echo "Creating schema: $$SCHEMA"; \
 	snow object create schema name=$$SCHEMA --database $$DATABASE --if-not-exists $(CONNECTION_FLAG); \
+	echo "Creating network rules and external access integration..."; \
+	cd release && snow sql -q "!source network_rules.sql" $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA || echo "⚠️  Network rules may already exist"; \
 	echo "Creating compute pool: $$COMPUTE_POOL"; \
 	cd release && snow spcs compute-pool deploy $(CONNECTION_FLAG) || echo "⚠️  Compute pool may already exist"; \
 	echo "Creating image repository: $$IMAGE_REPOSITORY"; \
@@ -130,6 +132,13 @@ service-status: check-env ## Check service status
 service-logs: check-env ## View service logs (instance 0)
 	@echo "📋 Fetching service logs..."
 	@snow spcs service logs $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --container-name $$CONTAINER_NAME --instance-id 0
+
+service-url: check-env ## Show public endpoint URL
+	@echo "🌐 Service endpoints:"
+	@echo ""
+	@snow spcs service list-endpoints $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA
+	@echo ""
+	@echo "Note: Copy the ingress_url from above and use https://INGRESS_URL/endpoint"
 
 service-drop: check-env ## Drop service
 	@echo "🗑️  Dropping service..."
