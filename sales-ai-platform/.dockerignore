@@ -1,0 +1,18 @@
+# Include patterns from root .gitignore
+# Docker doesn't support includes, so we keep this minimal
+
+# Development & deployment files (not needed in container)
+.git/
+.gitignore
+.dockerignore
+release/
+Dockerfile
+Makefile
+*.md
+
+# LangGraph Studio
+.langgraph_api/
+
+# Environment files
+.env*
+

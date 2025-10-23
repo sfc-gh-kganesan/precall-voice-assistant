@@ -286,3 +286,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 support-data-agent/.claude/
+
+# LangGraph
+*.langgraph_api/

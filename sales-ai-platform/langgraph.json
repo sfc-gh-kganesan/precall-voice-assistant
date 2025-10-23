@@ -1,0 +1,12 @@
+{
+  "dockerfile_lines": [],
+  "graphs": {
+    "arithmetic_agent": "./graphs/arithmetic_agent.py:graph",
+    "greeting_workflow": "./graphs/greeting_workflow.py:graph"
+  },
+  "env": "./.env",
+  "python_version": "3.11",
+  "dependencies": [
+    "."
+  ]
+}

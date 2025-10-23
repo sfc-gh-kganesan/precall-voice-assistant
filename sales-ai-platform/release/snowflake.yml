@@ -1,0 +1,35 @@
+definition_version: 2
+entities:
+  compute_pool:
+    type: compute-pool
+    identifier: <% ctx.env.COMPUTE_POOL %>
+    min_nodes: 1
+    max_nodes: 1
+    instance_family: CPU_X64_XS
+    auto_resume: true
+    initially_suspended: true
+    auto_suspend_seconds: 60
+  
+  image_repository:
+    type: image-repository
+    identifier:
+      name: <% ctx.env.IMAGE_REPOSITORY %>
+      database: <% ctx.env.DATABASE %>
+      schema: <% ctx.env.SCHEMA %>
+  
+  sales_ai_service:
+    type: service
+    identifier: 
+      name: <% ctx.env.SERVICE_NAME %>
+      database: <% ctx.env.DATABASE %>
+      schema: <% ctx.env.SCHEMA %>
+    stage: <% ctx.env.STAGE %>
+    compute_pool: <% ctx.env.COMPUTE_POOL %>
+    spec_file: service_spec.yaml
+    min_instances: 1
+    max_instances: 1
+    auto_resume: true
+    artifacts:
+      - service_spec.yaml
+    comment: "Sales AI Platform - LangGraph workflows for sales operations"
+

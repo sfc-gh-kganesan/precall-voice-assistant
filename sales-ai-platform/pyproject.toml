@@ -1,0 +1,23 @@
+[project]
+name = "sales-ai-platform"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.119.1",
+    "httpx>=0.28.1",
+    "langchain-community>=0.4",
+    "langchain-core>=1.0.0",
+    "langchain-openai>=1.0.1",
+    "langgraph>=1.0.1",
+    "langgraph-checkpoint-sqlite>=3.0.0",
+    "langgraph-cli[inmem]>=0.4.4",
+    "langgraph-prebuilt>=1.0.1",
+    "langgraph-sdk>=0.2.9",
+    "langsmith>=0.4.37",
+    "notebook>=7.4.7",
+    "pydantic>=2.12.3",
+    "trustcall>=0.0.39",
+    "uvicorn>=0.32.1",
+]
