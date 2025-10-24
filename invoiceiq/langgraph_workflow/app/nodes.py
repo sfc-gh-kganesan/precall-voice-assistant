@@ -115,8 +115,8 @@ def get_ai_extract_metadata(state: State) -> State:
 
     logger.info(f"Using existing AI extract metadata for invoice_id: {invoice_id}")
     try:
-        query = queries.GET_AI_EXTRACT_METADATA_QUERY.format(target_table=target_table)
-        rows = run_query(query, {"invoice_id": invoice_id})
+        query = queries.GET_AI_EXTRACT_METADATA_QUERY
+        rows = run_query(query, {"invoice_id": invoice_id, "target_table": target_table})
 
         if rows and len(rows) > 0:
             try:
@@ -189,11 +189,12 @@ def record_to_table(state: State):
             json_string = json.dumps(ai_extract_metadata)
 
             # Use string formatting for table name (identifier) but keep parameterized queries for data values
-            query = queries.RECORD_METADATA_QUERY.format(target_table=target_table)
+            query = queries.RECORD_METADATA_QUERY
             rows = run_query(query, 
             {
                 "json_string": json_string,
-                "invoice_id": invoice_id
+                "invoice_id": invoice_id,
+                "target_table": target_table
             })
             logger.info(f"Number of rows inserted with AI Extract: {rows[0].get('number of rows inserted')}")
             return None
@@ -316,8 +317,8 @@ def record_ai_decision(state: State):
     target_table = state["target_table"]
 
     try:
-        query = queries.RECORD_AI_DECISION_QUERY.format(target_table=target_table)
-        rows = run_query(query, {"ai_decision": ai_decision, "ai_reasoning": ai_reasoning, "invoice_id": invoice_id})
+        query = queries.RECORD_AI_DECISION_QUERY
+        rows = run_query(query, {"ai_decision": ai_decision, "ai_reasoning": ai_reasoning, "invoice_id": invoice_id, "target_table": target_table})
         logger.info(f"Number of rows updated with AI Decision: {rows[0].get('number of rows updated')}")
         return None
     except Exception as e:

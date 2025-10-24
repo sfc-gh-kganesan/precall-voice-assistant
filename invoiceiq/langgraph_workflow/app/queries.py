@@ -31,7 +31,7 @@ GET_AI_EXTRACT_METADATA_QUERY = """SELECT
             ,vendor_address
             ,vendor_name
             ,vendor_tax_id
-        FROM {target_table} WHERE INVOICE_ID = %(invoice_id)s LIMIT 1"""
+        FROM identifier(%(target_table)s) WHERE INVOICE_ID = %(invoice_id)s LIMIT 1"""
 
 RUN_AI_EXTRACT_QUERY = """SELECT AI_EXTRACT(
             file => TO_FILE(%(stage_name)s, %(relative_path)s),
@@ -39,7 +39,7 @@ RUN_AI_EXTRACT_QUERY = """SELECT AI_EXTRACT(
             ) AS INVOICE_METADATA"""
 
 RECORD_METADATA_QUERY = """
-            MERGE INTO {target_table} AS target
+            MERGE INTO identifier(%(target_table)s) AS target
             USING (
                 SELECT 
                     %(invoice_id)s as invoice_id,
@@ -172,6 +172,6 @@ GET_PURCHASE_ORDER_LINE_ITEM_METADATA_QUERY = """SELECT
         where PO_HEADER_NUMBER = %(purchase_order_number)s"""
 
 RECORD_AI_DECISION_QUERY = """
-        UPDATE {target_table}
+        UPDATE identifier(%(target_table)s)
         SET AI_DECISION = %(ai_decision)s, AI_REASONING = %(ai_reasoning)s, AI_PROCESSED_AT = CURRENT_TIMESTAMP()
         WHERE INVOICE_ID = %(invoice_id)s"""

@@ -75,6 +75,8 @@ $$;
 CREATE OR REPLACE TASK process_invoices_stream_task
   WAREHOUSE = COMPUTE_WH
   SCHEDULE = '2 MINUTE' -- A single invocation can take roughly up to 2 minutes to complete
-  WHEN SYSTEM$STREAM_HAS_DATA(ATTACHMENT_STREAM)
+  WHEN SYSTEM$STREAM_HAS_DATA('ATTACHMENT_STREAM')
 AS
 CALL PROCESS_INVOICES_STREAM();
+
+ALTER TASK process_invoices_stream_task RESUME;
