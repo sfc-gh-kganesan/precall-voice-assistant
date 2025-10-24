@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { TrendingUp, CheckCircle, Clock, XCircle } from "lucide-react";
+import { CheckCircle, Clock, TrendingUp, XCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 interface InvoiceStatisticsProps {
   totalInvoices: number;
@@ -8,11 +8,11 @@ interface InvoiceStatisticsProps {
   rejectedCount: number;
 }
 
-export function InvoiceStatistics({ 
-  totalInvoices, 
-  approvedCount, 
-  pendingCount, 
-  rejectedCount 
+export function InvoiceStatistics({
+  totalInvoices,
+  approvedCount,
+  pendingCount,
+  rejectedCount,
 }: InvoiceStatisticsProps) {
   const approvedPercentage = totalInvoices > 0 ? (approvedCount / totalInvoices) * 100 : 0;
   const pendingPercentage = totalInvoices > 0 ? (pendingCount / totalInvoices) * 100 : 0;
@@ -27,9 +27,7 @@ export function InvoiceStatistics({
         </CardHeader>
         <CardContent>
           <div className="text-3xl">{totalInvoices}</div>
-          <p className="text-xs opacity-80 mt-1">
-            Processed invoices
-          </p>
+          <p className="text-xs opacity-80 mt-1">Processed invoices</p>
         </CardContent>
       </Card>
 
@@ -40,9 +38,7 @@ export function InvoiceStatistics({
         </CardHeader>
         <CardContent>
           <div className="text-3xl text-emerald-800">{approvedCount}</div>
-          <p className="text-xs text-emerald-600 mt-2">
-            {approvedPercentage.toFixed(1)}% of total
-          </p>
+          <p className="text-xs text-emerald-600 mt-2">{approvedPercentage.toFixed(1)}% of total</p>
         </CardContent>
       </Card>
 
@@ -53,9 +49,7 @@ export function InvoiceStatistics({
         </CardHeader>
         <CardContent>
           <div className="text-3xl text-amber-800">{pendingCount}</div>
-          <p className="text-xs text-amber-600 mt-2">
-            {pendingPercentage.toFixed(1)}% of total
-          </p>
+          <p className="text-xs text-amber-600 mt-2">{pendingPercentage.toFixed(1)}% of total</p>
         </CardContent>
       </Card>
 
@@ -66,9 +60,7 @@ export function InvoiceStatistics({
         </CardHeader>
         <CardContent>
           <div className="text-3xl text-rose-800">{rejectedCount}</div>
-          <p className="text-xs text-rose-600 mt-2">
-            {rejectedPercentage.toFixed(1)}% of total
-          </p>
+          <p className="text-xs text-rose-600 mt-2">{rejectedPercentage.toFixed(1)}% of total</p>
         </CardContent>
       </Card>
     </div>

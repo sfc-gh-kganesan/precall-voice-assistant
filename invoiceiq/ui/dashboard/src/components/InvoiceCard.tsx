@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
-import { Eye, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Eye } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader } from './ui/card';
+import { Checkbox } from './ui/checkbox';
 
 export interface Invoice {
   id: string;
@@ -60,12 +60,12 @@ interface InvoiceCardProps {
   showSelection?: boolean;
 }
 
-export function InvoiceCard({ 
-  invoice, 
-  onViewPdf, 
-  isSelected = false, 
+export function InvoiceCard({
+  invoice,
+  onViewPdf,
+  isSelected = false,
   onSelect,
-  showSelection = false 
+  showSelection = false,
 }: InvoiceCardProps) {
   const getStatusIcon = () => {
     switch (invoice.status) {
@@ -90,11 +90,15 @@ export function InvoiceCard({
   };
 
   return (
-    <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${
-      invoice.status === 'approved' ? 'border-l-emerald-500' :
-      invoice.status === 'pending' ? 'border-l-amber-500' :
-      'border-l-rose-500'
-    } ${isSelected ? 'ring-2 ring-[var(--snowflake-blue)] shadow-lg' : ''}`}>
+    <Card
+      className={`hover:shadow-md transition-all duration-200 border-l-4 ${
+        invoice.status === 'approved'
+          ? 'border-l-emerald-500'
+          : invoice.status === 'pending'
+            ? 'border-l-amber-500'
+            : 'border-l-rose-500'
+      } ${isSelected ? 'ring-2 ring-[var(--snowflake-blue)] shadow-lg' : ''}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -130,19 +134,21 @@ export function InvoiceCard({
               <span className="text-muted-foreground">Invoice #:</span> {invoice.invoiceNumber}
             </p>
             <p className="text-sm">
-              <span className="text-muted-foreground">Lift Ticket #:</span> {invoice.liftTicketNumber}
+              <span className="text-muted-foreground">Lift Ticket #:</span>{' '}
+              {invoice.liftTicketNumber}
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">PO #:</span> {invoice.purchaseOrderNumber}
             </p>
           </div>
-          
+
           <div className="pt-2 border-t">
             <p className="text-sm">
               <span className="text-muted-foreground">Vendor:</span> {invoice.vendor}
             </p>
             <p className="text-sm">
-              <span className="text-muted-foreground">Amount:</span> ${invoice.amount.toLocaleString()}
+              <span className="text-muted-foreground">Amount:</span> $
+              {invoice.amount.toLocaleString()}
             </p>
             <p className="text-sm text-muted-foreground">{invoice.date}</p>
           </div>
@@ -152,7 +158,9 @@ export function InvoiceCard({
               <p className="text-sm">
                 <span className="text-muted-foreground">Reason:</span>
               </p>
-              <p className="text-sm bg-gradient-to-r from-[var(--snowflake-light-blue)] to-blue-50 p-3 rounded-lg mt-1 border border-[var(--snowflake-blue)]/20">{invoice.reason}</p>
+              <p className="text-sm bg-gradient-to-r from-[var(--snowflake-light-blue)] to-blue-50 p-3 rounded-lg mt-1 border border-[var(--snowflake-blue)]/20">
+                {invoice.reason}
+              </p>
             </div>
           )}
         </div>

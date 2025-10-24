@@ -1,8 +1,8 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { Label } from "./ui/label";
-import { Search, X, Filter } from "lucide-react";
+import { Filter, Search, X } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface InvoiceFiltersProps {
   searchBy: string;
@@ -19,7 +19,7 @@ export function InvoiceFilters({
   searchTerm,
   onSearchChange,
   onSearch,
-  onClearFilters
+  onClearFilters,
 }: InvoiceFiltersProps) {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -33,12 +33,14 @@ export function InvoiceFilters({
         <Filter className="w-5 h-5 text-[var(--snowflake-blue)]" />
         <h3 className="text-[var(--snowflake-blue)]">Search Invoices</h3>
       </div>
-      
+
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="min-w-[220px]">
-          <Label htmlFor="searchBy" className="text-sm mb-2 block">Search By</Label>
+          <Label htmlFor="searchBy" className="text-sm mb-2 block">
+            Search By
+          </Label>
           <Select value={searchBy} onValueChange={onSearchByChange}>
-            <SelectTrigger 
+            <SelectTrigger
               id="searchBy"
               className="border-[var(--snowflake-blue)]/30 focus:border-[var(--snowflake-blue)] focus:ring-[var(--snowflake-blue)]"
             >
@@ -52,7 +54,9 @@ export function InvoiceFilters({
         </div>
 
         <div className="flex-1">
-          <Label htmlFor="search" className="text-sm mb-2 block">Search Term</Label>
+          <Label htmlFor="search" className="text-sm mb-2 block">
+            Search Term
+          </Label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input

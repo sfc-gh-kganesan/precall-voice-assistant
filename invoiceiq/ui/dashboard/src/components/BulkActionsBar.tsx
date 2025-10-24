@@ -1,7 +1,7 @@
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { CheckCircle, Clock, XCircle, X } from "lucide-react";
-import { Invoice } from "./InvoiceCard";
+import { CheckCircle, Clock, X, XCircle } from 'lucide-react';
+import { Invoice } from './InvoiceCard';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -10,18 +10,18 @@ interface BulkActionsBarProps {
   onClearSelection: () => void;
 }
 
-export function BulkActionsBar({ 
-  selectedCount, 
-  selectedInvoiceIds, 
-  onBulkAction, 
-  onClearSelection 
+export function BulkActionsBar({
+  selectedCount,
+  selectedInvoiceIds,
+  onBulkAction,
+  onClearSelection,
 }: BulkActionsBarProps) {
   return (
     <div className="mb-6 p-4 bg-gradient-to-r from-[var(--snowflake-light-blue)] to-blue-50 border border-[var(--snowflake-blue)]/20 rounded-xl shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Badge 
-            variant="secondary" 
+          <Badge
+            variant="secondary"
             className="bg-[var(--snowflake-blue)] text-white hover:bg-[var(--snowflake-blue)]/90"
           >
             {selectedCount} selected
@@ -30,7 +30,7 @@ export function BulkActionsBar({
             Choose an action for selected invoices:
           </span>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -41,7 +41,7 @@ export function BulkActionsBar({
             <CheckCircle className="w-4 h-4" />
             Approve
           </Button>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -51,7 +51,7 @@ export function BulkActionsBar({
             <Clock className="w-4 h-4" />
             Pending
           </Button>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -61,13 +61,8 @@ export function BulkActionsBar({
             <XCircle className="w-4 h-4" />
             Reject
           </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearSelection}
-            className="ml-2"
-          >
+
+          <Button variant="ghost" size="sm" onClick={onClearSelection} className="ml-2">
             <X className="w-4 h-4" />
           </Button>
         </div>

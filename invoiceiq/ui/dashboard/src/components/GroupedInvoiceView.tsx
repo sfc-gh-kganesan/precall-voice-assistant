@@ -1,10 +1,10 @@
-import { Invoice } from "./InvoiceCard";
-import { InvoiceColumns } from "./InvoiceColumns";
-import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { Invoice } from './InvoiceCard';
+import { InvoiceColumns } from './InvoiceColumns';
+import { Badge } from './ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 
 interface GroupedInvoiceViewProps {
   invoices: Invoice[];
@@ -15,15 +15,15 @@ interface GroupedInvoiceViewProps {
   onSelectAll: (invoiceIds: string[]) => void;
   onClearSelection: () => void;
   refreshTrigger?: number;
-  optimisticUpdate?: { invoiceIds: string[], newStatus: string, timestamp: number };
+  optimisticUpdate?: { invoiceIds: string[]; newStatus: string; timestamp: number };
   isSearchMode?: boolean;
   searchResults?: Invoice[];
 }
 
-export function GroupedInvoiceView({ 
-  invoices, 
-  groupBy, 
-  onViewPdf, 
+export function GroupedInvoiceView({
+  invoices,
+  groupBy,
+  onViewPdf,
   selectedInvoiceIds,
   onSelectInvoice,
   onSelectAll,
@@ -31,13 +31,13 @@ export function GroupedInvoiceView({
   refreshTrigger = 0,
   optimisticUpdate,
   isSearchMode = false,
-  searchResults = []
+  searchResults = [],
 }: GroupedInvoiceViewProps) {
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   if (groupBy === 'none') {
     return (
-      <InvoiceColumns 
+      <InvoiceColumns
         onViewPdf={onViewPdf}
         selectedInvoiceIds={selectedInvoiceIds}
         onSelectInvoice={onSelectInvoice}
@@ -53,8 +53,8 @@ export function GroupedInvoiceView({
 
   const groupInvoices = () => {
     const groups: { [key: string]: Invoice[] } = {};
-    
-    invoices.forEach(invoice => {
+
+    invoices.forEach((invoice) => {
       let key = '';
       switch (groupBy) {
         case 'liftTicket':
@@ -69,13 +69,13 @@ export function GroupedInvoiceView({
         default:
           key = 'Ungrouped';
       }
-      
+
       if (!groups[key]) {
         groups[key] = [];
       }
       groups[key].push(invoice);
     });
-    
+
     return groups;
   };
 
@@ -107,12 +107,12 @@ export function GroupedInvoiceView({
 
   return (
     <div className="space-y-6">
-      {sortedGroupKeys.map(groupKey => {
+      {sortedGroupKeys.map((groupKey) => {
         const groupInvoices = groupedInvoices[groupKey];
         const isOpen = openGroups.has(groupKey);
-        const approvedCount = groupInvoices.filter(inv => inv.status === 'approved').length;
-        const pendingCount = groupInvoices.filter(inv => inv.status === 'pending').length;
-        const rejectedCount = groupInvoices.filter(inv => inv.status === 'rejected').length;
+        const approvedCount = groupInvoices.filter((inv) => inv.status === 'approved').length;
+        const pendingCount = groupInvoices.filter((inv) => inv.status === 'pending').length;
+        const rejectedCount = groupInvoices.filter((inv) => inv.status === 'rejected').length;
 
         return (
           <Card key={groupKey}>
@@ -129,9 +129,7 @@ export function GroupedInvoiceView({
                       {getGroupTitle(groupKey)}
                     </CardTitle>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">
-                        {groupInvoices.length} total
-                      </Badge>
+                      <Badge variant="secondary">{groupInvoices.length} total</Badge>
                       {approvedCount > 0 && (
                         <Badge className="bg-emerald-100 text-emerald-800 rounded-full">
                           {approvedCount} approved
@@ -153,7 +151,7 @@ export function GroupedInvoiceView({
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <CardContent>
-                  <InvoiceColumns 
+                  <InvoiceColumns
                     onViewPdf={onViewPdf}
                     selectedInvoiceIds={selectedInvoiceIds}
                     onSelectInvoice={onSelectInvoice}

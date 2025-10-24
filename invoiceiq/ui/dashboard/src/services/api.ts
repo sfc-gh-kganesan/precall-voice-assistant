@@ -80,11 +80,11 @@ export async function fetchInvoices(
 
   try {
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -117,12 +117,12 @@ export async function searchInvoices(
 
   try {
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -150,7 +150,7 @@ export function getDownloadPdfUrl(ticketNumber: string): string {
  */
 export async function downloadPdf(ticketNumber: string): Promise<void> {
   const url = getDownloadPdfUrl(ticketNumber);
-  
+
   try {
     // Create a temporary anchor element to trigger download
     const a = document.createElement('a');
@@ -186,7 +186,7 @@ export async function updateInvoiceStatus(
   status: 'approved' | 'pending' | 'rejected'
 ): Promise<UpdateStatusResponse> {
   const url = `${API_BASE_URL}/invoices/status`;
-  
+
   const requestBody: UpdateStatusRequest = {
     ticket_numbers: ticketNumbers,
     status: status,
@@ -200,12 +200,12 @@ export async function updateInvoiceStatus(
       },
       body: JSON.stringify(requestBody),
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
     }
-    
+
     const data: UpdateStatusResponse = await response.json();
     return data;
   } catch (error) {
@@ -229,7 +229,7 @@ export async function updateInvoiceFields(
   fields: Record<string, any>
 ): Promise<UpdateFieldsResponse> {
   const url = `${API_BASE_URL}/invoices/${ticketNumber}/fields`;
-  
+
   try {
     const response = await fetch(url, {
       method: 'PATCH',
@@ -238,12 +238,12 @@ export async function updateInvoiceFields(
       },
       body: JSON.stringify(fields),
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
     }
-    
+
     const data: UpdateFieldsResponse = await response.json();
     return data;
   } catch (error) {
@@ -262,11 +262,9 @@ export interface ReprocessInvoiceResponse {
  * Trigger agent to reprocess an invoice after user edits
  * @param ticketNumber Ticket number of the invoice to reprocess
  */
-export async function reprocessInvoice(
-  ticketNumber: string
-): Promise<ReprocessInvoiceResponse> {
+export async function reprocessInvoice(ticketNumber: string): Promise<ReprocessInvoiceResponse> {
   const url = `${API_BASE_URL}/invoices/${ticketNumber}/reprocess`;
-  
+
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -274,12 +272,12 @@ export async function reprocessInvoice(
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
     }
-    
+
     const data: ReprocessInvoiceResponse = await response.json();
     return data;
   } catch (error) {
@@ -287,4 +285,3 @@ export async function reprocessInvoice(
     throw error;
   }
 }
-

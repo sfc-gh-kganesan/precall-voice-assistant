@@ -1,7 +1,7 @@
 // Mapper to convert backend API responses to frontend Invoice objects
 
-import { InvoiceResponse } from './api';
 import { Invoice } from '../components/InvoiceCard';
+import { InvoiceResponse } from './api';
 import { getViewPdfUrl } from './api';
 
 /**
@@ -9,11 +9,11 @@ import { getViewPdfUrl } from './api';
  */
 function parseAmount(amount: string | null): number {
   if (!amount) return 0;
-  
+
   // Remove currency symbols and commas
   const cleaned = amount.replace(/[$,]/g, '');
   const parsed = parseFloat(cleaned);
-  
+
   return isNaN(parsed) ? 0 : parsed;
 }
 
@@ -22,13 +22,13 @@ function parseAmount(amount: string | null): number {
  */
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'N/A';
-  
+
   try {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   } catch {
     return dateStr;
@@ -43,7 +43,7 @@ export function mapInvoiceResponse(response: InvoiceResponse): Invoice {
   const vendorName = response.vendor_name || 'Unknown Vendor';
   const ticketNumber = response.ticket_number;
   const invoiceDate = response.invoice_date || undefined;
-  
+
   return {
     id: ticketNumber,
     invoiceNumber: response.invoice_number || 'N/A',
@@ -65,7 +65,9 @@ export function mapInvoiceResponse(response: InvoiceResponse): Invoice {
     // Additional invoice fields
     dueDate: response.due_date || undefined,
     bankingDetails: response.banking_details || undefined,
-    freightShippingAmount: response.freight_shipping_amount ? parseAmount(response.freight_shipping_amount) : undefined,
+    freightShippingAmount: response.freight_shipping_amount
+      ? parseAmount(response.freight_shipping_amount)
+      : undefined,
     invoiceCurrency: response.invoice_currency || undefined,
     memoDescription: response.memo_description || undefined,
     paymentTerms: response.payment_terms || undefined,
@@ -99,4 +101,3 @@ export function mapInvoiceResponse(response: InvoiceResponse): Invoice {
 export function mapInvoiceResponses(responses: InvoiceResponse[]): Invoice[] {
   return responses.map(mapInvoiceResponse);
 }
-

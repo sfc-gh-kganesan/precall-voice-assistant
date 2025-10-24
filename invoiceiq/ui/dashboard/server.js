@@ -15,23 +15,26 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://backend.ivzu.svc.spcs.int
 console.log(`🔧 Backend URL: ${BACKEND_URL}`);
 
 // API proxy - forwards /api/* requests to backend
-app.use('/api', createProxyMiddleware({
-  target: BACKEND_URL,
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api': '', // Remove /api prefix when forwarding to backend
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[Proxy] ${req.method} ${req.path} -> ${BACKEND_URL}${req.path}`);
-  },
-  onError: (err, req, res) => {
-    console.error(`[Proxy Error] ${err.message}`);
-    res.status(500).json({
-      error: 'Backend communication error',
-      message: err.message
-    });
-  }
-}));
+app.use(
+  '/api',
+  createProxyMiddleware({
+    target: BACKEND_URL,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api': '', // Remove /api prefix when forwarding to backend
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      console.log(`[Proxy] ${req.method} ${req.path} -> ${BACKEND_URL}${req.path}`);
+    },
+    onError: (err, req, res) => {
+      console.error(`[Proxy Error] ${err.message}`);
+      res.status(500).json({
+        error: 'Backend communication error',
+        message: err.message,
+      });
+    },
+  })
+);
 
 // Serve static files from build directory
 app.use(express.static(path.join(__dirname, 'build')));
@@ -45,4 +48,3 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
   console.log(`📡 Proxying /api/* requests to ${BACKEND_URL}`);
 });
-
