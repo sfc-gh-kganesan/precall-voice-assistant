@@ -241,7 +241,7 @@ const AppContent: React.FC = () => {
               className="graph-pane"
               resizeSide="left"
             >
-              <GraphVisualization />
+              <GraphVisualization selectedFile={selectedFile} />
             </ResizablePane>
           </div>
           

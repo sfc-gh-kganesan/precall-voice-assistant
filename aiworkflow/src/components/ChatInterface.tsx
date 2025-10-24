@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Send } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { apiService } from '../services/api'
 
 interface Message {
@@ -7,6 +9,7 @@ interface Message {
   content: string
   sender: 'user' | 'assistant'
   timestamp: Date
+  isStreaming?: boolean
 }
 
 export const ChatInterface: React.FC = () => {
@@ -47,27 +50,47 @@ export const ChatInterface: React.FC = () => {
     setInputValue('')
     setIsLoading(true)
 
-    try {
-      const response = await apiService.sendChatMessage(inputValue)
-      
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response,
-        sender: 'assistant',
-        timestamp: new Date()
-      }
+    // Create a placeholder assistant message for streaming
+    const assistantMessageId = (Date.now() + 1).toString()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      content: '',
+      sender: 'assistant',
+      timestamp: new Date(),
+      isStreaming: true
+    }
 
-      setMessages(prev => [...prev, assistantMessage])
+    setMessages(prev => [...prev, assistantMessage])
+
+    try {
+      await apiService.streamChatMessage(
+        inputValue,
+        (chunk: string) => {
+          // Update the assistant message content as chunks arrive
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: msg.content + chunk }
+              : msg
+          ))
+        },
+        () => {
+          // Mark streaming as complete
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, isStreaming: false }
+              : msg
+          ))
+          setIsLoading(false)
+        }
+      )
     } catch (error) {
       console.error('Failed to send message:', error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: 'Sorry, I encountered an error. Please try again.',
-        sender: 'assistant',
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
+      // Update the assistant message with error content
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMessageId 
+          ? { ...msg, content: 'Sorry, I encountered an error. Please try again.' }
+          : msg
+      ))
       setIsLoading(false)
     }
   }
@@ -87,13 +110,34 @@ export const ChatInterface: React.FC = () => {
             <div style={{ fontWeight: '500', marginBottom: '4px' }}>
               {message.sender === 'user' ? 'You' : 'AI Assistant'}
             </div>
-            <div>{message.content}</div>
+            <div>
+              {message.sender === 'assistant' ? (
+                message.isStreaming ? (
+                  <div>
+                    {message.content}
+                    <span className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </span>
+                  </div>
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                )
+              ) : (
+                message.content
+              )}
+            </div>
           </div>
         ))}
         {isLoading && (
           <div className="message assistant">
             <div style={{ fontWeight: '500', marginBottom: '4px' }}>AI Assistant</div>
-            <div>Thinking...</div>
+            <div className="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
           </div>
         )}
         <div ref={messagesEndRef} />

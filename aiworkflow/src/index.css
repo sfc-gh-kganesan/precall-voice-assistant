@@ -304,6 +304,173 @@ body {
   margin-right: 20px;
 }
 
+/* Markdown rendering styles for chat messages */
+.message h1,
+.message h2,
+.message h3,
+.message h4,
+.message h5,
+.message h6 {
+  margin: 8px 0 4px 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.message h1 { font-size: 1.2em; }
+.message h2 { font-size: 1.1em; }
+.message h3 { font-size: 1.05em; }
+
+.message p {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.message ul,
+.message ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.message li {
+  margin: 2px 0;
+}
+
+.message code {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+}
+
+.message pre {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 8px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.message pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+}
+
+.message blockquote {
+  border-left: 3px solid var(--border-focus);
+  margin: 8px 0;
+  padding-left: 12px;
+  color: var(--text-secondary);
+}
+
+.message a {
+  color: var(--border-focus);
+  text-decoration: none;
+}
+
+.message a:hover {
+  text-decoration: underline;
+}
+
+.message strong {
+  font-weight: 600;
+}
+
+.message em {
+  font-style: italic;
+}
+
+.message hr {
+  border: none;
+  border-top: 1px solid var(--border-primary);
+  margin: 12px 0;
+}
+
+/* Enhanced table styles with higher specificity */
+.message table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 12px 0 !important;
+  border: 2px solid var(--border-primary) !important;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.message th,
+.message td {
+  border: 1px solid var(--border-primary) !important;
+  padding: 10px 12px !important;
+  text-align: left !important;
+  vertical-align: top !important;
+}
+
+.message th {
+  background-color: var(--bg-input) !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  font-size: 0.9em;
+}
+
+.message td {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  font-size: 0.9em;
+}
+
+.message tr:nth-child(even) td {
+  background-color: var(--bg-tertiary) !important;
+}
+
+.message tr:hover td {
+  background-color: var(--bg-hover) !important;
+}
+
+/* Ensure table content doesn't overflow */
+.message table td,
+.message table th {
+  max-width: 200px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Typing indicator animation */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .graph-node {
   background-color: var(--bg-input);
   border: 1px solid var(--border-primary);

@@ -68,9 +68,63 @@ export const apiService = {
     return response.data.response
   },
 
+  async streamChatMessage(message: string, onChunk: (chunk: string) => void, onComplete: () => void): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('No response body reader available')
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.content) {
+                onChunk(data.content)
+              }
+              if (data.done) {
+                onComplete()
+                return
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e)
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  },
+
   // Workflow graph operations
-  async getWorkflowGraph(): Promise<WorkflowGraph> {
-    const response = await axios.get(`${API_BASE_URL}/workflow/graph`)
+  async getWorkflowGraph(filePath?: string): Promise<WorkflowGraph> {
+    const params = filePath ? { path: filePath } : {}
+    const response = await axios.get(`${API_BASE_URL}/workflow/graph`, { params })
     return response.data
   },
 
