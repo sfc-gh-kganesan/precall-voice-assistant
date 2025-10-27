@@ -1,26 +1,22 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useAppStore } from '@/stores/appStore'
 import { chatApi } from '@/services/api'
 import { cn } from '@/lib/utils'
-import { DEFAULTS, UI_CONSTANTS, ERROR_MESSAGES } from '@/lib/constants'
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-  suggestedQueries?: string[]
-}
+import { UI_CONSTANTS, ERROR_MESSAGES } from '@/lib/constants'
 
 export function ChatWindow() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const messages = useAppStore((state) => state.messages)
+  const addMessage = useAppStore((state) => state.addMessage)
+  const updateMessage = useAppStore((state) => state.updateMessage)
+  const toggleChat = useAppStore((state) => state.toggleChat)
+
   const [input, setInput] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
+  const [messageHistory, setMessageHistory] = useState<any[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const toggleChat = useAppStore((state) => state.toggleChat)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -33,41 +29,88 @@ export function ChatWindow() {
   const handleSend = async () => {
     if (!input.trim() || input.length > UI_CONSTANTS.MAX_MESSAGE_LENGTH) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    }
-
-    setMessages(prev => [...prev, userMessage])
+    const messageText = input.trim()
     setInput('')
-    setIsTyping(true)
 
     try {
-      const response = await chatApi.sendMessage(input, DEFAULTS.SESSION_ID)
+      // Pass message history to API and capture updated history
+      const updatedHistory = await chatApi.streamMessage(messageText, messageHistory, (data) => {
+        if (data.role === 'user') {
+          // Echo the user message
+          addMessage({
+            id: Date.now().toString(),
+            role: 'user',
+            content: data.content || '',
+            timestamp: new Date(data.timestamp),
+          })
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.response,
-        timestamp: new Date(),
-        suggestedQueries: response.suggestedQueries,
-      }
+          // Immediately create an empty assistant message placeholder
+          const assistantMessageId = (Date.now() + 1).toString()
+          addMessage({
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date(),
+          })
 
-      setMessages(prev => [...prev, assistantMessage])
+          // Store the ID in a way that's accessible to subsequent chunks
+          ;(handleSend as any).currentAssistantId = assistantMessageId
+        } else if (data.role === 'tool_status') {
+          // Handle tool execution status messages
+          // Add timestamp to ID to make each tool invocation unique
+          const toolMessageId = `tool-${data.tool_name}-${Date.now()}`
+
+          if (data.status === 'running') {
+            // Add a new tool status message with unique ID
+            addMessage({
+              id: toolMessageId,
+              role: 'tool_status',
+              content: '',
+              timestamp: new Date(data.timestamp),
+              toolName: data.tool_name,
+              status: 'running',
+            })
+
+            // Store the ID so we can update it when completed
+            ;(handleSend as any).currentToolId = toolMessageId
+          } else if (data.status === 'completed') {
+            // Update the existing tool status message using stored ID
+            const storedToolId = (handleSend as any).currentToolId
+            if (storedToolId) {
+              updateMessage(storedToolId, {
+                status: 'completed',
+                timestamp: new Date(data.timestamp),
+              })
+            }
+          }
+        } else if (data.role === 'model') {
+          // Update the existing assistant message with accumulated content
+          const assistantId = (handleSend as any).currentAssistantId
+          if (assistantId) {
+            updateMessage(assistantId, {
+              content: data.content || '',
+              timestamp: new Date(data.timestamp)
+            })
+          }
+        }
+        // Note: history_update messages are captured by the API, not displayed
+      })
+
+      // Update message history state with the returned history
+      setMessageHistory(updatedHistory)
     } catch (error) {
       console.error('Chat error:', error)
-      
-      const errorMessage: Message = {
+
+      addMessage({
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `${ERROR_MESSAGES.CHAT_ERROR}: ${error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR}`,
         timestamp: new Date(),
-      }
-      setMessages(prev => [...prev, errorMessage])
+      })
     } finally {
-      setIsTyping(false)
+      // Clean up the stored IDs
+      delete (handleSend as any).currentAssistantId
+      delete (handleSend as any).currentToolId
     }
   }
 
@@ -99,48 +142,77 @@ export function ChatWindow() {
           </div>
         )}
 
-        {messages.map((message) => (
-          <div key={message.id} className={cn(
-            'flex',
-            message.role === 'user' ? 'justify-end' : 'justify-start'
-          )}>
-            <div className={cn(
-              'max-w-[80%] rounded-lg px-4 py-2',
-              message.role === 'user'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted'
-            )}>
-              <p className="text-sm">{message.content}</p>
-
-              {/* Suggested Queries */}
-              {message.suggestedQueries && (
-                <div className="mt-2 pt-2 border-t border-border/20">
-                  <p className="text-xs opacity-70 mb-1">Suggested:</p>
-                  <div className="space-y-1">
-                    {message.suggestedQueries.map((query, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSuggestedQuery(query)}
-                        className="block text-xs text-left hover:underline"
-                      >
-                        {query}
-                      </button>
-                    ))}
-                  </div>
+        {messages.map((message) => {
+          // Special rendering for tool status messages
+          if (message.role === 'tool_status') {
+            return (
+              <div key={message.id} className="flex justify-start">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full text-xs">
+                  {message.status === 'running' ? (
+                    <>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                      <span className="text-primary font-medium">
+                        Querying database...
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3 h-3 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-success font-medium">
+                        Query completed
+                      </span>
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-        ))}
+              </div>
+            )
+          }
 
-        {/* Typing Indicator */}
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-4 py-2">
-              <div className="dots-pulse" />
+          // Regular user/assistant messages
+          return (
+            <div key={message.id} className={cn(
+              'flex',
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            )}>
+              <div className={cn(
+                'max-w-[80%] rounded-lg px-4 py-2',
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-muted'
+              )}>
+                <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1">
+                  {message.content.trim() ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground italic animate-pulse">
+                      <span>💭 Thinking...</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Suggested Queries */}
+                {message.suggestedQueries && (
+                  <div className="mt-2 pt-2 border-t border-border/20">
+                    <p className="text-xs opacity-70 mb-1">Suggested:</p>
+                    <div className="space-y-1">
+                      {message.suggestedQueries.map((query, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleSuggestedQuery(query)}
+                          className="block text-xs text-left hover:underline"
+                        >
+                          {query}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })}
 
         <div ref={messagesEndRef} />
       </div>
@@ -165,7 +237,7 @@ export function ChatWindow() {
           />
           <button
             type="submit"
-            disabled={!input.trim() || isTyping}
+            disabled={!input.trim()}
             className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Send

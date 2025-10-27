@@ -239,6 +239,7 @@ def get_product_metrics(
 ) -> list[dict[str, Any]]:
     """
     Get product-level metrics from pre-aggregated PRODUCTS table.
+    Transforms nested multi-period data to flat structure based on requested period.
 
     Args:
         period: Time period ('week', 'month', 'custom')
@@ -249,21 +250,13 @@ def get_product_metrics(
         categories: Optional list of categories to filter by
 
     Returns:
-        List of product metrics dictionaries
+        List of product metrics dictionaries with flat metrics structure
     """
     session = snowflake_service._get_session()
     tables = get_active_configuration()
 
-    filter_conditions = [f"PERIOD = '{period}'"]
-
-    if start_date and end_date:
-        start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
-        end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-        start_date_str = start_dt.date().isoformat()
-        end_date_str = end_dt.date().isoformat()
-
-        filter_conditions.append(f"START_DATE = TO_DATE('{start_date_str}')")
-        filter_conditions.append(f"END_DATE = TO_DATE('{end_date_str}')")
+    # Build filter conditions - PERIOD is now always 'multi'
+    filter_conditions = []
 
     if products:
         product_list = "','".join(products)
@@ -273,7 +266,7 @@ def get_product_metrics(
         category_list = "','".join(categories)
         filter_conditions.append(f"PRODUCT_CATEGORY IN ('{category_list}')")
 
-    where_clause = " AND ".join(filter_conditions)
+    where_clause = " AND ".join(filter_conditions) if filter_conditions else "1=1"
     query = f"""
     SELECT
         PRODUCT_ID,
@@ -289,11 +282,107 @@ def get_product_metrics(
 
     results = session.sql(query).collect()
 
+    # Map custom period to week (default behavior)
+    display_period = "week" if period == "custom" else period
+
     product_metrics = []
     for row in results:
         metrics_json = json.loads(str(row[3])) if isinstance(row[3], str) else row[3]
         top_issues_json = json.loads(str(row[4])) if row[4] and isinstance(row[4], str) else row[4]
         trend_data_json = json.loads(str(row[5])) if row[5] and isinstance(row[5], str) else row[5]
+
+        # Extract period-specific metrics from nested structure
+        period_metrics = metrics_json.get(display_period, {})
+        current_metrics = period_metrics.get("current", {})
+        previous_metrics = period_metrics.get("previous", {})
+        change_metrics = period_metrics.get("change", {})
+
+        def _get_value(metric_dict: dict, key: str, default: Any = 0) -> Any:
+            """Helper to safely extract values from nested metrics."""
+            return metric_dict.get(key, {}).get("value", default)
+
+        def _get_change(change_dict: dict, key: str, value_key: str, default: Any = 0) -> Any:
+            """Helper to safely extract change values."""
+            return change_dict.get(key, {}).get(value_key, default)
+
+        def _determine_change_type(change_value: float) -> str:
+            """Determine change type from absolute value."""
+            if change_value > 0:
+                return "increase"
+            elif change_value < 0:
+                return "decrease"
+            else:
+                return "neutral"
+
+        # Build flat metrics structure for backward compatibility
+        total_cases_current = _get_value(current_metrics, "totalCases", 0)
+        total_cases_previous = _get_value(previous_metrics, "totalCases", 0)
+        total_cases_change = _get_change(change_metrics, "totalCases", "absolute", 0)
+        total_cases_change_pct = _get_change(change_metrics, "totalCases", "percentage", 0.0)
+
+        avg_case_life_current = _get_value(current_metrics, "avgCaseLife", 0.0)
+        avg_case_life_previous = _get_value(previous_metrics, "avgCaseLife", 0.0)
+        avg_case_life_change = _get_change(change_metrics, "avgCaseLife", "absolute", 0.0)
+        avg_case_life_change_pct = _get_change(change_metrics, "avgCaseLife", "percentage", 0.0)
+
+        resolution_rate_current = _get_value(current_metrics, "resolutionRate", 0.0)
+        resolution_rate_previous = _get_value(previous_metrics, "resolutionRate", 0.0)
+        resolution_rate_change = _get_change(change_metrics, "resolutionRate", "absolute", 0.0)
+        resolution_rate_change_pct = _get_change(change_metrics, "resolutionRate", "percentage", 0.0)
+
+        flat_metrics = {
+            "totalCases": {
+                "id": "total_cases",
+                "name": "Total Cases",
+                "value": total_cases_current,
+                "previousValue": total_cases_previous,
+                "change": total_cases_change,
+                "changePercentage": round(total_cases_change_pct, 1),
+                "changeType": _determine_change_type(total_cases_change),
+                "period": period,
+                "unit": "cases",
+                "drillDownEnabled": True,
+            },
+            "avgCaseLife": {
+                "id": "avg_case_life",
+                "name": "Average Case Life",
+                "value": round(avg_case_life_current, 1),
+                "previousValue": round(avg_case_life_previous, 1),
+                "change": round(avg_case_life_change, 1),
+                "changePercentage": round(avg_case_life_change_pct, 1),
+                "changeType": _determine_change_type(avg_case_life_change),
+                "period": period,
+                "unit": "hours",
+                "drillDownEnabled": True,
+            },
+            "resolutionRate": {
+                "id": "resolution_rate",
+                "name": "Resolution Rate",
+                "value": round(resolution_rate_current, 1),
+                "previousValue": round(resolution_rate_previous, 1),
+                "change": round(resolution_rate_change, 1),
+                "changePercentage": round(resolution_rate_change_pct, 1),
+                "changeType": _determine_change_type(resolution_rate_change),
+                "period": period,
+                "unit": "%",
+                "drillDownEnabled": True,
+            },
+        }
+
+        # Extract appropriate trend data based on period
+        # For 'week' → use weekly trend, for 'month' → use monthly trend
+        trend_key = "weekly" if display_period == "week" else "monthly"
+        trend_array = trend_data_json.get(trend_key, []) if trend_data_json else []
+
+        # Transform trend format to match frontend expectations: [{date, value}, ...]
+        transformed_trend = []
+        for point in trend_array:
+            if display_period == "week":
+                # Weekly trend: use weekStart as date
+                transformed_trend.append({"date": point.get("weekStart", ""), "value": point.get("cases", 0)})
+            else:
+                # Monthly trend: use monthStart as date
+                transformed_trend.append({"date": point.get("monthStart", ""), "value": point.get("cases", 0)})
 
         product_metrics.append(
             {
@@ -301,13 +390,9 @@ def get_product_metrics(
                 "productName": row[1],
                 "productCategory": row[2],
                 "parentProduct": None,
-                "metrics": {
-                    "totalCases": metrics_json.get("totalCases", {}),
-                    "avgCaseLife": metrics_json.get("avgCaseLife", {}),
-                    "resolutionRate": metrics_json.get("resolutionRate", {}),
-                },
+                "metrics": flat_metrics,
                 "topIssues": top_issues_json if top_issues_json else [],
-                "trend": trend_data_json if trend_data_json else [],
+                "trend": transformed_trend,
             }
         )
 
@@ -324,6 +409,7 @@ def get_topic_metrics(
 ) -> list[dict[str, Any]]:
     """
     Get topic-level metrics from pre-aggregated TOPICS table.
+    Transforms nested multi-period data to flat structure based on requested period.
 
     Args:
         period: Time period ('week', 'month', 'custom')
@@ -334,73 +420,83 @@ def get_topic_metrics(
         categories: Optional list of categories to filter by (not used with pre-aggregated data)
 
     Returns:
-        List of topic metrics dictionaries
+        List of topic metrics dictionaries with flat structure
     """
     session = snowflake_service._get_session()
     tables = get_active_configuration()
 
-    filter_conditions = [f"PERIOD = '{period}'"]
-
-    if start_date and end_date:
-        start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
-        end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-        start_date_str = start_dt.date().isoformat()
-        end_date_str = end_dt.date().isoformat()
-
-        filter_conditions.append(f"START_DATE = TO_DATE('{start_date_str}')")
-        filter_conditions.append(f"END_DATE = TO_DATE('{end_date_str}')")
+    # Build filter conditions - PERIOD is now always 'multi'
+    filter_conditions = []
 
     if topics:
         topic_list = "','".join(topics)
         filter_conditions.append(f"TOPIC_NAME IN ('{topic_list}')")
 
-    where_clause = " AND ".join(filter_conditions)
+    where_clause = " AND ".join(filter_conditions) if filter_conditions else "1=1"
     query = f"""
     SELECT
         TOPIC_ID,
         TOPIC_NAME,
-        TOTAL_CASES,
-        CHANGE_ABSOLUTE,
-        CHANGE_PERCENTAGE,
-        CHANGE_TYPE,
-        AVG_RESOLUTION_TIME,
-        RESOLUTION_RATE,
-        SENTIMENT_POSITIVE,
-        SENTIMENT_NEUTRAL,
-        SENTIMENT_NEGATIVE,
+        METRICS,
+        TREND_DATA,
         TOP_PRODUCTS
     FROM {tables["topics"]}
     WHERE {where_clause}
-    ORDER BY TOTAL_CASES DESC
+    ORDER BY TOPIC_NAME
     """
 
     results = session.sql(query).collect()
 
+    # Map custom period to week (default behavior)
+    display_period = "week" if period == "custom" else period
+
     topic_metrics = []
     for row in results:
-        top_products = []
-        if row[11]:
-            try:
-                top_products = json.loads(str(row[11])) if isinstance(row[11], str) else row[11]
-            except (json.JSONDecodeError, TypeError):
-                top_products = []
+        metrics_json = json.loads(str(row[2])) if isinstance(row[2], str) else row[2]
+        trend_data_json = json.loads(str(row[3])) if row[3] and isinstance(row[3], str) else row[3]
+        top_products_json = json.loads(str(row[4])) if row[4] and isinstance(row[4], str) else row[4]
+
+        # Extract period-specific metrics from nested structure
+        period_metrics = metrics_json.get(display_period, {})
+        current_metrics = period_metrics.get("current", {})
+        previous_metrics = period_metrics.get("previous", {})
+        change_metrics = period_metrics.get("change", {})
+
+        def _get_value(metric_dict: dict, key: str, default: Any = 0) -> Any:
+            """Helper to safely extract values from nested metrics."""
+            return metric_dict.get(key, {}).get("value", default)
+
+        def _get_change(change_dict: dict, key: str, value_key: str, default: Any = 0) -> Any:
+            """Helper to safely extract change values."""
+            return change_dict.get(key, {}).get(value_key, default)
+
+        # Extract values
+        total_cases_current = _get_value(current_metrics, "totalCases", 0)
+        total_cases_previous = _get_value(previous_metrics, "totalCases", 0)
+        total_cases_change = _get_change(change_metrics, "totalCases", "absolute", 0)
+        total_cases_change_pct = _get_change(change_metrics, "totalCases", "percentage", 0.0)
+
+        avg_resolution_time = _get_value(current_metrics, "avgCaseLife", 0.0)
+        resolution_rate = _get_value(current_metrics, "resolutionRate", 0.0)
+
+        # Determine change type
+        change_type = "increase" if total_cases_change > 0 else ("decrease" if total_cases_change < 0 else "neutral")
+
+        # Default sentiment values (these could be enhanced later with real sentiment data)
+        sentiment = {"positive": 25, "neutral": 50, "negative": 25}
 
         topic_metrics.append(
             {
                 "topicId": row[0],
                 "topicName": row[1],
-                "totalCases": int(row[2]) if row[2] else 0,
-                "change": int(row[3]) if row[3] else 0,
-                "changePercentage": round(float(row[4]), 1) if row[4] else 0.0,
-                "changeType": row[5] if row[5] else "neutral",
-                "avgResolutionTime": round(float(row[6]), 1) if row[6] else 0.0,
-                "resolutionRate": round(float(row[7]), 1) if row[7] else 0.0,
-                "sentiment": {
-                    "positive": int(row[8]) if row[8] else 0,
-                    "neutral": int(row[9]) if row[9] else 0,
-                    "negative": int(row[10]) if row[10] else 0,
-                },
-                "topProducts": top_products,
+                "totalCases": int(total_cases_current),
+                "change": int(total_cases_change),
+                "changePercentage": round(total_cases_change_pct, 1),
+                "changeType": change_type,
+                "avgResolutionTime": round(avg_resolution_time, 1),
+                "resolutionRate": round(resolution_rate, 1),
+                "sentiment": sentiment,
+                "topProducts": [p for p in (top_products_json if top_products_json else []) if p.get('product')],
             }
         )
 

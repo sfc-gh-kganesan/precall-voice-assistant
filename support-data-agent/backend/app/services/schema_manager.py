@@ -132,16 +132,8 @@ class SchemaManager:
             PERIOD VARCHAR(20) NOT NULL,
             START_DATE DATE NOT NULL,
             END_DATE DATE NOT NULL,
-            TOTAL_CASES INTEGER NOT NULL,
-            PREVIOUS_CASES INTEGER DEFAULT 0,
-            CHANGE_ABSOLUTE INTEGER DEFAULT 0,
-            CHANGE_PERCENTAGE FLOAT DEFAULT 0.0,
-            CHANGE_TYPE VARCHAR(20) DEFAULT 'stable',
-            AVG_RESOLUTION_TIME FLOAT DEFAULT 0.0,
-            RESOLUTION_RATE FLOAT DEFAULT 0.0,
-            SENTIMENT_POSITIVE FLOAT DEFAULT 0.0,
-            SENTIMENT_NEUTRAL FLOAT DEFAULT 0.0,
-            SENTIMENT_NEGATIVE FLOAT DEFAULT 0.0,
+            METRICS VARIANT,
+            TREND_DATA VARIANT,
             TOP_PRODUCTS VARIANT,
             AI_SUMMARY TEXT,
             CUSTOMER_FEEDBACK TEXT,
@@ -251,7 +243,6 @@ class SchemaManager:
         connection_params = snowflake_settings.get_connection_params()
         configured_schema = connection_params.get("schema", "PUBLIC")
         configured_database = connection_params.get("database", "SDA")
-
         config_data = [
             {
                 "CONFIG_ID": "config_default_cases",

@@ -10,7 +10,6 @@ from pydantic_settings import BaseSettings
 class SnowflakeSettings(BaseSettings):
     """
     Flexible Snowflake connection configuration.
-
     Automatically captures any environment variables starting with SNOWFLAKE_
     and passes them to the Snowflake connection. This supports all Snowflake
     authentication methods (password, key-pair, SSO, etc.) and connection parameters.
@@ -28,7 +27,6 @@ class SnowflakeSettings(BaseSettings):
     def get_connection_params(self) -> dict[str, Any]:
         params = {}
         supported_params = {"account", "user", "password", "database", "warehouse", "schema", "role"}
-
         for env_key, env_value in os.environ.items():
             if env_key.startswith("SNOWFLAKE_"):
                 param_name = env_key[10:].lower()

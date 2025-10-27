@@ -205,17 +205,91 @@ export const adminApi = {
 }
 
 export const chatApi = {
-  async sendMessage(message: string, sessionId: string): Promise<{
-    response: string
-    suggestedQueries?: string[]
-  }> {
-    return await apiRequest<{
-      response: string
-      suggestedQueries?: string[]
-    }>(`${API_BASE}/api/v1/chat/messages`, {
+  /**
+   * Stream chat messages from the backend with conversation history support
+   * @param message - The user's message
+   * @param messageHistory - Previous conversation messages for context (limited to last 5 by backend)
+   * @param onChunk - Callback for each streamed message chunk
+   * @returns Updated message history after the conversation turn
+   */
+  async streamMessage(
+    message: string,
+    messageHistory: any[] | null,
+    onChunk: (data: {
+      role: 'user' | 'model' | 'tool_status' | 'history_update'
+      timestamp: string
+      content?: string
+      event_type?: string
+      tool_name?: string
+      status?: 'running' | 'completed'
+      messages?: string
+    }) => void
+  ): Promise<any[]> {
+    // Backend expects FormData with 'message' and optional 'message_history' fields
+    const formData = new FormData()
+    formData.append('message', message)
+
+    // Send message history if available
+    if (messageHistory && messageHistory.length > 0) {
+      formData.append('message_history', JSON.stringify(messageHistory))
+    }
+
+    const response = await fetch(`${API_BASE}/api/v1/chat/messages`, {
       method: 'POST',
-      body: JSON.stringify({ message, sessionId }),
+      body: formData,
     })
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`)
+    }
+
+    // Read the streaming response
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('No response body')
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let updatedHistory: any[] = []
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) break
+
+        // Decode the chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete lines (newline-delimited JSON)
+        const lines = buffer.split('\n')
+        // Keep the last incomplete line in buffer
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line)
+
+              // Capture history update event
+              if (data.role === 'history_update' && data.messages) {
+                updatedHistory = JSON.parse(data.messages)
+              }
+
+              onChunk(data)
+            } catch (e) {
+              console.error('Failed to parse JSON line:', line, e)
+            }
+          }
+        }
+      }
+
+      // Return the updated message history
+      return updatedHistory
+    } finally {
+      reader.releaseLock()
+    }
   },
 }
 

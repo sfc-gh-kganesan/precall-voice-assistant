@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { ticketsApi } from '@/services/api'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { SnowflakeLogo } from '@/components/ui/SnowflakeLogo'
@@ -121,21 +122,21 @@ export default function TicketsPage() {
               </div>
             </div>
             <nav className="flex gap-6">
-              <a href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Dashboard
-              </a>
-              <a href="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Products
-              </a>
-              <a href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Topics
-              </a>
-              <a href="/tickets" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
+              </Link>
+              <Link href="/tickets" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
                 Cases
-              </a>
-              <a href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Admin
-              </a>
+              </Link>
             </nav>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { dashboardApi } from '@/services/api'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { SnowflakeLogo } from '@/components/ui/SnowflakeLogo'
@@ -84,21 +85,21 @@ export default function ProductsPage() {
               </div>
             </div>
             <nav className="flex gap-6">
-              <a href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Dashboard
-              </a>
-              <a href="/products" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
+              </Link>
+              <Link href="/products" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
                 Products
-              </a>
-              <a href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Topics
-              </a>
-              <a href="/tickets" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/tickets" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Cases
-              </a>
-              <a href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Admin
-              </a>
+              </Link>
             </nav>
           </div>
         </div>
@@ -242,7 +243,7 @@ export default function ProductsPage() {
 
                 {/* Trend Chart */}
                 <div className="mb-4 pt-4 border-t border-border">
-                  <h4 className="text-sm font-medium text-muted-foreground mb-3">7-Day Trend</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3">Weekly Trend</h4>
                   <div className="h-24 flex items-end gap-1">
                     {product.trend.map((point, idx) => {
                       const maxValue = Math.max(...product.trend.map(p => p.value))

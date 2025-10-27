@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { useAppStore } from '@/stores/appStore'
 import { dashboardApi } from '@/services/api'
 import { KPICard } from '@/components/dashboard/KPICard'
@@ -8,12 +9,11 @@ import { FilterBar } from '@/components/common/FilterBar'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { ProductPerformanceSection } from '@/components/dashboard/ProductPerformanceSection'
 import { TopicPerformanceSection } from '@/components/dashboard/TopicPerformanceSection'
-import { ChatWindow } from '@/components/chat/ChatWindow'
 import { SnowflakeLogo } from '@/components/ui/SnowflakeLogo'
 import { NoConfigurationAlert } from '@/components/common/NoConfigurationAlert'
 
 export default function DashboardPage() {
-  const { filters, chatOpen, activeConfigId, isInitializing } = useAppStore()
+  const { filters, activeConfigId, isInitializing } = useAppStore()
 
   // Fetch KPIs
   const { data: kpis, isLoading: kpisLoading } = useQuery({
@@ -38,21 +38,21 @@ export default function DashboardPage() {
               </div>
             </div>
             <nav className="flex gap-6">
-              <a href="/dashboard" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
+              <Link href="/dashboard" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
                 Dashboard
-              </a>
-              <a href="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Products
-              </a>
-              <a href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Topics
-              </a>
-              <a href="/tickets" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/tickets" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Cases
-              </a>
-              <a href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Admin
-              </a>
+              </Link>
             </nav>
           </div>
         </div>
@@ -93,30 +93,6 @@ export default function DashboardPage() {
           </>
         )}
       </main>
-
-      {/* Chat Window */}
-      {chatOpen && <ChatWindow />}
-
-      {/* Chat Toggle Button */}
-      <button
-        onClick={() => useAppStore.getState().toggleChat()}
-        className="fixed bottom-4 right-4 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 hover:scale-110 transition-all flex items-center justify-center ring-2 ring-primary/20"
-        aria-label="Toggle chat"
-      >
-        <svg
-          className="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-          />
-        </svg>
-      </button>
     </div>
   )
 }
