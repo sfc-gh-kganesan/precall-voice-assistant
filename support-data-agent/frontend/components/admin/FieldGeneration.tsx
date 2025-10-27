@@ -14,7 +14,9 @@ export function FieldGeneration() {
     selectedTables,
     fieldMappings,
     generationJobId,
+    outputTableName,
     setGenerationJobId,
+    setConfigurationId,
     setCurrentStep,
   } = useAdminStore()
 
@@ -27,9 +29,11 @@ export function FieldGeneration() {
       schema: selectedSchema!,
       tables: selectedTables,
       mappings: fieldMappings,
+      outputTable: outputTableName || `${selectedTables[0]}_ENRICHED`,
     }),
     onSuccess: (data) => {
       setGenerationJobId(data.jobId)
+      setConfigurationId(data.configId)
       setIsGenerating(true)
     },
   })

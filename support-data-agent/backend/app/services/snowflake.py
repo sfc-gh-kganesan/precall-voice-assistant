@@ -19,7 +19,12 @@ def _get_session() -> Session:
     if _session is None:
         try:
             connection_params = snowflake_settings.get_connection_params()
+            # Log non-sensitive parameters
+            debug_params = {k: v for k, v in connection_params.items() if k not in ["password", "private_key"]}
+            logger.info("Attempting Snowflake connection", params=debug_params)
+
             _session = Session.builder.configs(connection_params).create()
+
             logger.info("Snowflake session created successfully")
         except Exception as e:
             logger.error("Failed to create Snowflake session", error=str(e))
@@ -99,15 +104,15 @@ def preview_table(database: str, schema: str, table: str, limit: int = None) -> 
         Dictionary with 'columns' (list of column names) and 'rows' (list of row data)
     """
     session = _get_session()
-    fully_qualified = f"{database}.{schema}.{table}"
+    schema_qualified = f"{schema}.{table}"
 
     if limit is None:
         limit = DEFAULT_TABLE_PREVIEW_LIMIT
 
-    describe_rows = session.sql(f"DESCRIBE TABLE {fully_qualified}").collect()
+    describe_rows = session.sql(f"DESCRIBE TABLE {schema_qualified}").collect()
     columns = [row[0] for row in describe_rows]
 
-    data_rows = session.sql(f"SELECT * FROM {fully_qualified} LIMIT {limit}").collect()
+    data_rows = session.sql(f"SELECT * FROM {schema_qualified} LIMIT {limit}").collect()
     rows = []
     for row in data_rows:
         row_dict = row.as_dict()

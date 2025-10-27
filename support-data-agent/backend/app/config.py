@@ -1,37 +1,41 @@
 """Configuration management for the Support Data Agent backend."""
 
+import os
+from typing import Any
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class SnowflakeSettings(BaseSettings):
-    """Snowflake connection configuration."""
+    """
+    Flexible Snowflake connection configuration.
 
-    account: str
-    user: str
-    password: str
+    Automatically captures any environment variables starting with SNOWFLAKE_
+    and passes them to the Snowflake connection. This supports all Snowflake
+    authentication methods (password, key-pair, SSO, etc.) and connection parameters.
+    """
+
     warehouse: str = "COMPUTE_WH"
-    database: str
     schema_name: str = Field(default="PUBLIC", alias="schema")
-    role: str | None = None
 
     model_config = {
         "env_prefix": "SNOWFLAKE_",
         "case_sensitive": False,
-        "extra": "ignore",
+        "extra": "allow",
     }
 
-    def get_connection_params(self) -> dict:
-        params = {
-            "account": self.account,
-            "user": self.user,
-            "password": self.password,
-            "warehouse": self.warehouse,
-            "database": self.database,
-            "schema": self.schema_name,
-        }
+    def get_connection_params(self) -> dict[str, Any]:
+        params = {}
+        supported_params = {"account", "user", "password", "database", "warehouse", "schema", "role"}
+
+        for env_key, env_value in os.environ.items():
+            if env_key.startswith("SNOWFLAKE_"):
+                param_name = env_key[10:].lower()
+                if param_name in supported_params:
+                    params[param_name] = env_value
+
         return params
 
 
-# Global settings instance
 snowflake_settings = SnowflakeSettings()

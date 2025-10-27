@@ -3,12 +3,17 @@
 import json
 from typing import Any
 
+import snowflake.snowpark
+import snowflake.snowpark.types as T
+from snowflake.snowpark import Row
 from snowflake.snowpark import functions as F
 from snowflake.snowpark.exceptions import SnowparkSQLException, SnowparkTableException
 from snowflake.snowpark.types import StringType
 from snowflake.snowpark.window import Window
 
 from ..services import snowflake as snowflake_service
+
+print("SNOWFLAKE VERSION:", snowflake.snowpark.__version__)
 
 
 class EnrichmentService:
@@ -54,6 +59,32 @@ class EnrichmentService:
         self.session.sql(create_sql).collect()
         print(f"Created output table: {output_table}")
 
+        # Ensure all GENERATED columns exist
+        self.session.sql(f"""
+            ALTER TABLE {output_table}
+            ADD COLUMN IF NOT EXISTS GENERATED_TOPIC VARCHAR
+        """).collect()
+
+        self.session.sql(f"""
+            ALTER TABLE {output_table}
+            ADD COLUMN IF NOT EXISTS GENERATED_PRODUCT VARCHAR
+        """).collect()
+
+        self.session.sql(f"""
+            ALTER TABLE {output_table}
+            ADD COLUMN IF NOT EXISTS GENERATED_PRODUCT_CATEGORY VARCHAR
+        """).collect()
+
+        self.session.sql(f"""
+            ALTER TABLE {output_table}
+            ADD COLUMN IF NOT EXISTS GENERATED_SENTIMENT FLOAT
+        """).collect()
+
+        self.session.sql(f"""
+            ALTER TABLE {output_table}
+            ADD COLUMN IF NOT EXISTS ENRICHED_AT TIMESTAMP
+        """).collect()
+
     def start_enrichment_job(self, config_id: str, job_id: str) -> str:
         try:
             config = self._get_configuration(config_id)
@@ -65,23 +96,28 @@ class EnrichmentService:
             self._materialize_analytics(job_id, output_table, analytics_only=False)
             return job_id
 
-        except (SnowparkSQLException, ValueError, RuntimeError) as e:
+        except Exception as e:
+            import traceback
+
             print(f"Enrichment failed: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise
 
     def start_analytics_job(self, config_id: str, job_id: str) -> str:
         try:
             config = self._get_configuration(config_id)
             output_table = config["OUTPUT_TABLE"]
-            source_tables = config["TABLES"]
 
-            self._ensure_output_table_exists(output_table, source_tables)
-
+            # Analytics-only job should NOT recreate base table or run AI classification
+            # It only materializes the _TOPICS, _PRODUCTS, and _KPI tables
             self._materialize_analytics(job_id, output_table, analytics_only=True)
             return job_id
 
-        except (SnowparkSQLException, ValueError, RuntimeError) as e:
+        except Exception as e:
+            import traceback
+
             print(f"Analytics failed: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise
 
     def _materialize_analytics(self, job_id: str, output_table: str, analytics_only: bool = False):
@@ -100,143 +136,228 @@ class EnrichmentService:
                 if self._table_exists(table):
                     self.session.sql(f"DELETE FROM {table}").collect()
 
+            print("Clearing existing GENERATED fields for re-processing...")
+            self.session.sql(f"""
+                UPDATE {output_table}
+                SET GENERATED_TOPIC = NULL,
+                    GENERATED_PRODUCT = NULL,
+                    GENERATED_PRODUCT_CATEGORY = NULL,
+                    GENERATED_SENTIMENT = NULL
+            """).collect()
+
             print("AI classifying cases...")
             cases_df = self.session.table(output_table)
 
+            # transformed_cases.select(F.ai_agg(F.col("CONTENT_SUBJECT"),"give me a python list with concise topics that people are complaining about"))
             topic_categories = [
-                "Performance & Optimization",
-                "Authentication & Access",
-                "Data Loading & Ingestion",
-                "Configuration & Setup",
-                "Compliance & Security",
-                "Storage & Data Retention",
-                "Query Errors",
+                "Security and Authentication",
+                "Performance Issues",
+                "Data Loading and Unloading",
+                "Query Optimization",
+                "Account Management",
+                "Data Sharing and Collaboration",
+                "Warehouse Issues",
+                "Snowpipe Issues",
+                "Cortex Issues",
+                "Streamlit Issues",
+                "Openflow Issues",
+                "Network Policy Issues",
+                "Privatelink Issues",
+                "Tri-Secret Secure Issues",
+                "Snowsight Issues",
+                "Credit Usage and Billing",
+                "MFA Issues",
+                "Data Ingestion Issues",
+                "Replication Issues",
             ]
 
-            product_categories = [
-                "Query Performance",
-                "Data Storage",
-                "Virtual Warehouses",
-                "Snowpipe",
-                "Tasks & Streams",
-                "Authentication",
-                "Access Control",
-                "Snowpark",
+            products = [
+                "AI-Driven Applications",
+                "Streams & Tasks (Batch & Streaming Ingestion)",
+                "Encryption & Secure Connectivity",
+                "SQL Analytics (Query Development & Execution + Advanced Analytics (SQL))",
+                "Data Lineage & Monitoring",
+                "Data Loading & Unloading (Copy)",
+                "AI/ML-Powered Functions",
+                "Event Logging Tracing & Telemetry",
+                "Hybrid Tables",
+                "Organization & Account Level Management (Account & Organization Management)",
+                "Iceberg Tables (Data Lake Querying)",
+                "Snowpark Container Services",
+                "Programming Language Drivers",
+                "User Authorization & Access Control",
+                "Query Performance & Optimization (Resource Provisioning & Management)",
+                "Snowflake Database & Information Schema (Metadata & Schema Management)",
+                "Snowpark Dev Framework & Code Execution (Snowpark & Development Frameworks)",
+                "Billing Discrepancies & Refunds",
                 "External Tables",
+                "Notebooks (Collaborative Analytics & Notebook Environment)",
+                "Cost Management & Monitoring (Monitoring & Alerts)",
+                "Data Sharing",
+                "User Access & Password Reset (User Support & Access)",
+                "General Billing Support",
+                "Account Authentication Setup & Management",
+                "Data Clean Rooms",
+                "Native Apps (Native Managed Connected Applications Development & Deployment)",
+                "Storage (Stages & Integrations) (Storage Management)",
+                "Openflow",
+                "Streamlit (SiS & Community Cloud) Streamlit Application Development & Deployment",
+                "Security Monitoring & Compliance",
+                "Dynamic Tables",
+                "Programmatic Extensions",
+                "Payment & Account Access",
+                "DevOps & Tools",
+                "External Platform Connectors",
+                "Data Marketplace",
+                "User Interface",
+                "Core Clients & Drivers (Core Drivers)",
+                "ML Platform (Machine Learning Development & Deployment)",
+                "Backup & Recovery",
+                "Snowpipe & Snowpipe Streaming (Batch & Streaming Ingestion)",
+                "Data Protection & Privacy",
             ]
 
             print("Using AI functions for topic and product extraction...")
-            cases_to_process = (
-                cases_df.filter(F.col("GENERATED_TOPIC").is_null() | F.col("GENERATED_PRODUCT").is_null())
-                .limit(100)
-                .collect()
+
+            # Get all cases that need classification (no limit - process everything)
+            cases_to_classify = cases_df.filter(
+                F.col("GENERATED_TOPIC").is_null() | F.col("GENERATED_PRODUCT").is_null()
             )
-            processed_topics = 0
-            processed_products = 0
 
-            for row in cases_to_process:
-                case_id = row["ID"]
-                subject = row["SUBJECT"] or ""
-                description = row["DESCRIPTION"] or ""
-                content = f"{subject} {description}".strip()
+            # Apply AI classification to create enriched DataFrame
+            classified_df = cases_to_classify.with_column(
+                "combined_text", F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION"))
+            ).select(
+                F.col("CASE_ID"),
+                F.ai_classify(F.col("combined_text"), topic_categories)["labels"][0]
+                .cast(T.StringType())
+                .alias("GENERATED_TOPIC"),
+                F.ai_classify(
+                    F.col("combined_text"),
+                    products,
+                )["labels"][0]
+                .cast(T.StringType())
+                .alias("GENERATED_PRODUCT"),
+            )
 
-                if not content:
-                    continue
-                if not row["GENERATED_TOPIC"]:
-                    try:
-                        topic_result = self.session.sql(f"""
-                            SELECT SNOWFLAKE.CORTEX.COMPLETE(
-                                'mixtral-8x7b',
-                                'Classify this support ticket into ONE of these topics: '
-                                f'{", ".join(topic_categories)}. Return only the topic name, nothing else.'
-                                f'\\n\\nTicket: {content.replace("'", "''")}'
-                            ) as topic
-                        """).collect()
+            # Get output table as Snowpark Table
+            output_table_df = self.session.table(output_table)
 
-                        topic = topic_result[0]["TOPIC"] if topic_result else "Query Errors"
-                        for cat in topic_categories:
-                            if cat.lower() in topic.lower():
-                                topic = cat
-                                break
-                        else:
-                            topic = "Query Errors"
+            # Use Table.update() to populate classifications in bulk
+            print("Updating topic and product classifications...")
+            output_table_df.update(
+                {
+                    "GENERATED_TOPIC": classified_df["GENERATED_TOPIC"],
+                    "GENERATED_PRODUCT": classified_df["GENERATED_PRODUCT"],
+                    "ENRICHED_AT": F.current_timestamp(),
+                },
+                output_table_df["CASE_ID"] == classified_df["CASE_ID"],
+                classified_df,
+            )
 
-                        self.session.sql(f"""
-                            UPDATE {output_table}
-                            SET GENERATED_TOPIC = '{topic.replace("'", "''")}',
-                                ENRICHED_AT = CURRENT_TIMESTAMP()
-                            WHERE ID = '{case_id.replace("'", "''")}'
-                        """).collect()
-                        processed_topics += 1
-
-                    except SnowparkSQLException as e:
-                        print(f"Error processing topic for case {case_id}: {str(e)}")
-                if not row["GENERATED_PRODUCT"]:
-                    try:
-                        product_result = self.session.sql(f"""
-                            SELECT SNOWFLAKE.CORTEX.COMPLETE(
-                                'mixtral-8x7b',
-                                'Identify the Snowflake product for this ticket from: '
-                                f'{", ".join(product_categories)}. Return only the product name, nothing else.'
-                                f'\\n\\nTicket: {content.replace("'", "''")}'
-                            ) as product
-                        """).collect()
-
-                        product = product_result[0]["PRODUCT"] if product_result else "Query Performance"
-                        for cat in product_categories:
-                            if cat.lower() in product.lower():
-                                product = cat
-                                break
-                        else:
-                            product = "Query Performance"
-
-                        self.session.sql(f"""
-                            UPDATE {output_table}
-                            SET GENERATED_PRODUCT = '{product.replace("'", "''")}',
-                                ENRICHED_AT = CURRENT_TIMESTAMP()
-                            WHERE ID = '{case_id.replace("'", "''")}'
-                        """).collect()
-                        processed_products += 1
-
-                    except SnowparkSQLException as e:
-                        print(f"Error processing product for case {case_id}: {str(e)}")
-
+            # Process sentiment for all cases that need it
+            print("Processing sentiment analysis...")
             sentiment_cases = cases_df.filter(F.col("GENERATED_SENTIMENT").is_null())
-            for row in sentiment_cases.collect():
-                case_id = row["ID"]
-                content = f"{row['SUBJECT'] or ''} {row['DESCRIPTION'] or ''}".strip()
 
-                if content:
-                    try:
-                        sentiment_result = self.session.sql(f"""
-                            SELECT SNOWFLAKE.CORTEX.SENTIMENT('{content.replace("'", "''")}') as sentiment
-                        """).collect()
-                        sentiment = sentiment_result[0]["SENTIMENT"] if sentiment_result else 0.0
+            sentiment_df = sentiment_cases.with_column(
+                "combined_text", F.concat_ws(F.lit(" "), F.col("SUBJECT"), F.col("DESCRIPTION"))
+            ).select(
+                F.col("CASE_ID"),
+                F.call_function("SNOWFLAKE.CORTEX.SENTIMENT", F.col("combined_text")).alias("GENERATED_SENTIMENT"),
+            )
 
-                        self.session.sql(f"""
-                            UPDATE {output_table}
-                            SET GENERATED_SENTIMENT = {sentiment},
-                                ENRICHED_AT = CURRENT_TIMESTAMP()
-                            WHERE ID = '{case_id.replace("'", "''")}'
-                        """).collect()
-                    except SnowparkSQLException as e:
-                        print(f"Error processing sentiment for case {case_id}: {str(e)}")
+            # Update using Table.update()
+            output_table_df.update(
+                {"GENERATED_SENTIMENT": sentiment_df["GENERATED_SENTIMENT"], "ENRICHED_AT": F.current_timestamp()},
+                output_table_df["CASE_ID"] == sentiment_df["CASE_ID"],
+                sentiment_df,
+            )
 
-            print(f"Processed {processed_topics} topics and {processed_products} products using AI functions")
+            print("AI classification and sentiment analysis completed")
 
             print("Setting product categories...")
-            self.session.sql(f"""
-                UPDATE {output_table}
-                SET GENERATED_PRODUCT_CATEGORY = CASE
-                    WHEN GENERATED_PRODUCT IN ('Query Performance', 'Data Storage',
-                        'Virtual Warehouses') THEN 'Data Warehousing'
-                    WHEN GENERATED_PRODUCT IN ('Snowpipe', 'Tasks & Streams', 'External Tables') THEN 'Data Engineering'
-                    WHEN GENERATED_PRODUCT IN ('Authentication', 'Access Control') THEN 'Security & Governance'
-                    WHEN GENERATED_PRODUCT = 'Snowpark' THEN 'Developer Tools'
-                    ELSE 'Data Integration'
-                END
-                WHERE GENERATED_PRODUCT_CATEGORY IS NULL
-            """).collect()
+
+            # Define mapping data as list of tuples (Feature, DOMAIN)
+            mapping_data = [
+                ("Snowpark Container Services", "Application Platform"),
+                ("User Interface", "Product Experiences"),
+                (
+                    "Streamlit (SiS & Community Cloud) Streamlit Application Development & Deployment",
+                    "Product Experiences",
+                ),
+                ("Data Marketplace", "Application Platform"),
+                ("Snowflake Database & Information Schema (Metadata & Schema Management)", "Metadata"),
+                ("Account Authentication Setup & Management", "Governance | Manageability | Privacy | Security"),
+                ("Billing Discrepancies & Refunds", "Billing & Monetization Platform"),
+                ("DevOps & Tools", "Data Engineering"),
+                ("Event Logging Tracing & Telemetry", "Data Engineering"),
+                (
+                    "Organization & Account Level Management (Account & Organization Management)",
+                    "Governance | Manageability | Privacy | Security",
+                ),
+                ("Payment & Account Access", "Billing & Monetization Platform"),
+                ("Snowpipe & Snowpipe Streaming (Batch & Streaming Ingestion)", "Data Engineering"),
+                (
+                    "Cost Management & Monitoring (Monitoring & Alerts)",
+                    "Governance | Manageability | Privacy | Security",
+                ),
+                ("ML Platform (Machine Learning Development & Deployment)", "AI & Machine Learning"),
+                ("Data Sharing", "Application Platform"),
+                ("External Platform Connectors", "Data Engineering"),
+                ("Data Loading & Unloading (Copy)", "Data Engineering"),
+                ("Core Clients & Drivers (Core Drivers)", "Data Analytics"),
+                ("Security Monitoring & Compliance", "Governance | Manageability | Privacy | Security"),
+                ("Programmatic Extensions", "Data Engineering"),
+                ("Programming Language Drivers", "Data Analytics"),
+                ("Query Performance & Optimization (Resource Provisioning & Management)", "Data Analytics"),
+                (
+                    "User Access & Password Reset (User Support & Access)",
+                    "Governance | Manageability | Privacy | Security",
+                ),
+                ("Backup & Recovery", "Metadata"),
+                ("Data Protection & Privacy", "Governance | Manageability | Privacy | Security"),
+                ("Iceberg Tables (Data Lake Querying)", "Open Lakehouse"),
+                ("Notebooks (Collaborative Analytics & Notebook Environment)", "Product Experiences"),
+                ("Storage (Stages & Integrations) (Storage Management)", "Open Lakehouse"),
+                ("Streams & Tasks (Batch & Streaming Ingestion)", "Data Engineering"),
+                ("Data Clean Rooms", "Governance | Manageability | Privacy | Security"),
+                ("Hybrid Tables", "Data Analytics"),
+                ("Data Lineage & Monitoring", "Governance | Manageability | Privacy | Security"),
+                ("General Billing Support", "Billing & Monetization Platform"),
+                ("SQL Analytics (Query Development & Execution + Advanced Analytics (SQL))", "Data Analytics"),
+                ("AI-Driven Applications", "AI & Machine Learning"),
+                ("Snowpark Dev Framework & Code Execution (Snowpark & Development Frameworks)", "Data Engineering"),
+                ("Dynamic Tables", "Data Engineering"),
+                ("External Tables", "Open Lakehouse"),
+                ("Encryption & Secure Connectivity", "Governance | Manageability | Privacy | Security"),
+                (
+                    "Native Apps (Native Managed Connected Applications Development & Deployment)",
+                    "Application Platform",
+                ),
+                ("User Authorization & Access Control", "Governance | Manageability | Privacy | Security"),
+                ("AI/ML-Powered Functions", "AI & Machine Learning"),
+                ("Openflow", "Data Engineering"),
+            ]
+
+            # Create Snowpark DataFrame directly from list of Row objects
+            rows = [Row(Feature=feature, DOMAIN=domain) for feature, domain in mapping_data]
+            mapping_df = self.session.create_dataframe(rows)
+
+            # Get output table as Snowpark Table
+            output_table_df = self.session.table(output_table)
+
+            # Use Table.update() to populate GENERATED_PRODUCT_CATEGORY from mapping
+            output_table_df.update(
+                {"GENERATED_PRODUCT_CATEGORY": mapping_df["DOMAIN"]},
+                output_table_df["GENERATED_PRODUCT"] == mapping_df["Feature"],
+                mapping_df,
+            )
+
+            # Set default category for any products that didn't match mapping
+            print("Setting default category for unmapped products...")
+            output_table_df.update(
+                {"GENERATED_PRODUCT_CATEGORY": F.lit("Unknown")}, F.col("GENERATED_PRODUCT_CATEGORY").is_null()
+            )
 
         print("Materializing PRODUCTS analytics...")
         self._materialize_products_df(output_table, products_table)
@@ -249,6 +370,14 @@ class EnrichmentService:
 
         print("Analytics materialization completed!")
 
+    def _resolution_time_expr(self):
+        """Calculate resolution time in hours.
+
+        For closed cases: hours between CREATED_AT and CLOSED_AT
+        For open cases: default to 24.0 hours
+        """
+        return F.coalesce(F.datediff("hour", F.col("CREATED_AT"), F.col("CLOSED_AT")), F.lit(24.0))
+
     def _materialize_products_df(self, base_table: str, products_table: str):
         cases_df = self.session.table(base_table)
 
@@ -257,7 +386,7 @@ class EnrichmentService:
             .group_by(F.col("GENERATED_PRODUCT"), F.col("GENERATED_PRODUCT_CATEGORY"))
             .agg(
                 F.count("*").alias("CASE_COUNT"),
-                F.avg(F.coalesce(F.col("RESOLUTION_TIME_HOURS"), F.lit(24.0))).alias("AVG_RESOLUTION"),
+                F.avg(self._resolution_time_expr()).alias("AVG_RESOLUTION"),
                 F.sum(F.when(F.col("STATUS") == "Closed", 1).otherwise(0)).alias("CLOSED_CASES"),
                 F.max(F.col("SUBJECT")).alias("SAMPLE_SUBJECT"),
             )
@@ -346,7 +475,7 @@ class EnrichmentService:
             .group_by(F.col("GENERATED_TOPIC"))
             .agg(
                 F.count("*").alias("CASE_COUNT"),
-                F.avg(F.coalesce(F.col("RESOLUTION_TIME_HOURS"), F.lit(24.0))).alias("AVG_RESOLUTION"),
+                F.avg(self._resolution_time_expr()).alias("AVG_RESOLUTION"),
                 F.sum(F.when(F.col("STATUS") == "Closed", 1).otherwise(0)).alias("CLOSED_CASES"),
                 F.max(F.col("GENERATED_PRODUCT")).alias("TOP_PRODUCT"),
             )
@@ -412,7 +541,7 @@ class EnrichmentService:
 
         kpi_df = cases_df.agg(
             F.count("*").alias("TOTAL_CASES"),
-            F.avg(F.coalesce(F.col("RESOLUTION_TIME_HOURS"), F.lit(24.0))).alias("AVG_CASE_LIFE"),
+            F.avg(self._resolution_time_expr()).alias("AVG_CASE_LIFE"),
             F.sum(F.when(F.col("STATUS") == "Closed", 1).otherwise(0)).alias("CLOSED_CASES"),
             F.min(F.col("CREATED_AT")).alias("MIN_DATE"),
             F.max(F.col("CREATED_AT")).alias("MAX_DATE"),

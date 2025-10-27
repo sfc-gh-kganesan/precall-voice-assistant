@@ -718,6 +718,8 @@ def generate_fake_cases(n: int, start_case_number: int = 1000) -> str:
 {",".join(cases)}"""
 
     return sql
+
+
 if __name__ == "__main__":
     print("Generating 5 fake cases...")
     print(generate_fake_cases(5))

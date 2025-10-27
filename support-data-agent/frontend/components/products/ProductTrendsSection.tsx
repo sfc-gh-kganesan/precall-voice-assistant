@@ -7,11 +7,12 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { TrendingUp, Clock, CheckCircle } from 'lucide-react'
 
 export function ProductTrendsSection() {
-  const { filters } = useAppStore()
+  const { filters, activeConfigId } = useAppStore()
 
   const { data, isLoading } = useQuery({
     queryKey: ['product-performance', filters],
     queryFn: () => dashboardApi.getProductPerformance(filters),
+    enabled: !!activeConfigId,
   })
 
   if (isLoading) {

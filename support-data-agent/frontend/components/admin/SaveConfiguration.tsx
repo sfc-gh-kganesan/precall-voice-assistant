@@ -12,6 +12,7 @@ export function SaveConfiguration() {
     fieldMappings,
     configurationName,
     outputTableName,
+    configurationId,
     setConfigurationName,
     setOutputTableName,
     setConfigurationId,
@@ -25,7 +26,7 @@ export function SaveConfiguration() {
       schema: selectedSchema!,
       tables: selectedTables,
       mappings: fieldMappings,
-      outputTable: outputTableName || selectedTables[0]
+      outputTable: outputTableName || `${selectedTables[0]}_ENRICHED`
     }),
     onSuccess: (data) => {
       setConfigurationId(data.configId)
@@ -38,9 +39,13 @@ export function SaveConfiguration() {
       setConfigurationName(`${selectedDatabase}.${selectedSchema} Configuration`)
     }
     if (!outputTableName) {
-      setOutputTableName(selectedTables[0])
+      setOutputTableName(`${selectedTables[0]}_ENRICHED`)
     }
     saveConfig.mutate()
+  }
+
+  const handleContinue = () => {
+    setCurrentStep(5)
   }
 
   const handleStartOver = () => {
@@ -74,11 +79,11 @@ export function SaveConfiguration() {
             type="text"
             value={outputTableName}
             onChange={(e) => setOutputTableName(e.target.value)}
-            placeholder={selectedTables[0]}
+            placeholder={`${selectedTables[0]}_ENRICHED`}
             className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm"
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Full path: {selectedDatabase}.{selectedSchema}.{outputTableName || selectedTables[0]}
+            Full path: {selectedDatabase}.{selectedSchema}.{outputTableName || `${selectedTables[0]}_ENRICHED`}
           </p>
         </div>
       </div>
@@ -130,17 +135,31 @@ export function SaveConfiguration() {
       </div>
 
       {/* Success Message */}
-      <div className="bg-success/20 border border-success/50 rounded-lg p-4 mb-8">
-        <div className="flex items-start">
-          <svg className="w-5 h-5 text-success mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h4 className="font-medium text-success">Configuration Ready</h4>
-            <p className="text-sm mt-1">Your configuration will create the enriched table and be ready for analytics processing.</p>
+      {configurationId ? (
+        <div className="bg-primary/20 border border-primary/50 rounded-lg p-4 mb-8">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-primary mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h4 className="font-medium text-primary">Configuration Already Saved</h4>
+              <p className="text-sm mt-1">This configuration was automatically saved when you started generation. You can continue or update the name and save again.</p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-success/20 border border-success/50 rounded-lg p-4 mb-8">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-success mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h4 className="font-medium text-success">Configuration Ready</h4>
+              <p className="text-sm mt-1">Your configuration will create the enriched table and be ready for analytics processing.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex justify-between">
@@ -151,16 +170,28 @@ export function SaveConfiguration() {
         >
           Start Over
         </button>
-        <button
-          onClick={handleSave}
-          disabled={saveConfig.isPending}
-          className="
-            bg-primary text-primary-foreground px-6 py-2 rounded-md
-            hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed
-          "
-        >
-          {saveConfig.isPending ? 'Saving Configuration...' : 'Save & Continue'}
-        </button>
+        {configurationId ? (
+          <button
+            onClick={handleContinue}
+            className="
+              bg-primary text-primary-foreground px-6 py-2 rounded-md
+              hover:bg-primary/90
+            "
+          >
+            Continue
+          </button>
+        ) : (
+          <button
+            onClick={handleSave}
+            disabled={saveConfig.isPending}
+            className="
+              bg-primary text-primary-foreground px-6 py-2 rounded-md
+              hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed
+            "
+          >
+            {saveConfig.isPending ? 'Saving Configuration...' : 'Save & Continue'}
+          </button>
+        )}
       </div>
     </div>
   )

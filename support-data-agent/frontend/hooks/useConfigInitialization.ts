@@ -19,10 +19,11 @@ export function useConfigInitialization() {
   const hasInitialized = useRef(false)
 
   // Fetch all configurations from backend
-  const { data: configurations, isLoading } = useQuery({
+  const { data: configurations, isLoading, isError } = useQuery({
     queryKey: ['configurations'],
     queryFn: () => adminApi.getAllConfigurations(),
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    retry: 1, // Only retry once on failure
   })
 
   useEffect(() => {
@@ -49,14 +50,15 @@ export function useConfigInitialization() {
       }
 
       hasInitialized.current = true
-    } else if (configurations && configurations.length === 0) {
-      // No configs exist, ensure activeConfigId is null
+    } else if ((configurations && configurations.length === 0) || isError) {
+      // No configs exist OR there was an error fetching configs
+      // In either case, ensure activeConfigId is null
       if (activeConfigId) {
         setActiveConfigId(null)
       }
       hasInitialized.current = true
     }
-  }, [configurations, isLoading, activeConfigId, setActiveConfigId, setIsInitializing])
+  }, [configurations, isLoading, isError, activeConfigId, setActiveConfigId, setIsInitializing])
 
   return { isInitializing: isLoading }
 }

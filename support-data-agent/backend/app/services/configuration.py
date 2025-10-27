@@ -221,6 +221,9 @@ def create_configuration(payload: dict[str, Any]) -> dict[str, str]:
     escaped_schema = payload["schema"].replace("'", "''")
     escaped_output_table = payload["outputTable"].replace("'", "''")
 
+    # Deactivate all existing configurations so new one becomes active
+    session.sql("UPDATE CONFIGURATIONS SET STATUS = 'inactive'").collect()
+
     insert_sql = f"""
     INSERT INTO CONFIGURATIONS (
         CONFIG_ID, NAME, DATABASE_NAME, SCHEMA_NAME,
@@ -328,7 +331,11 @@ def start_generation_job(config_id: str, job_type: str) -> dict[str, str]:
                 SET STATUS = 'completed', PROGRESS = 100, COMPLETED_AT = CURRENT_TIMESTAMP()
                 WHERE JOB_ID = '{escaped_job_id}'
             """).collect()
-        except (SnowparkSQLException, ValueError, RuntimeError) as e:
+        except Exception as e:
+            import traceback
+
+            print(f"Job {job_id} failed: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             escaped_error = str(e).replace("'", "''")
             update_query = f"""
                 UPDATE GENERATION_JOBS
@@ -352,7 +359,11 @@ def start_generation_job(config_id: str, job_type: str) -> dict[str, str]:
                 SET STATUS = 'completed', PROGRESS = 100, COMPLETED_AT = CURRENT_TIMESTAMP()
                 WHERE JOB_ID = '{escaped_job_id}'
             """).collect()
-        except (SnowparkSQLException, ValueError, RuntimeError) as e:
+        except Exception as e:
+            import traceback
+
+            print(f"Job {job_id} failed: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             escaped_error = str(e).replace("'", "''")
             update_query = f"""
                 UPDATE GENERATION_JOBS

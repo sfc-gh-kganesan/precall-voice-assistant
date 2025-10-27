@@ -1,0 +1,16 @@
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+
+WORKDIR /app
+
+COPY . /app
+
+ENV UV_LINK_MODE=copy
+ENV PYTHONPATH=/app
+
+# Set up Jupyter config directory
+RUN mkdir -p /root/.jupyter
+COPY .jupyter/jupyter_config.py /root/.jupyter/
+
+EXPOSE 8888
+
+CMD ["sh", "-c", "uv sync --locked --group notebook && cd /app/notebooks && uv run jupyter-lab --ip=0.0.0.0 --port=8888 --no-browser"]

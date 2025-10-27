@@ -51,7 +51,7 @@ services:
   jupyter:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.jupyter
     working_dir: /app
     volumes:
       - ./backend:/app
@@ -69,8 +69,6 @@ services:
       - SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}
       - SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA:-PUBLIC}
       - SNOWFLAKE_ROLE=${SNOWFLAKE_ROLE:-SYSADMIN}
-    command: >-
-      sh -c "uv sync --group dev && uv run jupyter-lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token='' --ServerApp.password=''"
     restart: unless-stopped
 
 networks:

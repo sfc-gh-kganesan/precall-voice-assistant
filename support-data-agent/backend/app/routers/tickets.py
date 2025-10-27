@@ -40,7 +40,11 @@ def _fetch_tickets(
     }
     sort_column = "CREATED_AT"
     if sort_by and sort_by.lower() in valid_sort_columns:
-        sort_column = sort_by.upper()
+        # Map severity to the actual column name
+        if sort_by.lower() == "severity":
+            sort_column = "CURRENT_SEVERITY"
+        else:
+            sort_column = sort_by.upper()
 
     # Calculate offset
     offset = (page - 1) * page_size
@@ -54,22 +58,23 @@ def _fetch_tickets(
     total = int(session.sql(count_query).collect()[0][0])
     data_query = f"""
     SELECT
-        ID,
+        CASE_ID,
         CASE_NUMBER,
         CREATED_AT,
-        UPDATED_AT,
         CLOSED_AT,
-        LAST_MODIFIED_AT,
         STATUS,
-        SEVERITY,
+        CURRENT_SEVERITY,
+        PEAK_SEVERITY,
         SUBJECT,
         DESCRIPTION,
-        ACCOUNT_ID,
+        SFDC_ACCOUNT_ID,
         ACCOUNT_NAME,
+        IS_PRIORITY_SUPPORT_ENTITLEMENT,
+        TOTAL_COMMENTS,
         GENERATED_TOPIC,
         GENERATED_PRODUCT_CATEGORY,
         GENERATED_PRODUCT,
-        RESOLUTION_TIME_HOURS
+        ENRICHED_AT
     FROM {base_table}{where_clause}
     ORDER BY {sort_column} {sort_order.upper()}
     LIMIT {page_size}
@@ -80,33 +85,46 @@ def _fetch_tickets(
 
     tickets = []
     for row in results:
+        # Calculate resolution time if case is closed
+        resolution_hours = None
+        if row[3]:  # CLOSED_AT
+            from datetime import datetime
+
+            created = row[2] if row[2] else datetime.now()  # CREATED_AT
+            closed = row[3]  # CLOSED_AT
+            resolution_hours = (closed - created).total_seconds() / 3600
+
         ticket = SupportTicket(
-            id=row[0],
-            case_number=row[1],
-            created_at=row[2].isoformat() if row[2] else "",
-            updated_at=row[3].isoformat() if row[3] else "",
-            closed_at=row[4].isoformat() if row[4] else None,
-            last_modified_at=row[5].isoformat() if row[5] else "",
-            status=row[6] or "",
-            severity=row[7] or "",
+            id=row[0],  # CASE_ID
+            case_number=row[1],  # CASE_NUMBER
+            created_at=row[2].isoformat() if row[2] else "",  # CREATED_AT
+            updated_at=row[16].isoformat()
+            if row[16]
+            else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
+            closed_at=row[3].isoformat() if row[3] else None,  # CLOSED_AT
+            last_modified_at=row[16].isoformat()
+            if row[16]
+            else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
+            status=row[4] or "",  # STATUS
+            severity=row[5] or "",  # CURRENT_SEVERITY
             initial_severity=None,
-            peak_severity=None,
-            subject=row[8] or "",
-            description=row[9] or "",
-            account_id=row[10],
-            account_name=row[11],
-            is_priority_support=None,
-            total_comments=None,
+            peak_severity=row[6] or None,  # PEAK_SEVERITY
+            subject=str(row[7]) if row[7] else "",  # SUBJECT (VARIANT)
+            description=str(row[8]) if row[8] else "",  # DESCRIPTION (VARIANT)
+            account_id=row[9],  # SFDC_ACCOUNT_ID
+            account_name=row[10],  # ACCOUNT_NAME
+            is_priority_support=row[11],  # IS_PRIORITY_SUPPORT_ENTITLEMENT
+            total_comments=int(row[12]) if row[12] is not None else None,  # TOTAL_COMMENTS
             has_jira_issues=None,
             has_escalations=None,
             has_collaborations=None,
-            generated_topic=row[12],
-            generated_product_category=row[13],
-            generated_product=row[14],
+            generated_topic=row[13],  # GENERATED_TOPIC
+            generated_product_category=row[14],  # GENERATED_PRODUCT_CATEGORY
+            generated_product=row[15],  # GENERATED_PRODUCT
             generated_feature=None,
             sentiment=None,
-            resolution_time_hours=float(row[15]) if row[15] is not None else None,
-            sla_violated=None
+            resolution_time_hours=resolution_hours,
+            sla_violated=None,
         )
         tickets.append(ticket)
 

@@ -5,9 +5,9 @@ class SupportTicket(BaseModel):
     id: str
     case_number: str
     created_at: str
-    updated_at: str
+    updated_at: str | None = None
     closed_at: str | None = None
-    last_modified_at: str
+    last_modified_at: str | None = None
     status: str
     severity: str
     initial_severity: str | None = None

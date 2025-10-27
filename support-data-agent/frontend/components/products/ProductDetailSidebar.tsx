@@ -22,7 +22,7 @@ interface TicketResponse {
 
 export function ProductDetailSidebar({ product, onClose }: ProductDetailSidebarProps) {
   const [page, setPage] = useState(1)
-  const pageSize = 20
+  const pageSize = 10
   const API_BASE = API_CONFIG.BASE_URL
 
   const { data, isLoading } = useQuery<TicketResponse>({

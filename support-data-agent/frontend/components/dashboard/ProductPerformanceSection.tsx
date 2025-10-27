@@ -8,11 +8,12 @@ import { PerformanceSection } from './PerformanceSection'
 import { TrendingUp, Clock, CheckCircle } from 'lucide-react'
 
 export function ProductPerformanceSection() {
-  const { filters } = useAppStore()
+  const { filters, activeConfigId } = useAppStore()
 
   const { data, isLoading } = useQuery({
     queryKey: ['product-performance', filters],
     queryFn: () => dashboardApi.getProductPerformance(filters),
+    enabled: !!activeConfigId,
   })
 
   if (isLoading) {

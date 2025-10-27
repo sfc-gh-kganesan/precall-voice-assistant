@@ -8,11 +8,12 @@ import { formatNumber, formatPercentage } from '@/lib/utils'
 import { ProductMetrics } from '@/types'
 
 export function ProductMetricsSection() {
-  const { filters } = useAppStore()
+  const { filters, activeConfigId } = useAppStore()
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['product-metrics', filters],
     queryFn: () => dashboardApi.getProductMetrics(filters),
+    enabled: !!activeConfigId,
   })
 
   if (isLoading) {

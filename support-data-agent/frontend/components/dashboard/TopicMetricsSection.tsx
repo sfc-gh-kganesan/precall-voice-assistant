@@ -9,11 +9,12 @@ import { TopicMetrics } from '@/types'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 export function TopicMetricsSection() {
-  const { filters } = useAppStore()
+  const { filters, activeConfigId } = useAppStore()
 
   const { data: topics, isLoading } = useQuery({
     queryKey: ['topic-metrics', filters],
     queryFn: () => dashboardApi.getTopicMetrics(filters),
+    enabled: !!activeConfigId,
   })
 
   if (isLoading) {

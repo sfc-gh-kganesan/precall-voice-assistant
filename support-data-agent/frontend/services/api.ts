@@ -90,14 +90,37 @@ export const adminApi = {
     schema: string
     tables: string[]
     mappings: FieldMapping[]
-  }): Promise<{ jobId: string }> {
-    return await apiRequest<{ jobId: string }>(`${API_BASE}/api/v1/admin/generate`, {
+    outputTable?: string
+  }): Promise<{ jobId: string; configId: string }> {
+    // First, save the configuration to get a real configId
+    const configName = `${config.database}.${config.schema} Auto-Generated Config`
+    const outputTable = config.outputTable || `${config.tables[0]}_ENRICHED`
+
+    const saveResult = await apiRequest<{ configId: string }>(`${API_BASE}/api/v1/admin/configurations`, {
       method: 'POST',
       body: JSON.stringify({
-        configId: `${config.database}_${config.schema}_${Date.now()}`,
+        name: configName,
+        database: config.database,
+        schema: config.schema,
+        tables: config.tables,
+        mappings: config.mappings,
+        outputTable: outputTable
+      })
+    })
+
+    // Now start the generation job with the real configId
+    const generateResult = await apiRequest<{ jobId: string }>(`${API_BASE}/api/v1/admin/generate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        configId: saveResult.configId,
         jobType: 'enrichment'
       })
     })
+
+    return {
+      jobId: generateResult.jobId,
+      configId: saveResult.configId
+    }
   },
 
   async getJobStatus(jobId: string): Promise<GenerationJob> {

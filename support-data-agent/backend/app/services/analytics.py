@@ -278,7 +278,7 @@ def get_product_metrics(
     SELECT
         PRODUCT_ID,
         PRODUCT_NAME,
-        PRODUCT_CATEGORY,
+        COALESCE(PRODUCT_CATEGORY, 'Unknown') AS PRODUCT_CATEGORY,
         METRICS,
         TOP_ISSUES,
         TREND_DATA

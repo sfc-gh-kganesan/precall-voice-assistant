@@ -5,6 +5,7 @@ import json
 from snowflake.snowpark.functions import col, current_timestamp, parse_json
 from snowflake.snowpark.types import StringType, StructField, StructType
 
+from ..config import snowflake_settings
 from ..logging_config import get_logger
 from . import snowflake as snowflake_service
 from .fake_case_generator import generate_fake_cases
@@ -246,12 +247,17 @@ class SchemaManager:
         self.session.sql(view_sql).collect()
 
     def _insert_minimal_data(self):
+        # Get the actual configured schema and database from environment
+        connection_params = snowflake_settings.get_connection_params()
+        configured_schema = connection_params.get("schema", "PUBLIC")
+        configured_database = connection_params.get("database", "SDA")
+
         config_data = [
             {
                 "CONFIG_ID": "config_default_cases",
                 "NAME": "Default Cases Configuration",
-                "DATABASE_NAME": "SDA",
-                "SCHEMA_NAME": "PUBLIC",
+                "DATABASE_NAME": configured_database,
+                "SCHEMA_NAME": configured_schema,
                 "TABLES": '["CASES"]',
                 "OUTPUT_TABLE": "CASES",
                 "MAPPINGS": json.dumps(
