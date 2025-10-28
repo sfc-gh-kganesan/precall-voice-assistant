@@ -288,3 +288,6 @@ support-data-agent/.claude/
 
 # LangGraph
 *.langgraph_api/
+
+# Sales AI Platform
+*.sql.tmp

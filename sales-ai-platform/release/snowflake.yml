@@ -30,7 +30,7 @@ entities:
     max_instances: 1
     auto_resume: true
     external_access_integrations:
-      - sales_ai_external_access
+      - <% ctx.env.EXTERNAL_ACCESS_INTEGRATION %>
     artifacts:
       - service_spec.yaml
     comment: "Sales AI Platform - LangGraph workflows for sales operations"

@@ -1,7 +1,7 @@
 spec:
   containers:
   - name: sales-ai-platform
-    image: sfengineering-aifde.registry.snowflakecomputing.com/sales_ai_platform/core/image_repository/sales-ai-platform:latest
+    image: sfcogsops-snowhouse-aws-us-west-2.registry.snowflakecomputing.com/ai_fde/sales_ai_platform/image_repository/sales-ai-platform:latest
     env:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING}

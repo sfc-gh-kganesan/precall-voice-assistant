@@ -37,7 +37,7 @@ check-env: ## Validate .env and show config
 	fi
 	@echo "📋 Validating required variables..."
 	@MISSING=""; \
-	for var in SNOW_CONNECTION COMPUTE_POOL DATABASE SCHEMA STAGE IMAGE_REPOSITORY IMAGE_NAME IMAGE_TAG SERVICE_NAME CONTAINER_NAME; do \
+	for var in SNOW_CONNECTION COMPUTE_POOL DATABASE SCHEMA STAGE IMAGE_REPOSITORY IMAGE_NAME IMAGE_TAG SERVICE_NAME CONTAINER_NAME EXTERNAL_ACCESS_INTEGRATION; do \
 		if ! grep -q "^$$var=..*" .env 2>/dev/null; then \
 			MISSING="$$MISSING $$var"; \
 		fi; \
