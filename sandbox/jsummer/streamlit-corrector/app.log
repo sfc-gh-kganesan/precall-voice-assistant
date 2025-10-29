@@ -1,0 +1,51 @@
+2025-10-29 09:51:48,187 - INFO - LLM initialized
+2025-10-29 09:51:58,248 - INFO - Joke generator button clicked
+2025-10-29 09:51:58,249 - INFO - Theme: ai engineering
+2025-10-29 09:51:58,249 - INFO - Generating joke for theme: ai engineering
+2025-10-29 09:52:00,573 - INFO - HTTP Request: POST https://sfengineering-aifde.snowflakecomputing.com/api/v2/cortex/openai/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 09:52:00,580 - INFO - Joke generated: Why did the AI engineer break up with their laptop?
+
+Because there were too many NEURAL connections but not enough PERSONAL ones! 🤖💔
+2025-10-29 09:52:39,431 - WARNING - Feedback: 0
+2025-10-29 09:53:04,822 - INFO - Feedback submitted: Not the best joke. Doesn't really have any good puns. Requires some technical knowledge to understand.
+2025-10-29 09:53:04,823 - INFO - Feedback data: {'theme': 'ai engineering', 'joke': 'Why did the AI engineer break up with their laptop?\n\nBecause there were too many NEURAL connections but not enough PERSONAL ones! 🤖💔', 'rating': 0, 'comment': "Not the best joke. Doesn't really have any good puns. Requires some technical knowledge to understand."}
+2025-10-29 09:53:13,016 - INFO - Joke generator button clicked
+2025-10-29 09:53:13,017 - INFO - Theme: california
+2025-10-29 09:53:13,018 - INFO - Generating joke for theme: california
+2025-10-29 09:53:14,715 - INFO - HTTP Request: POST https://sfengineering-aifde.snowflakecomputing.com/api/v2/cortex/openai/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 09:53:14,717 - INFO - Joke generated: Why don't Californians like buying used cars?
+
+Because they're afraid of getting someone else's fault!
+2025-10-29 09:53:26,597 - WARNING - Feedback: 0
+2025-10-29 09:53:32,939 - INFO - Feedback submitted: Not very funny
+2025-10-29 09:53:32,939 - INFO - Feedback data: {'theme': 'california', 'joke': "Why don't Californians like buying used cars?\n\nBecause they're afraid of getting someone else's fault!", 'rating': 0, 'comment': 'Not very funny'}
+2025-10-29 09:53:38,222 - INFO - Joke generator button clicked
+2025-10-29 09:53:38,224 - INFO - Theme: chicago
+2025-10-29 09:53:38,224 - INFO - Generating joke for theme: chicago
+2025-10-29 09:53:40,355 - INFO - HTTP Request: POST https://sfengineering-aifde.snowflakecomputing.com/api/v2/cortex/openai/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 09:53:40,357 - INFO - Joke generated: Why don't Chicago pizza makers ever get lost?
+
+Because they always deep dish-cover their way home!
+2025-10-29 09:54:08,143 - INFO - Feedback: 1
+2025-10-29 09:54:10,778 - INFO - Feedback submitted: meh
+2025-10-29 09:54:10,778 - INFO - Feedback data: {'theme': 'chicago', 'joke': "Why don't Chicago pizza makers ever get lost?\n\nBecause they always deep dish-cover their way home!", 'rating': 1, 'comment': 'meh'}
+2025-10-29 09:54:16,810 - INFO - Joke generator button clicked
+2025-10-29 09:54:16,810 - INFO - Theme: cats
+2025-10-29 09:54:16,811 - INFO - Generating joke for theme: cats
+2025-10-29 09:54:18,560 - INFO - HTTP Request: POST https://sfengineering-aifde.snowflakecomputing.com/api/v2/cortex/openai/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 09:54:18,562 - INFO - Joke generated: Why don't cats like online shopping?
+
+They prefer a CAT-alog!
+2025-10-29 09:54:24,361 - INFO - Feedback: 1
+2025-10-29 09:54:39,065 - INFO - Feedback submitted: great. it's short and sweet. extremely punny. should be more like this
+2025-10-29 09:54:39,065 - INFO - Feedback data: {'theme': 'cats', 'joke': "Why don't cats like online shopping?\n\nThey prefer a CAT-alog!", 'rating': 1, 'comment': "great. it's short and sweet. extremely punny. should be more like this"}
+2025-10-29 09:54:49,631 - INFO - Joke generator button clicked
+2025-10-29 09:54:49,631 - INFO - Theme: programming
+2025-10-29 09:54:49,632 - INFO - Generating joke for theme: programming
+2025-10-29 09:54:51,329 - INFO - HTTP Request: POST https://sfengineering-aifde.snowflakecomputing.com/api/v2/cortex/openai/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 09:54:51,331 - INFO - Joke generated: Why do programmers prefer dark mode?
+
+Because light attracts too many bugs! 🪲
+2025-10-29 09:54:59,651 - INFO - Feedback: 1
+2025-10-29 09:55:05,035 - INFO - Feedback submitted: amazing. classic
+2025-10-29 09:55:05,035 - INFO - Feedback data: {'theme': 'programming', 'joke': 'Why do programmers prefer dark mode?\n\nBecause light attracts too many bugs! 🪲', 'rating': 1, 'comment': 'amazing. classic'}
