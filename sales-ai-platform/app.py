@@ -19,12 +19,58 @@ from langchain_core.messages import HumanMessage
 
 from graphs.greeting_workflow import create_graph as create_greeting_graph
 from graphs.arithmetic_agent import graph as arithmetic_graph
+from graphs.post_meeting_workflow import graph as post_meeting_graph
 from utils import unpack_function_request
+from datetime import datetime
 
-
+from dotenv import load_dotenv
+load_dotenv()
 # ============================================================================
 # API Schemas
 # ============================================================================
+
+# Request and Response model for synchronous RPC
+class PostMeetingRequest(BaseModel):
+    """Request model for the post meeting workflow."""
+    
+    call_transcript: str = Field(
+        ...,
+        description="The transcript of the call",
+        examples=["SPEAKER 1: Hello, how are you? SPEAKER 2: I'm fine, thank you."]
+    )
+    # # TODO: Add additional context and metadata
+    # additional_context: str = Field(
+    #     default="",
+    #     description="Additional context for the meeting regarding the account and opportunity"
+    # )
+    # metadata: dict[str, str] = Field(
+    #     default={},
+    #     description="Metadata for the call transcript"
+    # )
+
+
+class PostMeetingResponse(BaseModel):
+    """Response model for the post meeting workflow."""
+
+    # id: str = Field(
+    #     description="A unique ID for this request"
+    # )
+    # status: Literal["pending", "error", "completed"] = Field(
+    #     description="The status of the request"
+    # )
+    # error_message: str = Field(
+    #     description="The error message if the status is 'error'"
+    # )
+    analysis: dict = Field(
+        description="The analysis of the meeting"
+    )
+    # created_at: datetime = Field(
+    #     description="The timestamp of the request creation"
+    # )
+    # updated_at: datetime = Field(
+    #     description="The timestamp of the request update"
+    # )   
+
 
 class GreetingRequest(BaseModel):
     """Request model for the greeting workflow."""
@@ -101,6 +147,7 @@ A collection of AI-powered workflows built with LangGraph.
 
 * **Greeting Workflow** - Simple workflow that generates personalized greetings
 * **Arithmetic Agent** - LLM-powered agent that performs arithmetic operations
+* **Post Meeting Workflow** - Workflow that analyzes a call transcript and extracts relevant information
 
 ### Features
 
@@ -120,6 +167,9 @@ async def lifespan(app: FastAPI):
     
     app.state.arithmetic_graph = arithmetic_graph
     print("✓ Arithmetic agent graph loaded")
+    
+    app.state.post_meeting_graph = post_meeting_graph
+    print("✓ Post meeting workflow graph loaded")
     
     print(f"🚀 {TITLE} v{VERSION} started")
     
@@ -149,6 +199,63 @@ app = FastAPI(
 )
 async def index():
     return {"message": "Hello, World!"}
+
+
+# ============================================================================
+# Post-Meeting Workflow Endpoint
+# ============================================================================
+
+# @app.post("/post-meeting")
+# async def post_meeting_workflow(request: Request):
+#     """
+#     Analyze a call transcript and extract relevant information.
+#     """
+#     body = await request.json()
+#     req = PostMeetingRequest(**body)
+#     result = await app.state.post_meeting_graph.ainvoke({"call_transcript": req.call_transcript, "additional_context": req.additional_context, "metadata": req.metadata})
+#     return PostMeetingResponse(id=result["id"], status=result["status"], error_message=result["error_message"], analysis=result["analysis"], created_at=result["created_at"], updated_at=result["updated_at"])
+
+@app.post("/post-meeting")
+async def post_meeting_workflow(request: Request):
+    """
+    Analyze a call transcript and extract relevant information.
+    
+    Handles both:
+    - Pydantic format: {"call_transcript": "..."} → PostMeetingResponse
+    - Snowflake batch: {"data": [[0, "call_transcript1"], ...]} → {"data": [[0, result], ...]}
+    
+    **Note:** Requires OPENAI_API_KEY environment variable.
+    """
+    body = await request.json()
+    
+    # Check if Snowflake batch format
+    if "data" in body and isinstance(body["data"], list):
+        inputs = unpack_function_request(body)
+        if not inputs:
+            return {"error": "No data provided"}
+        
+        async def process_row(row_index: int, call_transcript: str):
+            result = await app.state.post_meeting_graph.ainvoke({"call_transcript": call_transcript})
+            return [row_index, {"analysis": result}]
+        
+        if len(inputs) > 10:
+            tasks = [process_row(row[0], row[1]) for row in inputs]
+            response = await asyncio.gather(*tasks)
+        else:
+            response = []
+            for row in inputs:
+                result = await process_row(row[0], row[1])
+                response.append(result)
+        return {"data": response}
+    
+    # Pydantic format
+    try:
+        req = PostMeetingRequest(**body)
+        input_message = req.call_transcript
+        result = await app.state.post_meeting_graph.ainvoke({"call_transcript": req.call_transcript})
+        return PostMeetingResponse(analysis=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================

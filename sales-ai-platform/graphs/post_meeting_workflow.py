@@ -8,8 +8,8 @@ from langgraph.graph import StateGraph, START, END, MessagesState
 from langchain_core.messages import HumanMessage, SystemMessage
 from typing import TypedDict, Optional, Annotated
 from pydantic import BaseModel, Field
-from graph_utils import get_llm
-from prompts import SYSTEM_PROMPT_SFDC_EXTRACTION, HUMAN_MESSAGE_SFDC_EXTRACTION
+from .graph_utils import get_llm
+from .prompts import SYSTEM_PROMPT_SFDC_EXTRACTION, HUMAN_MESSAGE_SFDC_EXTRACTION
 import json
 
 # # Define State Schemas
@@ -65,7 +65,7 @@ def sfdc_assistant(state: OverallState) -> OverallState:
     # response = llm.invoke(messages)
     response = llm.with_structured_output(SFDCOutputState).invoke(messages)
     
-    # # Format response as JSON
+    # # Format response as JSON (if using a TypedDict state)
     # try:
     #     response_dict = json.loads(response.content)
     # except json.JSONDecodeError:
