@@ -6,7 +6,10 @@ CONNECTION_FLAG = $(if $(filter-out default,$(SNOW_CONNECTION)),--connection $(S
 
 .DEFAULT_GOAL := help
 
-.PHONY: studio api dev help deploy deploy-service deploy-functions build push setup-infra service-status service-logs service-drop service-url clean check-env registry-login
+.PHONY: setup-dev studio api dev help deploy deploy-service deploy-functions build push setup-infra service-status service-logs service-drop service-url clean check-env registry-login
+
+setup-dev: ## Setup development environment
+	uv sync
 
 help: ## Show this help message
 	@echo "Sales AI Platform"
@@ -15,7 +18,7 @@ help: ## Show this help message
 	@echo ""
 
 # Development
-dev: ## Start dev server with auto-reload
+dev: setup-dev ## Start dev server with auto-reload
 	@uv run uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 api: ## Start production server

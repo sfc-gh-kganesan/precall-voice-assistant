@@ -4,7 +4,8 @@ Utilities for Snowflake SPCS service function integration.
 
 import os
 from pathlib import Path
-
+import snowflake.connector
+from snowflake.snowpark import Session
 
 def unpack_function_request(data: dict) -> list[list]:
     """
@@ -18,7 +19,6 @@ def unpack_function_request(data: dict) -> list[list]:
     if "data" in data and isinstance(data["data"], list):
         return data["data"]
     return []
-
 
 def get_snowflake_token() -> str:
     """
@@ -42,3 +42,20 @@ def get_snowflake_token() -> str:
             print("Warning: SNOWFLAKE_PAT not set. Cortex inference may fail.")
         return token
 
+def get_snowflake_connection():
+    """
+    Get Snowflake connection.
+    https://docs.snowflake.com/en/developer-guide/snowpark-container-services/additional-considerations-services-jobs#using-an-oauth-token-to-execute-sql
+    """
+    return snowflake.connector.connect(
+        host = os.getenv('SNOWFLAKE_HOST'),
+        account = os.getenv('SNOWFLAKE_ACCOUNT'),
+        token = get_snowflake_token(),
+        authenticator = 'oauth'
+    )
+
+def get_snowflake_session() -> Session:
+    """
+    Get Snowflake session.
+    """
+    return Session.builder.configs({"connection": get_snowflake_connection()}).create()
