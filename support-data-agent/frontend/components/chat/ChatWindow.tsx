@@ -6,12 +6,14 @@ import { useAppStore } from '@/stores/appStore'
 import { chatApi } from '@/services/api'
 import { cn } from '@/lib/utils'
 import { UI_CONSTANTS, ERROR_MESSAGES } from '@/lib/constants'
+import { VoiceControls } from './VoiceControls'
 
 export function ChatWindow() {
   const messages = useAppStore((state) => state.messages)
   const addMessage = useAppStore((state) => state.addMessage)
   const updateMessage = useAppStore((state) => state.updateMessage)
   const toggleChat = useAppStore((state) => state.toggleChat)
+  const voiceEnabled = useAppStore((state) => state.voiceEnabled)
 
   const [input, setInput] = useState('')
   const [messageHistory, setMessageHistory] = useState<any[]>([])
@@ -124,14 +126,17 @@ export function ChatWindow() {
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h3 className="font-semibold">Support Assistant</h3>
-        <button
-          onClick={toggleChat}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          <VoiceControls />
+          <button
+            onClick={toggleChat}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -231,20 +236,24 @@ export function ChatWindow() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question..."
+            placeholder={voiceEnabled ? "Voice mode active" : "Ask a question..."}
             maxLength={UI_CONSTANTS.MAX_MESSAGE_LENGTH}
-            className="flex-1 bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            disabled={voiceEnabled}
+            className={cn(
+              "flex-1 bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary",
+              voiceEnabled && "opacity-50 cursor-not-allowed"
+            )}
           />
           <button
             type="submit"
-            disabled={!input.trim()}
+            disabled={!input.trim() || voiceEnabled}
             className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Send
           </button>
         </div>
         <div className="mt-1 text-xs text-muted-foreground text-right">
-          {input.length}/{UI_CONSTANTS.MAX_MESSAGE_LENGTH}
+          {voiceEnabled ? "Voice mode enabled - use microphone" : `${input.length}/${UI_CONSTANTS.MAX_MESSAGE_LENGTH}`}
         </div>
       </form>
     </div>

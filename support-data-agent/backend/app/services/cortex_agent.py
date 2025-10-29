@@ -62,6 +62,18 @@ def get_snowpark_session():
     return _snowpark_session
 
 
+def reset_snowpark_session():
+    """Reset the global Snowpark session to force reconnection."""
+    global _snowpark_session
+    if _snowpark_session:
+        try:
+            _snowpark_session.close()
+        except Exception:
+            pass  # Ignore errors closing expired session
+    _snowpark_session = None
+    logger.info("Snowpark session reset")
+
+
 class SnowflakeCortexModel(OpenAIChatModel):
     """Custom model that handles Snowflake Cortex API response quirks"""
 
@@ -171,94 +183,139 @@ async def query_cortex_analyst(ctx, query: str) -> str:
     """
     logger.info(f"=== query_cortex_analyst CALLED with query: {query}")
 
-    snowpark_session = get_snowpark_session()
-    logger.info("Got Snowpark session")
+    # Retry logic for session expiry
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            snowpark_session = get_snowpark_session()
+            logger.info("Got Snowpark session")
 
-    # Get token from Snowpark session
-    token = snowpark_session.connection.rest.token
+            # Get token from Snowpark session
+            token = snowpark_session.connection.rest.token
 
-    analyst_url = f"""https://{os.getenv("SNOWFLAKE_ACCOUNT").replace("_", "-")}.snowflakecomputing.com/api/v2/cortex/analyst/message"""
+            analyst_url = f"""https://{os.getenv("SNOWFLAKE_ACCOUNT").replace("_", "-")}.snowflakecomputing.com/api/v2/cortex/analyst/message"""
 
-    # Setup headers with Snowflake authentication
-    headers = {
-        "Authorization": f'Snowflake Token="{token}"',
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
+            # Setup headers with Snowflake authentication
+            headers = {
+                "Authorization": f'Snowflake Token="{token}"',
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
 
-    payload = {
-        "messages": [
-            {
-                "role": "user",
-                "content": [
+            payload = {
+                "messages": [
                     {
-                        "type": "text",
-                        "text": query,
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": query,
+                            }
+                        ],
                     }
                 ],
+                "semantic_model_file": "@AI_FDE.CX360.CX360/CX_SEMANTIC.yaml",
+                "stream": False,
             }
-        ],
-        "semantic_model_file": "@AI_FDE.CX360.CX360/CX_SEMANTIC.yaml",
-        "stream": False,
-    }
 
-    logger.info(f"Sending request to Cortex Analyst API: {analyst_url}")
-    response = requests.post(analyst_url, headers=headers, json=payload)
-    logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Sending request to Cortex Analyst API: {analyst_url}")
+            response = requests.post(analyst_url, headers=headers, json=payload)
+            logger.info(f"Response status code: {response.status_code}")
 
-    if response.status_code == 200:
-        response_json = response.json()
-        logger.info(f"Response JSON keys: {response_json.keys()}")
+            if response.status_code == 200:
+                response_json = response.json()
+                logger.info(f"Response JSON keys: {response_json.keys()}")
 
-        # Check if this is an error response (has 'error_code' or 'code' keys with string 'message')
-        if 'error_code' in response_json or ('code' in response_json and isinstance(response_json.get('message'), str)):
-            error_msg = response_json.get('message', 'Unknown error')
-            error_code = response_json.get('error_code', response_json.get('code', 'UNKNOWN'))
-            logger.error(f"Cortex Analyst Error [{error_code}]: {error_msg}")
-            raise Exception(f"Cortex Analyst Error [{error_code}]: {error_msg}")
+                # Check if this is an error response (has 'error_code' or 'code' keys with string 'message')
+                if "error_code" in response_json or (
+                    "code" in response_json and isinstance(response_json.get("message"), str)
+                ):
+                    error_msg = response_json.get("message", "Unknown error")
+                    error_code = response_json.get("error_code", response_json.get("code", "UNKNOWN"))
+                    logger.error(f"Cortex Analyst Error [{error_code}]: {error_msg}")
 
-        # Success response - safely extract content array
-        message = response_json.get("message", {})
-        if not isinstance(message, dict):
-            logger.error(f"Unexpected message format: {type(message)}")
-            raise Exception("Cortex Analyst returned unexpected message format")
+                    # Handle session expiry with retry
+                    if error_code == "390112":
+                        if attempt < max_retries - 1:
+                            logger.info(
+                                f"Session expired (390112). Resetting session and retrying (attempt {attempt + 1}/{max_retries})"
+                            )
+                            reset_snowpark_session()
+                            continue  # Retry with fresh session
+                        else:
+                            return "⚠️ Database session has expired. Please try your question again."
 
-        content = message.get("content", [])
-        if not content or not isinstance(content, list):
-            logger.error("Unexpected response format: missing or invalid content array")
-            raise Exception("Cortex Analyst response missing content array")
+                    raise Exception(f"Cortex Analyst Error [{error_code}]: {error_msg}")
 
-        # Extract SQL statement from content array
-        sql_item = next((item for item in content if isinstance(item, dict) and item.get("type") == "sql"), None)
-        if not sql_item or "statement" not in sql_item:
-            logger.error("No SQL statement found in response content")
-            raise Exception("Cortex Analyst did not return SQL statement")
+                # Success response - safely extract content array
+                message = response_json.get("message", {})
+                if not isinstance(message, dict):
+                    logger.error(f"Unexpected message format: {type(message)}")
+                    raise Exception("Cortex Analyst returned unexpected message format")
 
-        query_sql = sql_item["statement"]
-        logger.info(f"Extracted SQL: {query_sql}")
+                content = message.get("content", [])
+                if not content or not isinstance(content, list):
+                    logger.error("Unexpected response format: missing or invalid content array")
+                    raise Exception("Cortex Analyst response missing content array")
 
-        # Execute the SQL query
-        result = snowpark_session.sql(str(query_sql)[:-1]).collect()
-        logger.info(f"SQL execution complete. Row count: {len(result)}")
-        logger.info(f"Result preview: {result[:5] if len(result) > 5 else result}")
+                # Log the full content array to debug what's being returned
+                logger.info(f"Response content array length: {len(content)}")
+                for idx, item in enumerate(content):
+                    if isinstance(item, dict):
+                        logger.info(f"Content item {idx}: type={item.get('type', 'unknown')}, keys={list(item.keys())}")
 
-        # Format results as a string for the agent
-        # Convert Snowflake Row objects to JSON-serializable dicts
-        def serialize_value(val):
-            """Convert non-JSON-serializable types to strings."""
-            if isinstance(val, datetime):
-                return val.isoformat()
-            elif hasattr(val, "__str__") and not isinstance(val, (str, int, float, bool, type(None))):
-                return str(val)
-            return val
+                # Extract SQL statement from content array
+                sql_item = next(
+                    (item for item in content if isinstance(item, dict) and item.get("type") == "sql"), None
+                )
 
-        serializable_results = [{k: serialize_value(v) for k, v in row.as_dict().items()} for row in result]
-        result_str = json.dumps(serializable_results, indent=2)
-        logger.info("Returning formatted results to agent")
-        return f"Query executed successfully. Results:\n{result_str}"
-    else:
-        logger.error(f"Cortex Analyst HTTP Error: {response.status_code} - {response.text}")
-        raise Exception(f"Cortex Analyst HTTP Error: {response.status_code} - {response.text}")
+                if sql_item and "statement" in sql_item:
+                    # SQL found - execute it
+                    query_sql = sql_item["statement"]
+                    logger.info(f"Extracted SQL: {query_sql}")
+
+                    # Execute the SQL query
+                    result = snowpark_session.sql(str(query_sql)[:-1]).collect()
+                    logger.info(f"SQL execution complete. Row count: {len(result)}")
+                    logger.info(f"Result preview: {result[:5] if len(result) > 5 else result}")
+
+                    # Format results as a string for the agent
+                    # Convert Snowflake Row objects to JSON-serializable dicts
+                    def serialize_value(val):
+                        """Convert non-JSON-serializable types to strings."""
+                        if isinstance(val, datetime):
+                            return val.isoformat()
+                        elif hasattr(val, "__str__") and not isinstance(val, (str, int, float, bool, type(None))):
+                            return str(val)
+                        return val
+
+                    serializable_results = [{k: serialize_value(v) for k, v in row.as_dict().items()} for row in result]
+                    result_str = json.dumps(serializable_results, indent=2)
+                    logger.info("Returning formatted results to agent")
+                    return f"Query executed successfully. Results:\n{result_str}"
+                else:
+                    # No SQL statement - check for text response
+                    logger.info("No SQL statement found, checking for text response")
+                    text_item = next(
+                        (item for item in content if isinstance(item, dict) and item.get("type") == "text"), None
+                    )
+                    if text_item and "text" in text_item:
+                        text_response = text_item["text"]
+                        logger.info(f"Cortex Analyst returned text response: {text_response[:100]}...")
+                        return f"Cortex Analyst message: {text_response}"
+                    else:
+                        logger.error(f"No SQL or text found in content array: {content}")
+                        raise Exception("Cortex Analyst returned neither SQL nor text response")
+            else:
+                logger.error(f"Cortex Analyst HTTP Error: {response.status_code} - {response.text}")
+                raise Exception(f"Cortex Analyst HTTP Error: {response.status_code} - {response.text}")
+        except Exception as e:
+            # If this is the last retry, raise the exception
+            if attempt >= max_retries - 1:
+                raise
+            # Otherwise log and continue to next retry
+            logger.warning(f"Attempt {attempt + 1} failed: {str(e)}, retrying...")
+            continue
 
 
 logger.info("Tool 'query_cortex_analyst' registered with agent")

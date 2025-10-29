@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .constants import ALLOWED_ORIGINS
 from .logging_config import configure_logging, get_logger
-from .routers import admin, chat, dashboard, health, tickets
+from .routers import admin, chat, dashboard, health, tickets, voice
 
 configure_logging()
 logger = get_logger(__name__)
@@ -26,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
     app.include_router(tickets.router, prefix="/api/v1", tags=["Tickets"])
     app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
+    app.include_router(voice.router)
 
     return app
 

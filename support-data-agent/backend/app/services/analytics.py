@@ -496,7 +496,7 @@ def get_topic_metrics(
                 "avgResolutionTime": round(avg_resolution_time, 1),
                 "resolutionRate": round(resolution_rate, 1),
                 "sentiment": sentiment,
-                "topProducts": [p for p in (top_products_json if top_products_json else []) if p.get('product')],
+                "topProducts": [p for p in (top_products_json if top_products_json else []) if p.get("product")],
             }
         )
 
