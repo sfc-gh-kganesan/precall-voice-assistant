@@ -1,9 +1,13 @@
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
 # from graphs.arithmetic_agent import graph as arithmetic_graph
 # from graphs.greeting_workflow import graph as greeting_graph
 from graphs.post_meeting_workflow import graph as post_meeting_graph
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Ensure project root is on sys.path so top-level modules (e.g., utils) resolve
 PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
