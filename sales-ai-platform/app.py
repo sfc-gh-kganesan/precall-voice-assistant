@@ -10,7 +10,8 @@ Also provides Snowflake service function endpoints that handle batch requests.
 import uvicorn
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Literal, Optional
+from typing import Optional
+# from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, HTTPException, Request
@@ -21,7 +22,7 @@ from graphs.greeting_workflow import create_graph as create_greeting_graph
 from graphs.arithmetic_agent import graph as arithmetic_graph
 from graphs.post_meeting_workflow import graph as post_meeting_graph
 from utils import unpack_function_request
-from datetime import datetime
+# from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -251,7 +252,6 @@ async def post_meeting_workflow(request: Request):
     # Pydantic format
     try:
         req = PostMeetingRequest(**body)
-        input_message = req.call_transcript
         result = await app.state.post_meeting_graph.ainvoke({"call_transcript": req.call_transcript})
         return PostMeetingResponse(analysis=result)
     except Exception as e:

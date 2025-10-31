@@ -9,7 +9,6 @@ Usage:
     python test_arithmetic.py
 """
 
-import asyncio
 import subprocess
 import time
 import sys
@@ -98,7 +97,7 @@ def main():
                 successful_tests += 1
 
         # Summary
-        print(f"\n📊 Test Summary")
+        print("\n📊 Test Summary")
         print("=" * 30)
         print(f"✅ Successful: {successful_tests}/{len(test_queries)}")
         print(f"❌ Failed: {len(test_queries) - successful_tests}/{len(test_queries)}")

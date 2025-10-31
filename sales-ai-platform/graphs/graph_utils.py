@@ -34,7 +34,7 @@ def get_llm():
         print("Using OpenAI")
         llm = ChatOpenAI(
             # model="gpt-5",
-            model="gpt-4",
+            model="gpt-4o-mini",
             temperature=0,
             max_retries=5,
             request_timeout=20

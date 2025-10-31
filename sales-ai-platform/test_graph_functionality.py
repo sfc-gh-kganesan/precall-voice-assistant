@@ -1,6 +1,9 @@
-import os
 import sys
 from pathlib import Path
+
+# from graphs.arithmetic_agent import graph as arithmetic_graph
+# from graphs.greeting_workflow import graph as greeting_graph
+from graphs.post_meeting_workflow import graph as post_meeting_graph
 
 # Ensure project root is on sys.path so top-level modules (e.g., utils) resolve
 PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
@@ -10,11 +13,6 @@ if PROJECT_ROOT not in sys.path:
 # Disable LangSmith tracing if misconfigured
 # os.environ.pop("LANGCHAIN_TRACING_V2", None)
 # os.environ.pop("LANGCHAIN_ENDPOINT", None)
-
-from arithmetic_agent import graph as arithmetic_graph
-from greeting_workflow import graph as greeting_graph
-from post_meeting_workflow import graph as post_meeting_graph
-from langchain_core.messages import HumanMessage
 
 
 def main() -> None:

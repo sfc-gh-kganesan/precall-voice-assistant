@@ -9,7 +9,6 @@ Usage:
     python test_post_meeting.py
 """
 
-import asyncio
 import subprocess
 import time
 import sys
@@ -60,7 +59,7 @@ def test_post_meeting_endpoint(call_transcript: str) -> Optional[dict]:
 
         if response.status_code == 200:
             result = response.json()
-            print(f"📥 Response received:")
+            print("📥 Response received:")
             if isinstance(result.get('analysis'), dict):
                 print(f"🔍 Analysis keys: {list(result['analysis'].keys())}")
                 # Print a sample of the analysis
@@ -152,7 +151,7 @@ SPEAKER 2: Perfect, I look forward to reviewing it."""
                 successful_tests += 1
 
         # Summary
-        print(f"\n📊 Test Summary")
+        print("\n📊 Test Summary")
         print("=" * 30)
         print(f"✅ Successful: {successful_tests}/{len(test_transcripts)}")
         print(f"❌ Failed: {len(test_transcripts) - successful_tests}/{len(test_transcripts)}")
