@@ -2,7 +2,7 @@ import logging
 from pydantic import BaseModel
 from pathlib import Path
 import os
-from typing import Optional, Any, Dict, Union, TypedDict, Literal
+from typing import Optional, Any, Dict, Union, TypedDict, Literal, NotRequired
 from dataclasses import dataclass
 from fastapi import Request
 
@@ -17,18 +17,18 @@ FRESH_OR_RERUN_OPTIONS = ["fresh", "rerun"] # TODO - Make ENUM
 
 
 class State(TypedDict):
-    classification: Literal[CLASS_OPTIONS[0], CLASS_OPTIONS[1]]
+    classification: NotRequired[Literal[CLASS_OPTIONS[0], CLASS_OPTIONS[1]]]
     target_table: str
     invoice_id: str # SUBMISSION_ID from ticket_metadata table
     relative_path: str
     stage_name: str
-    ai_extract_metadata: dict
-    purchase_order_header_metadata: dict | list[dict]
-    purchase_order_line_item_metadata: dict | list[dict]
-    use_existing_ai_extract: bool
-    ai_decision: str
-    ai_reasoning: str
-    ai_processed_at: str
+    ai_extract_metadata: NotRequired[dict]
+    purchase_order_header_metadata: NotRequired[dict | list[dict]]
+    purchase_order_line_item_metadata: NotRequired[dict | list[dict]]
+    use_existing_ai_extract: NotRequired[bool] = False
+    ai_decision: NotRequired[str]
+    ai_reasoning: NotRequired[str]
+    ai_processed_at: NotRequired[str]
 
 
 class AI_Decision_Output(BaseModel):
