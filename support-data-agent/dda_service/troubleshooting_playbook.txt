@@ -1,0 +1,752 @@
+# TSW (Troubleshooting Workflows) - Business Logic Playbook
+
+## Executive Summary
+
+The TSW (Troubleshooting Workflows) system is an automated diagnostic framework that helps support engineers quickly identify and troubleshoot common Snowflake issues. The system consists of 9 specialized workflows, each designed to diagnose a specific category of problems:
+
+1. **Query UDFs TSW** - Diagnoses issues with User-Defined Functions
+2. **Query Compilation TSW** - Analyzes query compilation failures
+3. **Query Locks TSW** - Identifies locking and concurrency issues
+4. **Query Incident Errors TSW** - Reviews internal incidents and failures
+5. **Iceberg Table TSW** - Troubleshoots Iceberg table queries
+6. **User Authentication TSW** - Diagnoses SAML/OAuth authentication problems
+7. **RBAC Securables TSW** - Analyzes permission errors on database objects
+8. **RBAC User TSW** - Reviews user role assignments and inheritance
+9. **RBAC Role TSW** - Comprehensive role-level privilege analysis
+
+These workflows automatically surface relevant diagnostic information when a case is loaded, reducing the time required to identify root causes from hours to minutes.
+
+---
+
+## How TSW Works: Three-Phase Architecture
+
+All TSW workflows follow a consistent pattern:
+
+### Phase 1: Detection
+- When a case is loaded, the system checks if each TSW is applicable
+- If relevant data exists, a tab appears on the case page with a count (e.g., "Query UDFs (3)")
+- Backend pipelines have already pre-processed the diagnostic data
+
+### Phase 2: Selection
+- User clicks on a specific item (query ID, integration name, etc.)
+- System navigates to the detailed TSW page for that item
+- Context from the case is carried forward (deployment, account, timestamps)
+
+### Phase 3: Analysis
+- Main TSW page displays diagnostic information in progressive levels of detail
+- Summary → Detailed view → Deep dive
+- Interactive elements allow filtering, time-based comparison, and exploration
+
+---
+
+## TSW Workflow Details
+
+### 1. Query UDFs TSW
+
+**Purpose**: Diagnoses issues related to User-Defined Functions that may have changed between when a query was written and when it failed.
+
+**Inputs**:
+- Query ID
+- Case number
+- Query execution timestamp
+
+**Workflow Steps**:
+
+1. **Identify Affected UDFs**
+   - System extracts all UDF names referenced in the failed query
+   - Displays list of UDFs with their signatures and basic metadata
+
+2. **Historical Timeline**
+   - Shows UDF version history over time
+   - Highlights when UDF was last modified relative to query execution
+   - Displays UDF body code for each version
+
+3. **Version Comparison**
+   - Allows comparison between current and historical UDF definitions
+   - Shows signature changes (parameters, return type)
+   - Displays implementation logic differences
+
+**Outputs**:
+- List of UDFs used by the query
+- UDF definition at query execution time
+- Historical changes to UDF (signature, body, return type)
+- Timeline of modifications
+
+**Decision-Making Guidance**:
+- **If UDF signature changed**: Query may be using old signature - update query to match current signature
+- **If UDF return type changed**: Query may expect old return type - check type casting in query
+- **If UDF body logic changed**: Review changes for bugs or unintended behavior - consider reverting UDF
+- **If UDF was deleted/recreated**: New implementation may differ - restore old version or update query logic
+
+---
+
+### 2. Query Compilation TSW
+
+**Purpose**: Analyzes query compilation pipeline failures to identify where compilation broke down.
+
+**Inputs**:
+- Query ID
+- Case number
+- Deployment information
+
+**Workflow Steps**:
+
+1. **Compilation Phase Analysis**
+   - Identifies which phase failed: Parsing, Binding, Optimization, or Code Generation
+   - Shows compilation timeline and metrics
+
+2. **Query Plan Inspection**
+   - Displays the execution plan (complete or partial)
+   - Highlights the operator or phase where failure occurred
+
+3. **Rewrite Rules Review**
+   - Shows which query rewrite rules were applied
+   - Identifies if aggressive optimizations caused the failure
+
+4. **Similar Query Comparison**
+   - Finds similar queries that compiled successfully
+   - Shows structural differences that may explain the failure
+
+**Outputs**:
+- Failed compilation phase (parsing/binding/optimization/code generation)
+- Query execution plan (if generated)
+- Applied rewrite rules
+- Comparison with similar successful queries
+
+**Decision-Making Guidance**:
+- **Parsing failure**: Syntax error or unsupported SQL construct - fix SQL syntax
+- **Binding failure**: Object not found or type mismatch - verify object names and types
+- **Optimization failure**: Query too complex - simplify query structure (CTEs, reduce nesting)
+- **Code generation failure**: Internal Snowflake issue - file support ticket
+- **Rewrite rule issues**: Disable specific optimizations if causing problems
+
+---
+
+### 3. Query Locks TSW
+
+**Purpose**: Diagnoses locking and concurrency issues causing queries to wait or deadlock.
+
+**Inputs**:
+- Query ID
+- Case number
+- Query execution timeframe
+
+**Workflow Steps**:
+
+1. **Lock Timeline Construction**
+   - Shows all locks held and waited for during query execution
+   - Displays timeline of lock requests, acquisitions, and releases
+
+2. **Deadlock Detection**
+   - Analyzes lock waits for circular dependencies
+   - Shows the cycle of queries waiting on each other
+   - Identifies deadlock victim query
+
+3. **Contention Analysis**
+   - Identifies database objects with highest contention
+   - Shows queries holding locks for extended periods
+
+4. **Blocking Query Identification**
+   - Links to queries holding blocking locks
+   - Shows what blocking query was doing during lock hold
+
+**Outputs**:
+- Lock acquisition timeline
+- Deadlock cycle visualization (if applicable)
+- Objects with highest lock contention
+- Blocking query details with duration
+
+**Decision-Making Guidance**:
+- **Long-running lock holder**: Optimize or cancel the blocking query
+- **Deadlock detected**: Implement consistent lock ordering across transactions
+- **Table-level lock escalation**: Reduce transaction size or use smaller batches
+- **Schema change blocking**: Schedule DDL operations during low-traffic periods
+- **Repeated contention**: Consider partitioning high-contention objects
+
+---
+
+### 4. Query Incident Errors TSW
+
+**Purpose**: Reviews internal Snowflake incidents that occurred during query execution, even if query ultimately succeeded.
+
+**Inputs**:
+- Query ID
+- Case number
+- Session ID
+- Account/deployment information
+
+**Workflow Steps**:
+
+1. **Incident Data Retrieval**
+   - Fetches incident summaries with error codes and internal messages
+   - Separates GS (Global Services) and XP (Execution Platform) incidents
+
+2. **Error Classification**
+   - Categorizes by severity and component
+   - Shows if incident was retried successfully or caused failure
+
+3. **Stack Trace Analysis**
+   - Displays stack traces from GS (Java) and XP (C++) layers
+   - Provides context on which Snowflake component failed
+
+4. **AI-Generated Summary** (Internal Only)
+   - Shows LLM-generated summaries of log patterns
+   - Highlights potential root causes
+
+5. **Session Context**
+   - Shows other queries in same session
+   - Displays concurrent queries on same warehouse
+
+**Outputs**:
+- Incident summary with error codes
+- Stack traces (GS and XP)
+- AI-generated log summary
+- Related session queries
+- Concurrent warehouse queries
+
+**Decision-Making Guidance**:
+- **Transparent retry**: Informational only - query succeeded after retry
+- **Component crash with failover**: Monitor for recurrence - may indicate infrastructure issue
+- **Performance degradation**: Review warehouse sizing or query optimization
+- **Isolated incident**: Likely transient - no action needed
+- **Pattern across session**: Broader issue - investigate session-level configuration or warehouse health
+
+---
+
+### 5. Iceberg Table TSW
+
+**Purpose**: Diagnoses issues specific to Apache Iceberg tables in Snowflake.
+
+**Inputs**:
+- Query ID
+- Table name (auto-extracted or manual input)
+- Case number
+
+**Workflow Steps**:
+
+1. **Table Name Extraction**
+   - Automatically parses Iceberg table names from query/error
+   - Handles fully qualified names (database.schema.table)
+
+2. **Metadata Retrieval**
+   - Fetches Iceberg table metadata from catalog
+   - Shows snapshot IDs, manifest lists, schema, partition spec
+
+3. **Manifest Analysis**
+   - Lists manifest files read
+   - Identifies missing or corrupted manifest files
+   - Shows partition pruning effectiveness
+
+4. **Snapshot History**
+   - Displays table snapshot timeline
+   - Shows which snapshot was used by failed query
+
+5. **File-Level Diagnostics**
+   - Lists data files attempted to be read
+   - Shows file read errors with details
+   - Identifies format compatibility issues
+
+**Outputs**:
+- Iceberg table metadata
+- Snapshot history with IDs and timestamps
+- Manifest file list and status
+- Data file list with read errors
+- Partition pruning statistics
+
+**Decision-Making Guidance**:
+- **Manifest file missing**: Restore from backup or regenerate table metadata
+- **Data file format incompatibility**: Convert files to compatible format (Parquet/ORC/Avro)
+- **Snapshot expired**: Configure longer retention or use available snapshot
+- **Partition metadata mismatch**: Rebuild table metadata or repair partitions
+- **External catalog unreachable**: Check catalog service health and connectivity
+
+---
+
+### 6. User Authentication TSW (SAML/OAuth)
+
+**Purpose**: Diagnoses authentication failures for SAML and OAuth integrations.
+
+**Inputs**:
+- Integration name (SAML or OAuth)
+- Case number
+- Deployment and account information
+- Failure timeframe
+
+**Workflow Steps**:
+
+1. **Integration Type Detection**
+   - Identifies whether issue is SAML or OAuth
+   - Routes to appropriate diagnostic path
+
+2. **SAML Integration Analysis** (if SAML):
+   - Displays SAML2 configuration (entity ID, SSO URL, attributes)
+   - Parses and validates X.509 certificates
+   - Extracts certificate details: serial number, issuer, subject, validity period
+   - Highlights expired or soon-to-expire certificates
+
+3. **OAuth Integration Analysis** (if OAuth):
+   - Shows OAuth provider settings (client ID, scopes, token endpoints)
+   - Lists authorized redirect URIs
+   - Displays OAuth flow configuration
+
+4. **Log Analysis**
+   - Fetches authentication logs for 4-hour window
+   - Shows SAML assertion validation logs or OAuth token exchange logs
+   - Allows time range filtering
+
+5. **Visualization**
+   - Renders chart of log events over time
+   - Groups by severity and class
+
+**Outputs**:
+- Integration configuration details
+- Certificate validation results (SAML)
+- OAuth flow configuration (OAuth)
+- Time-based authentication logs
+- Log event visualization
+
+**Decision-Making Guidance**:
+- **Certificate expired** (SAML): Update Snowflake integration with new IDP certificate
+- **Assertion signature verification failed** (SAML): Verify certificate matches IDP configuration
+- **Clock skew detected** (SAML): Synchronize IDP server clock (must be within 5 minutes)
+- **Missing SAML attributes**: Fix attribute mapping in integration configuration
+- **OAuth token expired/revoked**: Refresh OAuth token or re-authorize application
+- **OAuth scope mismatch**: Update OAuth integration scopes to match requirements
+- **Redirect URI mismatch** (OAuth): Add correct redirect URI to OAuth provider configuration
+
+---
+
+### 7. RBAC Securables TSW
+
+**Purpose**: Diagnoses permission errors on specific database objects (tables, views, schemas, databases).
+
+**Inputs**:
+- Query ID with RBAC error message
+- Securable name (extracted from error)
+- Case number
+- Query timestamp
+
+**Workflow Steps**:
+
+1. **Securable Identification**
+   - Extracts securable name from error message
+   - Resolves partially qualified names using query context
+   - Shows candidate securables if multiple matches
+
+2. **Securable Metadata**
+   - Displays type (TABLE, VIEW, SCHEMA, DATABASE, etc.)
+   - Shows creation date, last updated, deleted date
+
+3. **Direct Privilege Analysis**
+   - Lists all roles with direct privileges on securable
+   - Shows specific privileges (SELECT, INSERT, UPDATE, OWNERSHIP, etc.)
+   - Indicates who granted each privilege and when
+
+4. **Inherited Privilege Analysis**
+   - Traverses role hierarchy to find inherited access
+   - Shows inheritance paths (e.g., "ROLE_A → ROLE_B → ROLE_C")
+   - Distinguishes inherited vs. direct privileges
+
+5. **Point-in-Time Comparison**
+   - Allows selecting any timestamp to view historical privilege state
+   - Compares current vs. historical privileges
+   - Highlights grants and revokes between timepoints
+
+6. **User-Role Mapping**
+   - Shows which users can access securable through role grants
+   - Traces full path: user → role → privilege → securable
+
+**Outputs**:
+- Securable metadata (type, dates, ID)
+- Direct privilege grants with timestamps
+- Inherited privilege paths
+- Point-in-time privilege comparison
+- User access paths
+
+**Decision-Making Guidance**:
+- **Object doesn't exist**: Verify spelling or restore deleted object
+- **No privileges found**: Grant required privilege to user's role
+- **Privileges recently revoked**: Restore privilege if revocation was error
+- **Role hierarchy broken**: Re-grant intermediate role to restore inheritance path
+- **User missing role grant**: Grant role to user that provides required access
+
+---
+
+### 8. RBAC User TSW
+
+**Purpose**: Comprehensive analysis of a user's RBAC role assignments and privilege inheritance.
+
+**Inputs**:
+- Query ID with RBAC error message containing user name
+- User name
+- Case number
+- Query timestamp
+
+**Workflow Steps**:
+
+1. **User Context Validation**
+   - Validates error matches RBAC criteria ("does not exist" + "not authorized")
+   - Extracts user name from query context
+   - Fetches user metadata (ID, email, created date, updated date)
+
+2. **Direct Role Grants**
+   - Lists all roles directly granted to user
+   - Shows grant timestamps and status (active/revoked)
+
+3. **Inherited Role Discovery**
+   - Builds complete role hierarchy graph
+   - Finds all roles accessible through direct grants (recursive)
+   - Calculates inheritance paths with hop counts
+
+4. **Unified Role View**
+   - Combines direct and inherited roles in single table
+   - Columns: Role name, Role ID, Grant type (DIRECT/INHERITED), Path length, Inheritance paths
+   - Sorted by: Grant type → Path length → Role name
+
+5. **Revoked Role Analysis** (30-day window)
+   - Shows directly revoked role grants
+   - Identifies inherited roles that became inaccessible due to revocations
+   - Traces which specific grant revocation caused access loss
+
+6. **Role Detail Views**
+   - Dropdown selector with all roles ([DIRECT] or [INHERITED] indicators)
+   - Selected role details: inheritance paths, grant timestamps, descendant role tree
+
+7. **Summary Metrics**
+   - Direct grants count
+   - Inherited roles count
+   - Total accessible roles
+   - Revoked grants breakdown
+
+**Outputs**:
+- User metadata
+- Complete list of accessible roles (direct + inherited)
+- Inheritance paths for each role
+- Revoked roles within 30 days
+- Descendant role tree for each role
+- Summary statistics
+
+**Decision-Making Guidance**:
+- **User missing expected role**: Grant role directly to user
+- **Role revoked recently**: Re-grant role if revocation was error
+- **Inherited role missing**: Check intermediate role grants - restore broken link
+- **User has role but lacks privileges**: Check role's privilege grants (use RBAC Role TSW)
+- **Long inheritance chain**: Consider granting role directly to user for clarity
+- **Descendant role has required privilege**: Grant that descendant role to user instead
+
+---
+
+### 9. RBAC Role TSW
+
+**Purpose**: Comprehensive role-level privilege analysis with change tracking across entire role hierarchy.
+
+**Inputs**:
+- Query ID with RBAC error message containing role name
+- Role name
+- Case number
+- Query timestamp
+
+**Workflow Steps**:
+
+#### Phase 1: Role Identification
+1. Validates error matches RBAC criteria
+2. Extracts role name from query context
+3. Fetches role metadata (ID, type, created/updated dates)
+
+#### Phase 2: Hierarchy Construction
+4. Builds complete role hierarchy graph for entire account
+5. Identifies all active role grants
+6. Discovers all descendant roles (active and revoked)
+
+#### Phase 3: Privilege Changelog (30-day window)
+7. Fetches privilege changes for query role + all descendants
+8. Includes both grants and revocations
+9. Covers all securable types (tables, views, schemas, databases)
+
+#### Phase 4: Role Information Structure
+10. Creates comprehensive dropdown with all roles:
+    - Query role (always first)
+    - Direct child roles
+    - Descendant roles
+    - Active and revoked roles (with status indicators)
+
+#### Phase 5: Analysis Interface
+11. **Role Selector Tab**:
+    - Dropdown to select specific role
+    - Shows role metadata and relationship
+    - Displays privilege changelog filtered to selected role + descendants
+    - Summary metrics (granted/revoked/total)
+
+12. **All Changes Table Tab**:
+    - Complete privilege changelog for all roles
+    - No filtering - full dataset
+    - Useful for export or comprehensive review
+
+#### Phase 6: Privilege Enhancement
+13. Calculates inheritance paths for each role
+14. Shows how roles connect to root roles
+15. Formats privilege data with role names and paths
+
+**Outputs**:
+- Role metadata
+- Complete role hierarchy (active and revoked)
+- Privilege changelog for role + all descendants:
+  - Role name and ID
+  - Change type (GRANTED/REVOKED)
+  - Privilege type (SELECT, INSERT, etc.)
+  - Securable name
+  - Inheritance paths
+  - Change timestamps
+- Summary metrics by role
+- Descendant role list with status
+
+**Decision-Making Guidance**:
+
+**Missing Privilege on Descendant Role**:
+- Select query role → view all descendants
+- Filter changelog to find when privilege was revoked from specific descendant
+- Trace inheritance path to identify where role grant broke
+- **Action**: Grant privilege directly to query role, or re-grant revoked intermediate role
+
+**Recent Role Grant Revocation**:
+- Select revoked descendant from dropdown (shows ❌ REVOKED status)
+- Review when privileges became inaccessible
+- Check revocation reason
+- **Action**: Re-grant role if revocation was error, or grant privileges directly
+
+**Privilege Audit**:
+- Use "All Changes Table" tab to see complete history
+- Export for compliance review
+- Filter by securable name or privilege type
+- **Action**: Document changes, identify unauthorized modifications
+
+**Complex Inheritance Debugging**:
+- Select intermediate role in hierarchy
+- View its descendants and privilege changes
+- Identify which specific role lacks required privilege
+- **Action**: Grant privilege at appropriate level in hierarchy
+
+**Privilege Was Granted Then Revoked**:
+- Look for GRANTED followed by REVOKED in changelog
+- Check timestamps to determine duration
+- Identify who performed revocation
+- **Action**: Restore grant if revocation was error, or adjust role structure
+
+---
+
+## Data Package Pattern
+
+All TSW workflows use pre-computed data packages:
+
+**Backend Pipeline**:
+- Runs when case is created or updated
+- Queries Snowflake metadata tables
+- Aggregates and processes data (graph construction, historical lookups, etc.)
+- Serializes to JSON and stores in TSW data package tables
+
+**Frontend Access**:
+- Fetches pre-computed JSON from package tables
+- Parses and displays data
+- No complex queries at page load time
+
+**Benefits**:
+- Fast page loads (data already processed)
+- Consistent data across multiple views
+- Point-in-time snapshot for accurate diagnosis
+
+**Tradeoff**:
+- Data is not real-time (reflects state at pipeline run time)
+- Must refresh case to re-run pipeline and get updated data
+
+---
+
+## Progressive Disclosure Pattern
+
+All TSWs follow progressive disclosure to manage information complexity:
+
+**Level 1: Case Page (Detection)**
+- Minimal info: "Query UDFs (3)" or "RBAC User (5)"
+- Quick scan to see which TSWs are applicable
+
+**Level 2: Overview Page (Summary)**
+- Summary metadata and key metrics
+- List or dropdown to select specific item for analysis
+
+**Level 3: Detail View (Analysis)**
+- Full diagnostic information for selected item
+- Structured tables, timelines, graphs
+- Related data in tabs or expanders
+
+**Level 4: Deep Dive (Optional)**
+- Historical comparisons (point-in-time analysis)
+- Related queries or sessions
+- Raw data for advanced debugging
+
+**Design Principle**: Show what's needed when it's needed, without overwhelming the user.
+
+---
+
+## Common Troubleshooting Scenarios
+
+### Scenario 1: "Table does not exist or not authorized" Error
+
+**Applicable TSWs**: RBAC Securables, RBAC User, RBAC Role
+
+**Troubleshooting Flow**:
+
+1. **Start with RBAC Securables TSW**:
+   - Verify table exists (check deleted date)
+   - Check if user's role has privileges (direct or inherited)
+   - Look for recent privilege revocations
+
+   **Decision Point**:
+   - If table deleted → Restore table or update query
+   - If table exists but no privileges → Proceed to step 2
+
+2. **Use RBAC User TSW**:
+   - Verify user has expected roles granted
+   - Check if role grant was recently revoked
+   - Review inherited roles for missing expected role
+
+   **Decision Point**:
+   - If role grant revoked → Re-grant role to user
+   - If user has role but role lacks privileges → Proceed to step 3
+
+3. **Use RBAC Role TSW**:
+   - Select user's role from dropdown
+   - Review privilege changelog for the table
+   - Identify when/why privilege was revoked
+
+   **Decision Point**:
+   - If privilege revoked from role → Re-grant privilege to role
+   - If privilege never existed → Grant privilege to role
+   - If privilege exists on descendant role → Grant descendant role to user
+
+**Resolution Actions**:
+- `GRANT SELECT ON TABLE database.schema.table TO ROLE role_name;`
+- `GRANT ROLE role_name TO USER user_name;`
+- Restore revoked privilege if revocation was mistake
+
+---
+
+### Scenario 2: Intermittent UDF Errors
+
+**Applicable TSWs**: Query UDFs
+
+**Troubleshooting Flow**:
+
+1. **Load Query UDFs TSW**:
+   - Identify UDFs referenced in query
+   - Review UDF history timeline
+
+2. **Use Time Slider**:
+   - View UDF state at query execution time
+   - Compare with current definition
+   - Look for signature or implementation changes
+
+   **Decision Point**:
+   - If UDF changed during query execution → Race condition
+   - If signature changed → Query using old signature
+   - If body logic changed → New bug introduced
+
+**Resolution Actions**:
+- Revert UDF to previous version if recent change caused bug
+- Update query to use new UDF signature
+- Add input validation to UDF
+- Lock UDF versions during critical operations
+
+---
+
+### Scenario 3: SAML Authentication Failure
+
+**Applicable TSWs**: User Authentication
+
+**Troubleshooting Flow**:
+
+1. **Load User Authentication TSW**:
+   - Select SAML integration
+   - Review configuration and certificates
+
+2. **Check Certificate Validity**:
+   - Look for expired certificates
+   - Verify issuer and subject match IDP
+
+   **Decision Point**:
+   - If certificate expired → Update certificate
+   - If certificate valid → Proceed to logs
+
+3. **Review SAML Logs**:
+   - Set time window around failure
+   - Look for specific error codes:
+     - "Assertion signature verification failed" → Certificate mismatch
+     - "Assertion expired" → Clock skew
+     - "Attribute not found" → Mapping misconfiguration
+
+   **Decision Point**:
+   - Identify specific error from logs
+   - Apply corresponding resolution
+
+**Resolution Actions**:
+- Update Snowflake SAML integration with new IDP certificate
+- Synchronize IDP server clock (within 5 minutes of Snowflake)
+- Fix SAML attribute mapping in integration config
+- Verify SSO URL and entity ID match IDP configuration
+
+---
+
+### Scenario 4: Query Compilation Failure
+
+**Applicable TSWs**: Query Compilation
+
+**Troubleshooting Flow**:
+
+1. **Load Query Compilation TSW**:
+   - Identify failed compilation phase
+   - Review query execution plan (if generated)
+
+2. **Analyze Phase**:
+   - **Parsing**: SQL syntax error → Fix SQL
+   - **Binding**: Object not found → Verify object names
+   - **Optimization**: Query too complex → Simplify structure
+   - **Code generation**: Internal bug → File support ticket
+
+3. **Compare Similar Queries**:
+   - Find similar successful queries
+   - Identify structural differences
+
+   **Decision Point**:
+   - If query structure significantly different → Simplify query
+   - If similar query succeeds → May be optimizer bug
+   - If rewrite rules applied → Try disabling specific optimizations
+
+**Resolution Actions**:
+- Simplify query (use CTEs, reduce nesting depth)
+- Break complex query into smaller parts
+- Avoid problematic function combinations
+- Disable specific query optimizations if causing issues
+- File Snowflake support ticket if optimizer bug suspected
+
+---
+
+## Key Limitations to Remember
+
+1. **Point-in-Time Data**: TSW data reflects state at pipeline execution, not current real-time state
+2. **30-Day Changelog Window**: RBAC workflows show privilege changes only for 30 days prior to query
+3. **Standard Roles Only**: Database roles and application roles not fully supported in RBAC workflows
+4. **No Cross-TSW Correlation**: Each TSW operates independently - can't see "all issues for user X" across workflows
+5. **Manual Refresh Required**: Must refresh case to trigger pipeline re-run for updated data
+
+---
+
+## Conclusion
+
+The TSW system provides automated diagnostic capabilities across 9 specialized workflows, each targeting a specific category of Snowflake issues. By using pre-computed data packages, progressive disclosure, and point-in-time analysis, TSWs enable support engineers to quickly identify root causes and take appropriate remediation actions.
+
+**Key Principles**:
+- **Automated detection** reduces manual diagnostic effort
+- **Pre-computed data** ensures fast page loads and consistent analysis
+- **Progressive disclosure** manages complexity without overwhelming users
+- **Point-in-time snapshots** provide accurate historical context
+- **Actionable outputs** guide engineers to specific resolution steps
+
+For each TSW workflow, follow the prescribed steps, review the outputs, and use the decision-making guidance to determine appropriate remediation actions.
