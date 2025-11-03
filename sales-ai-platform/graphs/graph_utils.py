@@ -1,43 +1,37 @@
 import os
+
 from langchain_openai import ChatOpenAI
+
+from utils import get_snowflake_token
+
 
 def get_llm():
     """
     Get LLM configured for either Snowflake Cortex or OpenAI.
-    
-    When SNOWFLAKE_HOST is set, uses Cortex inference.
-    Otherwise, uses OpenAI (requires OPENAI_API_KEY).
-    
     Note: For Cortex, token is read fresh each call to handle rotation.
     """
-    snowflake_host = os.getenv('SNOWFLAKE_HOST')
-    
-    if snowflake_host:
-        # Use Snowflake Cortex inference - read token fresh each time
-        from utils import get_snowflake_token
-        
-        base_url = f'https://{snowflake_host}/api/v2/cortex/openai'
-        api_key = get_snowflake_token()  # Fresh token on each call
-        
+    llm_provider = os.getenv("LLM_PROVIDER")
+    if llm_provider == "openai":
+        if os.getenv("OPENAI_API_KEY") is None:
+            raise Exception("OPENAI_API_KEY is not set")
+        print("get_llm: using OpenAI")
         llm = ChatOpenAI(
-            # model="claude-3-5-sonnet",
-            # model="claude-3-7-sonnet",
+            model="gpt-4o-mini", temperature=0, max_retries=5, request_timeout=20
+        )
+        return llm
+    else:
+        snowflake_host = os.getenv("SNOWFLAKE_HOST")
+        if snowflake_host is None:
+            raise Exception("SNOWFLAKE_HOST is not set")
+        print("get_llm: using Snowflake Cortex")
+        base_url = f"https://{snowflake_host}/api/v2/cortex/openai"
+        api_key = get_snowflake_token()  # Fresh token on each call
+        llm = ChatOpenAI(
             model="openai-gpt-4.1",
             base_url=base_url,
             api_key=api_key,
             temperature=0,
             max_retries=5,
-            request_timeout=20
+            request_timeout=20,
         )
-    else:
-        # Use OpenAI directly
-        print("Using OpenAI")
-        llm = ChatOpenAI(
-            # model="gpt-5",
-            model="gpt-4o-mini",
-            temperature=0,
-            max_retries=5,
-            request_timeout=20
-        )
-    
-    return llm
+        return llm

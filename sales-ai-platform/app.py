@@ -9,11 +9,13 @@ Also provides Snowflake service function endpoints that handle batch requests.
 
 import uvicorn
 import asyncio
+import os
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import List, Optional, Tuple
 # from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+from dbos import DBOS, DBOSConfig, Queue
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
@@ -158,6 +160,11 @@ A collection of AI-powered workflows built with LangGraph.
 * 🧩 Modular graph architecture
 """
 
+config: DBOSConfig = {
+    "name": "sales-ai-platform-dbos",
+    "system_database_url": os.getenv("DBOS_SYSTEM_DATABASE_URL", ""),
+}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -172,6 +179,14 @@ async def lifespan(app: FastAPI):
     app.state.post_meeting_graph = post_meeting_graph
     print("✓ Post meeting workflow graph loaded")
     
+    # initialize dbos
+    DBOS(config=config)
+    DBOS.launch()
+    # This queue may run no more than 10 functions concurrently and may not start more than 50 functions per 30 seconds
+    app.state.post_meeting_queue = Queue(
+        "post_meeting_queue", concurrency=10, limiter={"limit": 50, "period": 30}
+    )
+    print("✓ DBOS: launched")
     print(f"🚀 {TITLE} v{VERSION} started")
     
     yield
@@ -355,6 +370,77 @@ async def arithmetic_workflow(request: Request):
         return ArithmeticResponse(query=req.query, answer=answer, tool_calls_made=tool_calls_made)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Post Meeting Intelligence Scheduler
+# Temporary scheduling logic until the Sales AI team can build their own
+# ============================================================================
+
+
+@DBOS.workflow()
+async def meetings_durable_workflow(args: PostMeetingRequest):
+    # TODO: right now we will fulfill this request using /post-meeting,
+    # however in the future this needs to go to the meta intelligence orchestrator API first
+    # it will be invoked using a Snowhouse UDF. In turn it will hit the Cortex Agent which will hit /post-meeting
+    result = await app.state.post_meeting_graph.ainvoke(
+        {"call_transcript": args.call_transcript}
+    )
+    return PostMeetingResponse(analysis=result)
+
+
+class MeetingsJobsRequest(BaseModel):
+    data: List[Tuple[int, PostMeetingRequest]] = Field(
+        ...,
+        description="""
+        Batch of call transcripts in Snowflake service function format. 
+        Each row is a list with two elements: [row_index: int, request_payload: dict]. 
+        The request_payload is a JSON object matching PostMeetingRequest schema: 
+        '{"call_transcript": "SPEAKER 1: ... SPEAKER 2: ..."}'
+        """,
+        examples=[
+            [
+                [
+                    0,
+                    {
+                        "call_transcript": "SPEAKER 1: Hello, how are you? SPEAKER 2: I'm fine, thank you."
+                    },
+                ],
+                [
+                    1,
+                    {
+                        "call_transcript": "SPEAKER 1: Let's discuss the proposal. SPEAKER 2: Sounds good."
+                    },
+                ],
+            ]
+        ],
+    )
+
+
+@app.post("/v1/meetings/jobs")
+async def meetings_jobs(request: MeetingsJobsRequest):
+    # TODO: handle deduplication and partitioning based on some request identifier
+    result_data = []
+    for row in request.data:
+        row_index, row_data = row[0], row[1]
+        handle = await app.state.post_meeting_queue.enqueue_async(
+            meetings_durable_workflow, row_data
+        )
+        result_data.append([
+            row_index,
+            {
+                "message": "Successfully enqueued post-meeting intelligence workflow",
+                "workflow_id": handle.get_workflow_id()
+            }
+        ])
+    return {"data": result_data}
+
+
+@app.get("/v1/meetings/jobs/{workflow_id}")
+async def meetings_job_status(workflow_id: str):
+    handle = await DBOS.retrieve_workflow_async(workflow_id)
+    status = await handle.get_status()
+    return status
 
 
 # ============================================================================

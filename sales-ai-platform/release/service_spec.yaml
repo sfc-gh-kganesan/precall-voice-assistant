@@ -1,15 +1,24 @@
 spec:
   containers:
   - name: sales-ai-platform
-    image: sfsenorthamerica-kirk-aws-west-demo.registry.snowflakecomputing.com/sales_ai_platform/core/image_repository/sales-ai-platform:latest
+    image: sfcogsops-snowhouse-aws-us-west-2.registry.snowflakecomputing.com/ai_fde/sales_ai_platform/image_repository/sales-ai-platform:latest
     env:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING}
       LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
       LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT}
       LANGCHAIN_ENDPOINT: ${LANGCHAIN_ENDPOINT}
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      DBOS_SYSTEM_DATABASE_URL: "sqlite:////sfmnt/dbos.db"
+    volumeMounts:
+    - name: dbos-data
+      mountPath: /sfmnt
   endpoints:
   - name: api
     port: 8000
     public: true
+  volumes:
+  - name: dbos-data
+    source: local
+
 

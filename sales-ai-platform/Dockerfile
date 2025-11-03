@@ -1,5 +1,5 @@
 # Sales AI Platform - Snowflake SPCS Deployment
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 # Set working directory
 WORKDIR /app
