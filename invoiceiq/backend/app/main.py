@@ -181,6 +181,24 @@ class UpdateFieldsResponse(BaseModel):
     message: str
 
 
+class InvoiceStatsResponse(BaseModel):
+    success: bool
+    approved: int
+    pending: int
+    rejected: int
+    total: int
+
+
+class InvoicesByStatusResponse(BaseModel):
+    success: bool
+    approved: List[Invoice]
+    pending: List[Invoice]
+    rejected: List[Invoice]
+    approved_count: int
+    pending_count: int
+    rejected_count: int
+
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -203,6 +221,79 @@ def get_snowflake_connection():
     finally:
         if conn:
             conn.close()
+
+
+def build_invoice_from_row(row: dict) -> Invoice:
+    """Helper function to build an Invoice object from a database row."""
+    relative_path = row.get("RELATIVE_PATH", "")
+
+    # Use AI_DECISION if available, fallback to 'pending'
+    # Normalize to 'approved'/'rejected'/'pending' format (with -ed suffix)
+    ai_decision = row.get("AI_DECISION")
+    if not ai_decision:
+        status_value = "pending"
+    elif ai_decision.lower() == "approve":
+        status_value = "approved"
+    elif ai_decision.lower() == "reject":
+        status_value = "rejected"
+    else:
+        status_value = ai_decision.lower()
+
+    return Invoice(
+        id=row.get("TICKET_NUMBER", ""),
+        ticket_number=row.get("TICKET_NUMBER", ""),
+        status=status_value,
+        file_url=f"@INVOICEIQ.SERVICE.TICKET_ATTACHMENTS/{relative_path}"
+        if relative_path
+        else "",
+        relative_path=relative_path,
+        vendor_name=row.get("VENDOR_NAME"),
+        invoice_number=row.get("INVOICE_NUMBER"),
+        invoice_date=str(row.get("INVOICE_DATE", ""))
+        if row.get("INVOICE_DATE")
+        else None,
+        total_amount=str(row.get("TOTAL_AMOUNT", ""))
+        if row.get("TOTAL_AMOUNT")
+        else None,
+        purchase_order_number=row.get("PURCHASE_ORDER_NUMBER"),
+        due_date=str(row.get("DUE_DATE", "")) if row.get("DUE_DATE") else None,
+        banking_details=row.get("BANKING_DETAILS"),
+        freight_shipping_amount=str(row.get("FREIGHT_SHIPPING_AMOUNT", ""))
+        if row.get("FREIGHT_SHIPPING_AMOUNT")
+        else None,
+        invoice_currency=row.get("INVOICE_CURRENCY"),
+        memo_description=row.get("MEMO_DESCRIPTION"),
+        payment_terms=row.get("PAYMENT_TERMS"),
+        payment_type=row.get("PAYMENT_TYPE"),
+        prepaid_flag=row.get("PREPAID_FLAG"),
+        quantity=str(row.get("QUANTITY", "")) if row.get("QUANTITY") else None,
+        service_end_date=str(row.get("SERVICE_END_DATE", ""))
+        if row.get("SERVICE_END_DATE")
+        else None,
+        service_start_date=str(row.get("SERVICE_START_DATE", ""))
+        if row.get("SERVICE_START_DATE")
+        else None,
+        shipped_to_address=row.get("SHIPPED_TO_ADDRESS"),
+        snowflake_entity=row.get("SNOWFLAKE_ENTITY"),
+        snowflake_tax_id=row.get("SNOWFLAKE_TAX_ID"),
+        tax_amount=str(row.get("TAX_AMOUNT", "")) if row.get("TAX_AMOUNT") else None,
+        unit_price=str(row.get("UNIT_PRICE", "")) if row.get("UNIT_PRICE") else None,
+        vendor_address=row.get("VENDOR_ADDRESS"),
+        vendor_tax_id=row.get("VENDOR_TAX_ID"),
+        ai_reasoning=row.get("AI_REASONING"),
+        ai_processed_at=str(row.get("AI_PROCESSED_AT", ""))
+        if row.get("AI_PROCESSED_AT")
+        else None,
+        last_edited_by=row.get("LAST_EDITED_BY"),
+        last_edited_at=str(row.get("LAST_EDITED_AT", ""))
+        if row.get("LAST_EDITED_AT")
+        else None,
+        submission_id=row.get("SUBMISSION_ID"),
+        created_at=str(row.get("CREATED_AT", "")),
+        updated_at=str(row.get("UPDATED_AT", "")),
+        email_from=row.get("EMAIL"),
+        email_subject=None,
+    )
 
 
 def parse_extracted_fields(variant_data) -> dict:
@@ -284,6 +375,172 @@ def download_file_from_stage(cursor, relative_path: str) -> str:
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "InvoiceIQ Backend"}
+
+
+@app.get("/invoices/stats", response_model=InvoiceStatsResponse)
+async def get_invoice_stats():
+    """
+    Get invoice counts by status in a single optimized query.
+    This replaces the need for 3 separate count queries.
+
+    Returns:
+    - approved: Count of approved invoices
+    - pending: Count of pending invoices (includes NULL AI_DECISION)
+    - rejected: Count of rejected invoices
+    - total: Total count of all invoices
+    """
+    logger.info("Fetching invoice statistics")
+
+    try:
+        with get_snowflake_connection() as conn:
+            cursor = conn.cursor(DictCursor)
+
+            query = """
+                SELECT
+                    COUNT(CASE 
+                        WHEN LOWER(AI_DECISION) IN ('approve', 'approved') THEN 1 
+                    END) as approved_count,
+                    COUNT(CASE 
+                        WHEN LOWER(AI_DECISION) IN ('reject', 'rejected') THEN 1 
+                    END) as rejected_count,
+                    COUNT(CASE 
+                        WHEN AI_DECISION IS NULL OR LOWER(AI_DECISION) = 'pending' THEN 1 
+                    END) as pending_count,
+                    COUNT(*) as total_count
+                FROM INVOICES
+                WHERE RELATIVE_PATH IS NOT NULL
+            """
+
+            cursor.execute(query)
+            result = cursor.fetchone()
+
+            logger.info(
+                f"Stats - Approved: {result['APPROVED_COUNT']}, Pending: {result['PENDING_COUNT']}, Rejected: {result['REJECTED_COUNT']}, Total: {result['TOTAL_COUNT']}"
+            )
+
+            return InvoiceStatsResponse(
+                success=True,
+                approved=result["APPROVED_COUNT"],
+                pending=result["PENDING_COUNT"],
+                rejected=result["REJECTED_COUNT"],
+                total=result["TOTAL_COUNT"],
+            )
+    except Exception as e:
+        logger.error(f"Error fetching invoice stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/invoices/all", response_model=InvoicesByStatusResponse)
+async def get_all_invoices(
+    limit: int = Query(100, ge=1, le=1000, description="Maximum results per status"),
+):
+    """
+    Fetch all invoices grouped by status in a single optimized query.
+    This replaces the need for 3 separate queries to fetch approved/pending/rejected.
+
+    Query Parameters:
+    - limit: Maximum invoices to return per status (default: 100, max: 1000)
+
+    Returns:
+    - approved: List of approved invoices
+    - pending: List of pending invoices
+    - rejected: List of rejected invoices
+    - approved_count/pending_count/rejected_count: Number of invoices in each list
+    """
+    logger.info(f"Fetching all invoices grouped by status, limit={limit}")
+
+    try:
+        with get_snowflake_connection() as conn:
+            cursor = conn.cursor(DictCursor)
+
+            # Single query to fetch all invoices, ordered by creation time
+            query = """
+                SELECT
+                    i.INVOICE_ID,
+                    i.TICKET_NUMBER,
+                    i.SUBMISSION_ID,
+                    i.AI_DECISION,
+                    i.RELATIVE_PATH,
+                    i.FILE_URL,
+                    i.VENDOR_NAME,
+                    i.INVOICE_NUMBER,
+                    i.INVOICE_DATE,
+                    i.TOTAL_AMOUNT,
+                    i.PURCHASE_ORDER_NUMBER,
+                    i.DUE_DATE,
+                    i.BANKING_DETAILS,
+                    i.FREIGHT_SHIPPING_AMOUNT,
+                    i.INVOICE_CURRENCY,
+                    i.MEMO_DESCRIPTION,
+                    i.PAYMENT_TERMS,
+                    i.PAYMENT_TYPE,
+                    i.PREPAID_FLAG,
+                    i.QUANTITY,
+                    i.SERVICE_END_DATE,
+                    i.SERVICE_START_DATE,
+                    i.SHIPPED_TO_ADDRESS,
+                    i.SNOWFLAKE_ENTITY,
+                    i.SNOWFLAKE_TAX_ID,
+                    i.TAX_AMOUNT,
+                    i.UNIT_PRICE,
+                    i.VENDOR_ADDRESS,
+                    i.VENDOR_TAX_ID,
+                    i.AI_REASONING,
+                    i.AI_PROCESSED_AT,
+                    i.LAST_EDITED_BY,
+                    i.LAST_EDITED_AT,
+                    i.CREATED_AT,
+                    i.UPDATED_AT,
+                    t.EMAIL
+                FROM INVOICES i
+                LEFT JOIN TICKET_METADATA t ON i.TICKET_NUMBER = t.TICKET_NUMBER
+                WHERE i.RELATIVE_PATH IS NOT NULL
+                ORDER BY i.CREATED_AT DESC
+            """
+
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+            # Group invoices by status
+            approved = []
+            pending = []
+            rejected = []
+
+            for row in rows:
+                invoice_obj = build_invoice_from_row(row)
+
+                # Add to appropriate list (respecting limit for each)
+                if invoice_obj.status == "approved" and len(approved) < limit:
+                    approved.append(invoice_obj)
+                elif invoice_obj.status == "pending" and len(pending) < limit:
+                    pending.append(invoice_obj)
+                elif invoice_obj.status == "rejected" and len(rejected) < limit:
+                    rejected.append(invoice_obj)
+
+                # Early exit if all buckets are full
+                if (
+                    len(approved) >= limit
+                    and len(pending) >= limit
+                    and len(rejected) >= limit
+                ):
+                    break
+
+            logger.info(
+                f"Grouped invoices - Approved: {len(approved)}, Pending: {len(pending)}, Rejected: {len(rejected)}"
+            )
+
+            return InvoicesByStatusResponse(
+                success=True,
+                approved=approved,
+                pending=pending,
+                rejected=rejected,
+                approved_count=len(approved),
+                pending_count=len(pending),
+                rejected_count=len(rejected),
+            )
+    except Exception as e:
+        logger.error(f"Error fetching all invoices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/invoices", response_model=InvoiceListResponse)
@@ -375,90 +632,8 @@ async def list_invoices(
             cursor.execute(query, params + [limit, offset])
             rows = cursor.fetchall()
 
-            # Build invoice list
-            invoices = []
-            for row in rows:
-                relative_path = row.get("RELATIVE_PATH", "")
-
-                # Use AI_DECISION if available, fallback to 'pending'
-                # Normalize to 'approved'/'rejected'/'pending' format (with -ed suffix)
-                ai_decision = row.get("AI_DECISION")
-                if not ai_decision:
-                    status_value = "pending"
-                elif ai_decision.lower() == "approve":
-                    status_value = "approved"
-                elif ai_decision.lower() == "reject":
-                    status_value = "rejected"
-                else:
-                    status_value = ai_decision.lower()
-
-                invoices.append(
-                    Invoice(
-                        id=row.get("TICKET_NUMBER", ""),
-                        ticket_number=row.get("TICKET_NUMBER", ""),
-                        status=status_value,
-                        file_url=f"@INVOICEIQ.SERVICE.TICKET_ATTACHMENTS/{relative_path}"
-                        if relative_path
-                        else "",
-                        relative_path=relative_path,
-                        vendor_name=row.get("VENDOR_NAME"),
-                        invoice_number=row.get("INVOICE_NUMBER"),
-                        invoice_date=str(row.get("INVOICE_DATE", ""))
-                        if row.get("INVOICE_DATE")
-                        else None,
-                        total_amount=str(row.get("TOTAL_AMOUNT", ""))
-                        if row.get("TOTAL_AMOUNT")
-                        else None,
-                        purchase_order_number=row.get("PURCHASE_ORDER_NUMBER"),
-                        due_date=str(row.get("DUE_DATE", ""))
-                        if row.get("DUE_DATE")
-                        else None,
-                        banking_details=row.get("BANKING_DETAILS"),
-                        freight_shipping_amount=str(
-                            row.get("FREIGHT_SHIPPING_AMOUNT", "")
-                        )
-                        if row.get("FREIGHT_SHIPPING_AMOUNT")
-                        else None,
-                        invoice_currency=row.get("INVOICE_CURRENCY"),
-                        memo_description=row.get("MEMO_DESCRIPTION"),
-                        payment_terms=row.get("PAYMENT_TERMS"),
-                        payment_type=row.get("PAYMENT_TYPE"),
-                        prepaid_flag=row.get("PREPAID_FLAG"),
-                        quantity=str(row.get("QUANTITY", ""))
-                        if row.get("QUANTITY")
-                        else None,
-                        service_end_date=str(row.get("SERVICE_END_DATE", ""))
-                        if row.get("SERVICE_END_DATE")
-                        else None,
-                        service_start_date=str(row.get("SERVICE_START_DATE", ""))
-                        if row.get("SERVICE_START_DATE")
-                        else None,
-                        shipped_to_address=row.get("SHIPPED_TO_ADDRESS"),
-                        snowflake_entity=row.get("SNOWFLAKE_ENTITY"),
-                        snowflake_tax_id=row.get("SNOWFLAKE_TAX_ID"),
-                        tax_amount=str(row.get("TAX_AMOUNT", ""))
-                        if row.get("TAX_AMOUNT")
-                        else None,
-                        unit_price=str(row.get("UNIT_PRICE", ""))
-                        if row.get("UNIT_PRICE")
-                        else None,
-                        vendor_address=row.get("VENDOR_ADDRESS"),
-                        vendor_tax_id=row.get("VENDOR_TAX_ID"),
-                        ai_reasoning=row.get("AI_REASONING"),
-                        ai_processed_at=str(row.get("AI_PROCESSED_AT", ""))
-                        if row.get("AI_PROCESSED_AT")
-                        else None,
-                        last_edited_by=row.get("LAST_EDITED_BY"),
-                        last_edited_at=str(row.get("LAST_EDITED_AT", ""))
-                        if row.get("LAST_EDITED_AT")
-                        else None,
-                        submission_id=row.get("SUBMISSION_ID"),
-                        created_at=str(row.get("CREATED_AT", "")),
-                        updated_at=str(row.get("UPDATED_AT", "")),
-                        email_from=row.get("EMAIL"),
-                        email_subject=None,
-                    )
-                )
+            # Build invoice list using helper function
+            invoices = [build_invoice_from_row(row) for row in rows]
 
             logger.info(f"Retrieved {len(invoices)} invoices (total: {total_count})")
             return InvoiceListResponse(
@@ -574,90 +749,8 @@ async def search_invoices(
             cursor.execute(query, params + [limit, offset])
             rows = cursor.fetchall()
 
-            # Build invoice list
-            invoices = []
-            for row in rows:
-                relative_path = row.get("RELATIVE_PATH", "")
-
-                # Use AI_DECISION if available, fallback to 'pending'
-                # Normalize to 'approved'/'rejected'/'pending' format (with -ed suffix)
-                ai_decision = row.get("AI_DECISION")
-                if not ai_decision:
-                    status_value = "pending"
-                elif ai_decision.lower() == "approve":
-                    status_value = "approved"
-                elif ai_decision.lower() == "reject":
-                    status_value = "rejected"
-                else:
-                    status_value = ai_decision.lower()
-
-                invoices.append(
-                    Invoice(
-                        id=row.get("TICKET_NUMBER", ""),
-                        ticket_number=row.get("TICKET_NUMBER", ""),
-                        status=status_value,
-                        file_url=f"@INVOICEIQ.SERVICE.TICKET_ATTACHMENTS/{relative_path}"
-                        if relative_path
-                        else "",
-                        relative_path=relative_path,
-                        vendor_name=row.get("VENDOR_NAME"),
-                        invoice_number=row.get("INVOICE_NUMBER"),
-                        invoice_date=str(row.get("INVOICE_DATE", ""))
-                        if row.get("INVOICE_DATE")
-                        else None,
-                        total_amount=str(row.get("TOTAL_AMOUNT", ""))
-                        if row.get("TOTAL_AMOUNT")
-                        else None,
-                        purchase_order_number=row.get("PURCHASE_ORDER_NUMBER"),
-                        due_date=str(row.get("DUE_DATE", ""))
-                        if row.get("DUE_DATE")
-                        else None,
-                        banking_details=row.get("BANKING_DETAILS"),
-                        freight_shipping_amount=str(
-                            row.get("FREIGHT_SHIPPING_AMOUNT", "")
-                        )
-                        if row.get("FREIGHT_SHIPPING_AMOUNT")
-                        else None,
-                        invoice_currency=row.get("INVOICE_CURRENCY"),
-                        memo_description=row.get("MEMO_DESCRIPTION"),
-                        payment_terms=row.get("PAYMENT_TERMS"),
-                        payment_type=row.get("PAYMENT_TYPE"),
-                        prepaid_flag=row.get("PREPAID_FLAG"),
-                        quantity=str(row.get("QUANTITY", ""))
-                        if row.get("QUANTITY")
-                        else None,
-                        service_end_date=str(row.get("SERVICE_END_DATE", ""))
-                        if row.get("SERVICE_END_DATE")
-                        else None,
-                        service_start_date=str(row.get("SERVICE_START_DATE", ""))
-                        if row.get("SERVICE_START_DATE")
-                        else None,
-                        shipped_to_address=row.get("SHIPPED_TO_ADDRESS"),
-                        snowflake_entity=row.get("SNOWFLAKE_ENTITY"),
-                        snowflake_tax_id=row.get("SNOWFLAKE_TAX_ID"),
-                        tax_amount=str(row.get("TAX_AMOUNT", ""))
-                        if row.get("TAX_AMOUNT")
-                        else None,
-                        unit_price=str(row.get("UNIT_PRICE", ""))
-                        if row.get("UNIT_PRICE")
-                        else None,
-                        vendor_address=row.get("VENDOR_ADDRESS"),
-                        vendor_tax_id=row.get("VENDOR_TAX_ID"),
-                        ai_reasoning=row.get("AI_REASONING"),
-                        ai_processed_at=str(row.get("AI_PROCESSED_AT", ""))
-                        if row.get("AI_PROCESSED_AT")
-                        else None,
-                        last_edited_by=row.get("LAST_EDITED_BY"),
-                        last_edited_at=str(row.get("LAST_EDITED_AT", ""))
-                        if row.get("LAST_EDITED_AT")
-                        else None,
-                        submission_id=row.get("SUBMISSION_ID"),
-                        created_at=str(row.get("CREATED_AT", "")),
-                        updated_at=str(row.get("UPDATED_AT", "")),
-                        email_from=row.get("EMAIL"),
-                        email_subject=None,
-                    )
-                )
+            # Build invoice list using helper function
+            invoices = [build_invoice_from_row(row) for row in rows]
 
             logger.info(
                 f"Found {len(invoices)} invoices matching search (total: {total_count})"

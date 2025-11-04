@@ -7,7 +7,7 @@ import { InvoiceFilters } from './components/InvoiceFilters';
 import { InvoiceStatistics } from './components/InvoiceStatistics';
 import { PDFViewer } from './components/PDFViewer';
 import { Toaster } from './components/ui/sonner';
-import { fetchInvoices, searchInvoices, updateInvoiceStatus } from './services/api';
+import { fetchInvoiceStats, searchInvoices, updateInvoiceStatus } from './services/api';
 import { mapInvoiceResponses } from './services/mapper';
 
 export default function App() {
@@ -32,18 +32,13 @@ export default function App() {
   useEffect(() => {
     async function loadStatistics() {
       try {
-        const [approvedResponse, pendingResponse, rejectedResponse] = await Promise.all([
-          fetchInvoices('approved', 1000, 0),
-          fetchInvoices('pending', 1000, 0),
-          fetchInvoices('rejected', 1000, 0),
-        ]);
+        // Use optimized single-query stats endpoint
+        const stats = await fetchInvoiceStats();
 
-        setApprovedCount(approvedResponse.total_count);
-        setPendingCount(pendingResponse.total_count);
-        setRejectedCount(rejectedResponse.total_count);
-        setTotalCount(
-          approvedResponse.total_count + pendingResponse.total_count + rejectedResponse.total_count
-        );
+        setApprovedCount(stats.approved);
+        setPendingCount(stats.pending);
+        setRejectedCount(stats.rejected);
+        setTotalCount(stats.total);
       } catch (error) {
         console.error('Error loading statistics:', error);
         toast.error('Failed to load invoice statistics');

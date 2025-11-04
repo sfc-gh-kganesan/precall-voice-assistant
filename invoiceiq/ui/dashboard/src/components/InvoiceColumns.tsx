@@ -1,6 +1,6 @@
 import { AlertCircle, Loader2 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
-import { fetchInvoices } from '../services/api';
+import { fetchAllInvoices } from '../services/api';
 import { mapInvoiceResponses } from '../services/mapper';
 import { Invoice, InvoiceCard } from './InvoiceCard';
 import { Alert, AlertDescription } from './ui/alert';
@@ -36,13 +36,8 @@ export function InvoiceColumns({
   const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>([]);
   const [rejectedInvoices, setRejectedInvoices] = useState<Invoice[]>([]);
 
-  const [loadingApproved, setLoadingApproved] = useState(true);
-  const [loadingPending, setLoadingPending] = useState(true);
-  const [loadingRejected, setLoadingRejected] = useState(true);
-
-  const [errorApproved, setErrorApproved] = useState<string | null>(null);
-  const [errorPending, setErrorPending] = useState<string | null>(null);
-  const [errorRejected, setErrorRejected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // No longer need to set state based on search results - we use them directly in render
   // This prevents any race conditions or state update issues
@@ -87,135 +82,60 @@ export function InvoiceColumns({
     });
   }, [optimisticUpdate, isSearchMode]);
 
-  // Fetch approved invoices
+  // Fetch all invoices in a single optimized query
   useEffect(() => {
     let isMounted = true;
 
-    async function loadApprovedInvoices() {
+    async function loadAllInvoices() {
       // Check search mode at the start - if in search mode, don't fetch
       if (isSearchMode) {
-        console.log('[FETCH APPROVED] Skipped - in search mode');
+        console.log('[FETCH ALL] Skipped - in search mode');
         return;
       }
 
       try {
         if (!silentRefresh) {
-          setLoadingApproved(true);
+          setLoading(true);
         }
-        setErrorApproved(null);
-        console.log('[FETCH APPROVED] Starting fetch...');
-        const response = await fetchInvoices('approved', 100, 0);
+        setError(null);
+        console.log('[FETCH ALL] Starting optimized fetch...');
+        
+        // Single API call to fetch all invoices grouped by status
+        const response = await fetchAllInvoices(100);
+        
         // Double-check we're still mounted AND not in search mode before updating state
         if (isMounted && !isSearchMode) {
-          console.log('[FETCH APPROVED] Setting', response.invoices.length, 'invoices');
-          setApprovedInvoices(mapInvoiceResponses(response.invoices));
+          console.log('[FETCH ALL] Setting invoices:', {
+            approved: response.approved.length,
+            pending: response.pending.length,
+            rejected: response.rejected.length,
+          });
+          
+          // Map and set all invoice lists at once
+          setApprovedInvoices(mapInvoiceResponses(response.approved));
+          setPendingInvoices(mapInvoiceResponses(response.pending));
+          setRejectedInvoices(mapInvoiceResponses(response.rejected));
         } else {
-          console.log('[FETCH APPROVED] Discarding results - unmounted or in search mode');
+          console.log('[FETCH ALL] Discarding results - unmounted or in search mode');
         }
-      } catch (error) {
+      } catch (err) {
         if (isMounted && !isSearchMode) {
-          setErrorApproved(
-            error instanceof Error ? error.message : 'Failed to load approved invoices'
-          );
+          const errorMessage = err instanceof Error ? err.message : 'Failed to load invoices';
+          console.error('[FETCH ALL] Error:', errorMessage);
+          setError(errorMessage);
         }
       } finally {
         if (isMounted && !silentRefresh && !isSearchMode) {
-          setLoadingApproved(false);
+          setLoading(false);
         }
       }
     }
 
-    loadApprovedInvoices();
+    loadAllInvoices();
     return () => {
       isMounted = false;
     };
-  }, [refreshTrigger, silentRefresh]);
-
-  // Fetch pending invoices
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadPendingInvoices() {
-      // Check search mode at the start - if in search mode, don't fetch
-      if (isSearchMode) {
-        console.log('[FETCH PENDING] Skipped - in search mode');
-        return;
-      }
-
-      try {
-        if (!silentRefresh) {
-          setLoadingPending(true);
-        }
-        setErrorPending(null);
-        console.log('[FETCH PENDING] Starting fetch...');
-        const response = await fetchInvoices('pending', 100, 0);
-        // Double-check we're still mounted AND not in search mode before updating state
-        if (isMounted && !isSearchMode) {
-          console.log('[FETCH PENDING] Setting', response.invoices.length, 'invoices');
-          setPendingInvoices(mapInvoiceResponses(response.invoices));
-        } else {
-          console.log('[FETCH PENDING] Discarding results - unmounted or in search mode');
-        }
-      } catch (error) {
-        if (isMounted && !isSearchMode) {
-          setErrorPending(
-            error instanceof Error ? error.message : 'Failed to load pending invoices'
-          );
-        }
-      } finally {
-        if (isMounted && !silentRefresh && !isSearchMode) {
-          setLoadingPending(false);
-        }
-      }
-    }
-
-    loadPendingInvoices();
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshTrigger, silentRefresh]);
-
-  // Fetch rejected invoices
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadRejectedInvoices() {
-      // Check search mode at the start - if in search mode, don't fetch
-      if (isSearchMode) {
-        console.log('[FETCH REJECTED] Skipped - in search mode');
-        return;
-      }
-
-      try {
-        setLoadingRejected(true);
-        setErrorRejected(null);
-        console.log('[FETCH REJECTED] Starting fetch...');
-        const response = await fetchInvoices('rejected', 100, 0);
-        // Double-check we're still mounted AND not in search mode before updating state
-        if (isMounted && !isSearchMode) {
-          console.log('[FETCH REJECTED] Setting', response.invoices.length, 'invoices');
-          setRejectedInvoices(mapInvoiceResponses(response.invoices));
-        } else {
-          console.log('[FETCH REJECTED] Discarding results - unmounted or in search mode');
-        }
-      } catch (error) {
-        if (isMounted && !isSearchMode) {
-          setErrorRejected(
-            error instanceof Error ? error.message : 'Failed to load rejected invoices'
-          );
-        }
-      } finally {
-        if (isMounted && !isSearchMode) {
-          setLoadingRejected(false);
-        }
-      }
-    }
-
-    loadRejectedInvoices();
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, silentRefresh, isSearchMode]);
 
   const getColumnInvoiceIds = (columnInvoices: Invoice[]) => columnInvoices.map((inv) => inv.id);
 
@@ -315,15 +235,15 @@ export function InvoiceColumns({
         />
         <CardContent>
           <div className="space-y-4 max-h-[600px] overflow-y-auto">
-            {loadingApproved && !isSearchMode ? (
+            {loading && !isSearchMode ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 <span className="ml-2 text-muted-foreground">Loading...</span>
               </div>
-            ) : errorApproved ? (
+            ) : error ? (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{errorApproved}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             ) : displayApprovedInvoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No approved invoices</p>
@@ -353,15 +273,15 @@ export function InvoiceColumns({
         />
         <CardContent>
           <div className="space-y-4 max-h-[600px] overflow-y-auto">
-            {loadingPending && !isSearchMode ? (
+            {loading && !isSearchMode ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 <span className="ml-2 text-muted-foreground">Loading...</span>
               </div>
-            ) : errorPending ? (
+            ) : error ? (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{errorPending}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             ) : displayPendingInvoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No pending invoices</p>
@@ -391,15 +311,15 @@ export function InvoiceColumns({
         />
         <CardContent>
           <div className="space-y-4 max-h-[600px] overflow-y-auto">
-            {loadingRejected && !isSearchMode ? (
+            {loading && !isSearchMode ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 <span className="ml-2 text-muted-foreground">Loading...</span>
               </div>
-            ) : errorRejected ? (
+            ) : error ? (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{errorRejected}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             ) : displayRejectedInvoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No rejected invoices</p>

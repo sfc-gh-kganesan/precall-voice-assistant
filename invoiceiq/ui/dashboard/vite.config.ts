@@ -1,9 +1,31 @@
 import path from 'path';
-import react from '@vitejs/plugin-react-swc';
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import stylexPlugin from 'unplugin-stylex/vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      babel: {
+        plugins: [
+          [
+            '@stylexjs/babel-plugin',
+            {
+              dev: process.env.NODE_ENV === 'development',
+              runtimeInjection: false,
+              genConditionalClasses: true,
+              treeshakeCompensation: true,
+              unstable_moduleResolution: {
+                type: 'commonJS',
+                rootDir: process.cwd(),
+              },
+            },
+          ],
+        ],
+      },
+    }),
+    stylexPlugin(),
+  ],
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     alias: {
@@ -47,6 +69,16 @@ export default defineConfig({
       '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  optimizeDeps: {
+    exclude: [
+      '@snowflake/stellar-components',
+      '@snowflake/stellar-charts',
+      '@snowflake/stellar-data-table',
+      '@snowflake/stellar-data-tools',
+      '@snowflake/stellar-icons',
+      '@snowflake/balto-themes',
+    ],
   },
   build: {
     target: 'esnext',

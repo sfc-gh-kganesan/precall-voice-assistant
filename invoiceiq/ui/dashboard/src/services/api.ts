@@ -56,6 +56,73 @@ export interface InvoiceListResponse {
   offset: number;
 }
 
+export interface InvoiceStatsResponse {
+  success: boolean;
+  approved: number;
+  pending: number;
+  rejected: number;
+  total: number;
+}
+
+export interface InvoicesByStatusResponse {
+  success: boolean;
+  approved: InvoiceResponse[];
+  pending: InvoiceResponse[];
+  rejected: InvoiceResponse[];
+  approved_count: number;
+  pending_count: number;
+  rejected_count: number;
+}
+
+/**
+ * Fetch invoice statistics in a single optimized query
+ * Replaces the need for 3 separate count queries
+ */
+export async function fetchInvoiceStats(): Promise<InvoiceStatsResponse> {
+  const url = `${API_BASE_URL}/invoices/stats`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching invoice stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all invoices grouped by status in a single optimized query
+ * Replaces the need for 3 separate queries
+ * @param limit Number of invoices to fetch per status (default: 100)
+ */
+export async function fetchAllInvoices(limit: number = 100): Promise<InvoicesByStatusResponse> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+  });
+
+  const url = `${API_BASE_URL}/invoices/all?${params.toString()}`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching all invoices:', error);
+    throw error;
+  }
+}
+
 /**
  * Fetch invoices from the backend
  * @param status Filter by status (approved, pending, rejected)

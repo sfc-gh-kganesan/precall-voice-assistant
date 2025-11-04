@@ -28,6 +28,74 @@ interface PDFViewerProps {
   onRefresh?: () => void;
 }
 
+// Helper function to format long text with line breaks (moved outside component)
+const formatTextWithLineBreaks = (
+  text: string | null | undefined,
+  maxWords: number = 5
+): React.ReactNode => {
+  if (!text) return 'N/A';
+
+  const words = text.toString().split(' ');
+  if (words.length <= maxWords) {
+    return text;
+  }
+
+  // Break into chunks of maxWords
+  const lines: string[] = [];
+  for (let i = 0; i < words.length; i += maxWords) {
+    lines.push(words.slice(i, i + maxWords).join(' '));
+  }
+
+  return lines.map((line, index) => (
+    <React.Fragment key={index}>
+      {line}
+      {index < lines.length - 1 && <br />}
+    </React.Fragment>
+  ));
+};
+
+// EditableField component extracted outside to prevent re-creation on every render
+interface EditableFieldProps {
+  label: string;
+  field: keyof Invoice;
+  value: any;
+  sectionId: string;
+  type?: string;
+  isEditing: boolean;
+  editedValue: any;
+  onFieldChange: (field: keyof Invoice, value: any) => void;
+}
+
+const EditableField = React.memo(({
+  label,
+  field,
+  value,
+  sectionId,
+  type = 'text',
+  isEditing,
+  editedValue,
+  onFieldChange,
+}: EditableFieldProps) => {
+  const displayValue = isEditing ? (editedValue ?? value) : value;
+
+  return (
+    <div>
+      {label && <span className="text-muted-foreground">{label}:</span>}
+      {isEditing ? (
+        <Input
+          type={type}
+          value={displayValue || ''}
+          onChange={(e) => onFieldChange(field, e.target.value)}
+          className="h-7 text-xs mt-0.5"
+          autoFocus={false}
+        />
+      ) : (
+        <p className="font-medium break-words">{formatTextWithLineBreaks(displayValue)}</p>
+      )}
+    </div>
+  );
+});
+
 export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh }: PDFViewerProps) {
   const [selectedStatus, setSelectedStatus] = useState<Invoice['status'] | ''>('');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -299,65 +367,6 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
     return `${year}-${month}-${day}`;
   };
 
-  // Helper function to format long text with line breaks
-  const formatTextWithLineBreaks = (
-    text: string | null | undefined,
-    maxWords: number = 5
-  ): React.ReactNode => {
-    if (!text) return 'N/A';
-
-    const words = text.toString().split(' ');
-    if (words.length <= maxWords) {
-      return text;
-    }
-
-    // Break into chunks of maxWords
-    const lines: string[] = [];
-    for (let i = 0; i < words.length; i += maxWords) {
-      lines.push(words.slice(i, i + maxWords).join(' '));
-    }
-
-    return lines.map((line, index) => (
-      <React.Fragment key={index}>
-        {line}
-        {index < lines.length - 1 && <br />}
-      </React.Fragment>
-    ));
-  };
-
-  // Helper component for editable fields
-  const EditableField = ({
-    label,
-    field,
-    value,
-    sectionId,
-    type = 'text',
-  }: { label: string; field: keyof Invoice; value: any; sectionId: string; type?: string }) => {
-    const isEditing = editingSection === sectionId;
-    const displayValue = isEditing ? (editedValues[field] ?? value) : value;
-
-    return (
-      <div>
-        {label && <span className="text-muted-foreground">{label}:</span>}
-        {isEditing ? (
-          <Input
-            key={`${sectionId}-${field}`}
-            type={type}
-            value={displayValue || ''}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-            className="h-7 text-xs mt-0.5"
-            autoFocus={false}
-            onKeyDown={(e) => {
-              // Prevent any default behavior that might cause focus loss
-              e.stopPropagation();
-            }}
-          />
-        ) : (
-          <p className="font-medium break-words">{formatTextWithLineBreaks(displayValue)}</p>
-        )}
-      </div>
-    );
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -512,18 +521,27 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     field="ticketNumber"
                     value={displayInvoice.ticketNumber}
                     sectionId="invoice-info"
+                    isEditing={editingSection === 'invoice-info'}
+                    editedValue={editedValues.ticketNumber}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Invoice #"
                     field="invoiceNumber"
                     value={displayInvoice.invoiceNumber}
                     sectionId="invoice-info"
+                    isEditing={editingSection === 'invoice-info'}
+                    editedValue={editedValues.invoiceNumber}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Purchase Order #"
                     field="purchaseOrderNumber"
                     value={displayInvoice.purchaseOrderNumber}
                     sectionId="invoice-info"
+                    isEditing={editingSection === 'invoice-info'}
+                    editedValue={editedValues.purchaseOrderNumber}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Invoice Date"
@@ -531,6 +549,9 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     value={formatDateWithoutTimezone(displayInvoice.invoiceDate)}
                     sectionId="invoice-info"
                     type="date"
+                    isEditing={editingSection === 'invoice-info'}
+                    editedValue={editedValues.invoiceDate}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Due Date"
@@ -538,12 +559,18 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     value={formatDateWithoutTimezone(displayInvoice.dueDate)}
                     sectionId="invoice-info"
                     type="date"
+                    isEditing={editingSection === 'invoice-info'}
+                    editedValue={editedValues.dueDate}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Currency"
                     field="invoiceCurrency"
                     value={displayInvoice.invoiceCurrency}
                     sectionId="invoice-info"
+                    isEditing={editingSection === 'invoice-info'}
+                    editedValue={editedValues.invoiceCurrency}
+                    onFieldChange={handleFieldChange}
                   />
                 </div>
               </div>
@@ -557,18 +584,27 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     field="vendorName"
                     value={displayInvoice.vendorName}
                     sectionId="vendor-info"
+                    isEditing={editingSection === 'vendor-info'}
+                    editedValue={editedValues.vendorName}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Vendor Tax ID"
                     field="vendorTaxId"
                     value={displayInvoice.vendorTaxId}
                     sectionId="vendor-info"
+                    isEditing={editingSection === 'vendor-info'}
+                    editedValue={editedValues.vendorTaxId}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Vendor Address"
                     field="vendorAddress"
                     value={displayInvoice.vendorAddress}
                     sectionId="vendor-info"
+                    isEditing={editingSection === 'vendor-info'}
+                    editedValue={editedValues.vendorAddress}
+                    onFieldChange={handleFieldChange}
                   />
                 </div>
               </div>
@@ -583,6 +619,9 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     value={displayInvoice.totalAmount}
                     sectionId="financial-details"
                     type="number"
+                    isEditing={editingSection === 'financial-details'}
+                    editedValue={editedValues.totalAmount}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Tax Amount"
@@ -590,6 +629,9 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     value={displayInvoice.taxAmount}
                     sectionId="financial-details"
                     type="number"
+                    isEditing={editingSection === 'financial-details'}
+                    editedValue={editedValues.taxAmount}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Unit Price"
@@ -597,12 +639,18 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     value={displayInvoice.unitPrice}
                     sectionId="financial-details"
                     type="number"
+                    isEditing={editingSection === 'financial-details'}
+                    editedValue={editedValues.unitPrice}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Quantity"
                     field="quantity"
                     value={displayInvoice.quantity}
                     sectionId="financial-details"
+                    isEditing={editingSection === 'financial-details'}
+                    editedValue={editedValues.quantity}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Freight/Shipping"
@@ -610,6 +658,9 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     value={displayInvoice.freightShippingAmount}
                     sectionId="financial-details"
                     type="number"
+                    isEditing={editingSection === 'financial-details'}
+                    editedValue={editedValues.freightShippingAmount}
+                    onFieldChange={handleFieldChange}
                   />
                   <div>
                     <span className="text-muted-foreground">Prepaid:</span>
@@ -627,18 +678,27 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     field="paymentTerms"
                     value={displayInvoice.paymentTerms}
                     sectionId="payment-info"
+                    isEditing={editingSection === 'payment-info'}
+                    editedValue={editedValues.paymentTerms}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Payment Type"
                     field="paymentType"
                     value={displayInvoice.paymentType}
                     sectionId="payment-info"
+                    isEditing={editingSection === 'payment-info'}
+                    editedValue={editedValues.paymentType}
+                    onFieldChange={handleFieldChange}
                   />
                   <EditableField
                     label="Banking Details"
                     field="bankingDetails"
                     value={displayInvoice.bankingDetails}
                     sectionId="payment-info"
+                    isEditing={editingSection === 'payment-info'}
+                    editedValue={editedValues.bankingDetails}
+                    onFieldChange={handleFieldChange}
                   />
                 </div>
               </div>
@@ -656,6 +716,9 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                       value={formatDateWithoutTimezone(displayInvoice.serviceStartDate)}
                       sectionId="service-shipping"
                       type="date"
+                      isEditing={editingSection === 'service-shipping'}
+                      editedValue={editedValues.serviceStartDate}
+                      onFieldChange={handleFieldChange}
                     />
                     <EditableField
                       label="Service End Date"
@@ -663,12 +726,18 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                       value={formatDateWithoutTimezone(displayInvoice.serviceEndDate)}
                       sectionId="service-shipping"
                       type="date"
+                      isEditing={editingSection === 'service-shipping'}
+                      editedValue={editedValues.serviceEndDate}
+                      onFieldChange={handleFieldChange}
                     />
                     <EditableField
                       label="Shipped To"
                       field="shippedToAddress"
                       value={displayInvoice.shippedToAddress}
                       sectionId="service-shipping"
+                      isEditing={editingSection === 'service-shipping'}
+                      editedValue={editedValues.shippedToAddress}
+                      onFieldChange={handleFieldChange}
                     />
                   </div>
                 </div>
@@ -684,12 +753,18 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                       field="snowflakeEntity"
                       value={displayInvoice.snowflakeEntity}
                       sectionId="snowflake-info"
+                      isEditing={editingSection === 'snowflake-info'}
+                      editedValue={editedValues.snowflakeEntity}
+                      onFieldChange={handleFieldChange}
                     />
                     <EditableField
                       label="Snowflake Tax ID"
                       field="snowflakeTaxId"
                       value={displayInvoice.snowflakeTaxId}
                       sectionId="snowflake-info"
+                      isEditing={editingSection === 'snowflake-info'}
+                      editedValue={editedValues.snowflakeTaxId}
+                      onFieldChange={handleFieldChange}
                     />
                   </div>
                 </div>
@@ -704,6 +779,9 @@ export function PDFViewer({ invoice, isOpen, onClose, onUpdateStatus, onRefresh 
                     field="memoDescription"
                     value={displayInvoice.memoDescription}
                     sectionId="memo"
+                    isEditing={editingSection === 'memo'}
+                    editedValue={editedValues.memoDescription}
+                    onFieldChange={handleFieldChange}
                   />
                 </div>
               )}
