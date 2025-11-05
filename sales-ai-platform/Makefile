@@ -40,7 +40,7 @@ check-env: ## Validate .env and show config
 	fi
 	@echo "📋 Validating required variables..."
 	@MISSING=""; \
-	for var in SNOW_CONNECTION COMPUTE_POOL DATABASE SCHEMA STAGE IMAGE_REPOSITORY IMAGE_NAME IMAGE_TAG SERVICE_NAME CONTAINER_NAME EXTERNAL_ACCESS_INTEGRATION; do \
+	for var in SNOW_CONNECTION COMPUTE_POOL DATABASE SCHEMA STAGE IMAGE_REPOSITORY IMAGE_NAME IMAGE_TAG SERVICE_NAME CONTAINER_NAME EXTERNAL_ACCESS_INTEGRATION ROLE; do \
 		if ! grep -q "^$$var=..*" .env 2>/dev/null; then \
 			MISSING="$$MISSING $$var"; \
 		fi; \
@@ -57,6 +57,7 @@ check-env: ## Validate .env and show config
 	@echo "  Connection:   $$SNOW_CONNECTION"
 	@echo "  Database:     $$DATABASE"
 	@echo "  Schema:       $$SCHEMA"
+	@echo "  Role:         $$ROLE"
 	@echo "  Service:      $$SERVICE_NAME"
 	@echo "  Container:    $$CONTAINER_NAME"
 	@echo "  Image:        $$IMAGE_NAME:$$IMAGE_TAG"
@@ -64,21 +65,21 @@ check-env: ## Validate .env and show config
 
 registry-login: check-env ## Login to Snowflake image registry
 	@echo "🔐 Logging into Snowflake image registry..."
-	@snow spcs image-registry login $(CONNECTION_FLAG)
+	@snow spcs image-registry login --role $$ROLE $(CONNECTION_FLAG)
 	@echo "✅ Login successful"
 
 setup-infra: check-env ## Create Snowflake resources
 	@echo "🏗️  Setting up Snowflake infrastructure..."
 	@echo "Creating database: $$DATABASE"; \
-	snow object create database name=$$DATABASE --if-not-exists $(CONNECTION_FLAG); \
+	snow object create database name=$$DATABASE --if-not-exists --role $$ROLE $(CONNECTION_FLAG); \
 	echo "Creating schema: $$SCHEMA"; \
-	snow object create schema name=$$SCHEMA --database $$DATABASE --if-not-exists $(CONNECTION_FLAG); \
+	snow object create schema name=$$SCHEMA --database $$DATABASE --if-not-exists --role $$ROLE $(CONNECTION_FLAG); \
 	echo "Creating network rules and external access integration..."; \
-	cd release && snow sql -q "!source network_rules.sql" $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA || echo "⚠️  Network rules may already exist"; \
+	cd release && snow sql -q "!source network_rules.sql" $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE || echo "⚠️  Network rules may already exist"; \
 	echo "Creating compute pool: $$COMPUTE_POOL"; \
-	snow spcs compute-pool deploy $(CONNECTION_FLAG) || echo "⚠️  Compute pool may already exist"; \
+	snow spcs compute-pool deploy $(CONNECTION_FLAG) --role $$ROLE || echo "⚠️  Compute pool may already exist"; \
 	echo "Creating image repository: $$IMAGE_REPOSITORY"; \
-	snow spcs image-repository deploy $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA || echo "⚠️  Image repository may already exist"; \
+	snow spcs image-repository deploy $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE || echo "⚠️  Image repository may already exist"; \
 	echo "✅ Infrastructure setup complete"
 
 deploy: check-env registry-login setup-infra build push deploy-service deploy-functions ## 🚀 Full deployment pipeline
@@ -97,27 +98,27 @@ deploy: check-env registry-login setup-infra build push deploy-service deploy-fu
 build: check-env ## Build Docker image
 	@echo "🐳 Building Docker image..."
 	@echo "Getting image repository URL..."; \
-	REPO_URL=$$(snow spcs image-repository url $$IMAGE_REPOSITORY $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA); \
+	REPO_URL=$$(snow spcs image-repository url $$IMAGE_REPOSITORY $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE); \
 	echo "Repository URL: $$REPO_URL"; \
 	cd release && docker build --rm --platform linux/amd64 -t $$REPO_URL/$$IMAGE_NAME:$$IMAGE_TAG ../. && \
 	echo "✅ Built: $$REPO_URL/$$IMAGE_NAME:$$IMAGE_TAG"
 
 push: check-env ## Push image to Snowflake registry
 	@echo "📤 Pushing to Snowflake image repository..."
-	@REPO_URL=$$(snow spcs image-repository url $$IMAGE_REPOSITORY $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA); \
+	@REPO_URL=$$(snow spcs image-repository url $$IMAGE_REPOSITORY $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE); \
 	echo "Pushing $$REPO_URL/$$IMAGE_NAME:$$IMAGE_TAG..."; \
 	docker push $$REPO_URL/$$IMAGE_NAME:$$IMAGE_TAG && \
 	echo "✅ Pushed successfully"
 
 deploy-service: check-env ## Deploy SPCS service
 	@echo "🚢 Deploying service to Snowflake..."
-	@REPO_URL=$$(snow spcs image-repository url $$IMAGE_REPOSITORY $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA); \
+	@REPO_URL=$$(snow spcs image-repository url $$IMAGE_REPOSITORY $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE); \
 	echo "Updating service_spec.yaml with image path..."; \
 	sed -i.bak "s|image:.*|image: $$REPO_URL/$$IMAGE_NAME:$$IMAGE_TAG|" release/service_spec.yaml && rm -f release/service_spec.yaml.bak; \
 	echo "Dropping existing service (if exists)..."; \
-	snow spcs service drop $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA 2>/dev/null || echo "⚠️  No existing service to drop"; \
+	snow spcs service drop $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE 2>/dev/null || echo "⚠️  No existing service to drop"; \
 	echo "Deploying service..."; \
-	cd release && snow spcs service deploy $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA; \
+	cd release && snow spcs service deploy $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE; \
 	echo "Waiting for service to initialize..."; \
 	sleep 5; \
 	echo "✅ Service deployed"
@@ -125,28 +126,28 @@ deploy-service: check-env ## Deploy SPCS service
 deploy-functions: check-env ## Deploy SQL functions
 	@echo "📝 Deploying Snowflake functions..."
 	@cd release && envsubst < function.sql > function.sql.tmp && \
-	snow sql -q "!source function.sql.tmp" $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA && \
+	snow sql -q "!source function.sql.tmp" $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE && \
 	rm -f function.sql.tmp; \
 	echo "✅ Functions deployed"
 
 service-status: check-env ## Check service status
 	@echo "📊 Checking service status..."
-	@snow spcs service status $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA
+	@snow spcs service status $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE
 
 service-logs: check-env ## View service logs (instance 0)
 	@echo "📋 Fetching service logs..."
-	@snow spcs service logs $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --container-name $$CONTAINER_NAME --instance-id 0
+	@snow spcs service logs $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE --container-name $$CONTAINER_NAME --instance-id 0
 
 service-url: check-env ## Show public endpoint URL
 	@echo "🌐 Service endpoints:"
 	@echo ""
-	@snow spcs service list-endpoints $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA
+	@snow spcs service list-endpoints $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE
 	@echo ""
 	@echo "Note: Copy the ingress_url from above and use https://INGRESS_URL/endpoint"
 
 service-drop: check-env ## Drop service
 	@echo "🗑️  Dropping service..."
-	@snow spcs service drop $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA
+	@snow spcs service drop $$SERVICE_NAME $(CONNECTION_FLAG) --database $$DATABASE --schema $$SCHEMA --role $$ROLE
 
 clean: ## Clean Docker images and cache
 	@echo "🧹 Cleaning up..."
