@@ -12,7 +12,6 @@ to protect sensitive customer information.
 
 from app.config import settings
 
-
 # Dev environment mapping - maps production tables to masked views
 DEV_VIEW_MAPPING = {
     "DDA_AUTHENTICATION_AGGS": "DDA_AUTHENTICATION_AGGS_MASKED_V",

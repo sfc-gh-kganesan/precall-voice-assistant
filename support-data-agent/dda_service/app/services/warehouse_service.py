@@ -5,13 +5,14 @@ This service handles all warehouse-related operations including warehouse detail
 chart data, change history, and event overlays.
 """
 
-from typing import Dict, Optional, Any, List
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
 
-from app.services.base import BaseService
 from app.queries.warehouse_queries import WarehouseViewQueries
+from app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
 

@@ -6,9 +6,11 @@ All REST API endpoints are automatically exposed as MCP tools.
 """
 
 import logging
+
 from fastmcp import FastMCP
-from app.main import app as fastapi_app
+
 from app.config import settings
+from app.main import app as fastapi_app
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

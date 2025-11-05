@@ -5,11 +5,12 @@ Simple TTL-based cache using Python dictionary.
 Phase 2 will migrate to Redis for distributed caching.
 """
 
-import time
 import hashlib
 import logging
-from typing import Optional, Any, Dict
+import time
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
 import pandas as pd
 
 from app.config import settings

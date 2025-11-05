@@ -3,8 +3,10 @@ Query endpoints for comprehensive query analysis.
 Implements all query-related operations.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query as QueryParam, status
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Query as QueryParam
 
 from app.dependencies import get_api_key
 from app.services.query_service import QueryService

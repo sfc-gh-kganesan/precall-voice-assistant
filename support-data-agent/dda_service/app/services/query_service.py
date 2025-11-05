@@ -5,11 +5,11 @@ This service handles all query-related operations including metadata retrieval,
 historical analysis, concurrent query detection, log retrieval, and more.
 """
 
-from typing import Dict, Optional, Any
 import logging
+from typing import Any, Dict, Optional
 
-from app.services.base import BaseService
 from app.queries.query_queries import QueryViewQueries
+from app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
 

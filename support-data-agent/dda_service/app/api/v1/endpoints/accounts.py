@@ -2,9 +2,10 @@
 Account API endpoints for account search, metadata, warehouses, cases, and more.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_api_key
 from app.services.account_service import AccountService

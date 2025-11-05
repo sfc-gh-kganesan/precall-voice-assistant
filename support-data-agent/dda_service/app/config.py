@@ -3,8 +3,9 @@ Application configuration using Pydantic BaseSettings.
 Loads configuration from environment variables and .env files.
 """
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):

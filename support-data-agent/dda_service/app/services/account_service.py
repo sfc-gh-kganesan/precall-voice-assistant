@@ -5,11 +5,11 @@ This service handles all account-related operations including search, metadata r
 warehouse listings, case associations, query history, and environment information.
 """
 
-from typing import Dict, Optional, Any, List
 import logging
+from typing import Any, Dict, List, Optional
 
-from app.services.base import BaseService
 from app.queries.account_queries import AccountViewQueries
+from app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
 

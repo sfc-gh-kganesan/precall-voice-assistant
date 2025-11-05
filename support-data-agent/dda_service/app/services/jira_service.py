@@ -7,22 +7,22 @@ This service handles:
 - Converting JIRA objects to Pydantic models
 """
 
-from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from jira.exceptions import JIRAError
 
-from app.services.base import BaseService
-from app.integrations.jira.client import get_jira_client, JiraClient
+from app.config import settings
+from app.integrations.jira.client import JiraClient, get_jira_client
 from app.integrations.jira.jql_builder import JQLBuilder
 from app.integrations.jira.models import (
-    JiraTicket,
     JiraSearchResponse,
+    JiraTicket,
     SimilarTicketResult,
     SimilarTicketsResponse,
 )
-from app.config import settings
+from app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
 

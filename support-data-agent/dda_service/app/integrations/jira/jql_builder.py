@@ -4,8 +4,8 @@ JQL (JIRA Query Language) query builder.
 Provides helper functions to construct JQL queries for various search scenarios.
 """
 
-from typing import Optional, List
 import logging
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 

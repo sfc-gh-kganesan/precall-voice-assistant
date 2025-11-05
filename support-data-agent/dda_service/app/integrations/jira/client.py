@@ -5,8 +5,8 @@ Provides a singleton client instance with connection pooling and error handling.
 """
 
 import logging
-from typing import List, Optional, Any
 from functools import lru_cache
+from typing import Any, List, Optional
 
 from jira import JIRA
 from jira.exceptions import JIRAError

@@ -4,11 +4,12 @@ All service classes inherit from this base.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import pandas as pd
 
-from app.core.database import get_connection_manager
 from app.core.cache import get_cache
+from app.core.database import get_connection_manager
 from app.core.table_mappings import get_table_mappings
 
 logger = logging.getLogger(__name__)

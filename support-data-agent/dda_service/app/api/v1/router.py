@@ -4,7 +4,7 @@ Main API v1 router that includes all endpoint routers.
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import queries, accounts, warehouses, tsw, cases, jira
+from app.api.v1.endpoints import accounts, cases, jira, queries, tsw, warehouses
 
 # Create API router
 api_router = APIRouter()

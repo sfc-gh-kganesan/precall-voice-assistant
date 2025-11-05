@@ -5,15 +5,16 @@ An AI agent that uses the DDA MCP server tools to help support engineers
 diagnose Snowflake customer issues. Uses Snowflake Cortex as the LLM provider.
 """
 
-import os
 import logging
+import os
+
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from openai.types import chat
 from pydantic_ai import Agent
+from pydantic_ai.mcp import MCPServerStreamableHTTP
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.mcp import MCPServerStreamableHTTP
 
 # Load environment variables
 load_dotenv()

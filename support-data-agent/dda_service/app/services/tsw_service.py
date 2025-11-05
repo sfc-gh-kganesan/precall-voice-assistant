@@ -11,19 +11,20 @@ This service handles all TSW-related operations including:
 - RBAC Analysis
 """
 
-from typing import Dict, Optional, Any
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
+
 import numpy as np
 
-from app.services.base import BaseService
-from app.queries.tsw.udf_queries import UdfQueries
-from app.queries.tsw.compilation_queries import CompilationQueries
-from app.queries.tsw.incident_queries import IncidentQueries
-from app.queries.tsw.iceberg_queries import IcebergQueries
-from app.queries.tsw.locks_queries import LocksQueries
 from app.queries.tsw.auth_queries import AuthQueries
+from app.queries.tsw.compilation_queries import CompilationQueries
+from app.queries.tsw.iceberg_queries import IcebergQueries
+from app.queries.tsw.incident_queries import IncidentQueries
+from app.queries.tsw.locks_queries import LocksQueries
 from app.queries.tsw.rbac_queries import RbacQueries
+from app.queries.tsw.udf_queries import UdfQueries
+from app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
 

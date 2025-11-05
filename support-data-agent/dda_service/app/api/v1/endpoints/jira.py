@@ -4,16 +4,17 @@ JIRA API Endpoints
 Provides REST API endpoints for JIRA ticket search operations.
 """
 
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query, Path
 import logging
+from typing import List, Optional
 
-from app.services.jira_service import JiraService
+from fastapi import APIRouter, HTTPException, Path, Query
+
 from app.integrations.jira.models import (
     JiraSearchResponse,
     JiraTicket,
     SimilarTicketsResponse,
 )
+from app.services.jira_service import JiraService
 
 logger = logging.getLogger(__name__)
 

@@ -7,12 +7,12 @@ This service handles all case-related operations including:
 - Case search and filtering
 """
 
-from typing import Dict, Any, Optional, List
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from app.services.base import BaseService
 from app.queries.case_queries import CaseQueries
+from app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
 

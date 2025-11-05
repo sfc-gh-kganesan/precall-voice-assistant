@@ -11,10 +11,11 @@ This module provides 7 TSW diagnostic endpoints:
 7. RBAC Analysis
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Dict, Any, Optional
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_api_key
 from app.services.tsw_service import TswService

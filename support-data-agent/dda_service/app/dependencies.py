@@ -3,9 +3,10 @@ Dependency injection for FastAPI endpoints.
 Provides reusable dependencies for authentication, database connections, etc.
 """
 
+from typing import Optional
+
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
-from typing import Optional
 
 from app.config import settings
 

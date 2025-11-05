@@ -4,10 +4,11 @@ Case API Endpoints
 Provides REST API endpoints for case-related operations.
 """
 
-from typing import Optional
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query
 import logging
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query
 
 from app.services.case_service import CaseService
 

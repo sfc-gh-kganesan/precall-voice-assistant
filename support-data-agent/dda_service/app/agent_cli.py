@@ -11,10 +11,10 @@ import sys
 import traceback
 
 from pydantic_ai import (
-    PartDeltaEvent,
-    PartStartEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
+    PartDeltaEvent,
+    PartStartEvent,
     TextPartDelta,
 )
 

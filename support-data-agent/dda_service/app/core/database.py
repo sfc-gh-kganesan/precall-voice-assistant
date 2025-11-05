@@ -3,10 +3,11 @@ Snowflake database connection management.
 Provides connection pooling and query execution for all database operations.
 """
 
-import snowflake.connector
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 import pandas as pd
+import snowflake.connector
 
 from app.config import settings
 
