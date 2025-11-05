@@ -38,6 +38,16 @@ DEV_VIEW_MAPPING = {
     "DDA_REL_QUERY_XP_ERROR_LOGS": "DDA_REL_QUERY_XP_ERROR_LOGS",
     "DDA_ACCOUNT_EXTENDED_PROPERTIES_HISTORY": "DDA_ACCOUNT_EXTENDED_PROPERTIES_HISTORY",
     "DDA_CASE_QUERYID_MAPPING_V": "DDA_CASE_QUERYID_MAPPING_V",
+    # New tables for Account Service (non-customer data)
+    "DDA_RELEASE_VERSION_HISTORY": "DDA_RELEASE_VERSION_HISTORY",
+    "FDTN_WAREHOUSE_METADATA": "FDTN_WAREHOUSE_METADATA",
+    "DDA_REL_WH_LOAD_QUERY_SEC_SLICE": "DDA_REL_WH_LOAD_QUERY_SEC_SLICE",
+    "FDTN_WAREHOUSE_EVENTS_LAST_30": "FDTN_WAREHOUSE_EVENTS_LAST_30",
+    "DDA_REL_SF_PS_ACCOUNT_SNFL_ACCOUNT_DEPLOYMENT_V": "DDA_REL_SF_PS_ACCOUNT_SNFL_ACCOUNT_DEPLOYMENT_V",
+    "CXE_DEPLOYMENT_MAPPING_V": "CXE_DEPLOYMENT_MAPPING_V",
+    # TSW-specific tables
+    "CXE_TABLE_ACCESS_LOGS_V_LAST_90": "CXE_TABLE_ACCESS_LOGS_V_LAST_90",
+    "dda_rel_acc_md_saml_integration_v": "dda_rel_acc_md_saml_integration_v",
 }
 
 
@@ -135,14 +145,20 @@ def get_table_mappings() -> dict:
         "FDTN_SNWFLK_ACCOUNT": get_table_name("FDTN_SNWFLK_ACCOUNT"),
         "FDTN_SALESFORCE_ACCOUNT": get_table_name("FDTN_SALESFORCE_ACCOUNT"),
         "FDTN_CASE": get_table_name("FDTN_CASE"),
+        "fdtn_case": get_table_name("FDTN_CASE"),
         # Other tables
         "AUTHENTICATION_AGGS_VIEW_OR_TABLE": get_table_name("DDA_AUTHENTICATION_AGGS"),
+        "authentication_aggs_view_or_table": get_table_name("DDA_AUTHENTICATION_AGGS"),
         "JOB_AGGS_VIEW_OR_TABLE": get_table_name("DDA_JOB_AGGS"),
+        "job_aggs_view_or_table": get_table_name("DDA_JOB_AGGS"),
         "NEW_QUERY_SET_VIEW_OR_TABLE": get_table_name("DDA_NEW_QUERY_SET"),
         "DDA_ADHOC_QUERY_STAGING_TABLE": get_table_name(
             "DDA_ADHOC_QUERY_STAGING_TABLE"
         ),
         "DDA_ACCOUNT_EXTENDED_PROPERTIES_HISTORY": get_table_name(
+            "DDA_ACCOUNT_EXTENDED_PROPERTIES_HISTORY"
+        ),
+        "dda_account_extended_properties_history": get_table_name(
             "DDA_ACCOUNT_EXTENDED_PROPERTIES_HISTORY"
         ),
     }

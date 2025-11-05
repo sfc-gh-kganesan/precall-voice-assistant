@@ -54,16 +54,21 @@ class SnowflakeConnectionManager:
                 client_session_keep_alive=True,
             )
 
-            # Explicitly activate the warehouse
-            # Even though warehouse is passed to connect(), Snowflake doesn't always activate it
+            # Explicitly activate warehouse, database, and schema context
+            # Even though these are passed to connect(), Snowflake doesn't always activate them
             try:
                 cursor = conn.cursor()
                 cursor.execute(f"USE WAREHOUSE {warehouse}")
+                cursor.execute(f"USE DATABASE {settings.SNOWFLAKE_DATABASE}")
+                cursor.execute(f"USE SCHEMA {schema}")
                 cursor.close()
-                logger.info(f"Activated warehouse: {warehouse}")
-            except Exception as wh_error:
-                logger.warning(f"Could not activate warehouse {warehouse}: {wh_error}")
-                # Continue anyway - the warehouse param in connect() might have worked
+                logger.info(
+                    f"Activated context: warehouse={warehouse}, "
+                    f"database={settings.SNOWFLAKE_DATABASE}, schema={schema}"
+                )
+            except Exception as ctx_error:
+                logger.warning(f"Could not activate context: {ctx_error}")
+                # Continue anyway - the params in connect() might have worked
 
             logger.info(
                 f"Created Snowflake connection: warehouse={warehouse}, "
