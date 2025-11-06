@@ -1,14 +1,11 @@
-name: Sales AI Platform - CI
+name: sales-ai-platform-ci
 
 on:
   push:
     branches:
       - "**"
     paths:
-      - 'sales-ai-platform/**'
-  pull_request:
-    paths:
-      - 'sales-ai-platform/**'
+      - "sales-ai-platform/**/*"
   workflow_dispatch:
 
 jobs:
@@ -31,8 +28,10 @@ jobs:
           version: "latest"
       
       - name: Install just
-        uses: extractions/setup-just@v3
-      
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Run code quality checks
         working-directory: sales-ai-platform
         run: just check
