@@ -99,17 +99,17 @@ _run-sql sql_file continue_on_error="false":
     
     # Process SQL file with envsubst
     SQL_BASENAME=$(basename "{{sql_file}}")
-    envsubst < "{{sql_file}}" > "release/${SQL_BASENAME}.processed"
+    envsubst < "{{sql_file}}" > "release/${SQL_BASENAME}.tmp"
     
     # Execute SQL with --silent to avoid leaking secrets
     if [ "{{continue_on_error}}" = "true" ]; then
-        snow sql -f "release/${SQL_BASENAME}.processed" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists. Run without --silent to see what happened.)"
+        snow sql -f "release/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists. Run without --silent to see what happened.)"
     else
-        snow sql -f "release/${SQL_BASENAME}.processed" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent
+        snow sql -f "release/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent
     fi
     
     # Cleanup
-    rm -f "release/${SQL_BASENAME}.processed"
+    rm -f "release/${SQL_BASENAME}.tmp"
 
 # 🚀 Full deployment pipeline
 deploy: check-env
@@ -123,8 +123,11 @@ deploy: check-env
     
     # Setup infrastructure
     echo "🏗️  Setting up Snowflake infrastructure..."
+    echo "Creating database schema..."
     just _run-sql release/1_database_schema.sql true
+    echo "Creating network rules..."
     just _run-sql release/2_network_rules.sql true
+    echo "Creating compute pool..."
     just _run-sql release/3_compute_pool.sql true
     
     # Build and push Docker image
@@ -204,6 +207,6 @@ clean:
     docker images | grep sales-ai-platform | awk '{print $3}' | xargs docker rmi -f 2>/dev/null || true
     find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
     find . -type f -name '*.pyc' -delete 2>/dev/null || true
-    rm -f release/*.processed 2>/dev/null || true
+    rm -f release/*.tmp 2>/dev/null || true
     echo "✅ Cleanup complete"
 
