@@ -34,6 +34,7 @@ class State(TypedDict):
 class AI_Decision_Output(BaseModel):
     ai_decision: str
     ai_reasoning: str
+    ai_extract_metadata: dict
 
 
 @dataclass

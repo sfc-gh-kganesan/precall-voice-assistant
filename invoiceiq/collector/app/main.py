@@ -61,23 +61,23 @@ async def submit_ticket(
     snowflake.insert_ticket_metadata(submission_id, ticket_number, email)
 
     if len(files) > 0:
-        # save all uploaded files in a temp directory, with filenames
-        # prefixed with submission id
+        # save all uploaded files in a temp directory
+        uploaded_files = []
         for file in files:
             filename = file.filename or "noname.bin"
-            safename = f"{submission_id}_{uuid.uuid4().hex}_{filename}"
-            abs = FILE_UPLOAD_DIR.joinpath(safename)
+            abs = FILE_UPLOAD_DIR.joinpath(filename)
             try:
                 with abs.open("wb") as out_file:
                     shutil.copyfileobj(file.file, out_file)
             finally:
                 await file.close()
+            uploaded_files.append(filename)
 
         # run snowflake PUT command to store all of these files
         # in the stage
-        results = snowflake.stage_put_files(FILE_UPLOAD_DIR, f"{submission_id}_*")
-        for r in results:
-            snowflake.insert_file_metadata(submission_id, r, ticket_number)
+        snowflake.stage_put_files(FILE_UPLOAD_DIR, "*")
+        for filename in uploaded_files:
+            snowflake.insert_file_metadata(filename, filename, ticket_number)
 
     return SubmitTicketResponse(
         submission_id=submission_id,
