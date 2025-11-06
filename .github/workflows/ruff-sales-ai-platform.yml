@@ -1,0 +1,34 @@
+name: Ruff - Sales AI Platform
+
+on:
+  pull_request:
+    paths:
+      - 'sales-ai-platform/**'
+
+jobs:
+  ruff-check:
+    runs-on: ubuntu-latest
+    name: Code Quality Check
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check import sorting
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: './sales-ai-platform'
+          args: 'check --select I --diff'
+      
+      - name: Run linter
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: './sales-ai-platform'
+          args: 'check --diff'
+      
+      - name: Check formatting
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: './sales-ai-platform'
+          args: 'format --check --diff'
+
