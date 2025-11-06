@@ -701,13 +701,7 @@ def generate_fake_cases(n: int, start_case_number: int = 1000) -> str:
         subject_escaped = subject.replace("'", "''")
         description_escaped = description.replace("'", "''")
         closed_value = closed_str if closed_str == "NULL" else f"'{closed_str}'"
-        case_values = (
-            f"('{case_id}', '{case_number}', '{created_str}', '{updated_str}', "
-            f"{closed_value}, "
-            f"'{modified_str}', '{status}', '{severity}', '{subject_escaped}', "
-            f"'{description_escaped}', '{account_id}', '{account_name}', "
-            f"'{topic}', '{category}', '{product}', {resolution_str})"
-        )
+        case_values = f"('{case_id}', '{case_number}', '{created_str}', '{updated_str}', {closed_value}, '{modified_str}', '{status}', '{severity}', '{subject_escaped}', '{description_escaped}', '{account_id}', '{account_name}', '{topic}', '{category}', '{product}', {resolution_str})"
 
         cases.append(case_values)
     sql = f"""INSERT INTO CASES (

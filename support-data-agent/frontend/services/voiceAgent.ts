@@ -255,7 +255,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
               }
             }
           }
-        } as any)
+        } as unknown)
 
         console.log('[Voice Agent] VAD disabled successfully for PTT mode')
       } catch (error) {
@@ -352,7 +352,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
           }
         }
       }
-    } as any) // Cast to any because we're using snake_case for server format
+    } as unknown) // Cast to unknown because we're using snake_case for server format
 
     console.log(`[Voice Agent] Continuous listening ${enabled ? 'enabled' : 'disabled'}`)
   }
@@ -385,7 +385,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
     })
 
     // User speech transcription (via transport events)
-    session.on('transport_event', (event: any) => {
+    session.on('transport_event', (event: Record<string, unknown>) => {
       // Log all transport events during development to debug issues
       if (event.type.includes('error')) {
         console.error('[Voice Agent] Transport error event:', JSON.stringify(event, null, 2))
@@ -430,15 +430,15 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
     })
 
     // History updates (for assistant messages)
-    session.on('history_added', (item: any) => {
+    session.on('history_added', (item: Record<string, unknown>) => {
       console.log('[Voice Agent] History item added:', item)
 
       // If it's an assistant message with content, add it to chat
       if (item.role === 'assistant' && item.content && Array.isArray(item.content)) {
         // Extract text content
         const textContent = item.content
-          .filter((c: any) => c.type === 'text')
-          .map((c: any) => c.text)
+          .filter((c: Record<string, unknown>) => c.type === 'text')
+          .map((c: Record<string, unknown>) => c.text as string)
           .join('')
 
         if (textContent) {
@@ -463,7 +463,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
     })
 
     // Error handling
-    session.on('error', (error: any) => {
+    session.on('error', (error: Record<string, unknown>) => {
       console.error('[Voice Agent] Session error (raw):', error)
       console.error('[Voice Agent] Session error (JSON):', JSON.stringify(error, null, 2))
 

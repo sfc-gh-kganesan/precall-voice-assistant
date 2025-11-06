@@ -35,9 +35,7 @@ def _get_session() -> Session:
 def list_databases() -> list[str]:
     session = _get_session()
     try:
-        rows = session.sql(
-            "select database_name from snowflake.account_usage.databases where deleted is null"
-        ).collect()
+        rows = session.sql("select database_name from snowflake.account_usage.databases where deleted is null").collect()
         names = [r[0] for r in rows]
         if names:
             return sorted(names)
@@ -51,9 +49,7 @@ def list_databases() -> list[str]:
             return sorted([r[1] for r in rows])
         except Exception as fallback_error:
             logger.error("Failed to list databases", error=str(fallback_error))
-            raise DataProcessingError(
-                f"Failed to list databases: {str(fallback_error)}", "list_databases"
-            ) from fallback_error
+            raise DataProcessingError(f"Failed to list databases: {str(fallback_error)}", "list_databases") from fallback_error
     return []
 
 
@@ -71,10 +67,7 @@ def list_tables(database: str, schema: str) -> list[dict[str, Any]]:
     session = _get_session()
     fully_qualified = f"{database}.{schema}"
     try:
-        rows = session.sql(
-            f"select table_name, row_count from {database}.information_schema.tables "
-            f"where table_schema = '{schema}' and table_type = 'BASE TABLE'"
-        ).collect()
+        rows = session.sql(f"select table_name, row_count from {database}.information_schema.tables where table_schema = '{schema}' and table_type = 'BASE TABLE'").collect()
         return [{"name": r[0], "rowCount": int(r[1]) if r[1] is not None else 0} for r in rows]
     except Exception:
         rows = session.sql(f"show tables in schema {fully_qualified}").collect()

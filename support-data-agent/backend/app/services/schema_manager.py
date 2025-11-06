@@ -257,16 +257,14 @@ class SchemaManager:
                             "targetField": "topic",
                             "sourceType": "generated",
                             "sourceColumns": ["SUBJECT", "DESCRIPTION"],
-                            "aiInstruction": "Classify the support ticket into topics: "
-                            "Performance & Optimization, Authentication & Access, Data Loading & Ingestion, etc.",
+                            "aiInstruction": "Classify the support ticket into topics: Performance & Optimization, Authentication & Access, Data Loading & Ingestion, etc.",
                             "generationType": "llm",
                         },
                         {
                             "targetField": "product",
                             "sourceType": "generated",
                             "sourceColumns": ["SUBJECT", "DESCRIPTION"],
-                            "aiInstruction": "Identify the Snowflake product: "
-                            "Query Performance, Data Storage, Virtual Warehouses, Snowpipe, Tasks & Streams, etc.",
+                            "aiInstruction": "Identify the Snowflake product: Query Performance, Data Storage, Virtual Warehouses, Snowpipe, Tasks & Streams, etc.",
                             "generationType": "llm",
                         },
                     ]

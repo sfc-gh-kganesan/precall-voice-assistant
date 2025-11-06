@@ -214,7 +214,7 @@ export const chatApi = {
    */
   async streamMessage(
     message: string,
-    messageHistory: any[] | null,
+    messageHistory: Array<{ role: string; content: string; timestamp: string }> | null,
     onChunk: (data: {
       role: 'user' | 'model' | 'tool_status' | 'history_update'
       timestamp: string
@@ -224,7 +224,7 @@ export const chatApi = {
       status?: 'running' | 'completed'
       messages?: string
     }) => void
-  ): Promise<any[]> {
+  ): Promise<Array<{ role: string; content: string; timestamp: string }>> {
     // Backend expects FormData with 'message' and optional 'message_history' fields
     const formData = new FormData()
     formData.append('message', message)
@@ -251,7 +251,7 @@ export const chatApi = {
 
     const decoder = new TextDecoder()
     let buffer = ''
-    let updatedHistory: any[] = []
+    let updatedHistory: Array<{ role: string; content: string; timestamp: string }> = []
 
     try {
       while (true) {

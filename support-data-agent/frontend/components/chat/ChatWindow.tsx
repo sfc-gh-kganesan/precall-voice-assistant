@@ -16,7 +16,7 @@ export function ChatWindow() {
   const voiceEnabled = useAppStore((state) => state.voiceEnabled)
 
   const [input, setInput] = useState('')
-  const [messageHistory, setMessageHistory] = useState<any[]>([])
+  const [messageHistory, setMessageHistory] = useState<Array<{ role: string; content: string; timestamp: string }>>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -56,7 +56,7 @@ export function ChatWindow() {
           })
 
           // Store the ID in a way that's accessible to subsequent chunks
-          ;(handleSend as any).currentAssistantId = assistantMessageId
+          ;(handleSend as unknown as { currentAssistantId?: string }).currentAssistantId = assistantMessageId
         } else if (data.role === 'tool_status') {
           // Handle tool execution status messages
           // Add timestamp to ID to make each tool invocation unique
@@ -74,10 +74,10 @@ export function ChatWindow() {
             })
 
             // Store the ID so we can update it when completed
-            ;(handleSend as any).currentToolId = toolMessageId
+            ;(handleSend as unknown as { currentToolId?: string }).currentToolId = toolMessageId
           } else if (data.status === 'completed') {
             // Update the existing tool status message using stored ID
-            const storedToolId = (handleSend as any).currentToolId
+            const storedToolId = (handleSend as unknown as { currentToolId?: string }).currentToolId
             if (storedToolId) {
               updateMessage(storedToolId, {
                 status: 'completed',
@@ -87,7 +87,7 @@ export function ChatWindow() {
           }
         } else if (data.role === 'model') {
           // Update the existing assistant message with accumulated content
-          const assistantId = (handleSend as any).currentAssistantId
+          const assistantId = (handleSend as unknown as { currentAssistantId?: string }).currentAssistantId
           if (assistantId) {
             updateMessage(assistantId, {
               content: data.content || '',
@@ -111,8 +111,8 @@ export function ChatWindow() {
       })
     } finally {
       // Clean up the stored IDs
-      delete (handleSend as any).currentAssistantId
-      delete (handleSend as any).currentToolId
+      delete (handleSend as unknown as { currentAssistantId?: string; currentToolId?: string }).currentAssistantId
+      delete (handleSend as unknown as { currentAssistantId?: string; currentToolId?: string }).currentToolId
     }
   }
 

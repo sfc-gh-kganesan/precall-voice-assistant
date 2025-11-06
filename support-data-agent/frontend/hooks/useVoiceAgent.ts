@@ -26,7 +26,7 @@ export function useVoiceAgent() {
   const setPushToTalk = useAppStore((state) => state.setPushToTalk)
   const toggleContinuousListening = useAppStore((state) => state.toggleContinuousListening)
   const addMessage = useAppStore((state) => state.addMessage)
-  const updateMessage = useAppStore((state) => state.updateMessage)
+  const _updateMessage = useAppStore((state) => state.updateMessage)
 
   // Check voice availability on mount
   useEffect(() => {

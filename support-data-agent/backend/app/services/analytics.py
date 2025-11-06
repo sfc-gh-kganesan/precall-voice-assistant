@@ -10,9 +10,7 @@ from . import snowflake as snowflake_service
 from .configuration import get_active_configuration
 
 
-def calculate_period_dates(
-    period: str, start_date: str | None = None, end_date: str | None = None
-) -> dict[str, datetime]:
+def calculate_period_dates(period: str, start_date: str | None = None, end_date: str | None = None) -> dict[str, datetime]:
     now = datetime.now()
 
     if period == "custom" and start_date and end_date:

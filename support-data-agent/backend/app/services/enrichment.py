@@ -120,10 +120,7 @@ class EnrichmentService:
             raise
 
     def _materialize_analytics(self, job_id: str, output_table: str, analytics_only: bool = False):
-        print(
-            f"Starting {'analytics materialization' if analytics_only else 'AI enrichment and analytics'} "
-            f"(job: {job_id})"
-        )
+        print(f"Starting {'analytics materialization' if analytics_only else 'AI enrichment and analytics'} (job: {job_id})")
         print(f"Using output table: {output_table}")
         topics_table = f"{output_table}_TOPICS"
         products_table = f"{output_table}_PRODUCTS"
@@ -219,18 +216,12 @@ class EnrichmentService:
             print("Using AI functions for topic and product extraction...")
 
             # Get all cases that need classification (no limit - process everything)
-            cases_to_classify = cases_df.filter(
-                F.col("GENERATED_TOPIC").is_null() | F.col("GENERATED_PRODUCT").is_null()
-            )
+            cases_to_classify = cases_df.filter(F.col("GENERATED_TOPIC").is_null() | F.col("GENERATED_PRODUCT").is_null())
 
             # Apply AI classification to create enriched DataFrame
-            classified_df = cases_to_classify.with_column(
-                "combined_text", F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION"))
-            ).select(
+            classified_df = cases_to_classify.with_column("combined_text", F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION"))).select(
                 F.col("CASE_ID"),
-                F.ai_classify(F.col("combined_text"), topic_categories)["labels"][0]
-                .cast(T.StringType())
-                .alias("GENERATED_TOPIC"),
+                F.ai_classify(F.col("combined_text"), topic_categories)["labels"][0].cast(T.StringType()).alias("GENERATED_TOPIC"),
                 F.ai_classify(
                     F.col("combined_text"),
                     products,
@@ -258,9 +249,7 @@ class EnrichmentService:
             print("Processing sentiment analysis...")
             sentiment_cases = cases_df.filter(F.col("GENERATED_SENTIMENT").is_null())
 
-            sentiment_df = sentiment_cases.with_column(
-                "combined_text", F.concat_ws(F.lit(" "), F.col("SUBJECT"), F.col("DESCRIPTION"))
-            ).select(
+            sentiment_df = sentiment_cases.with_column("combined_text", F.concat_ws(F.lit(" "), F.col("SUBJECT"), F.col("DESCRIPTION"))).select(
                 F.col("CASE_ID"),
                 F.call_function("SNOWFLAKE.CORTEX.SENTIMENT", F.col("combined_text")).alias("GENERATED_SENTIMENT"),
             )
@@ -354,9 +343,7 @@ class EnrichmentService:
 
             # Set default category for any products that didn't match mapping
             print("Setting default category for unmapped products...")
-            output_table_df.update(
-                {"GENERATED_PRODUCT_CATEGORY": F.lit("Unknown")}, F.col("GENERATED_PRODUCT_CATEGORY").is_null()
-            )
+            output_table_df.update({"GENERATED_PRODUCT_CATEGORY": F.lit("Unknown")}, F.col("GENERATED_PRODUCT_CATEGORY").is_null())
 
         print("Materializing PRODUCTS analytics...")
         self._materialize_products_df(output_table, products_table)

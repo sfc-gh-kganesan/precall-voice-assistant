@@ -67,9 +67,7 @@ async def generate_voice_token() -> dict[str, str]:
 
     if not openai_key or not openai_key.strip():
         logger.error("Voice token requested but OPENAI_API_KEY not configured")
-        raise HTTPException(
-            status_code=503, detail="Voice chat is not configured. Please set OPENAI_API_KEY in environment."
-        )
+        raise HTTPException(status_code=503, detail="Voice chat is not configured. Please set OPENAI_API_KEY in environment.")
 
     try:
         logger.info("Generating ephemeral token for voice session")

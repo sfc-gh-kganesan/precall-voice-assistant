@@ -9,9 +9,7 @@ from ..services.configuration import get_active_configuration
 router = APIRouter()
 
 
-def _fetch_tickets(
-    page: int, page_size: int, sort_by: str | None, sort_order: str, product: str | None = None
-) -> tuple[list[SupportTicket], int]:
+def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: str, product: str | None = None) -> tuple[list[SupportTicket], int]:
     """
     Fetch paginated tickets from the active configuration's base table.
 
@@ -98,13 +96,9 @@ def _fetch_tickets(
             id=row[0],  # CASE_ID
             case_number=row[1],  # CASE_NUMBER
             created_at=row[2].isoformat() if row[2] else "",  # CREATED_AT
-            updated_at=row[16].isoformat()
-            if row[16]
-            else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
+            updated_at=row[16].isoformat() if row[16] else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
             closed_at=row[3].isoformat() if row[3] else None,  # CLOSED_AT
-            last_modified_at=row[16].isoformat()
-            if row[16]
-            else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
+            last_modified_at=row[16].isoformat() if row[16] else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
             status=row[4] or "",  # STATUS
             severity=row[5] or "",  # CURRENT_SEVERITY
             initial_severity=None,

@@ -150,13 +150,7 @@ async def keep_recent_messages(messages: list[ModelMessage]) -> list[ModelMessag
 # Create agent first (without tools)
 agent = Agent(
     model,
-    system_prompt=(
-        "You are a helpful customer support data analyst assistant. "
-        "When users ask questions about support data, metrics, cases, or products, "
-        "you MUST call the query_cortex_analyst tool with their question. "
-        "The tool will query the database and return actual data. "
-        "Use the output of the tool to answer the user's question simply and directly."
-    ),
+    system_prompt=("You are a helpful customer support data analyst assistant. When users ask questions about support data, metrics, cases, or products, you MUST call the query_cortex_analyst tool with their question. The tool will query the database and return actual data. Use the output of the tool to answer the user's question simply and directly."),
     deps_type=str,
     retries=3,
     history_processors=[keep_recent_messages],
@@ -227,9 +221,7 @@ async def query_cortex_analyst(ctx, query: str) -> str:
                 logger.info(f"Response JSON keys: {response_json.keys()}")
 
                 # Check if this is an error response (has 'error_code' or 'code' keys with string 'message')
-                if "error_code" in response_json or (
-                    "code" in response_json and isinstance(response_json.get("message"), str)
-                ):
+                if "error_code" in response_json or ("code" in response_json and isinstance(response_json.get("message"), str)):
                     error_msg = response_json.get("message", "Unknown error")
                     error_code = response_json.get("error_code", response_json.get("code", "UNKNOWN"))
                     logger.error(f"Cortex Analyst Error [{error_code}]: {error_msg}")
@@ -237,9 +229,7 @@ async def query_cortex_analyst(ctx, query: str) -> str:
                     # Handle session expiry with retry
                     if error_code == "390112":
                         if attempt < max_retries - 1:
-                            logger.info(
-                                f"Session expired (390112). Resetting session and retrying (attempt {attempt + 1}/{max_retries})"
-                            )
+                            logger.info(f"Session expired (390112). Resetting session and retrying (attempt {attempt + 1}/{max_retries})")
                             reset_snowpark_session()
                             continue  # Retry with fresh session
                         else:
@@ -265,9 +255,7 @@ async def query_cortex_analyst(ctx, query: str) -> str:
                         logger.info(f"Content item {idx}: type={item.get('type', 'unknown')}, keys={list(item.keys())}")
 
                 # Extract SQL statement from content array
-                sql_item = next(
-                    (item for item in content if isinstance(item, dict) and item.get("type") == "sql"), None
-                )
+                sql_item = next((item for item in content if isinstance(item, dict) and item.get("type") == "sql"), None)
 
                 if sql_item and "statement" in sql_item:
                     # SQL found - execute it
@@ -296,9 +284,7 @@ async def query_cortex_analyst(ctx, query: str) -> str:
                 else:
                     # No SQL statement - check for text response
                     logger.info("No SQL statement found, checking for text response")
-                    text_item = next(
-                        (item for item in content if isinstance(item, dict) and item.get("type") == "text"), None
-                    )
+                    text_item = next((item for item in content if isinstance(item, dict) and item.get("type") == "text"), None)
                     if text_item and "text" in text_item:
                         text_response = text_item["text"]
                         logger.info(f"Cortex Analyst returned text response: {text_response[:100]}...")
@@ -380,9 +366,7 @@ async def stream_chat_response(prompt: str, message_history: list[ModelMessage] 
                 if not any(isinstance(part, ToolCallPart) for part in msg.parts):
                     filtered_history.append(msg)
 
-    logger.info(
-        f"Filtered history length: {len(filtered_history)} (from {len(message_history) if message_history else 0})"
-    )
+    logger.info(f"Filtered history length: {len(filtered_history)} (from {len(message_history) if message_history else 0})")
 
     full_content = ""
     tools_pending = 0
@@ -444,9 +428,7 @@ async def stream_chat_response(prompt: str, message_history: list[ModelMessage] 
                 text_content = event.part.content
                 if isinstance(text_content, str) and text_content:
                     full_content += text_content
-                    logger.info(
-                        f"  - extracted from part: '{text_content[:50] if len(text_content) > 50 else text_content}...'"
-                    )
+                    logger.info(f"  - extracted from part: '{text_content[:50] if len(text_content) > 50 else text_content}...'")
                     logger.info(f"ACCUMULATED CONTENT (length={len(full_content)}): '{full_content[:100]}...'")
                     yield (
                         json.dumps(
@@ -466,9 +448,7 @@ async def stream_chat_response(prompt: str, message_history: list[ModelMessage] 
                 text_content = event.delta.content_delta
                 if text_content:
                     full_content += text_content
-                    logger.info(
-                        f"  - extracted from delta: '{text_content[:50] if len(text_content) > 50 else text_content}...'"
-                    )
+                    logger.info(f"  - extracted from delta: '{text_content[:50] if len(text_content) > 50 else text_content}...'")
                     logger.info(f"ACCUMULATED CONTENT (length={len(full_content)}): '{full_content[:100]}...'")
                     yield (
                         json.dumps(
