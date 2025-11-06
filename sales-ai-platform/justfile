@@ -1,0 +1,209 @@
+# Sales AI Platform - justfile
+# Run `just` or `just help` to see available commands
+
+# Load environment variables from .env
+set dotenv-load := true
+
+# Export all variables
+set export := true
+
+# Allow passing positional arguments
+set positional-arguments := true
+
+# Default recipe (run `just` with no args)
+default: help
+
+# Show this help message
+help:
+    @echo "Sales AI Platform"
+    @echo ""
+    @just --list --unsorted
+    @echo ""
+
+# Setup development environment
+install:
+    uv sync
+
+# Start dev server with auto-reload (optionally specify port, default: 8000)
+dev port="8000": install
+    uv run uvicorn app:app --host 0.0.0.0 --port {{port}} --reload
+
+# Start production server (optionally specify port, default: 8000)
+api port="8000":
+    uv run uvicorn app:app --host 0.0.0.0 --port {{port}}
+
+# Open LangGraph Studio
+studio:
+    langgraph dev
+
+# Validate .env and show config
+check-env:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    # Check if .env file exists
+    echo "🔍 Checking environment configuration..."
+    if [ ! -f .env ]; then
+        echo "❌ .env file not found"
+        echo ""
+        echo "Create .env from template:"
+        echo "  cp .env.example .env"
+        echo ""
+        echo "Then fill in all required values."
+        exit 1
+    fi
+    
+    # Validate required environment variables
+    echo "📋 Validating required variables..."
+    MISSING=""
+    for var in SNOW_CONNECTION COMPUTE_POOL DATABASE SCHEMA STAGE IMAGE_REPOSITORY IMAGE_NAME IMAGE_TAG SERVICE_NAME CONTAINER_NAME EXTERNAL_ACCESS_INTEGRATION ROLE SNOWFLAKE_WAREHOUSE SNOWFLAKE_ACCOUNT; do
+        if ! grep -q "^$var=..*" .env 2>/dev/null; then
+            MISSING="$MISSING $var"
+        fi
+    done
+    if [ -n "$MISSING" ]; then
+        echo "❌ Missing or empty required variables:$MISSING"
+        echo ""
+        echo "Edit .env and set all required values."
+        exit 1
+    fi
+    echo "✅ Environment configuration is valid"
+    
+    # Show current configuration
+    echo ""
+    echo "Configuration:"
+    echo "  Connection:   $SNOW_CONNECTION"
+    echo "  Database:     $DATABASE"
+    echo "  Schema:       $SCHEMA"
+    echo "  Role:         $ROLE"
+    echo "  Service:      $SERVICE_NAME"
+    echo "  Container:    $CONTAINER_NAME"
+    echo "  Image:        $IMAGE_NAME:$IMAGE_TAG"
+    echo "  Compute Pool: $COMPUTE_POOL"
+
+# Private: Get connection flag for snow CLI
+_connection-flag:
+    #!/usr/bin/env bash
+    if [ "$SNOW_CONNECTION" != "default" ]; then
+        echo "--connection $SNOW_CONNECTION"
+    fi
+
+# Private: Run SQL file with envsubst and snow sql
+_run-sql sql_file continue_on_error="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+    
+    # Get repository URL and export for envsubst (needed for service.sql)
+    export REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE 2>/dev/null || echo "")
+    
+    # Process SQL file with envsubst
+    SQL_BASENAME=$(basename "{{sql_file}}")
+    envsubst < "{{sql_file}}" > "release/${SQL_BASENAME}.processed"
+    
+    # Execute SQL with --silent to avoid leaking secrets
+    if [ "{{continue_on_error}}" = "true" ]; then
+        snow sql -f "release/${SQL_BASENAME}.processed" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists. Run without --silent to see what happened.)"
+    else
+        snow sql -f "release/${SQL_BASENAME}.processed" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent
+    fi
+    
+    # Cleanup
+    rm -f "release/${SQL_BASENAME}.processed"
+
+# 🚀 Full deployment pipeline
+deploy: check-env
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+    
+    # Login to registry
+    echo "🔐 Logging into Snowflake image registry..."
+    snow spcs image-registry login --role $ROLE $CONNECTION_FLAG --silent || echo "⚠️  Registry login failed or already logged in"
+    
+    # Setup infrastructure
+    echo "🏗️  Setting up Snowflake infrastructure..."
+    just _run-sql release/1_database_schema.sql true
+    just _run-sql release/2_network_rules.sql true
+    just _run-sql release/3_compute_pool.sql true
+    
+    # Build and push Docker image
+    echo "🐳 Building Docker image..."
+    REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent)
+    echo "Building image..."
+    cd release && docker build --rm --platform linux/amd64 -t $REPO_URL/$IMAGE_NAME:$IMAGE_TAG ../. --quiet
+    cd ..
+    
+    echo "📤 Pushing to Snowflake image repository..."
+    docker push $REPO_URL/$IMAGE_NAME:$IMAGE_TAG --quiet
+    
+    # Deploy service and functions
+    echo "🚢 Deploying service to Snowflake..."
+    just _run-sql release/4_service.sql false
+    
+    echo "📝 Deploying functions..."
+    just _run-sql release/5_functions.sql false
+    
+    echo "Waiting for service to initialize..."
+    sleep 5
+    
+    echo ""
+    echo "✅ 🎉 Deployment complete!"
+    echo ""
+    echo "Next steps:"
+    echo "  just status    - Check service status"
+    echo "  just logs      - View service logs"
+    echo "  just url       - Show public endpoint URL"
+    echo ""
+
+# Check service status
+status: check-env
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📊 Checking service status..."
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service status $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE
+
+# View service logs (optionally specify instance-id, default: 0)
+logs instance="0": check-env
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📋 Fetching service logs (instance {{instance}})..."
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service logs $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --container-name $CONTAINER_NAME --instance-id {{instance}}
+
+# Show public endpoint URL
+url: check-env
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service list-endpoints $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE
+
+# Check code quality (used by CI)
+check:
+    @echo "🔍 Checking import sorting..."
+    uv run ruff check --select I
+    @echo "🔍 Checking linting..."
+    uv run ruff check
+    @echo "🔍 Checking formatting..."
+    uv run ruff format --check
+    @echo "✅ All checks passed"
+
+# Format and lint Python code (auto-fix)
+fmt:
+    uv run ruff check --select I --fix .
+    uv run ruff format .
+    uv run ruff check --fix .
+    @echo "✅ Code formatted and linted"
+
+# Clean Docker images and cache
+clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🧹 Cleaning up..."
+    docker images | grep sales-ai-platform | awk '{print $3}' | xargs docker rmi -f 2>/dev/null || true
+    find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+    find . -type f -name '*.pyc' -delete 2>/dev/null || true
+    rm -f release/*.processed 2>/dev/null || true
+    echo "✅ Cleanup complete"
+

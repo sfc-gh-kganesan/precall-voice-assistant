@@ -1,4 +1,4 @@
-name: Ruff - Sales AI Platform
+name: Sales AI Platform - CI
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
       - 'sales-ai-platform/**'
 
 jobs:
-  ruff-check:
+  check:
     runs-on: ubuntu-latest
     name: Code Quality Check
     
@@ -14,21 +14,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Check import sorting
-        uses: astral-sh/ruff-action@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          src: './sales-ai-platform'
-          args: 'check --select I --diff'
+          python-version: "3.11"
       
-      - name: Run linter
-        uses: astral-sh/ruff-action@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          src: './sales-ai-platform'
-          args: 'check --diff'
+          version: "latest"
       
-      - name: Check formatting
-        uses: astral-sh/ruff-action@v3
-        with:
-          src: './sales-ai-platform'
-          args: 'format --check --diff'
+      - name: Install just
+        uses: extractions/setup-just@v3
+      
+      - name: Run code quality checks
+        working-directory: sales-ai-platform
+        run: just check
 
