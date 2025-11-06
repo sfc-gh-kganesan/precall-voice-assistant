@@ -31,10 +31,29 @@ class State(TypedDict):
     ai_processed_at: NotRequired[str]
 
 
+class AIExtractMetadata(BaseModel):
+    """Output structure of graph specifically for AI Extract Metadata"""
+    model_config = {"extra": "forbid"} # Cortex Model requires additionalProperties to be false
+    
+    company_name: str
+    currency: str
+    invoice_date: str
+    memo_description: str
+    payment_terms: str
+    due_date: str
+    purchase_order_number: str
+    tax_amount: str
+    total_amount: str
+    vendor_name: str
+
+
 class AI_Decision_Output(BaseModel):
+    """Final output structure of graph for AI Decision"""
+    model_config = {"extra": "forbid"} # Cortex Model requires additionalProperties to be false
+    
     ai_decision: str
     ai_reasoning: str
-    ai_extract_metadata: dict
+    ai_extract_metadata: AIExtractMetadata
 
 
 @dataclass

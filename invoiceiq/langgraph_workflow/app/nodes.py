@@ -298,7 +298,7 @@ def call_model(state: State) -> State:
         response = model.model.with_structured_output(AI_Decision_Output).invoke(msg)
         logger.info(f"Model response received: {response.ai_decision}")
         
-        return {"ai_decision": response.ai_decision, "ai_reasoning": response.ai_reasoning, "ai_extract_metadata": response.ai_extract_metadata}
+        return {"ai_decision": response.ai_decision, "ai_reasoning": response.ai_reasoning, "ai_extract_metadata": response.ai_extract_metadata.model_dump()}
     except Exception as e:
         logger.error(f"Error calling model: {str(e)}")
         return {"ai_decision": "error", "ai_reasoning": f"Error: {str(e)}"}
