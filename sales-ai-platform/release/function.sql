@@ -13,7 +13,7 @@ CREATE OR REPLACE FUNCTION sales_ai_arithmetic(query VARCHAR)
   AS '/arithmetic';
 
 -- Post meeting workflow function
-CREATE OR REPLACE FUNCTION sales_ai_post_meeting(call_transcript VARCHAR)
+CREATE OR REPLACE FUNCTION sales_ai_post_meeting(activity_id VARCHAR, owner_id VARCHAR, salesforce_account_id VARCHAR)
   RETURNS VARIANT
   SERVICE=${SERVICE_NAME}
   ENDPOINT=api

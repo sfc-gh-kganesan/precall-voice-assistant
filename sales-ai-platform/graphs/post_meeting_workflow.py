@@ -10,11 +10,16 @@ from typing import TypedDict, Annotated
 from pydantic import BaseModel, Field
 from graphs.graph_utils import get_llm
 from graphs.prompts import SYSTEM_PROMPT_SFDC_EXTRACTION, HUMAN_MESSAGE_SFDC_EXTRACTION
+from utils import get_snowflake_session
 # import json
 
 # # Define State Schemas
 class OverallState(TypedDict):
+    activity_id: str
+    salesforce_account_id: str
+    owner_id: str
     call_transcript: str
+    takeaways: str
     next_steps: list[str]
     opportunity_comments: list[str]
     deal_stage: str
@@ -52,7 +57,29 @@ class OutputState(TypedDict):
     new_use_cases: list[str]
     objections: list[str]
 
+
 # Create nodes
+def extract_transcript(state: OverallState) -> OverallState:
+    """
+    Extract the call transcript from snowflake table
+    """
+
+    session = get_snowflake_session()
+    #NOTE: We are hard-coding the fully-qualified table name for now.   FROM sales.engagement360_pitch.all_engagement_details 
+    query = f"""
+    SELECT RAW_CONTENT, TAKEAWAYS 
+    FROM ai_fde.sales_ai_platform.engagement_details_test
+    WHERE activity_id = '{state['activity_id']}'
+    AND salesforce_account_id = '{state['salesforce_account_id']}'
+    AND owner_id = '{state['owner_id']}'
+    ORDER BY activity_date desc
+    LIMIT 1
+    """
+    results = session.sql(query).collect()
+    transcript = results[0]['RAW_CONTENT']
+    takeaways = results[0]['TAKEAWAYS']
+    return {"call_transcript": transcript, "takeaways": takeaways}
+
 def sfdc_assistant(state: OverallState) -> OverallState:
     """
     Extract SFDC fields from the call transcript.
@@ -97,10 +124,12 @@ def final_results(state: OverallState) -> OutputState:
             "objections": state["objections"]}
 
 builder = StateGraph(OverallState, output_schema=OutputState)
+builder.add_node("extract_transcript", extract_transcript)
 builder.add_node("sfdc_assistant", sfdc_assistant)
 builder.add_node("final_results", final_results)
 
-builder.add_edge(START, "sfdc_assistant")
+builder.add_edge(START, "extract_transcript")
+builder.add_edge("extract_transcript", "sfdc_assistant")
 builder.add_edge("sfdc_assistant", "final_results")
 builder.add_edge("final_results", END)
 

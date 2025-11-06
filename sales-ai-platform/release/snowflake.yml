@@ -29,6 +29,7 @@ entities:
     min_instances: 1
     max_instances: 1
     auto_resume: true
+    query_warehouse: <% ctx.env.SNOWFLAKE_WAREHOUSE %>
     external_access_integrations:
       - <% ctx.env.EXTERNAL_ACCESS_INTEGRATION %>
     artifacts:

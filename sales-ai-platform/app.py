@@ -36,10 +36,20 @@ load_dotenv()
 class PostMeetingRequest(BaseModel):
     """Request model for the post meeting workflow."""
     
-    call_transcript: str = Field(
+    activity_id: str = Field(
         ...,
-        description="The transcript of the call",
-        examples=["SPEAKER 1: Hello, how are you? SPEAKER 2: I'm fine, thank you."]
+        description="The activity ID of the call",
+        examples=["1234567890"]
+    )
+    owner_id: str = Field(
+        ...,
+        description="The owner ID of the call",
+        examples=["1234567890"]
+    )
+    salesforce_account_id: str = Field(
+        ...,
+        description="The Salesforce account ID of the call",
+        examples=["1234567890"]
     )
     # # TODO: Add additional context and metadata
     # additional_context: str = Field(
@@ -250,24 +260,24 @@ async def post_meeting_workflow(request: Request):
         if not inputs:
             return {"error": "No data provided"}
         
-        async def process_row(row_index: int, call_transcript: str):
-            result = await app.state.post_meeting_graph.ainvoke({"call_transcript": call_transcript})
+        async def process_row(row_index: int, activity_id: str, owner_id: str, salesforce_account_id: str):
+            result = await app.state.post_meeting_graph.ainvoke({"activity_id": activity_id, "owner_id": owner_id, "salesforce_account_id": salesforce_account_id})
             return [row_index, {"analysis": result}]
         
         if len(inputs) > 10:
-            tasks = [process_row(row[0], row[1]) for row in inputs]
+            tasks = [process_row(row[0], row[1], row[2], row[3]) for row in inputs]
             response = await asyncio.gather(*tasks)
         else:
             response = []
             for row in inputs:
-                result = await process_row(row[0], row[1])
+                result = await process_row(row[0], row[1], row[2], row[3])
                 response.append(result)
         return {"data": response}
     
     # Pydantic format
     try:
         req = PostMeetingRequest(**body)
-        result = await app.state.post_meeting_graph.ainvoke({"call_transcript": req.call_transcript})
+        result = await app.state.post_meeting_graph.ainvoke({"activity_id": req.activity_id, "owner_id": req.owner_id, "salesforce_account_id": req.salesforce_account_id})
         return PostMeetingResponse(analysis=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -384,7 +394,7 @@ async def meetings_durable_workflow(args: PostMeetingRequest):
     # however in the future this needs to go to the meta intelligence orchestrator API first
     # it will be invoked using a Snowhouse UDF. In turn it will hit the Cortex Agent which will hit /post-meeting
     result = await app.state.post_meeting_graph.ainvoke(
-        {"call_transcript": args.call_transcript}
+        {"activity_id": args.activity_id, "owner_id": args.owner_id, "salesforce_account_id": args.salesforce_account_id}
     )
     return PostMeetingResponse(analysis=result)
 

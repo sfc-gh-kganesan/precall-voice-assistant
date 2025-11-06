@@ -20,6 +20,12 @@ def unpack_function_request(data: dict) -> list[list]:
         return data["data"]
     return []
 
+def is_spcs_environment() -> bool:
+    """
+    Check if running in SPCS environment.
+    """
+    return Path("/snowflake/session/token").exists()
+
 def get_snowflake_token() -> str:
     """
     Get Snowflake authentication token.
@@ -30,9 +36,9 @@ def get_snowflake_token() -> str:
     Returns:
         OAuth token for Snowflake API authentication
     """
-    token_path = Path("/snowflake/session/token")
     
-    if token_path.exists():
+    if is_spcs_environment():
+        token_path = Path("/snowflake/session/token")
         # Running in SPCS container
         return token_path.read_text().strip()
     else:
@@ -47,15 +53,27 @@ def get_snowflake_connection():
     Get Snowflake connection.
     https://docs.snowflake.com/en/developer-guide/snowpark-container-services/additional-considerations-services-jobs#using-an-oauth-token-to-execute-sql
     """
-    return snowflake.connector.connect(
-        host = os.getenv('SNOWFLAKE_HOST'),
-        account = os.getenv('SNOWFLAKE_ACCOUNT'),
-        token = get_snowflake_token(),
-        authenticator = 'oauth'
-    )
+
+    if is_spcs_environment():
+        return snowflake.connector.connect(
+            host = os.getenv('SNOWFLAKE_HOST'),
+            account = os.getenv('SNOWFLAKE_ACCOUNT'),
+            token = get_snowflake_token(),
+            authenticator = 'oauth'
+        )
+    else:
+        return snowflake.connector.connect(
+            host = os.getenv('SNOWFLAKE_HOST'),
+            account = os.getenv('SNOWFLAKE_ACCOUNT'),
+            token = get_snowflake_token(),
+            warehouse = os.getenv('SNOWFLAKE_WAREHOUSE'),
+            authenticator = 'programmatic_access_token',
+            user = os.getenv('SNOWFLAKE_USER')
+            )
+        
 
 def get_snowflake_session() -> Session:
     """
     Get Snowflake session.
     """
-    return Session.builder.configs({"connection": get_snowflake_connection()}).create()
+    return Session.builder.configs({"connection": get_snowflake_connection()}).getOrCreate()
