@@ -1,8 +1,6 @@
 {
   "dockerfile_lines": [],
   "graphs": {
-    "arithmetic_agent": "./graphs/arithmetic_agent.py:graph",
-    "greeting_workflow": "./graphs/greeting_workflow.py:graph",
     "post_meeting_workflow": "./graphs/post_meeting_workflow.py:graph"
   },
   "env": "./.env",

@@ -157,4 +157,8 @@ clean: ## Clean Docker images and cache
 	@echo "✓ Cleanup complete"
 
 format: ## Format Python files in project
-	uv format
+	uv run ruff check --select I --fix
+	uv run ruff format
+
+lint: ## Lint Python files in project
+	uv run ruff check --fix

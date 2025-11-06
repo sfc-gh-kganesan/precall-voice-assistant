@@ -36,31 +36,9 @@ graph TD
 sales-ai-platform/
 ├── app.py                    # FastAPI + API schemas
 ├── graphs/                   # LangGraph workflows
-│   ├── greeting_workflow.py # Simple workflow + state
-│   └── arithmetic_agent.py  # LLM agent
 ├── release/                  # Snowflake deployment
-│   ├── snowflake.yml        # Resource definitions
-│   ├── service_spec.yaml    # Service config
-│   └── function.sql         # SQL functions
-└── Makefile                 # All commands
+└── Makefile                  # All commands
 ```
-
-## Workflows
-
-### Greeting (`POST /greeting`)
-```bash
-curl -X POST http://localhost:8000/greeting \
-  -d '{"name": "Alice"}'
-# → {"name": "Alice", "age": 42, "message": "Hello, Alice!..."}
-```
-
-### Arithmetic (`POST /arithmetic`)
-```bash
-curl -X POST http://localhost:8000/arithmetic \
-  -d '{"query": "What is 25 + 17?"}'
-# → {"query": "...", "answer": "42", "tool_calls_made": 1}
-```
-
 ## Commands
 
 Run `make help` to see all available commands.
@@ -103,22 +81,6 @@ SERVICE_NAME=sales_ai_service
 make deploy
 # Creates all resources
 # Deploys service & functions
-```
-
-### 4. Test in Snowflake
-```sql
--- Simple calls
-SELECT sales_ai_greeting('Alice');
-SELECT sales_ai_arithmetic('What is 25 + 17?');
-
--- Extract fields from VARIANT result
-SELECT 
-    sales_ai_greeting('Alice'):message::STRING as greeting,
-    sales_ai_greeting('Alice'):age::INT as age;
-
--- Batch processing (async for >10 rows)
-SELECT name, sales_ai_greeting(name) as result
-FROM (SELECT 'Alice' as name UNION ALL SELECT 'Bob' UNION ALL SELECT 'Charlie');
 ```
 
 ## Adding Workflows

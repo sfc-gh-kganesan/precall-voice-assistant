@@ -1,9 +1,8 @@
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
-# from graphs.arithmetic_agent import graph as arithmetic_graph
-# from graphs.greeting_workflow import graph as greeting_graph
 from graphs.post_meeting_workflow import graph as post_meeting_graph
 
 # Load environment variables from .env file
@@ -14,16 +13,8 @@ PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Disable LangSmith tracing if misconfigured
-# os.environ.pop("LANGCHAIN_TRACING_V2", None)
-# os.environ.pop("LANGCHAIN_ENDPOINT", None)
-
 
 def main() -> None:
-    # prompt = "what is 43+2?" if len(sys.argv) == 1 else " ".join(sys.argv[1:])
-    # result = arithmetic_graph.invoke({"messages": [HumanMessage(content=prompt)]})
-    # print(result)
-
     prompt = """
 Date: October 22, 2025
 Duration: 27 minutes
