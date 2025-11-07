@@ -17,7 +17,7 @@ from dbos import DBOS, DBOSConfig, Queue
 
 # from datetime import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 # from typing import Literal, Optional
@@ -47,36 +47,12 @@ class PostMeetingRequest(BaseModel):
         description="The Salesforce account ID of the call",
         examples=["1234567890"],
     )
-    # # TODO: Add additional context and metadata
-    # additional_context: str = Field(
-    #     default="",
-    #     description="Additional context for the meeting regarding the account and opportunity"
-    # )
-    # metadata: dict[str, str] = Field(
-    #     default={},
-    #     description="Metadata for the call transcript"
-    # )
 
 
 class PostMeetingResponse(BaseModel):
     """Response model for the post meeting workflow."""
 
-    # id: str = Field(
-    #     description="A unique ID for this request"
-    # )
-    # status: Literal["pending", "error", "completed"] = Field(
-    #     description="The status of the request"
-    # )
-    # error_message: str = Field(
-    #     description="The error message if the status is 'error'"
-    # )
     analysis: dict = Field(description="The analysis of the meeting")
-    # created_at: datetime = Field(
-    #     description="The timestamp of the request creation"
-    # )
-    # updated_at: datetime = Field(
-    #     description="The timestamp of the request update"
-    # )
 
 
 class GreetingRequest(BaseModel):
@@ -110,16 +86,13 @@ DESCRIPTION = """
 
 A collection of AI-powered workflows built with LangGraph.
 
-### Available Workflows
+### API Versioning
 
-* **Post Meeting Workflow** - Workflow that analyzes a call transcript and extracts relevant information
+This API uses URL path versioning (e.g., `/v1/`, `/v2/`). All endpoints are versioned
+except for health checks and root endpoints. When breaking changes are introduced,
+a new version will be released while maintaining backward compatibility for older versions.
 
-### Features
-
-* 🚀 Fast and async
-* 📝 Automatic OpenAPI documentation
-* 🔒 Type-safe with Pydantic
-* 🧩 Modular graph architecture
+Current API version: **v1**
 """
 
 config: DBOSConfig = {
@@ -159,42 +132,57 @@ app = FastAPI(
     docs_url="/docs",
 )
 
+# Create v1 API router
+v1_router = APIRouter(prefix="/v1", tags=["v1"])
+
 
 # ============================================================================
 # Health & Info Endpoints
 # ============================================================================
 
 
-@app.get("/", tags=["System"], summary="index")
+@app.get("/", tags=["System"], summary="Root endpoint")
 async def index():
-    return {"message": "Hello, World!"}
+    """Root endpoint with API information."""
+    return {
+        "message": "Sales AI Platform API",
+        "version": VERSION,
+        "api_version": "v1",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
+@app.get("/health", tags=["System"], summary="Health check")
+async def health():
+    """Health check endpoint for monitoring and load balancers."""
+    return {"status": "healthy", "version": VERSION, "api_version": "v1"}
+
+
+@app.get(
+    "/healthz",
+    tags=["System"],
+    summary="Kubernetes health check",
+    include_in_schema=False,
+)
+async def healthz():
+    """Kubernetes-style health check endpoint (hidden from docs)."""
+    return {"status": "ok"}
 
 
 # ============================================================================
-# Post-Meeting Workflow Endpoint
+# Meeting Analysis RPC
 # ============================================================================
 
-# @app.post("/post-meeting")
-# async def post_meeting_workflow(request: Request):
-#     """
-#     Analyze a call transcript and extract relevant information.
-#     """
-#     body = await request.json()
-#     req = PostMeetingRequest(**body)
-#     result = await app.state.post_meeting_graph.ainvoke({"call_transcript": req.call_transcript, "additional_context": req.additional_context, "metadata": req.metadata})
-#     return PostMeetingResponse(id=result["id"], status=result["status"], error_message=result["error_message"], analysis=result["analysis"], created_at=result["created_at"], updated_at=result["updated_at"])
 
-
-@app.post("/post-meeting")
-async def post_meeting_workflow(request: Request):
+@v1_router.post("/meetings/analyze", summary="Analyze meeting transcript")
+async def meetings_analyze(request: Request):
     """
     Analyze a call transcript and extract relevant information.
 
     Handles both:
     - Pydantic format: {"call_transcript": "..."} → PostMeetingResponse
     - Snowflake batch: {"data": [[0, "call_transcript1"], ...]} → {"data": [[0, result], ...]}
-
-    **Note:** Requires OPENAI_API_KEY environment variable.
     """
     body = await request.json()
 
@@ -290,7 +278,7 @@ class MeetingsJobsRequest(BaseModel):
     )
 
 
-@app.post("/v1/meetings/jobs")
+@v1_router.post("/meetings/jobs", summary="Submit meeting analysis jobs")
 async def meetings_jobs(request: MeetingsJobsRequest):
     # TODO: handle deduplication and partitioning based on some request identifier
     result_data = []
@@ -311,11 +299,19 @@ async def meetings_jobs(request: MeetingsJobsRequest):
     return {"data": result_data}
 
 
-@app.get("/v1/meetings/jobs/{workflow_id}")
+@v1_router.get("/meetings/jobs/{workflow_id}", summary="Get meeting job status")
 async def meetings_job_status(workflow_id: str):
+    """Get the status of a meeting analysis job by workflow ID."""
     handle = await DBOS.retrieve_workflow_async(workflow_id)
     status = await handle.get_status()
     return status
+
+
+# ============================================================================
+# Register API Router
+# ============================================================================
+
+app.include_router(v1_router)
 
 
 # ============================================================================

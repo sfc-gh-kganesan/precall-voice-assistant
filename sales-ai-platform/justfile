@@ -56,7 +56,7 @@ check-env:
     # Validate required environment variables
     echo "📋 Validating required variables..."
     MISSING=""
-    for var in SNOW_CONNECTION COMPUTE_POOL DATABASE SCHEMA STAGE IMAGE_REPOSITORY IMAGE_NAME IMAGE_TAG SERVICE_NAME CONTAINER_NAME EXTERNAL_ACCESS_INTEGRATION ROLE SNOWFLAKE_WAREHOUSE SNOWFLAKE_ACCOUNT; do
+    for var in SNOW_CONNECTION COMPUTE_POOL DATABASE SCHEMA STAGE IMAGE_REPOSITORY IMAGE_NAME IMAGE_TAG SERVICE_NAME CONTAINER_NAME EXTERNAL_ACCESS_INTEGRATION ROLE USAGE_ROLES SNOWFLAKE_WAREHOUSE SNOWFLAKE_ACCOUNT; do
         if ! grep -q "^$var=..*" .env 2>/dev/null; then
             MISSING="$MISSING $var"
         fi
@@ -76,6 +76,7 @@ check-env:
     echo "  Database:     $DATABASE"
     echo "  Schema:       $SCHEMA"
     echo "  Role:         $ROLE"
+    echo "  Usage Roles:  $USAGE_ROLES"
     echo "  Service:      $SERVICE_NAME"
     echo "  Container:    $CONTAINER_NAME"
     echo "  Image:        $IMAGE_NAME:$IMAGE_TAG"
