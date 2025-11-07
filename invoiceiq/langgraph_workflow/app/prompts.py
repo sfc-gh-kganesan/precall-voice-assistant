@@ -20,15 +20,16 @@ Follow the following business rules when evaluating the invoice:
 """
 
 AI_EXTRACT_PROMPT = {
-    'snowflake_entity': 'Who is the company or Snowflake entity on the invoice being billed for goods or services.',
-    'vendor_name': 'What is the name of the vendor or supplier?',
-    'invoice_date': 'What is the date of the invoice?',
+    'classification': 'If the content contains invoice information answer with TRUE, otherwise answer with FALSE.',
+    'snowflake_entity': 'Who is the company or Snowflake entity on the invoice being billed as the customer in the invoice?',
+    'vendor_name': 'What is the name of the vendor or supplier sending the invoice and payable to?',
+    'invoice_date': 'What is the primary date of the invoice or the date the invoice was sent?',
     'total_amount': 'What is the total amount due on the invoice?',
     'tax_amount': 'What is the amount of tax on the invoice?',
     'currency': 'What is the currency of the invoice?',
     'purchase_order_number': 'What is the Purchase Order (PO) number?',
     'payment_terms': 'What are the payment terms (e.g., Net 30, Due on receipt)?',
-    'due_date': 'What is the due date of the invoice?',
+    'due_date': 'What is the due date or payment due date of the invoice?',
     'memo_description': 'Is there a memo, description, or summary of charges?',
 }
 

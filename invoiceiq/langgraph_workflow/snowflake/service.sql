@@ -1,6 +1,24 @@
 use role invoiceiq_admin;
 use invoiceiq.service;
 
+-- Parse Date UDF for unpacking AI_EXTRACT_METADATA
+CREATE OR REPLACE FUNCTION parse_date(date_string STRING)
+  RETURNS DATE
+  LANGUAGE PYTHON
+  PACKAGES = ('python-dateutil')
+  RUNTIME_VERSION = '3.12'
+  HANDLER = 'parse_date'
+AS $$
+from dateutil import parser
+from datetime import date
+def parse_date(date_string):
+    try:
+        date_object = parser.parse(date_string).date()
+        return date_object
+    except ValueError:
+        return None 
+$$;
+
 drop service if exists INVOICE_PROCESSING_SERVICE;
 
 CREATE SERVICE INVOICE_PROCESSING_SERVICE

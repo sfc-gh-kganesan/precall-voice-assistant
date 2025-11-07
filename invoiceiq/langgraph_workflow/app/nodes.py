@@ -158,7 +158,7 @@ def run_ai_extract(state: State) -> State:
 
         if rows and len(rows) > 0:
             # AI_EXTRACT returns a single row, so extract the first row
-            data = json.loads(rows[0].get("INVOICE_METADATA")).get('response')
+            data = json.loads(rows[0].get("INVOICE_METADATA"))
 
             return {"ai_extract_metadata": data}
         else:

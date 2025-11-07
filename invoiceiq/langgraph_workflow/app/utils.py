@@ -12,6 +12,9 @@ from langgraph.runtime import get_runtime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+DATABASE_NAME = "INVOICEIQ"
+SCHEMA_NAME = "SERVICE"
+
 CLASS_OPTIONS = ["invoice", "not an invoice"] # TODO - Make ENUM
 FRESH_OR_RERUN_OPTIONS = ["fresh", "rerun"] # TODO - Make ENUM
 
@@ -128,6 +131,8 @@ def get_persistent_connection() -> connection:
                 "account": os.getenv("SNOWFLAKE_ACCOUNT"),
                 "token": get_spcs_container_token(),
                 "authenticator": "oauth",
+                "database": DATABASE_NAME,
+                "schema": SCHEMA_NAME,
             }
 
         else:
@@ -136,6 +141,8 @@ def get_persistent_connection() -> connection:
                 "user": os.getenv("SNOWFLAKE_USER"),
                 "password": os.getenv("SNOWFLAKE_PAT"),
                 "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+                "database": DATABASE_NAME,
+                "schema": SCHEMA_NAME,
             }
 
         connection = connect(

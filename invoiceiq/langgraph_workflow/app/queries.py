@@ -8,57 +8,75 @@ CLASSIFY_QUERY = """with input_text as (
 
 GET_AI_EXTRACT_METADATA_QUERY = """SELECT 
             invoice_id
-            ,banking_details
             ,due_date
-            ,freight_shipping_amount
             ,invoice_currency
             ,invoice_date
-            ,invoice_number
             ,memo_description
             ,payment_terms
-            ,payment_type
-            ,prepaid_flag
             ,purchase_order_number
-            ,quantity
-            ,service_end_date
-            ,service_start_date
-            ,shipped_to_address
             ,snowflake_entity
-            ,snowflake_tax_id
             ,tax_amount
             ,total_amount
-            ,unit_price
-            ,vendor_address
             ,vendor_name
-            ,vendor_tax_id
         FROM identifier(%(target_table)s) WHERE INVOICE_ID = %(invoice_id)s LIMIT 1"""
 
-RUN_AI_EXTRACT_QUERY = """SELECT AI_EXTRACT(
-            file => TO_FILE(%(stage_name)s, %(relative_path)s),
-            responseFormat => PARSE_JSON(%(ai_extract_prompt)s)
-            ) AS INVOICE_METADATA"""
+RUN_AI_EXTRACT_QUERY = """with ai_extract_result as (
+SELECT AI_EXTRACT(
+  file => TO_FILE(%(stage_name)s, %(relative_path)s),
+  responseFormat => PARSE_JSON(%(ai_extract_prompt)s)
+) as invoice_metadata)
+SELECT 
+    OBJECT_CONSTRUCT(*) as invoice_metadata
+    FROM (
+        SELECT
+        invoice_metadata:response:snowflake_entity::STRING AS "snowflake_entity",
+        invoice_metadata:response:vendor_name::STRING AS "vendor_name",
+        PARSE_DATE(invoice_metadata:response:invoice_date::STRING) AS "invoice_date",
+        ROUND(REGEXP_REPLACE(invoice_metadata:response:total_amount, '[^0-9]', '')::INT /100::DECIMAL(38,2), 2) AS "total_amount",
+        ROUND(REGEXP_REPLACE(invoice_metadata:response:tax_amount, '[^0-9]', '')::INT /100::DECIMAL(38,2), 2) AS "tax_amount",
+        invoice_metadata:response:currency::STRING AS "invoice_currency",
+        'PO-' || REGEXP_REPLACE(invoice_metadata:response:purchase_order_number::STRING, '[^0-9]', '') AS "purchase_order_number",
+        invoice_metadata:response:payment_terms::STRING AS "payment_terms",
+        CASE
+            -- 1. Try to use the due_date field directly
+            WHEN PARSE_DATE(invoice_metadata:response:due_date::STRING) IS NOT NULL
+                THEN PARSE_DATE(invoice_metadata:response:due_date::STRING)
+
+            -- 2. Calculate due_date based on invoice_date and payment_terms
+            WHEN PARSE_DATE(invoice_metadata:response:invoice_date::STRING) IS NOT NULL
+                AND invoice_metadata:response:payment_terms::STRING IS NOT NULL
+                THEN
+                    CASE
+                        WHEN LOWER(invoice_metadata:response:payment_terms::STRING) = 'net 30'
+                            THEN DATEADD(DAY, 30, PARSE_DATE(invoice_metadata:response:invoice_date::STRING))
+                        WHEN LOWER(invoice_metadata:response:payment_terms::STRING) = 'net 60'
+                            THEN DATEADD(DAY, 60, PARSE_DATE(invoice_metadata:response:invoice_date::STRING))
+                        WHEN LOWER(invoice_metadata:response:payment_terms::STRING) = 'net 45'
+                            THEN DATEADD(DAY, 45, PARSE_DATE(invoice_metadata:response:invoice_date::STRING))
+                        WHEN LOWER(invoice_metadata:response:payment_terms::STRING) in ('due upon receipt', 'immediate')
+                            THEN PARSE_DATE(invoice_metadata:response:invoice_date::STRING)
+                        ELSE NULL
+                    END
+            ELSE NULL
+        END AS "due_date",
+        invoice_metadata:response:memo_description::STRING AS "memo_description"
+FROM ai_extract_result
+)"""
 
 RECORD_METADATA_QUERY = """
             MERGE INTO identifier(%(target_table)s) AS target
             USING (
                 SELECT 
                     %(invoice_id)s as invoice_id,
-                    case
-                        when lower(extracted_data:payment_terms::string) = 'net 30'
-                        then dateadd(day, 30, try_to_date(extracted_data:invoice_date::string, 'mm/dd/yyyy'))
-                        else try_to_date(nullif(extracted_data:due_date::string, 'none'))
-                    end as due_date,
-                    case
-                        when extracted_data:currency::string = 'us currency' then 'usd'
-                        else left(extracted_data:currency::string, 10)
-                    end as invoice_currency,
-                    try_to_date(extracted_data:invoice_date::string, 'mm/dd/yyyy') as invoice_date,
+                    PARSE_DATE(extracted_data:due_date::string) as due_date,
+                    extracted_data:invoice_currency as invoice_currency,
+                    PARSE_DATE(extracted_data:invoice_date::string) as invoice_date,
                     extracted_data:memo_description::varchar as memo_description,
                     extracted_data:payment_terms::varchar as payment_terms,
                     extracted_data:purchase_order_number::varchar as purchase_order_number,
                     extracted_data:snowflake_entity::varchar as snowflake_entity,
-                    try_cast(nullif(extracted_data:tax_amount::string, 'none') as number(38, 2)) as tax_amount,
-                    try_cast(replace(extracted_data:total_amount::string, ',', '') as number(38, 2)) as total_amount,
+                    extracted_data:tax_amount::decimal(38,2) as tax_amount,
+                    extracted_data:total_amount::decimal(38,2) as total_amount,
                     extracted_data:vendor_name::varchar as vendor_name,
                     fm.ticket_number as ticket_number,
                     fm.relative_path as relative_path
