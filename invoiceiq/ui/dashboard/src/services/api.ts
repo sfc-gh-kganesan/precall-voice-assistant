@@ -1,354 +1,205 @@
 // API service for InvoiceIQ backend
+// This file now re-exports from the new react-query hooks and types
+// Kept for backward compatibility
 
-// Use /api prefix to route through our Express proxy server
-// The proxy server handles internal SPCS communication to the backend
-const API_BASE_URL = '/api';
+// Re-export types
+export type {
+    InvoiceResponse,
+    InvoiceListResponse,
+    InvoiceStatsResponse,
+    InvoicesByStatusResponse,
+    UpdateStatusRequest,
+    UpdateStatusResponse,
+    UpdateFieldsResponse,
+    ReprocessInvoiceResponse,
+} from "./types";
 
-export interface InvoiceResponse {
-  id: string;
-  ticket_number: string;
-  status: 'approved' | 'pending' | 'rejected';
-  relative_path: string | null;
-  file_url: string;
-  // Invoice fields
-  vendor_name: string | null;
-  invoice_number: string | null;
-  invoice_date: string | null;
-  total_amount: string | null;
-  purchase_order_number: string | null;
-  due_date: string | null;
-  banking_details: string | null;
-  freight_shipping_amount: string | null;
-  invoice_currency: string | null;
-  memo_description: string | null;
-  payment_terms: string | null;
-  payment_type: string | null;
-  prepaid_flag: boolean | null;
-  quantity: string | null;
-  service_end_date: string | null;
-  service_start_date: string | null;
-  shipped_to_address: string | null;
-  snowflake_entity: string | null;
-  snowflake_tax_id: string | null;
-  tax_amount: string | null;
-  unit_price: string | null;
-  vendor_address: string | null;
-  vendor_tax_id: string | null;
-  // AI fields
-  ai_reasoning: string | null;
-  ai_processed_at: string | null;
-  // Edit tracking
-  last_edited_by: string | null;
-  last_edited_at: string | null;
-  // Metadata
-  submission_id: string | null;
-  created_at: string;
-  updated_at: string;
-  email_from: string | null;
-  email_subject: string | null;
-}
+// Re-export utility functions
+export { getViewPdfUrl, getDownloadPdfUrl, downloadPdf } from "./hooks";
 
-export interface InvoiceListResponse {
-  success: boolean;
-  invoices: InvoiceResponse[];
-  total_count: number;
-  limit: number;
-  offset: number;
-}
+// For backward compatibility, export legacy functions that use the hooks internally
+// These should be migrated to use the hooks directly in components
+import {
+    InvoiceStatsResponse,
+    InvoicesByStatusResponse,
+    InvoiceListResponse,
+    UpdateStatusResponse,
+    UpdateFieldsResponse,
+    ReprocessInvoiceResponse,
+} from "./types";
 
-export interface InvoiceStatsResponse {
-  success: boolean;
-  approved: number;
-  pending: number;
-  rejected: number;
-  total: number;
-}
-
-export interface InvoicesByStatusResponse {
-  success: boolean;
-  approved: InvoiceResponse[];
-  pending: InvoiceResponse[];
-  rejected: InvoiceResponse[];
-  approved_count: number;
-  pending_count: number;
-  rejected_count: number;
-}
+const API_BASE_URL = "/api";
 
 /**
- * Fetch invoice statistics in a single optimized query
- * Replaces the need for 3 separate count queries
+ * @deprecated Use useInvoiceStats hook instead
  */
 export async function fetchInvoiceStats(): Promise<InvoiceStatsResponse> {
-  const url = `${API_BASE_URL}/invoices/stats`;
-
-  try {
+    const url = `${API_BASE_URL}/invoices/stats`;
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching invoice stats:', error);
-    throw error;
-  }
+    return response.json();
 }
 
 /**
- * Fetch all invoices grouped by status in a single optimized query
- * Replaces the need for 3 separate queries
- * @param limit Number of invoices to fetch per status (default: 100)
+ * @deprecated Use useAllInvoices hook instead
  */
-export async function fetchAllInvoices(limit: number = 100): Promise<InvoicesByStatusResponse> {
-  const params = new URLSearchParams({
-    limit: limit.toString(),
-  });
+export async function fetchAllInvoices(
+    limit: number = 100,
+): Promise<InvoicesByStatusResponse> {
+    const params = new URLSearchParams({
+        limit: limit.toString(),
+    });
 
-  const url = `${API_BASE_URL}/invoices/all?${params.toString()}`;
-
-  try {
+    const url = `${API_BASE_URL}/invoices/all?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching all invoices:', error);
-    throw error;
-  }
+    return response.json();
 }
 
 /**
- * Fetch invoices from the backend
- * @param status Filter by status (approved, pending, rejected)
- * @param limit Number of invoices to fetch
- * @param offset Pagination offset
+ * @deprecated Use useInvoices hook instead
  */
 export async function fetchInvoices(
-  status?: string,
-  limit: number = 100,
-  offset: number = 0
+    status?: string,
+    limit: number = 100,
+    offset: number = 0,
 ): Promise<InvoiceListResponse> {
-  const params = new URLSearchParams({
-    limit: limit.toString(),
-    offset: offset.toString(),
-  });
+    const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString(),
+    });
 
-  if (status) {
-    params.append('status', status);
-  }
+    if (status) {
+        params.append("status", status);
+    }
 
-  const url = `${API_BASE_URL}/invoices?${params.toString()}`;
-
-  try {
+    const url = `${API_BASE_URL}/invoices?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching invoices:', error);
-    throw error;
-  }
+    return response.json();
 }
 
 /**
- * Search invoices by Lift Ticket # or Purchase Order #
- * @param searchBy Field to search: 'liftTicket' or 'purchaseOrder'
- * @param searchTerm Search term (exact match, case-insensitive)
- * @param limit Number of invoices to fetch
- * @param offset Pagination offset
+ * @deprecated Use useSearchInvoices hook instead
  */
 export async function searchInvoices(
-  searchBy: 'liftTicket' | 'purchaseOrder',
-  searchTerm: string,
-  limit: number = 1000,
-  offset: number = 0
+    searchBy: "liftTicket" | "purchaseOrder",
+    searchTerm: string,
+    limit: number = 1000,
+    offset: number = 0,
 ): Promise<InvoiceListResponse> {
-  const params = new URLSearchParams({
-    search_by: searchBy,
-    search_term: searchTerm,
-    limit: limit.toString(),
-    offset: offset.toString(),
-  });
+    const params = new URLSearchParams({
+        search_by: searchBy,
+        search_term: searchTerm,
+        limit: limit.toString(),
+        offset: offset.toString(),
+    });
 
-  const url = `${API_BASE_URL}/invoices/search?${params.toString()}`;
-
-  try {
+    const url = `${API_BASE_URL}/invoices/search?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+            errorData.detail || `HTTP error! status: ${response.status}`,
+        );
     }
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error searching invoices:', error);
-    throw error;
-  }
+    return response.json();
 }
 
 /**
- * Get the URL for viewing a PDF inline
- */
-export function getViewPdfUrl(ticketNumber: string): string {
-  return `${API_BASE_URL}/invoices/${ticketNumber}/view`;
-}
-
-/**
- * Get the URL for downloading a PDF
- */
-export function getDownloadPdfUrl(ticketNumber: string): string {
-  return `${API_BASE_URL}/invoices/${ticketNumber}/download`;
-}
-
-/**
- * Download a PDF file
- */
-export async function downloadPdf(ticketNumber: string): Promise<void> {
-  const url = getDownloadPdfUrl(ticketNumber);
-
-  try {
-    // Create a temporary anchor element to trigger download
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${ticketNumber}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } catch (error) {
-    console.error('Error downloading PDF:', error);
-    throw error;
-  }
-}
-
-export interface UpdateStatusRequest {
-  ticket_numbers: string[];
-  status: 'approved' | 'pending' | 'rejected';
-}
-
-export interface UpdateStatusResponse {
-  success: boolean;
-  updated_count: number;
-  message: string;
-}
-
-/**
- * Update the status of one or more invoices
- * @param ticketNumbers Array of ticket numbers to update
- * @param status New status (approved, pending, rejected)
+ * @deprecated Use useUpdateInvoiceStatus hook instead
  */
 export async function updateInvoiceStatus(
-  ticketNumbers: string[],
-  status: 'approved' | 'pending' | 'rejected'
+    ticketNumbers: string[],
+    status: "approved" | "pending" | "rejected",
 ): Promise<UpdateStatusResponse> {
-  const url = `${API_BASE_URL}/invoices/status`;
+    const url = `${API_BASE_URL}/invoices/status`;
 
-  const requestBody: UpdateStatusRequest = {
-    ticket_numbers: ticketNumbers,
-    status: status,
-  };
+    const requestBody = {
+        ticket_numbers: ticketNumbers,
+        status: status,
+    };
 
-  try {
     const response = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+            errorData.detail || `HTTP error! status: ${response.status}`,
+        );
     }
 
-    const data: UpdateStatusResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error updating invoice status:', error);
-    throw error;
-  }
-}
-
-export interface UpdateFieldsResponse {
-  success: boolean;
-  message: string;
+    return response.json();
 }
 
 /**
- * Update invoice fields
- * @param ticketNumber Ticket number of the invoice to update
- * @param fields Object containing the fields to update
+ * @deprecated Use useUpdateInvoiceFields hook instead
  */
 export async function updateInvoiceFields(
-  ticketNumber: string,
-  fields: Record<string, any>
+    ticketNumber: string,
+    fields: Record<string, unknown>,
 ): Promise<UpdateFieldsResponse> {
-  const url = `${API_BASE_URL}/invoices/${ticketNumber}/fields`;
+    const url = `${API_BASE_URL}/invoices/${ticketNumber}/fields`;
 
-  try {
     const response = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(fields),
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(fields),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+            errorData.detail || `HTTP error! status: ${response.status}`,
+        );
     }
 
-    const data: UpdateFieldsResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error updating invoice fields:', error);
-    throw error;
-  }
-}
-
-export interface ReprocessInvoiceResponse {
-  success: boolean;
-  message: string;
-  invoice_id: string;
+    return response.json();
 }
 
 /**
- * Trigger agent to reprocess an invoice after user edits
- * @param ticketNumber Ticket number of the invoice to reprocess
+ * @deprecated Use useReprocessInvoice hook instead
  */
-export async function reprocessInvoice(ticketNumber: string): Promise<ReprocessInvoiceResponse> {
-  const url = `${API_BASE_URL}/invoices/${ticketNumber}/reprocess`;
+export async function reprocessInvoice(
+    ticketNumber: string,
+): Promise<ReprocessInvoiceResponse> {
+    const url = `${API_BASE_URL}/invoices/${ticketNumber}/reprocess`;
 
-  try {
     const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+            errorData.detail || `HTTP error! status: ${response.status}`,
+        );
     }
 
-    const data: ReprocessInvoiceResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error reprocessing invoice:', error);
-    throw error;
-  }
+    return response.json();
 }
