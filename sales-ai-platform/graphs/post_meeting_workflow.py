@@ -91,10 +91,10 @@ def extract_transcript(state: OverallState) -> OverallState:
     """
 
     session = get_snowflake_session()
-    # NOTE: We are hard-coding the fully-qualified table name for now.   FROM sales.engagement360_pitch.all_engagement_details
+    # NOTE: We are hard-coding the fully-qualified table name for now.
     query = f"""
     SELECT RAW_CONTENT, TAKEAWAYS
-    FROM ai_fde.sales_ai_platform.engagement_details_test
+    FROM sales.engagement360_pitch.all_engagement_details
     WHERE activity_id = '{state["activity_id"]}'
     AND salesforce_account_id = '{state["salesforce_account_id"]}'
     AND owner_id = '{state["owner_id"]}'
@@ -102,6 +102,10 @@ def extract_transcript(state: OverallState) -> OverallState:
     LIMIT 1
     """
     results = session.sql(query).collect()
+
+    if not results:
+        raise ValueError(f"No transcript found for activity_id={state['activity_id']}, salesforce_account_id={state['salesforce_account_id']}, owner_id={state['owner_id']}")
+
     transcript = results[0]["RAW_CONTENT"]
     takeaways = results[0]["TAKEAWAYS"]
     return {"call_transcript": transcript, "takeaways": takeaways}
