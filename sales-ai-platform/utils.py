@@ -53,6 +53,20 @@ def get_snowflake_token() -> str:
         return token
 
 
+def get_sales_ai_metaorchestrator_api_token():
+    """
+    Get Sales AI MetaOrchestrator API token.
+    """
+    if is_spcs_environment():
+        token_path = Path("/sfmnt/sales_ai_metaorchestrator_api_token")
+        return token_path.read_text().strip()
+    else:
+        token = os.getenv("SALES_AI_METAORCHESTRATOR_API_TOKEN", "")
+        if not token:
+            print("Warning: SALES_AI_METAORCHESTRATOR_API_TOKEN not set. Sales AI MetaOrchestrator API token may fail.")
+        return token
+
+
 def get_snowflake_connection():
     """
     Get Snowflake connection.

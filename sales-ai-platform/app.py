@@ -13,17 +13,13 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from dbos import DBOS, DBOSConfig, Queue
-
-# from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-
-# from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 from graphs.post_meeting_workflow import graph as post_meeting_graph
-from utils import unpack_function_request
+from utils import get_snowflake_session, unpack_function_request
 
 load_dotenv()
 # ============================================================================
@@ -88,11 +84,6 @@ a new version will be released while maintaining backward compatibility for olde
 Current API version: **v1**
 """
 
-config: DBOSConfig = {
-    "name": "sales-ai-platform-dbos",
-    "system_database_url": os.getenv("DBOS_SYSTEM_DATABASE_URL", ""),
-}
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -100,13 +91,6 @@ async def lifespan(app: FastAPI):
     # Startup: Pre-compile graphs for better performance
     app.state.post_meeting_graph = post_meeting_graph
     print("✓ Post meeting workflow graph loaded")
-
-    # initialize dbos
-    DBOS(config=config)
-    DBOS.launch()
-    # This queue may run no more than 10 functions concurrently and may not start more than 50 functions per 30 seconds
-    app.state.post_meeting_queue = Queue("post_meeting_queue", concurrency=10, limiter={"limit": 50, "period": 30})
-    print("✓ DBOS: launched")
     print(f"🚀 {TITLE} v{VERSION} started")
 
     yield
@@ -122,6 +106,16 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
 )
+
+config: DBOSConfig = {
+    "name": "sales-ai-platform-dbos",
+    "system_database_url": os.getenv("DBOS_SYSTEM_DATABASE_URL", ""),
+}
+
+DBOS(fastapi=app, config=config)
+
+# This queue may run no more than 10 functions concurrently and may not start more than 50 functions per 30 seconds
+dbos_meetings_jobs_queue = Queue("dbos_meetings_jobs_queue", concurrency=10, limiter={"limit": 50, "period": 30})
 
 # Create v1 API router
 v1_router = APIRouter(prefix="/v1", tags=["v1"])
@@ -244,19 +238,17 @@ class MeetingsJobsRequest(BaseModel):
         ...,
         description="""
         Batch of call transcripts in Snowflake service function format.
-        Each row is a list with two elements: [row_index: int, request_payload: dict].
-        The request_payload is a JSON object matching PostMeetingRequest schema:
-        '{"call_transcript": "SPEAKER 1: ... SPEAKER 2: ..."}'
+        Each row is a list with two elements: [row_index: int, request_payload: PostMeetingRequest].
         """,
         examples=[
             [
                 [
                     0,
-                    {"call_transcript": "SPEAKER 1: Hello, how are you? SPEAKER 2: I'm fine, thank you."},
+                    {"activity_id": "", "owner_id": "", "salesforce_account_id": ""},
                 ],
                 [
                     1,
-                    {"call_transcript": "SPEAKER 1: Let's discuss the proposal. SPEAKER 2: Sounds good."},
+                    {"activity_id": "", "owner_id": "", "salesforce_account_id": ""},
                 ],
             ]
         ],
@@ -269,7 +261,7 @@ async def meetings_jobs(request: MeetingsJobsRequest):
     result_data = []
     for row in request.data:
         row_index, row_data = row[0], row[1]
-        handle = await app.state.post_meeting_queue.enqueue_async(meetings_durable_workflow, row_data)
+        handle = await dbos_meetings_jobs_queue.enqueue_async(meetings_durable_workflow, row_data)
         result_data.append(
             [
                 row_index,
@@ -288,6 +280,26 @@ async def meetings_job_status(workflow_id: str):
     handle = await DBOS.retrieve_workflow_async(workflow_id)
     status = await handle.get_status()
     return status
+
+
+# ============================================================================
+# Sales AI MetaOrchestrator API token rotation
+# ============================================================================
+
+
+@DBOS.scheduled("30 */2 * * *")  # crontab syntax to run every 2 hours and 30 minutes (at 30 minutes past every 2nd hour)
+@DBOS.workflow()
+def rotate_sales_ai_metaorchestrator_api_token():
+    DBOS.logger.info("Rotating Sales AI MetaOrchestrator API token.")
+    session = get_snowflake_session()
+    result = session.sql(f"SELECT SALES.RAVEN_DEV.GET_SALES_AI_AUTH_TOKEN('{os.getenv('METAORCHESTRATOR_AUTH_EMAIL')}'):data:access_token::VARCHAR").collect()
+    token = result[0][0] if result else None
+    if token:
+        with open("/sfmnt/sales_ai_metaorchestrator_api_token", "w") as f:
+            f.write(token)
+        DBOS.logger.info("Sales AI MetaOrchestrator API token written to file.")
+    else:
+        DBOS.logger.error("Failed to retrieve Sales AI MetaOrchestrator API token.")
 
 
 # ============================================================================
@@ -313,4 +325,5 @@ async def generic_exception_handler(request, exc):
 # ============================================================================
 
 if __name__ == "__main__":
+    DBOS.launch()
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
