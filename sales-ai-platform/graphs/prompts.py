@@ -1,5 +1,5 @@
 SYSTEM_PROMPT_SFDC_EXTRACTION = """
-You are a helpful assistant that reviews transcripts of calls between our account teams and customers. 
+You are a helpful assistant that reviews transcripts of calls between our account teams and customers.
 Your task is to extract the following Salesforce fields from a call transcript:
 - Next Steps
 - Opportunity Comments
@@ -20,8 +20,8 @@ Return your response in the following JSON format:
     "objections": ["list of objections"]
 }
 
-The dictionary must include each of those keys. 
-If a value is not found in the call transcript, return an empty list or empty string for that field. 
+The dictionary must include each of those keys.
+If a value is not found in the call transcript, return an empty list or empty string for that field.
 """
 
 HUMAN_MESSAGE_SFDC_EXTRACTION = """

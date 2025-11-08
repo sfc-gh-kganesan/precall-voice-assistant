@@ -40,7 +40,7 @@ studio:
 check-env:
     #!/usr/bin/env bash
     set -euo pipefail
-    
+
     # Check if .env file exists
     echo "🔍 Checking environment configuration..."
     if [ ! -f .env ]; then
@@ -52,7 +52,7 @@ check-env:
         echo "Then fill in all required values."
         exit 1
     fi
-    
+
     # Validate required environment variables
     echo "📋 Validating required variables..."
     MISSING=""
@@ -68,7 +68,7 @@ check-env:
         exit 1
     fi
     echo "✅ Environment configuration is valid"
-    
+
     # Show current configuration
     echo ""
     echo "Configuration:"
@@ -94,21 +94,21 @@ _run-sql sql_file continue_on_error="false":
     #!/usr/bin/env bash
     set -euo pipefail
     CONNECTION_FLAG=$(just _connection-flag)
-    
+
     # Get repository URL and export for envsubst (needed for service.sql)
     export REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE 2>/dev/null || echo "")
-    
+
     # Process SQL file with envsubst
     SQL_BASENAME=$(basename "{{sql_file}}")
     envsubst < "{{sql_file}}" > "release/${SQL_BASENAME}.tmp"
-    
+
     # Execute SQL with --silent to avoid leaking secrets
     if [ "{{continue_on_error}}" = "true" ]; then
         snow sql -f "release/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists. Run without --silent to see what happened.)"
     else
         snow sql -f "release/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent
     fi
-    
+
     # Cleanup
     rm -f "release/${SQL_BASENAME}.tmp"
 
@@ -117,11 +117,11 @@ deploy: check-env
     #!/usr/bin/env bash
     set -euo pipefail
     CONNECTION_FLAG=$(just _connection-flag)
-    
+
     # Login to registry
     echo "🔐 Logging into Snowflake image registry..."
     snow spcs image-registry login --role $ROLE $CONNECTION_FLAG --silent || echo "⚠️  Registry login failed or already logged in"
-    
+
     # Setup infrastructure
     echo "🏗️  Setting up Snowflake infrastructure..."
     echo "Creating database schema..."
@@ -130,27 +130,27 @@ deploy: check-env
     just _run-sql release/2_network_rules.sql true
     echo "Creating compute pool..."
     just _run-sql release/3_compute_pool.sql true
-    
+
     # Build and push Docker image
     echo "🐳 Building Docker image..."
     REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent)
     echo "Building image..."
     cd release && docker build --rm --platform linux/amd64 -t $REPO_URL/$IMAGE_NAME:$IMAGE_TAG ../. --quiet
     cd ..
-    
+
     echo "📤 Pushing to Snowflake image repository..."
     docker push $REPO_URL/$IMAGE_NAME:$IMAGE_TAG --quiet
-    
+
     # Deploy service and functions
     echo "🚢 Deploying service to Snowflake..."
     just _run-sql release/4_service.sql false
-    
+
     echo "📝 Deploying functions..."
     just _run-sql release/5_functions.sql false
-    
+
     echo "Waiting for service to initialize..."
     sleep 5
-    
+
     echo ""
     echo "✅ 🎉 Deployment complete!"
     echo ""
@@ -210,4 +210,3 @@ clean:
     find . -type f -name '*.pyc' -delete 2>/dev/null || true
     rm -f release/*.tmp 2>/dev/null || true
     echo "✅ Cleanup complete"
-

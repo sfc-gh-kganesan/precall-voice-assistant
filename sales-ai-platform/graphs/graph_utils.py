@@ -15,9 +15,7 @@ def get_llm():
         if os.getenv("OPENAI_API_KEY") is None:
             raise Exception("OPENAI_API_KEY is not set")
         print("get_llm: using OpenAI")
-        llm = ChatOpenAI(
-            model="gpt-4o-mini", temperature=0, max_retries=5, request_timeout=20
-        )
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, max_retries=5, request_timeout=20)
         return llm
     else:
         snowflake_host = os.getenv("SNOWFLAKE_HOST")

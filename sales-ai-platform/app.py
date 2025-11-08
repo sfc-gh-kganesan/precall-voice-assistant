@@ -10,7 +10,6 @@ Also provides Snowflake service function endpoints that handle batch requests.
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from typing import List, Optional, Tuple
 
 import uvicorn
 from dbos import DBOS, DBOSConfig, Queue
@@ -36,12 +35,8 @@ load_dotenv()
 class PostMeetingRequest(BaseModel):
     """Request model for the post meeting workflow."""
 
-    activity_id: str = Field(
-        ..., description="The activity ID of the call", examples=["1234567890"]
-    )
-    owner_id: str = Field(
-        ..., description="The owner ID of the call", examples=["1234567890"]
-    )
+    activity_id: str = Field(..., description="The activity ID of the call", examples=["1234567890"])
+    owner_id: str = Field(..., description="The owner ID of the call", examples=["1234567890"])
     salesforce_account_id: str = Field(
         ...,
         description="The Salesforce account ID of the call",
@@ -58,9 +53,7 @@ class PostMeetingResponse(BaseModel):
 class GreetingRequest(BaseModel):
     """Request model for the greeting workflow."""
 
-    name: str = Field(
-        ..., description="The name of the person to greet", examples=["Alice", "Bob"]
-    )
+    name: str = Field(..., description="The name of the person to greet", examples=["Alice", "Bob"])
 
 
 class GreetingResponse(BaseModel):
@@ -75,7 +68,7 @@ class ErrorResponse(BaseModel):
     """Error response model."""
 
     error: str = Field(description="Error message describing what went wrong")
-    detail: Optional[str] = Field(default=None, description="Additional error details")
+    detail: str | None = Field(default=None, description="Additional error details")
 
 
 # Application metadata
@@ -112,9 +105,7 @@ async def lifespan(app: FastAPI):
     DBOS(config=config)
     DBOS.launch()
     # This queue may run no more than 10 functions concurrently and may not start more than 50 functions per 30 seconds
-    app.state.post_meeting_queue = Queue(
-        "post_meeting_queue", concurrency=10, limiter={"limit": 50, "period": 30}
-    )
+    app.state.post_meeting_queue = Queue("post_meeting_queue", concurrency=10, limiter={"limit": 50, "period": 30})
     print("✓ DBOS: launched")
     print(f"🚀 {TITLE} v{VERSION} started")
 
@@ -192,9 +183,7 @@ async def meetings_analyze(request: Request):
         if not inputs:
             return {"error": "No data provided"}
 
-        async def process_row(
-            row_index: int, activity_id: str, owner_id: str, salesforce_account_id: str
-        ):
+        async def process_row(row_index: int, activity_id: str, owner_id: str, salesforce_account_id: str):
             result = await app.state.post_meeting_graph.ainvoke(
                 {
                     "activity_id": activity_id,
@@ -226,7 +215,7 @@ async def meetings_analyze(request: Request):
         )
         return PostMeetingResponse(analysis=result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ============================================================================
@@ -251,27 +240,23 @@ async def meetings_durable_workflow(args: PostMeetingRequest):
 
 
 class MeetingsJobsRequest(BaseModel):
-    data: List[Tuple[int, PostMeetingRequest]] = Field(
+    data: list[tuple[int, PostMeetingRequest]] = Field(
         ...,
         description="""
-        Batch of call transcripts in Snowflake service function format. 
-        Each row is a list with two elements: [row_index: int, request_payload: dict]. 
-        The request_payload is a JSON object matching PostMeetingRequest schema: 
+        Batch of call transcripts in Snowflake service function format.
+        Each row is a list with two elements: [row_index: int, request_payload: dict].
+        The request_payload is a JSON object matching PostMeetingRequest schema:
         '{"call_transcript": "SPEAKER 1: ... SPEAKER 2: ..."}'
         """,
         examples=[
             [
                 [
                     0,
-                    {
-                        "call_transcript": "SPEAKER 1: Hello, how are you? SPEAKER 2: I'm fine, thank you."
-                    },
+                    {"call_transcript": "SPEAKER 1: Hello, how are you? SPEAKER 2: I'm fine, thank you."},
                 ],
                 [
                     1,
-                    {
-                        "call_transcript": "SPEAKER 1: Let's discuss the proposal. SPEAKER 2: Sounds good."
-                    },
+                    {"call_transcript": "SPEAKER 1: Let's discuss the proposal. SPEAKER 2: Sounds good."},
                 ],
             ]
         ],
@@ -284,9 +269,7 @@ async def meetings_jobs(request: MeetingsJobsRequest):
     result_data = []
     for row in request.data:
         row_index, row_data = row[0], row[1]
-        handle = await app.state.post_meeting_queue.enqueue_async(
-            meetings_durable_workflow, row_data
-        )
+        handle = await app.state.post_meeting_queue.enqueue_async(meetings_durable_workflow, row_data)
         result_data.append(
             [
                 row_index,
@@ -322,9 +305,7 @@ app.include_router(v1_router)
 @app.exception_handler(Exception)
 async def generic_exception_handler(request, exc):
     """Handle unexpected exceptions gracefully."""
-    return JSONResponse(
-        status_code=500, content={"error": "Internal server error", "detail": str(exc)}
-    )
+    return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(exc)})
 
 
 # ============================================================================

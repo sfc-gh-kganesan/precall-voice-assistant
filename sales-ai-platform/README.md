@@ -25,7 +25,7 @@ graph TD
     E --> F[deploy-service<br/>SPCS Service]
     F --> G[deploy-functions<br/>SQL Functions]
     G --> H[✅ Ready!]
-    
+
     style A fill:#4CAF50,color:#fff
     style H fill:#2196F3,color:#fff
 ```

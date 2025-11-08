@@ -81,6 +81,4 @@ def get_snowflake_session() -> Session:
     """
     Get Snowflake session.
     """
-    return Session.builder.configs(
-        {"connection": get_snowflake_connection()}
-    ).getOrCreate()
+    return Session.builder.configs({"connection": get_snowflake_connection()}).getOrCreate()

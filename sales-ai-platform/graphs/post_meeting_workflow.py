@@ -46,45 +46,31 @@ class OverallState(TypedDict):
 class SFDCOutputState(BaseModel):
     next_steps: Annotated[
         list[str],
-        Field(
-            description="List of next steps. If a value is not found in the call transcript, assign an empty list"
-        ),
+        Field(description="List of next steps. If a value is not found in the call transcript, assign an empty list"),
     ]
     opportunity_comments: Annotated[
         list[str],
-        Field(
-            description="List of opportunity comments. If a value is not found in the call transcript, assign an empty list"
-        ),
+        Field(description="List of opportunity comments. If a value is not found in the call transcript, assign an empty list"),
     ]
     deal_stage: Annotated[
         str,
-        Field(
-            description="Deal stage. If a value is not found in the call transcript, assign an empty string"
-        ),
+        Field(description="Deal stage. If a value is not found in the call transcript, assign an empty string"),
     ]
     close_date: Annotated[
         str,
-        Field(
-            description="Close date (in date format YYYY-MM-DD). If a value is not found in the call transcript, assign an empty string"
-        ),
+        Field(description="Close date (in date format YYYY-MM-DD). If a value is not found in the call transcript, assign an empty string"),
     ]
     opportunity_meddpicc_status: Annotated[
         str,
-        Field(
-            description="Opportunity MEDDPICC status. If a value is not found in the call transcript, assign an empty string"
-        ),
+        Field(description="Opportunity MEDDPICC status. If a value is not found in the call transcript, assign an empty string"),
     ]
     new_use_cases: Annotated[
         list[str],
-        Field(
-            description="List of new use cases. If a value is not found in the call transcript, assign an empty list"
-        ),
+        Field(description="List of new use cases. If a value is not found in the call transcript, assign an empty list"),
     ]
     objections: Annotated[
         list[str],
-        Field(
-            description="List of objections. If a value is not found in the call transcript, assign an empty list"
-        ),
+        Field(description="List of objections. If a value is not found in the call transcript, assign an empty list"),
     ]
 
 
@@ -107,7 +93,7 @@ def extract_transcript(state: OverallState) -> OverallState:
     session = get_snowflake_session()
     # NOTE: We are hard-coding the fully-qualified table name for now.   FROM sales.engagement360_pitch.all_engagement_details
     query = f"""
-    SELECT RAW_CONTENT, TAKEAWAYS 
+    SELECT RAW_CONTENT, TAKEAWAYS
     FROM ai_fde.sales_ai_platform.engagement_details_test
     WHERE activity_id = '{state["activity_id"]}'
     AND salesforce_account_id = '{state["salesforce_account_id"]}'
@@ -127,9 +113,7 @@ def sfdc_assistant(state: OverallState) -> OverallState:
     """
     llm = get_llm()
     system_prompt = SYSTEM_PROMPT_SFDC_EXTRACTION
-    human_prompt = HUMAN_MESSAGE_SFDC_EXTRACTION.format(
-        transcript=state["call_transcript"]
-    )
+    human_prompt = HUMAN_MESSAGE_SFDC_EXTRACTION.format(transcript=state["call_transcript"])
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=human_prompt),
@@ -146,9 +130,7 @@ def sfdc_assistant(state: OverallState) -> OverallState:
 
     # response_dict = response # If using structured output with a TypedDict state
 
-    response_dict = (
-        response.model_dump()
-    )  # If using structured output with a pydantic BaseModel state
+    response_dict = response.model_dump()  # If using structured output with a pydantic BaseModel state
 
     return {
         # "messages": [response],

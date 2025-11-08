@@ -62,7 +62,7 @@ Jamie (CT): Great, thanks.
 Alex (AE): Awesome — I'll send a summary with next steps, workshop invite, and some Cortex docs. Appreciate your time today!
 
 Jamie (CT): Likewise. Looking forward to the follow-up.
-    
+
     """
     result = post_meeting_graph.invoke({"call_transcript": prompt})
     print(result)
