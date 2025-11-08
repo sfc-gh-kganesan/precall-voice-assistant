@@ -150,7 +150,11 @@ async def keep_recent_messages(messages: list[ModelMessage]) -> list[ModelMessag
 # Create agent first (without tools)
 agent = Agent(
     model,
-    system_prompt=("You are a helpful customer support data analyst assistant. When users ask questions about support data, metrics, cases, or products, you MUST call the query_cortex_analyst tool with their question. The tool will query the database and return actual data. Use the output of the tool to answer the user's question simply and directly."),
+    system_prompt=(
+        "You are a helpful customer support data analyst assistant. When users ask questions about support data, "
+        "metrics, cases, or products, you MUST call the query_cortex_analyst tool with their question. The tool will "
+        "query the database and return actual data. Use the output of the tool to answer the user's question simply and directly."
+    ),
     deps_type=str,
     retries=3,
     history_processors=[keep_recent_messages],

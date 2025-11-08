@@ -131,8 +131,8 @@ class TswService(BaseService):
         queries_with_issues = []
         for _, row in metadata_df.iterrows():
             query_id = row["QUERYID"]
-            account_id = row["ACCOUNT_ID"]
-            deployment = row["DEPLOYMENT"]
+            row["ACCOUNT_ID"]
+            row["DEPLOYMENT"]
 
             # Get duration values
             dur_params = {"queryid": query_id}

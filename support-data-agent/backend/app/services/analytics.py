@@ -451,7 +451,7 @@ def get_topic_metrics(
     topic_metrics = []
     for row in results:
         metrics_json = json.loads(str(row[2])) if isinstance(row[2], str) else row[2]
-        trend_data_json = json.loads(str(row[3])) if row[3] and isinstance(row[3], str) else row[3]
+        json.loads(str(row[3])) if row[3] and isinstance(row[3], str) else row[3]
         top_products_json = json.loads(str(row[4])) if row[4] and isinstance(row[4], str) else row[4]
 
         # Extract period-specific metrics from nested structure
@@ -470,7 +470,7 @@ def get_topic_metrics(
 
         # Extract values
         total_cases_current = _get_value(current_metrics, "totalCases", 0)
-        total_cases_previous = _get_value(previous_metrics, "totalCases", 0)
+        _get_value(previous_metrics, "totalCases", 0)
         total_cases_change = _get_change(change_metrics, "totalCases", "absolute", 0)
         total_cases_change_pct = _get_change(change_metrics, "totalCases", "percentage", 0.0)
 

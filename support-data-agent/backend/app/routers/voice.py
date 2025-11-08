@@ -106,7 +106,7 @@ async def generate_voice_token() -> dict[str, str]:
 
     except httpx.HTTPError as e:
         logger.error(f"HTTP error during token generation: {e}")
-        raise HTTPException(status_code=500, detail=f"Network error generating voice token: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Network error generating voice token: {str(e)}") from e
     except Exception as e:
         logger.error(f"Unexpected error generating token: {e}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}") from e
