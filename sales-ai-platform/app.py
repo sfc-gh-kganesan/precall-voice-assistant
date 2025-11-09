@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 import uvicorn
 from dbos import DBOS, DBOSConfig, Queue
@@ -312,7 +313,7 @@ def _rotate_token_impl():
 
 @DBOS.scheduled("30 */2 * * *")  # crontab syntax to run every 2 hours and 30 minutes (at 30 minutes past every 2nd hour)
 @DBOS.workflow()
-def rotate_sales_ai_metaorchestrator_api_token():
+def rotate_sales_ai_metaorchestrator_api_token(_scheduled_time: datetime, _actual_time: datetime):
     """Scheduled workflow to rotate the Sales AI MetaOrchestrator API token."""
     DBOS.logger.info("Rotating Sales AI MetaOrchestrator API token.")
     success = _rotate_token_impl()
