@@ -17,14 +17,19 @@ spec:
       METAORCHESTRATOR_AUTH_EMAIL: ${METAORCHESTRATOR_AUTH_EMAIL}
       DBOS_SYSTEM_DATABASE_URL: "sqlite:////sfmnt/dbos.db"
     volumeMounts:
-    - name: dbos-data
+    - name: shared-data
       mountPath: /sfmnt
   endpoints:
   - name: api
     port: 8000
     public: true
+  platformMonitor:
+    metricConfig:
+      groups:
+      - system
+      - system_limits
   volumes:
-  - name: dbos-data
+  - name: shared-data
     source: local
 $$
 AUTO_RESUME = TRUE

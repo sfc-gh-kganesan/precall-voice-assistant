@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from dbos import DBOS, DBOSConfig, Queue
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -23,46 +23,13 @@ from graphs.post_meeting_workflow import graph as post_meeting_graph
 from utils import (
     get_sales_ai_metaorchestrator_api_token,
     get_snowflake_session,
-    unpack_function_request,
 )
 
 load_dotenv()
+
 # ============================================================================
 # API Schemas
 # ============================================================================
-
-
-# Request and Response model for synchronous RPC
-class PostMeetingRequest(BaseModel):
-    """Request model for the post meeting workflow."""
-
-    activity_id: str = Field(..., description="The activity ID of the call", examples=["1234567890"])
-    owner_id: str = Field(..., description="The owner ID of the call", examples=["1234567890"])
-    salesforce_account_id: str = Field(
-        ...,
-        description="The Salesforce account ID of the call",
-        examples=["1234567890"],
-    )
-
-
-class PostMeetingResponse(BaseModel):
-    """Response model for the post meeting workflow."""
-
-    analysis: dict = Field(description="The analysis of the meeting")
-
-
-class GreetingRequest(BaseModel):
-    """Request model for the greeting workflow."""
-
-    name: str = Field(..., description="The name of the person to greet", examples=["Alice", "Bob"])
-
-
-class GreetingResponse(BaseModel):
-    """Response model for the greeting workflow."""
-
-    name: str = Field(description="The name that was greeted")
-    age: int = Field(description="The generated age")
-    message: str = Field(description="The personalized greeting message")
 
 
 class ErrorResponse(BaseModel):
@@ -77,16 +44,7 @@ VERSION = "0.1.0"
 TITLE = "Sales AI Platform API"
 DESCRIPTION = """
 ## Sales AI Platform
-
 A collection of AI-powered workflows built with LangGraph.
-
-### API Versioning
-
-This API uses URL path versioning (e.g., `/v1/`, `/v2/`). All endpoints are versioned
-except for health checks and root endpoints. When breaking changes are introduced,
-a new version will be released while maintaining backward compatibility for older versions.
-
-Current API version: **v1**
 """
 
 
@@ -153,82 +111,82 @@ async def health():
     return {"status": "healthy", "version": VERSION, "api_version": "v1"}
 
 
-@app.get(
-    "/healthz",
-    tags=["System"],
-    summary="Kubernetes health check",
-    include_in_schema=False,
-)
-async def healthz():
-    """Kubernetes-style health check endpoint (hidden from docs)."""
-    return {"status": "ok"}
-
-
 # ============================================================================
 # Meeting Analysis RPC
 # ============================================================================
 
 
+class MeetingsAnalyzeRequest(BaseModel):
+    data: list[tuple[int, str, str, str]] = Field(
+        ...,
+        description="""
+        Batch of call transcripts in Snowflake service function format.
+        Each row is a list with four elements.
+        """,
+        examples=[
+            [
+                [
+                    0,
+                    "activity_id",
+                    "owner_id",
+                    "salesforce_account_id",
+                ],
+                [
+                    1,
+                    "activity_id",
+                    "owner_id",
+                    "salesforce_account_id",
+                ],
+            ]
+        ],
+    )
+
+
+class MeetingsAnalyzeResponse(BaseModel):
+    """Response model for the post meeting workflow."""
+
+    analysis: dict = Field(description="The analysis of the meeting")
+
+
 @v1_router.post("/meetings/analyze", summary="Analyze meeting transcript")
-async def meetings_analyze(request: Request):
+async def meetings_analyze(request: MeetingsAnalyzeRequest):
     """
     Analyze a call transcript and extract relevant information.
-
-    Handles both:
-    - Pydantic format: {"call_transcript": "..."} → PostMeetingResponse
-    - Snowflake batch: {"data": [[0, "call_transcript1"], ...]} → {"data": [[0, result], ...]}
     """
-    body = await request.json()
 
-    # Check if Snowflake batch format
-    if "data" in body and isinstance(body["data"], list):
-        inputs = unpack_function_request(body)
-        if not inputs:
-            return {"error": "No data provided"}
-
-        async def process_row(row_index: int, activity_id: str, owner_id: str, salesforce_account_id: str):
-            result = await app.state.post_meeting_graph.ainvoke(
-                {
-                    "activity_id": activity_id,
-                    "owner_id": owner_id,
-                    "salesforce_account_id": salesforce_account_id,
-                }
-            )
-            return [row_index, {"analysis": result}]
-
-        if len(inputs) > 10:
-            tasks = [process_row(row[0], row[1], row[2], row[3]) for row in inputs]
-            response = await asyncio.gather(*tasks)
-        else:
-            response = []
-            for row in inputs:
-                result = await process_row(row[0], row[1], row[2], row[3])
-                response.append(result)
-        return {"data": response}
-
-    # Pydantic format
-    try:
-        req = PostMeetingRequest(**body)
+    async def process_row(row_index: int, activity_id: str, owner_id: str, salesforce_account_id: str):
         result = await app.state.post_meeting_graph.ainvoke(
             {
-                "activity_id": req.activity_id,
-                "owner_id": req.owner_id,
-                "salesforce_account_id": req.salesforce_account_id,
+                "activity_id": activity_id,
+                "owner_id": owner_id,
+                "salesforce_account_id": salesforce_account_id,
             }
         )
-        return PostMeetingResponse(analysis=result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        return [row_index, MeetingsAnalyzeResponse(analysis=result)]
+
+    tasks = [process_row(row[0], row[1], row[2], row[3]) for row in request.data]
+    response = await asyncio.gather(*tasks)
+    return {"data": response}
 
 
 # ============================================================================
-# Post Meeting Intelligence Scheduler
+# Meetings Jobs Scheduler
 # Temporary scheduling logic until the Sales AI team can build their own
 # ============================================================================
 
 
+class MeetingsJobParams(BaseModel):
+    activity_id: str = Field(..., description="The activity ID of the call", examples=["foo"])
+    owner_id: str = Field(..., description="The owner ID of the call", examples=["bar"])
+    salesforce_account_id: str = Field(
+        ...,
+        description="The Salesforce account ID of the call",
+        examples=["baz"],
+    )
+
+
 @DBOS.workflow()
-async def meetings_durable_workflow(args: PostMeetingRequest):
+async def meetings_durable_workflow(args: MeetingsJobParams):
     """
     Trigger the post-meeting workflow via the Sales AI MetaOrchestrator UDF.
 
@@ -286,7 +244,7 @@ async def meetings_durable_workflow(args: PostMeetingRequest):
 
 
 class MeetingsJobsRequest(BaseModel):
-    data: list[tuple[int, PostMeetingRequest]] = Field(
+    data: list[tuple[int, MeetingsJobParams]] = Field(
         ...,
         description="""
         Batch of call transcripts in Snowflake service function format.

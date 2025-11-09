@@ -181,7 +181,7 @@ url: check-env
     #!/usr/bin/env bash
     set -euo pipefail
     CONNECTION_FLAG=$(just _connection-flag)
-    snow spcs service list-endpoints $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE
+    snow spcs service list-endpoints $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --format JSON_EXT
 
 # Restart the service
 restart: check-env
@@ -209,6 +209,8 @@ fmt:
     uv run ruff format .
     uv run ruff check --fix .
     @echo "✅ Code formatted and linted"
+
+alias format := fmt
 
 # Clean Docker images and cache
 clean:
