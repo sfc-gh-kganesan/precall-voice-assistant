@@ -183,6 +183,16 @@ url: check-env
     CONNECTION_FLAG=$(just _connection-flag)
     snow spcs service list-endpoints $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE
 
+# Restart the service
+restart: check-env
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🔄 Restarting service..."
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service suspend $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE
+    snow spcs service resume $SERVICE_NAME $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE
+    echo "✅ Service restarted"
+
 # Check code quality (used by CI)
 check:
     @echo "🔍 Checking import sorting..."
