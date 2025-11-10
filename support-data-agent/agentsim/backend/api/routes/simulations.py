@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.database import get_db, SessionLocal
@@ -135,3 +136,54 @@ async def get_simulation_results(simulation_id: int, db: Session = Depends(get_d
         failed=failed,
         aggregate_metrics=aggregate_metrics,
     )
+
+
+@router.delete("/{simulation_id}")
+async def delete_simulation(simulation_id: int, db: Session = Depends(get_db)):
+    """Delete a simulation and all related data."""
+    simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    # Can't delete a running simulation - must stop it first
+    if simulation.status == SimulationStatus.RUNNING:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete running simulation. Stop it first."
+        )
+
+    # Delete related conversations (cascade should handle metrics/messages)
+    db.query(Conversation).filter(Conversation.simulation_id == simulation_id).delete()
+
+    # Delete simulation
+    db.delete(simulation)
+    db.commit()
+
+    return {"message": "Simulation deleted successfully"}
+
+
+@router.post("/{simulation_id}/stop")
+async def stop_simulation(simulation_id: int, db: Session = Depends(get_db)):
+    """Stop a running simulation and mark it as failed."""
+    simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    # Can only stop running simulations
+    if simulation.status != SimulationStatus.RUNNING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot stop simulation with status: {simulation.status.value}"
+        )
+
+    # Mark as failed with cancellation message
+    simulation.status = SimulationStatus.FAILED
+    simulation.error_message = "Manually stopped by user"
+    simulation.completed_at = datetime.utcnow()
+    db.commit()
+
+    # Note: We can't actually kill the background asyncio task from here
+    # The task will continue but when it tries to update the simulation,
+    # it will see status is FAILED and should handle gracefully
+
+    return {"message": "Simulation stopped successfully"}

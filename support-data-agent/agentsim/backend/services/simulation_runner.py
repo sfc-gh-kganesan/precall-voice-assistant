@@ -162,7 +162,7 @@ class SimulationRunner:
             auth_type=project.auth_type.value,
             auth_credentials=project.auth_credentials,
             custom_headers=project.custom_headers,
-            timeout=60.0,  # Increased for Cortex Analyst queries that can take >30s
+            timeout=120.0,  # Increased to match simulation timeout for MCP tool calls (DDA + Glean)
         )
 
     def _create_stop_conditions(self, simulation: Simulation) -> List[Any]:
@@ -264,6 +264,10 @@ class SimulationRunner:
             try:
                 # Parse persona
                 persona_dict = scenario_dict.get("persona", {})
+
+                # Extract knowledge_base - can be at persona level or scenario level
+                knowledge_base = persona_dict.get("knowledge_base") or scenario_dict.get("knowledge_base")
+
                 persona = Persona(
                     name=persona_dict.get("name", "Custom User"),
                     goal=persona_dict.get("goal", "Complete task"),
@@ -273,6 +277,7 @@ class SimulationRunner:
                     ),
                     technical_level=persona_dict.get("technical_level", "intermediate"),
                     edge_case=persona_dict.get("edge_case", False),
+                    knowledge_base=knowledge_base,
                 )
 
                 # Parse scenario
@@ -284,6 +289,7 @@ class SimulationRunner:
                     ),
                     complexity=scenario_dict.get("complexity", "simple"),
                     category=scenario_dict.get("category", "general"),
+                    knowledge_base=knowledge_base,  # Store in scenario for easy access
                 )
                 scenarios.append(scenario)
             except Exception as e:

@@ -48,21 +48,33 @@ class SnowflakeCortexModel(OpenAIChatModel):
 
 
 # System prompt for the agent
-SYSTEM_PROMPT = """You are a Snowflake Support Diagnostic Assistant. You help support engineers
-investigate and troubleshoot customer issues using the DDA (Diagnostic Data Application) tools.
+SYSTEM_PROMPT = """You are a Snowflake Support Assistant. You help support engineers
+investigate and troubleshoot customer issues using the DDA (Diagnostic Data Application) tools
+and Glean enterprise search capabilities.
 
 Your capabilities include:
+
+**DDA Diagnostic Tools:**
 - Analyzing Salesforce cases and associated queries
 - Investigating query performance issues (locks, compilation, execution)
 - Troubleshooting authentication and authorization problems (SAML, OAuth, RBAC)
 - Examining warehouse performance and configuration
 - Analyzing account-level metrics and parameters
+- Reviewing existing Jira tickets related to customer problem
+
+**Glean Knowledge Tools:**
+- Searching internal Snowflake documentation and knowledge base
+- Finding code examples and implementations
+- Locating employee information and org structure
+- reviewing Snowflake internal conversations for answer to similar problems or reports of similar issues
+- Reading full document content
 
 When investigating issues:
 1. Start by gathering context (case details, query metadata)
 2. Use appropriate diagnostic tools based on the issue type
-3. Analyze the data and identify patterns or anomalies
-4. Provide clear, actionable findings
+3. Supplement with Glean search for documentation, procedures, or related information
+4. Analyze the data and identify patterns or anomalies
+5. Provide clear, actionable findings
 
 Always be thorough but concise and not overly verbose. Format technical details clearly.
 """
@@ -71,17 +83,19 @@ Always be thorough but concise and not overly verbose. Format technical details 
 def create_dda_agent(
     model_name: str = "claude-4-sonnet",
     mcp_server_url: str = "http://localhost:8000/mcp",
+    glean_proxy_url: str = "http://localhost:8001/mcp",
 ) -> Agent:
     """
-    Create a PydanticAI agent configured with DDA MCP tools.
+    Create a PydanticAI agent configured with DDA MCP tools and Glean search.
     Uses Snowflake Cortex as the LLM provider instead of OpenAI.
 
     Args:
         model_name: The Cortex model to use (e.g., 'claude-4-sonnet', 'mistral-large')
         mcp_server_url: URL of the DDA MCP server
+        glean_proxy_url: URL of the Glean proxy server (set to None to disable Glean)
 
     Returns:
-        Configured PydanticAI Agent
+        Configured PydanticAI Agent with both DDA and Glean toolsets
     """
     # Setup OpenAI-compatible client for Snowflake Cortex
     snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
@@ -94,7 +108,7 @@ def create_dda_agent(
 
     # Create client pointing to Snowflake Cortex API
     client = AsyncOpenAI(
-        max_retries=3,
+        max_retries=10,
         api_key=snowflake_password,
         base_url=f"https://{snowflake_account}.snowflakecomputing.com/api/v2/cortex/v1",
     )
@@ -105,13 +119,26 @@ def create_dda_agent(
     # Use custom model that handles Snowflake response quirks
     model = SnowflakeCortexModel(model_name, provider=provider)
 
-    # Connect to the MCP server
-    mcp_server = MCPServerStreamableHTTP(mcp_server_url)
+    # Connect to the DDA MCP server
+    logger.info(f"Connecting to DDA MCP server at {mcp_server_url}")
+    dda_server = MCPServerStreamableHTTP(mcp_server_url)
 
-    # Create agent with the MCP server as a toolset
+    # Build toolsets list
+    toolsets = [dda_server]
+
+    # Optionally connect to Glean proxy
+    if glean_proxy_url:
+        logger.info(f"Connecting to Glean proxy at {glean_proxy_url}")
+        glean_server = MCPServerStreamableHTTP(glean_proxy_url)
+        toolsets.append(glean_server)
+        logger.info("✓ Agent configured with DDA + Glean toolsets")
+    else:
+        logger.info("✓ Agent configured with DDA toolset only")
+
+    # Create agent with multiple toolsets
     agent = Agent(
         model=model,
-        toolsets=[mcp_server],
+        toolsets=toolsets,
         system_prompt=SYSTEM_PROMPT,
     )
 

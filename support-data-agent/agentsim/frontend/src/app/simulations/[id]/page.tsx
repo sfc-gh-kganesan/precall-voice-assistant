@@ -83,7 +83,7 @@ export default function MonitorSimulationPage({ params }: { params: Promise<{ id
   const completed = conversations.filter(c => c.completed_at)
   const inProgress = conversations.filter(c => !c.completed_at)
   const successful = completed.filter(c => c.success)
-  const progress = conversations.length > 0 ? (completed.length / conversations.length) * 100 : 0
+  const progress = simulation.num_simulations > 0 ? (completed.length / simulation.num_simulations) * 100 : 0
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -102,7 +102,7 @@ export default function MonitorSimulationPage({ params }: { params: Promise<{ id
       <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 mb-6">
         <div className="flex justify-between mb-2">
           <span className="text-sm font-medium text-parchment-100">Overall Progress</span>
-          <span className="text-sm text-parchment-200">{completed.length} of {conversations.length}</span>
+          <span className="text-sm text-parchment-200">{completed.length} of {simulation.num_simulations}</span>
         </div>
         <div className="w-full bg-slate-700 rounded-full h-4">
           <div className="bg-strategic-600 h-4 rounded-full transition-all" style={{ width: `${progress}%` }}></div>

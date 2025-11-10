@@ -11,7 +11,7 @@ import type {
   PersonaTemplateCreate,
 } from './types'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'  // Changed from 8000 to 8080
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -42,6 +42,8 @@ export const simulationsApi = {
   get: (id: number) => api.get<Simulation>(`/api/simulations/${id}`),
   getResults: (id: number) => api.get<SimulationResults>(`/api/simulations/${id}/results`),
   getConversations: (id: number) => api.get<ConversationSummary[]>(`/api/simulations/${id}/conversations`),
+  delete: (id: number) => api.delete(`/api/simulations/${id}`),
+  stop: (id: number) => api.post(`/api/simulations/${id}/stop`),
 }
 
 // Conversations API

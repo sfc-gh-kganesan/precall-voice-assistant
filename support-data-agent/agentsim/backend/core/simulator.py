@@ -188,6 +188,7 @@ class SimulationEngine:
                             persona=scenario.persona,
                             conversation_history=messages,
                             agent_last_message=response.content,
+                            knowledge_base=scenario.knowledge_base,  # Pass knowledge_base!
                         )
 
                         # Add user's follow-up message

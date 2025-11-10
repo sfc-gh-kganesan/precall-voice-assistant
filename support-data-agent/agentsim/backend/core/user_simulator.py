@@ -45,7 +45,7 @@ class UserSimulator:
                 self._client = OpenAI(
                     api_key=self.api_key,
                     base_url=self.base_url,
-                    max_retries=3,
+                    max_retries=10,
                 )
             elif self.provider == "anthropic":
                 from anthropic import Anthropic

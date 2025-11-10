@@ -9,7 +9,7 @@ services:
       - /app/.venv
       - uv-cache:/root/.cache/uv
     ports:
-      - "8000:8000"
+      - "8080:8000"  # Changed from 8000 to 8080 to avoid conflict with troubleshooting DDA MCP server
     environment:
       - UV_LINK_MODE=copy
       - SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
@@ -21,6 +21,7 @@ services:
       - SNOWFLAKE_ROLE=${SNOWFLAKE_ROLE:-SYSADMIN}
       - SEMANTIC_MODEL_FILE=${SEMANTIC_MODEL_FILE}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TROUBLESHOOTING_AGENT_URL=${TROUBLESHOOTING_AGENT_URL:-http://host.docker.internal:8002}
     command: >-
       sh -c "uv sync --locked && uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
     restart: unless-stopped

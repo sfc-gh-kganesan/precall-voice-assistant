@@ -91,7 +91,9 @@ async def stream_cli_response(agent, prompt: str):
 
 
 async def run_cli(
-    model_name: str = "claude-4-sonnet", server_url: str = "http://localhost:8000/mcp"
+    model_name: str = "claude-4-sonnet",
+    server_url: str = "http://localhost:8000/mcp",
+    glean_proxy_url: str = "http://localhost:8001/mcp",
 ):
     """
     Run the interactive CLI for the DDA agent.
@@ -99,22 +101,32 @@ async def run_cli(
     Args:
         model_name: The Snowflake Cortex model to use
         server_url: URL of the DDA MCP server
+        glean_proxy_url: URL of the Glean proxy server (or None to disable)
     """
     print("=" * 70)
     print("DDA Support Agent - Interactive CLI")
     print("=" * 70)
     print(f"\nModel: {model_name} (via Snowflake Cortex)")
-    print(f"MCP Server: {server_url}")
-    print("\nConnecting to MCP server...")
+    print(f"DDA MCP Server: {server_url}")
+    if glean_proxy_url:
+        print(f"Glean Proxy: {glean_proxy_url}")
+    print("\nConnecting to MCP servers...")
 
     try:
-        # Create the agent
-        agent = create_dda_agent(model_name=model_name, mcp_server_url=server_url)
+        # Create the agent with both DDA and Glean toolsets
+        agent = create_dda_agent(
+            model_name=model_name,
+            mcp_server_url=server_url,
+            glean_proxy_url=glean_proxy_url,
+        )
 
         print("\nAgent ready! Type your questions or commands:")
         print("  - Ask about cases: 'Get details for case 01172497'")
         print("  - Analyze locks: 'Analyze transaction locks for query 01c00d3d...'")
         print("  - Search cases: 'Find open performance cases'")
+        if glean_proxy_url:
+            print("  - Search docs: 'Search for documents about authentication'")
+            print("  - Find people: 'Who works on query optimization?'")
         print("  - Type 'help' for more examples")
         print("  - Type 'exit' or 'quit' to end")
         print("=" * 70)
@@ -182,6 +194,11 @@ def print_help():
     print("\nWarehouse & Account:")
     print("  - Show warehouse metrics for <warehouse_name>")
     print("  - Get account information for <account_id>")
+    print("\nGlean Knowledge Search:")
+    print("  - Search for documents about authentication issues")
+    print("  - Find code examples for stored procedures")
+    print("  - Who works on query optimization?")
+    print("  - Read document at <url>")
     print("=" * 70)
 
 

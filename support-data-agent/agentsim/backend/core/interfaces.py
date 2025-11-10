@@ -47,6 +47,7 @@ class Persona(BaseModel):
     personality_traits: List[str]
     technical_level: str  # beginner, intermediate, expert
     edge_case: bool = False
+    knowledge_base: Optional[Dict[str, Any]] = None  # Real data the persona can reference
 
 
 class Scenario(BaseModel):
@@ -57,6 +58,7 @@ class Scenario(BaseModel):
     expected_outcome: Optional[str] = None
     complexity: str  # simple, moderate, complex
     category: str  # e.g., login_issue, data_query, bug_report
+    knowledge_base: Optional[Dict[str, Any]] = None  # Forwarded from persona for easy access
 
 
 class StopCondition(ABC):

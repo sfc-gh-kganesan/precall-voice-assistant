@@ -234,11 +234,13 @@ export default function SimulatePage({ params }: { params: Promise<{ id: string 
               personality_traits,
               technical_level: mapColumn(row, ['technical_level', 'tech_level', 'skill_level', 'expertise']) || 'intermediate',
               edge_case: mapColumn(row, ['edge_case']).toLowerCase() === 'true',
+              knowledge_base,  // Include parsed knowledge_base from CSV
             },
             initial_query: initial_query || 'Help me with my issue',
             expected_outcome: mapColumn(row, ['expected_outcome', 'outcome']),
             complexity: mapColumn(row, ['complexity']) || 'simple',
             category: mapColumn(row, ['category']) || 'general',
+            knowledge_base,  // Also include at scenario level for backend access
           })
         }
 
@@ -336,11 +338,10 @@ export default function SimulatePage({ params }: { params: Promise<{ id: string 
                 max="50"
                 value={formData.num_simulations}
                 onChange={(e) => setFormData({...formData, num_simulations: parseInt(e.target.value) || 1})}
-                disabled={totalPersonas > 0}
                 className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-strategic-600"
               />
               {totalPersonas > 0 && (
-                <p className="mt-1 text-xs text-parchment-300">Using {totalPersonas} selected personas</p>
+                <p className="mt-1 text-xs text-parchment-300">{totalPersonas} personas selected (will be distributed across simulations)</p>
               )}
             </div>
 
