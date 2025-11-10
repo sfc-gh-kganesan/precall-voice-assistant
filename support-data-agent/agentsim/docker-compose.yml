@@ -1,0 +1,58 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/.venv
+      - uv-cache:/root/.cache/uv
+    ports:
+      - "8000:8000"
+    environment:
+      - UV_LINK_MODE=copy
+      - SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
+      - SNOWFLAKE_USER=${SNOWFLAKE_USER}
+      - SNOWFLAKE_PASSWORD=${SNOWFLAKE_PASSWORD}
+      - SNOWFLAKE_DATABASE=${SNOWFLAKE_DATABASE}
+      - SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}
+      - SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA:-PUBLIC}
+      - SNOWFLAKE_ROLE=${SNOWFLAKE_ROLE:-SYSADMIN}
+      - SEMANTIC_MODEL_FILE=${SEMANTIC_MODEL_FILE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    command: >-
+      sh -c "uv sync --locked && uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - CI=false
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=1
+      - TURBOPACK=0
+      - NEXT_TELEMETRY_DISABLED=1
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    command: >-
+      sh -c "npm install --no-audit --no-fund && npm run dev -- --port 3000 --hostname 0.0.0.0"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: agentsim
+
+volumes:
+  uv-cache:
