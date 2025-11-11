@@ -618,6 +618,13 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/36/e6c583cdd46825c6f6587631bb037c25da17fedb686bedea88664f34188b/dbos-2.3.0-py3-none-any.whl", hash = "sha256:723d0971d1e3ecc14222106b091f4d3cebd4854e287d396e05bfa8a33455af02", size = 135472, upload-time = "2025-10-27T18:37:13.599Z" },
 ]
 
+[package.optional-dependencies]
+otel = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+]
+
 [[package]]
 name = "debugpy"
 version = "1.8.17"
@@ -3221,7 +3228,7 @@ name = "sales-ai-platform"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "dbos" },
+    { name = "dbos", extra = ["otel"] },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "langchain-community" },
@@ -3245,7 +3252,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dbos", specifier = ">=2.3.0" },
+    { name = "dbos", extras = ["otel"], specifier = ">=2.3.0" },
     { name = "fastapi", specifier = ">=0.119.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain-community", specifier = ">=0.4" },

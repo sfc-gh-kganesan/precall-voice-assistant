@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "dbos>=2.3.0",
+    "dbos[otel]>=2.3.0",
     "fastapi>=0.119.1",
     "httpx>=0.28.1",
     "langchain-community>=0.4",

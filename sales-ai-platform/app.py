@@ -78,6 +78,8 @@ app = FastAPI(
 config: DBOSConfig = {
     "name": "sales-ai-platform-dbos",
     "system_database_url": os.getenv("DBOS_SYSTEM_DATABASE_URL", ""),
+    "enable_otlp": True,
+    "otlp_traces_endpoints": [os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")],
 }
 
 DBOS(fastapi=app, config=config)
@@ -186,6 +188,23 @@ class MeetingsJobParams(BaseModel):
     )
 
 
+@DBOS.step()
+def execute_snowflake_query_sync(query: str):
+    """
+    Execute a Snowflake query synchronously (blocking).
+    This runs in a thread pool via asyncio.to_thread() to avoid blocking
+    the event loop, but uses the simple synchronous Snowpark API.
+    Returns:
+        tuple: (results, query_id) where results is the query result and
+               query_id is the Snowflake query ID for tracking
+    """
+    session = get_snowflake_session()
+    result = session.sql(query)
+    rows = result.collect()
+    query_id = session.sql("SELECT LAST_QUERY_ID()").collect()[0][0]
+    return rows, query_id
+
+
 @DBOS.workflow()
 async def meetings_durable_workflow(args: MeetingsJobParams):
     """
@@ -206,7 +225,7 @@ async def meetings_durable_workflow(args: MeetingsJobParams):
     workflow_payload = {
         "workflow_name": "POST_MEETING_TRANSCRIPT",
         "workflow_variant_name": "POST_MEETING_TRANSCRIPT_V2",
-        # TODO: make sure call_transcript is excluded via idempotency_keys
+        # TODO: make sure call_transcript is excluded via idempotency_keys or keep it blank
         "inputs": {
             "activity_id": args.activity_id,
             "salesforce_account_id": args.salesforce_account_id,
@@ -220,27 +239,37 @@ async def meetings_durable_workflow(args: MeetingsJobParams):
     # Convert payload to JSON string for the UDF
     payload_json = json.dumps(workflow_payload)
 
-    # Get Snowflake session and call the UDF
-    session = get_snowflake_session()
+    # Build the query
     query = f"""
     SELECT SALES.RAVEN_DEV.TRIGGER_SALES_AI_WORKFLOW(
         '{auth_token}',
         PARSE_JSON('{payload_json}')
     )
     """
-    results = session.sql(query).collect()
 
+    try:
+        # Execute query in thread pool to avoid blocking event loop
+        # This will block for ~2 minutes, but in a separate thread
+        DBOS.logger.info(f"Executing Snowflake query for activity_id: {args.activity_id}")
+        results, query_id = await asyncio.to_thread(execute_snowflake_query_sync, query)
+        DBOS.logger.info(f"Snowflake query completed with query_id: {query_id}")
+
+    except Exception as e:
+        DBOS.logger.error(f"Snowflake query failed: {str(e)}")
+        raise ValueError(f"Failed to execute TRIGGER_SALES_AI_WORKFLOW UDF: {str(e)}") from e
+
+    # Validate results
     if not results:
         raise ValueError("No results returned from TRIGGER_SALES_AI_WORKFLOW UDF")
 
     # Extract the result from the first row and convert to dict
     result = results[0][0]
-
-    # If result is a string (JSON), parse it to dict
-    if isinstance(result, str):
+    try:
         result = json.loads(result)
-
-    # TODO: create a Pydantic model for the result
+    except json.JSONDecodeError as e:
+        DBOS.logger.error(f"Failed to parse result as JSON: {result}")
+        raise ValueError(f"Invalid JSON response from UDF: {str(e)}") from e
+    result["_snowflake_query_id"] = query_id
     return result
 
 
@@ -300,15 +329,14 @@ async def meetings_job_status(workflow_id: str):
 
 def _rotate_token_impl():
     """Helper function to perform the actual token rotation logic."""
-    return True
-    # session = get_snowflake_session()
-    # result = session.sql(f"SELECT SALES.RAVEN_DEV.GET_SALES_AI_AUTH_TOKEN('{os.getenv('METAORCHESTRATOR_AUTH_EMAIL')}'):data:access_token::VARCHAR").collect()
-    # token = result[0][0] if result else None
-    # if token:
-    #     with open("/sfmnt/sales_ai_metaorchestrator_api_token", "w") as f:
-    #         f.write(token)
-    #     return True
-    # return False
+    session = get_snowflake_session()
+    result = session.sql(f"SELECT SALES.RAVEN_DEV.GET_SALES_AI_AUTH_TOKEN('{os.getenv('METAORCHESTRATOR_AUTH_EMAIL')}'):data:access_token::VARCHAR").collect()
+    token = result[0][0] if result else None
+    if token:
+        with open("/sfmnt/sales_ai_metaorchestrator_api_token", "w") as f:
+            f.write(token)
+        return True
+    return False
 
 
 @DBOS.scheduled("30 */2 * * *")  # crontab syntax to run every 2 hours and 30 minutes (at 30 minutes past every 2nd hour)
