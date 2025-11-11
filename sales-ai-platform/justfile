@@ -89,26 +89,30 @@ _connection-flag:
         echo "--connection $SNOW_CONNECTION"
     fi
 
-# Private: Run SQL file with envsubst and snow sql
-_run-sql sql_file continue_on_error="false":
+# Private: Run SQL file with optional envsubst and snow sql
+_run-sql sql_file continue_on_error="false" substitute_vars="true":
     #!/usr/bin/env bash
     set -euo pipefail
     CONNECTION_FLAG=$(just _connection-flag)
-
+    
     # Get repository URL and export for envsubst (needed for service.sql)
     export REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE 2>/dev/null || echo "")
-
-    # Process SQL file with envsubst
+    
+    # Process SQL file
     SQL_BASENAME=$(basename "{{sql_file}}")
-    envsubst < "{{sql_file}}" > "release/${SQL_BASENAME}.tmp"
-
+    if [ "{{substitute_vars}}" = "true" ]; then
+        envsubst < "{{sql_file}}" > "release/${SQL_BASENAME}.tmp"
+    else
+        cp "{{sql_file}}" "release/${SQL_BASENAME}.tmp"
+    fi
+    
     # Execute SQL with --silent to avoid leaking secrets
     if [ "{{continue_on_error}}" = "true" ]; then
         snow sql -f "release/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists. Run without --silent to see what happened.)"
     else
         snow sql -f "release/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent
     fi
-
+    
     # Cleanup
     rm -f "release/${SQL_BASENAME}.tmp"
 
@@ -147,6 +151,9 @@ deploy: check-env
 
     echo "📝 Deploying functions..."
     just _run-sql release/5_functions.sql false
+    
+    echo "📝 Deploying task and stream..."
+    just _run-sql release/6_task_stream.sql false false
 
     echo "Waiting for service to initialize..."
     sleep 5
