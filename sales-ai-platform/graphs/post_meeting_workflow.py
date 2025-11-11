@@ -4,7 +4,7 @@ Post Meeting Workflow Graph
 This workflow processes a call transcipt to extract specific information.
 """
 
-from typing import Annotated, TypedDict
+from typing import TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
@@ -15,6 +15,7 @@ from graphs.prompts import HUMAN_MESSAGE_SFDC_EXTRACTION, SYSTEM_PROMPT_SFDC_EXT
 from utils import get_snowflake_session
 
 # import json
+# from typing import Annotated
 
 
 # # Define State Schemas
@@ -43,43 +44,41 @@ class OverallState(TypedDict):
 #     objections: list[str]
 
 
+# class SFDCOutputState(BaseModel):
+#     next_steps: Annotated[
+#         list[str],
+#         Field(description="List of next steps. If a value is not found in the call transcript, assign an empty list"),
+#     ]
+#     close_date: Annotated[
+#         str,
+#         Field(description="Close date (in date format YYYY-MM-DD). If a value is not found in the call transcript, assign an empty string"),
+#     ]
+#     new_use_cases: Annotated[
+#         list[str],
+#         Field(description="List of new use cases. If a value is not found in the call transcript, assign an empty list"),
+#     ]
+#     objections: Annotated[
+#         list[str],
+#         Field(description="List of objections. If a value is not found in the call transcript, assign an empty list"),
+#     ]
+#     opportunity_comments: Annotated[
+#         list[str],
+#         Field(description="List of opportunity comments. If a value is not found in the call transcript, assign an empty list"),
+#     ]
+
+
 class SFDCOutputState(BaseModel):
-    next_steps: Annotated[
-        list[str],
-        Field(description="List of next steps. If a value is not found in the call transcript, assign an empty list"),
-    ]
-    opportunity_comments: Annotated[
-        list[str],
-        Field(description="List of opportunity comments. If a value is not found in the call transcript, assign an empty list"),
-    ]
-    deal_stage: Annotated[
-        str,
-        Field(description="Deal stage. If a value is not found in the call transcript, assign an empty string"),
-    ]
-    close_date: Annotated[
-        str,
-        Field(description="Close date (in date format YYYY-MM-DD). If a value is not found in the call transcript, assign an empty string"),
-    ]
-    opportunity_meddpicc_status: Annotated[
-        str,
-        Field(description="Opportunity MEDDPICC status. If a value is not found in the call transcript, assign an empty string"),
-    ]
-    new_use_cases: Annotated[
-        list[str],
-        Field(description="List of new use cases. If a value is not found in the call transcript, assign an empty list"),
-    ]
-    objections: Annotated[
-        list[str],
-        Field(description="List of objections. If a value is not found in the call transcript, assign an empty list"),
-    ]
+    next_steps: list[str] = Field(default_factory=list, description="List of next steps from the call")
+    close_date: str = Field(default="", description="Expected close date (YYYY-MM-DD)")
+    new_use_cases: list[str] = Field(default_factory=list, description="List of new use cases identified")
+    objections: list[str] = Field(default_factory=list, description="List of customer objections and issues that were raised")
+    opportunity_comments: list[str] = Field(default_factory=list, description="List of opportunity comments")
 
 
 class OutputState(TypedDict):
     next_steps: list[str]
     opportunity_comments: list[str]
-    deal_stage: str
     close_date: str
-    opportunity_meddpicc_status: str
     new_use_cases: list[str]
     objections: list[str]
 
@@ -139,24 +138,20 @@ def sfdc_assistant(state: OverallState) -> OverallState:
     return {
         # "messages": [response],
         "next_steps": response_dict["next_steps"],
-        "opportunity_comments": response_dict["opportunity_comments"],
-        "deal_stage": response_dict["deal_stage"],
         "close_date": response_dict["close_date"],
-        "opportunity_meddpicc_status": response_dict["opportunity_meddpicc_status"],
         "new_use_cases": response_dict["new_use_cases"],
         "objections": response_dict["objections"],
+        "opportunity_comments": response_dict["opportunity_comments"],
     }
 
 
 def final_results(state: OverallState) -> OutputState:
     return {
         "next_steps": state["next_steps"],
-        "opportunity_comments": state["opportunity_comments"],
-        "deal_stage": state["deal_stage"],
         "close_date": state["close_date"],
-        "opportunity_meddpicc_status": state["opportunity_meddpicc_status"],
         "new_use_cases": state["new_use_cases"],
         "objections": state["objections"],
+        "opportunity_comments": state["opportunity_comments"],
     }
 
 
