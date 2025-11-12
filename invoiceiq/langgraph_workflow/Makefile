@@ -1,4 +1,4 @@
-.PHONY: help run build-local run-local test-local build-spcs login-spcs push-spcs langgraph-studio clean
+.PHONY: help run build-local run-local test-local build-spcs login-spcs push-spcs langgraph-studio clean eval-csv eval-snowflake
 
 # Variables
 IMAGE_NAME := invoiceiq-agent
@@ -29,7 +29,7 @@ run-local: ## Run Docker container locally (requires .env file)
 test-local: ## Send a test request to the local API
 		curl -X POST "http://localhost:$(PORT)/process" \
 			-H "Content-Type: application/json" \
-			-d '{"target_table": "INVOICEIQ.SERVICE.INVOICES", "invoice_id": "2b0771cd-61b4-4ce7-9e29-5bcd9b19a568", "relative_path": "bfb86d4683af4210be180c673c621076_50b88f1f9ebe4317bf3892f66d4c0c74_invoice_01.pdf", "stage_name": "INVOICEIQ.SERVICE.TICKET_ATTACHMENTS"}'
+			-d '{"target_table": "INVOICEIQ.SERVICE.INVOICES", "invoice_id": "2b0771cd-61b4-4ce7-9e29-5bcd9b19a568", "relative_path":"bfb86d4683af4210be180c673c621076_50b88f1f9ebe4317bf3892f66d4c0c74_invoice_01.pdf", "stage_name": "INVOICEIQ.SERVICE.TICKET_ATTACHMENTS"}'
 
 build-spcs: ## Build Docker image for SPCS (linux/amd64)
 	docker build --rm --platform linux/amd64 -t $(SPCS_IMAGE) .
@@ -42,6 +42,12 @@ push-spcs: ## Push Docker image to SPCS image repository
 
 langgraph-studio: ## Run LangGraph Studio
 	source .venv/bin/activate && langgraph dev
+
+eval-csv: ## Run LangSmith evals using the bundled CSV test set
+	uv run evals/eval.py --csv-file evals/data/test_set.csv --target-table INVOICEIQ.SERVICE.INVOICES --stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
+
+eval-snowflake: ## Run LangSmith evals by pulling rows from a Snowflake table
+	uv run evals/eval.py --snowflake-table AJOSYULA.PUBLIC.INVOICES_EVALUATION --target-table INVOICEIQ.SERVICE.INVOICES --stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
 
 clean: ## Remove local Docker images
 	docker rmi -f $(LOCAL_IMAGE) 2>/dev/null || true

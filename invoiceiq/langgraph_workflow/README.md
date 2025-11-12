@@ -25,6 +25,8 @@ The following commands are available via `make`:
 | `make push-spcs` | Push Docker image to SPCS image repository |
 | `make clean` | Remove local Docker images |
 | `make langgraph-studio` | Startup local LangGraph Studio in browser |
+| `make eval-csv` | Run LangSmith evals against the bundled CSV test set |
+| `make eval-snowflake` | Run LangSmith evals using rows pulled from Snowflake |
 
 
 ## Running Locally
@@ -148,4 +150,25 @@ LangGraph Studio provides interactive visualization to monitor full LangGraph wo
 To use LangGraph Studio locally from agent_app root:
 ```bash
 make langraph-studio
+```
+
+## Running LangSmith Evaluations
+
+You can evaluate the workflow outputs either from a static CSV or by pulling ground-truth rows directly from Snowflake:
+
+- **CSV test set** (uses `evals/data/test_set.csv`):
+  ```bash
+  make eval-csv
+  ```
+- **Snowflake table** (replace the sample table name with your own; `--target-table` and `--stage-name` provide defaults if those columns are absent):
+  ```bash
+  make eval-snowflake
+  ```
+
+Alternatively, run the script directly and customize all arguments:
+```bash
+uv run evals/eval.py \
+  --snowflake-table YOUR_DB.YOUR_SCHEMA.YOUR_TABLE \
+  --target-table INVOICEIQ.SERVICE.INVOICES \
+  --stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
 ```
