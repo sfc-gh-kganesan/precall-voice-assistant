@@ -1,0 +1,170 @@
+# Snowflake Container Services - API Demo
+# justfile for common tasks
+
+default:
+    @just --list
+
+help:
+    @echo "Snowflake Container Services - API Demo"
+    @echo ""
+    @echo "Available commands:"
+    @echo "  just build      - Build Docker image locally"
+    @echo "  just test       - Run Rust tests"
+    @echo "  just check      - Check Rust code without building"
+    @echo "  just fmt        - Format Rust code"
+    @echo "  just run        - Run locally with Docker"
+    @echo "  just run-cargo  - Run locally with Cargo"
+    @echo "  just clean      - Clean build artifacts"
+    @echo "  just deploy     - Deploy to Snowflake"
+    @echo "  just tree       - Show project structure"
+
+build:
+    @echo "Building Docker image..."
+    docker build -t spcs-api-demo:latest .
+
+test:
+    @echo "Running tests..."
+    cargo test
+
+check:
+    @echo "Checking Rust code..."
+    cargo check
+
+fmt:
+    @echo "Formatting Rust code..."
+    cargo fmt
+
+clippy:
+    @echo "Running clippy..."
+    cargo clippy -- -D warnings
+
+run API_KEY="demo-api-key-12345" API_ENDPOINT="https://api.publicapis.org/entries":
+    @echo "Running container locally..."
+    @echo "API_KEY: {{API_KEY}}"
+    @echo "API_ENDPOINT: {{API_ENDPOINT}}"
+    docker run \
+        -e API_KEY="{{API_KEY}}" \
+        -e API_ENDPOINT="{{API_ENDPOINT}}" \
+        spcs-api-demo:latest
+
+run-cargo API_KEY="demo-api-key-12345" API_ENDPOINT="https://api.publicapis.org/entries":
+    @echo "Running with cargo..."
+    @echo "API_KEY: {{API_KEY}}"
+    @echo "API_ENDPOINT: {{API_ENDPOINT}}"
+    API_KEY="{{API_KEY}}" API_ENDPOINT="{{API_ENDPOINT}}" cargo run
+
+build-run: build run
+
+clean:
+    @echo "Cleaning build artifacts..."
+    cargo clean
+    -docker rmi spcs-api-demo:latest 2>/dev/null || true
+
+deploy:
+    @echo "Deploying to Snowflake..."
+    ./deploy.sh
+
+# Deploy using Snowflake CLI directly
+deploy-cli:
+    @echo "Building image..."
+    docker build -t spcs-api-demo:latest .
+    @echo "Logging into Snowflake registry..."
+    snow spcs image-registry login
+    @echo "Uploading image..."
+    snow spcs image-repository upload \
+        --database SPCS_DEMO \
+        --schema API_JOBS \
+        --repository spcs_demo_repo \
+        --image-name spcs-api-demo \
+        --tag latest
+    @echo "Image uploaded successfully"
+
+# Create the service using Snowflake CLI
+create-service:
+    @echo "Creating service..."
+    snow sql -q "USE DATABASE SPCS_DEMO; USE SCHEMA API_JOBS; CREATE OR REPLACE SERVICE api_job_service IN COMPUTE POOL job_pool FROM SPECIFICATION \$\$$$ \
+    spec: \
+      containers: \
+      - name: api-client \
+        image: /spcs_demo/api_jobs/spcs_demo_repo/spcs-api-demo:latest \
+        env: \
+          API_KEY: \
+            secretKeyRef: \
+              key: api_key_secret \
+          API_ENDPOINT: 'https://api.publicapis.org/entries' \
+      externalAccessIntegrations: \
+      - api_access_integration \
+    \$\$$$ MIN_INSTANCES = 1 MAX_INSTANCES = 1;"
+
+# View service logs
+logs-service:
+    @echo "Fetching service logs..."
+    snow spcs service logs api_job_service --container-name api-client
+
+# Check service status
+status-service:
+    @snow sql -q "SHOW SERVICES IN SCHEMA SPCS_DEMO.API_JOBS;"
+    @snow sql -q "SELECT SYSTEM\$GET_SERVICE_STATUS('SPCS_DEMO.API_JOBS.api_job_service');"
+
+# Full deployment workflow
+deploy-full: deploy-cli create-service
+    @echo "Waiting for service to start..."
+    @sleep 10
+    @just logs-service
+
+# Run end-to-end test
+test-e2e:
+    @echo "Running end-to-end test..."
+    ./test.sh
+
+# Setup Snowflake resources only
+setup:
+    @echo "Setting up Snowflake resources..."
+    snow sql -f setup.sql
+
+# Cleanup all resources
+cleanup:
+    @echo "Cleaning up resources..."
+    snow sql -f cleanup.sql
+
+# Check compute pool status
+check-pool:
+    @snow sql -q "SHOW COMPUTE POOLS;"
+
+# List images in repository
+list-images:
+    @snow spcs image-repository list-images \
+        --database SPCS_DEMO \
+        --schema API_JOBS \
+        --repository spcs_demo_repo
+
+tree:
+    @echo "Project structure:"
+    @tree -L 2 -a --gitignore 2>/dev/null || find . -type f -o -type d | grep -v ".git" | sort
+
+verify-docker:
+    @echo "Checking Docker..."
+    @docker info > /dev/null 2>&1 || (echo "Error: Docker is not running. Please start Docker Desktop." && exit 1)
+    @echo "Docker is running"
+
+test-local: verify-docker build run
+
+dev: fmt check test
+    @echo "Development checks passed"
+
+build-release:
+    @echo "Building release binary..."
+    cargo build --release
+    @echo "Binary: target/release/spcs-api-demo"
+
+watch:
+    @echo "Watching for changes..."
+    cargo watch -x check -x test -x run
+
+logs:
+    @docker logs $(docker ps -q --filter ancestor=spcs-api-demo:latest) || echo "No container running"
+
+shell:
+    @echo "Opening shell in container..."
+    docker run -it --entrypoint /bin/bash spcs-api-demo:latest
+

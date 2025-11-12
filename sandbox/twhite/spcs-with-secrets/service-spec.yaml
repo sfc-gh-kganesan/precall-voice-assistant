@@ -1,0 +1,37 @@
+# Snowflake Container Services - Service Specification
+# This file defines the service configuration for SPCS
+
+spec:
+  containers:
+  - name: api-client
+    # Update this image path after pushing to Snowflake repository
+    # Format: /<database>/<schema>/<repository>/<image>:<tag>
+    image: /spcs_demo/api_jobs/spcs_demo_repo/spcs-api-demo:latest
+    
+    # Environment variables - secrets will be injected by Snowflake
+    env:
+      # Reference to Snowflake secret
+      API_KEY:
+        secretKeyRef:
+          key: api_key_secret
+      
+      # Direct environment variable (not a secret)
+      API_ENDPOINT: "https://api.publicapis.org/entries"
+    
+    # Resource requests (optional)
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 0.5
+      limits:
+        memory: 1Gi
+        cpu: 1.0
+    
+    # Restart policy for job services
+    # For job services, containers run to completion
+    restartPolicy: Never
+
+  # External access integration for network rules
+  externalAccessIntegrations:
+  - api_access_integration
+
