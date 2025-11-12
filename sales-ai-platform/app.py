@@ -273,35 +273,13 @@ async def meetings_durable_workflow(args: MeetingsJobParams):
     return result
 
 
-class MeetingsJobsRequest(BaseModel):
-    data: list[tuple[int, MeetingsJobParams]] = Field(
-        ...,
-        description="""
-        Batch of call transcripts in Snowflake service function format.
-        Each row is a list with two elements: [row_index: int, request_payload: PostMeetingRequest].
-        """,
-        examples=[
-            [
-                [
-                    0,
-                    {"activity_id": "", "owner_id": "", "salesforce_account_id": ""},
-                ],
-                [
-                    1,
-                    {"activity_id": "", "owner_id": "", "salesforce_account_id": ""},
-                ],
-            ]
-        ],
-    )
-
-
 @v1_router.post("/meetings/jobs", summary="Submit meeting analysis jobs")
-async def meetings_jobs(request: MeetingsJobsRequest):
+async def meetings_jobs(request: MeetingsAnalyzeRequest):
     # TODO: handle deduplication and partitioning based on some request identifier
     result_data = []
     for row in request.data:
-        row_index, row_data = row[0], row[1]
-        handle = await dbos_meetings_jobs_queue.enqueue_async(meetings_durable_workflow, row_data)
+        row_index, activity_id, owner_id, salesforce_account_id = row[0], row[1], row[2], row[3]
+        handle = await dbos_meetings_jobs_queue.enqueue_async(meetings_durable_workflow, MeetingsJobParams(activity_id=activity_id, owner_id=owner_id, salesforce_account_id=salesforce_account_id))
         result_data.append(
             [
                 row_index,

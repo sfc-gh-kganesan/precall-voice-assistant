@@ -10,28 +10,46 @@ LANGUAGE SQL
 AS
 $$
 DECLARE
-  payload VARIANT;
+  rows_processed INTEGER DEFAULT 0;
+  batch_size INTEGER DEFAULT 100;
+  insert_timestamp TIMESTAMP_NTZ;
 BEGIN
-  -- build a compact batch payload from the stream rows
-  SELECT ARRAY_AGG(OBJECT_CONSTRUCT(*))
-  INTO :payload
+  -- Create tracking table to advance stream offset
+  CREATE TABLE IF NOT EXISTS ai_fde.sales_ai_platform.processed_engagement_details (
+    activity_id VARCHAR,
+    owner_id VARCHAR,
+    salesforce_account_id VARCHAR,
+    processed_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+  );
+  
+  -- Capture timestamp BEFORE insert for precise filtering
+  insert_timestamp := CURRENT_TIMESTAMP();
+  
+  -- INSERT from stream to advance it (and persist the batch)
+  INSERT INTO ai_fde.sales_ai_platform.processed_engagement_details 
+    (activity_id, owner_id, salesforce_account_id)
+  SELECT activity_id, owner_id, salesforce_account_id
   FROM ai_fde.sales_ai_platform.all_engagement_details_stream
   WHERE type='MEETING' 
-  AND raw_content is not null
-  LIMIT 1000; -- TODO: Remove this limit once we have validated the approach
-
-  -- send to sales_ai_meetings_jobs function
-  SELECT sales_ai_meetings_jobs(:payload);
-
-  -- advance the stream offset without persisting rows
-  -- TODO: advance the offset only by the amount of rows processed above
-  CREATE OR REPLACE TEMP TABLE _noop LIKE sales.engagement360_pitch.all_engagement_details;
-  INSERT INTO _noop
-    SELECT * EXCLUDE (METADATA$ACTION, METADATA$ISUPDATE, METADATA$ROW_ID)
-    FROM ai_fde.sales_ai_platform.all_engagement_details_stream
-    WHERE FALSE;
+  AND raw_content IS NOT NULL
+  LIMIT :batch_size;
   
-  RETURN 'Success';
+  rows_processed := SQLROWCOUNT;
+  
+  -- Process the rows we just captured 
+  IF (rows_processed > 0) THEN
+    SELECT sales_ai_meetings_jobs(activity_id, owner_id, salesforce_account_id)
+    FROM ai_fde.sales_ai_platform.processed_engagement_details
+    WHERE processed_at >= :insert_timestamp
+    ORDER BY activity_date DESC
+    LIMIT :rows_processed;
+  END IF;
+  
+  RETURN OBJECT_CONSTRUCT('status', 'success', 'rows_processed', rows_processed)::VARCHAR;
+  
+EXCEPTION
+  WHEN OTHER THEN
+    RETURN OBJECT_CONSTRUCT('status', 'error', 'message', SQLERRM)::VARCHAR;
 END
 $$;
 
