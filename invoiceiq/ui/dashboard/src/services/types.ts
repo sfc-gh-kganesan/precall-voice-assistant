@@ -92,3 +92,14 @@ export interface ReprocessInvoiceResponse {
     message: string;
     invoice_id: string;
 }
+
+export interface GenerateEmailRequest {
+    ai_reasoning: string;
+    vendor_name?: string | null;
+    invoice_number?: string | null;
+}
+
+export interface GenerateEmailResponse {
+    success: boolean;
+    email_template: string;
+}

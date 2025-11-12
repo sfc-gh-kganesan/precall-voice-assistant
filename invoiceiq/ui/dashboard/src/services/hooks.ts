@@ -8,12 +8,13 @@ import {
 } from "react-query";
 import type {
     InvoiceListResponse,
-    InvoiceStatsResponse,
     InvoicesByStatusResponse,
     UpdateStatusResponse,
     UpdateFieldsResponse,
     ReprocessInvoiceResponse,
     UpdateStatusRequest,
+    GenerateEmailRequest,
+    GenerateEmailResponse,
 } from "./types";
 
 // Use /api prefix to route through our Express proxy server
@@ -21,10 +22,7 @@ const API_BASE_URL = "/api";
 
 // Query Keys
 export const queryKeys = {
-    invoiceStats: ["invoiceStats"] as const,
     allInvoices: (limit?: number) => ["allInvoices", limit] as const,
-    invoices: (status?: string, limit?: number, offset?: number) =>
-        ["invoices", status, limit, offset] as const,
     searchInvoices: (
         searchBy: string,
         searchTerm: string,
@@ -34,17 +32,6 @@ export const queryKeys = {
 };
 
 // API Functions
-async function fetchInvoiceStatsApi(): Promise<InvoiceStatsResponse> {
-    const url = `${API_BASE_URL}/invoices/stats`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-}
-
 async function fetchAllInvoicesApi(
     limit: number = 100,
 ): Promise<InvoicesByStatusResponse> {
@@ -53,30 +40,6 @@ async function fetchAllInvoicesApi(
     });
 
     const url = `${API_BASE_URL}/invoices/all?${params.toString()}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-}
-
-async function fetchInvoicesApi(
-    status?: string,
-    limit: number = 100,
-    offset: number = 0,
-): Promise<InvoiceListResponse> {
-    const params = new URLSearchParams({
-        limit: limit.toString(),
-        offset: offset.toString(),
-    });
-
-    if (status) {
-        params.append("status", status);
-    }
-
-    const url = `${API_BASE_URL}/invoices?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -187,20 +150,30 @@ async function reprocessInvoiceApi(
     return response.json();
 }
 
-// Query Hooks
-export function useInvoiceStats(
-    options?: Omit<
-        UseQueryOptions<InvoiceStatsResponse, Error>,
-        "queryKey" | "queryFn"
-    >,
-) {
-    return useQuery<InvoiceStatsResponse, Error>(
-        queryKeys.invoiceStats,
-        fetchInvoiceStatsApi,
-        options,
-    );
+async function generateEmailApi(
+    request: GenerateEmailRequest,
+): Promise<GenerateEmailResponse> {
+    const url = `${API_BASE_URL}/invoices/generate-email`;
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+            errorData.detail || `HTTP error! status: ${response.status}`,
+        );
+    }
+
+    return response.json();
 }
 
+// Query Hooks
 export function useAllInvoices(
     limit: number = 100,
     options?: Omit<
@@ -211,22 +184,6 @@ export function useAllInvoices(
     return useQuery<InvoicesByStatusResponse, Error>(
         queryKeys.allInvoices(limit),
         () => fetchAllInvoicesApi(limit),
-        options,
-    );
-}
-
-export function useInvoices(
-    status?: string,
-    limit: number = 100,
-    offset: number = 0,
-    options?: Omit<
-        UseQueryOptions<InvoiceListResponse, Error>,
-        "queryKey" | "queryFn"
-    >,
-) {
-    return useQuery<InvoiceListResponse, Error>(
-        queryKeys.invoices(status, limit, offset),
-        () => fetchInvoicesApi(status, limit, offset),
         options,
     );
 }
@@ -273,9 +230,7 @@ export function useUpdateInvoiceStatus(
             ...options,
             onSuccess: (data, variables, context) => {
                 // Invalidate and refetch related queries
-                queryClient.invalidateQueries(queryKeys.invoiceStats);
                 queryClient.invalidateQueries(queryKeys.allInvoices());
-                queryClient.invalidateQueries(queryKeys.invoices());
 
                 if (options?.onSuccess) {
                     options.onSuccess(data, variables, context);
@@ -307,7 +262,6 @@ export function useUpdateInvoiceFields(
             onSuccess: (data, variables, context) => {
                 // Invalidate and refetch related queries
                 queryClient.invalidateQueries(queryKeys.allInvoices());
-                queryClient.invalidateQueries(queryKeys.invoices());
 
                 if (options?.onSuccess) {
                     options.onSuccess(data, variables, context);
@@ -339,13 +293,25 @@ export function useReprocessInvoice(
         onSuccess: (data, variables, context) => {
             // Invalidate and refetch related queries
             queryClient.invalidateQueries(queryKeys.allInvoices());
-            queryClient.invalidateQueries(queryKeys.invoices());
 
             if (options?.onSuccess) {
                 options.onSuccess(data, variables, context);
             }
         },
     });
+}
+
+export function useGenerateEmail(
+    options?: UseMutationOptions<
+        GenerateEmailResponse,
+        Error,
+        GenerateEmailRequest
+    >,
+) {
+    return useMutation<GenerateEmailResponse, Error, GenerateEmailRequest>(
+        (request) => generateEmailApi(request),
+        options,
+    );
 }
 
 // Utility Functions (non-query related)

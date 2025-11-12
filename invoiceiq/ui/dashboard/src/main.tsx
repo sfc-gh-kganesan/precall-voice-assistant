@@ -3,6 +3,7 @@ import { QueryClientProvider } from "react-query";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import "./index.css";
+import "react-pdf-highlighter/dist/style.css";
 import { queryClient } from "./services/queryClient";
 
 createRoot(document.getElementById("root")!).render(

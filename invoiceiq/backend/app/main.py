@@ -7,7 +7,7 @@ from contextlib import contextmanager
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
 import snowflake.connector
 from snowflake.connector import DictCursor
@@ -199,6 +199,17 @@ class InvoicesByStatusResponse(BaseModel):
     rejected_count: int
 
 
+class GenerateEmailRequest(BaseModel):
+    ai_reasoning: str
+    vendor_name: Optional[str] = None
+    invoice_number: Optional[str] = None
+
+
+class GenerateEmailResponse(BaseModel):
+    success: bool
+    email_template: str
+
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -377,66 +388,13 @@ async def health_check():
     return {"status": "healthy", "service": "InvoiceIQ Backend"}
 
 
-@app.get("/invoices/stats", response_model=InvoiceStatsResponse)
-async def get_invoice_stats():
-    """
-    Get invoice counts by status in a single optimized query.
-    This replaces the need for 3 separate count queries.
-
-    Returns:
-    - approved: Count of approved invoices
-    - pending: Count of pending invoices (includes NULL AI_DECISION)
-    - rejected: Count of rejected invoices
-    - total: Total count of all invoices
-    """
-    logger.info("Fetching invoice statistics")
-
-    try:
-        with get_snowflake_connection() as conn:
-            cursor = conn.cursor(DictCursor)
-
-            query = """
-                SELECT
-                    COUNT(CASE 
-                        WHEN LOWER(AI_DECISION) IN ('approve', 'approved') THEN 1 
-                    END) as approved_count,
-                    COUNT(CASE 
-                        WHEN LOWER(AI_DECISION) IN ('reject', 'rejected') THEN 1 
-                    END) as rejected_count,
-                    COUNT(CASE 
-                        WHEN AI_DECISION IS NULL OR LOWER(AI_DECISION) = 'pending' THEN 1 
-                    END) as pending_count,
-                    COUNT(*) as total_count
-                FROM INVOICES
-                WHERE RELATIVE_PATH IS NOT NULL
-            """
-
-            cursor.execute(query)
-            result = cursor.fetchone()
-
-            logger.info(
-                f"Stats - Approved: {result['APPROVED_COUNT']}, Pending: {result['PENDING_COUNT']}, Rejected: {result['REJECTED_COUNT']}, Total: {result['TOTAL_COUNT']}"
-            )
-
-            return InvoiceStatsResponse(
-                success=True,
-                approved=result["APPROVED_COUNT"],
-                pending=result["PENDING_COUNT"],
-                rejected=result["REJECTED_COUNT"],
-                total=result["TOTAL_COUNT"],
-            )
-    except Exception as e:
-        logger.error(f"Error fetching invoice stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/invoices/all", response_model=InvoicesByStatusResponse)
 async def get_all_invoices(
     limit: int = Query(100, ge=1, le=1000, description="Maximum results per status"),
 ):
     """
-    Fetch all invoices grouped by status in a single optimized query.
-    This replaces the need for 3 separate queries to fetch approved/pending/rejected.
+    Fetch all invoices grouped by status using SELECT * and Python categorization.
+    This fetches all invoice data and categorizes them in Python rather than SQL.
 
     Query Parameters:
     - limit: Maximum invoices to return per status (default: 100, max: 1000)
@@ -453,7 +411,7 @@ async def get_all_invoices(
         with get_snowflake_connection() as conn:
             cursor = conn.cursor(DictCursor)
 
-            # Single query to fetch all invoices, ordered by creation time
+            # Simple SELECT * query - categorization happens in Python
             query = """
                 SELECT
                     i.INVOICE_ID,
@@ -501,7 +459,7 @@ async def get_all_invoices(
             cursor.execute(query)
             rows = cursor.fetchall()
 
-            # Group invoices by status
+            # Categorize invoices in Python
             approved = []
             pending = []
             rejected = []
@@ -540,113 +498,6 @@ async def get_all_invoices(
             )
     except Exception as e:
         logger.error(f"Error fetching all invoices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/invoices", response_model=InvoiceListResponse)
-async def list_invoices(
-    status: Optional[str] = Query(None, description="Filter by AI decision status"),
-    limit: int = Query(50, ge=1, le=1000, description="Maximum results"),
-    offset: int = Query(0, ge=0, description="Results to skip"),
-):
-    """
-    List invoices with optional filtering and pagination.
-    Filters and returns invoices based on the AI_DECISION column.
-
-    Query Parameters:
-    - status: Filter by AI decision: 'approved', 'pending', or 'rejected' (optional)
-    - limit: Maximum invoices to return (default: 50, max: 1000)
-    - offset: Number of invoices to skip for pagination (default: 0)
-    """
-    logger.info(f"Listing invoices: status={status}, limit={limit}, offset={offset}")
-
-    try:
-        with get_snowflake_connection() as conn:
-            cursor = conn.cursor(DictCursor)
-
-            query = """
-                SELECT
-                    i.INVOICE_ID,
-                    i.TICKET_NUMBER,
-                    i.SUBMISSION_ID,
-                    i.AI_DECISION,
-                    i.RELATIVE_PATH,
-                    i.FILE_URL,
-                    i.VENDOR_NAME,
-                    i.INVOICE_NUMBER,
-                    i.INVOICE_DATE,
-                    i.TOTAL_AMOUNT,
-                    i.PURCHASE_ORDER_NUMBER,
-                    i.DUE_DATE,
-                    i.BANKING_DETAILS,
-                    i.FREIGHT_SHIPPING_AMOUNT,
-                    i.INVOICE_CURRENCY,
-                    i.MEMO_DESCRIPTION,
-                    i.PAYMENT_TERMS,
-                    i.PAYMENT_TYPE,
-                    i.PREPAID_FLAG,
-                    i.QUANTITY,
-                    i.SERVICE_END_DATE,
-                    i.SERVICE_START_DATE,
-                    i.SHIPPED_TO_ADDRESS,
-                    i.SNOWFLAKE_ENTITY,
-                    i.SNOWFLAKE_TAX_ID,
-                    i.TAX_AMOUNT,
-                    i.UNIT_PRICE,
-                    i.VENDOR_ADDRESS,
-                    i.VENDOR_TAX_ID,
-                    i.AI_REASONING,
-                    i.AI_PROCESSED_AT,
-                    i.LAST_EDITED_BY,
-                    i.LAST_EDITED_AT,
-                    i.CREATED_AT,
-                    i.UPDATED_AT,
-                    t.EMAIL
-                FROM INVOICES i
-                LEFT JOIN TICKET_METADATA t ON i.TICKET_NUMBER = t.TICKET_NUMBER
-                WHERE i.RELATIVE_PATH IS NOT NULL
-            """
-
-            params = []
-            if status:
-                # When filtering for 'pending', include both explicit 'pending' and null values
-                if status.lower() == "pending":
-                    query += " AND (LOWER(i.AI_DECISION) = %s OR i.AI_DECISION IS NULL)"
-                    params.append(status.lower())
-                # Handle both 'approve'/'approved' and 'reject'/'rejected' formats
-                elif status.lower() == "approved":
-                    query += " AND LOWER(i.AI_DECISION) IN ('approve', 'approved')"
-                elif status.lower() == "rejected":
-                    query += " AND LOWER(i.AI_DECISION) IN ('reject', 'rejected')"
-                else:
-                    query += " AND LOWER(i.AI_DECISION) = %s"
-                    params.append(status.lower())
-
-            # Get total count
-            count_query = f"SELECT COUNT(*) as total FROM ({query}) as subquery"
-            cursor.execute(count_query, params)
-            total_count = cursor.fetchone()["TOTAL"]
-
-            # Add pagination and execute
-            query += " ORDER BY i.CREATED_AT DESC LIMIT %s OFFSET %s"
-            cursor.execute(query, params + [limit, offset])
-            rows = cursor.fetchall()
-
-            # Build invoice list using helper function
-            invoices = [build_invoice_from_row(row) for row in rows]
-
-            logger.info(f"Retrieved {len(invoices)} invoices (total: {total_count})")
-            return InvoiceListResponse(
-                success=True,
-                invoices=invoices,
-                total_count=total_count,
-                limit=limit,
-                offset=offset,
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error listing invoices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -769,6 +620,19 @@ async def search_invoices(
         raise HTTPException(
             status_code=500, detail=f"Failed to search invoices: {str(e)}"
         )
+
+
+@app.options("/invoices/{ticket_number}/view")
+async def options_view_invoice_pdf(ticket_number: str):
+    """Handle CORS preflight request for PDF viewing."""
+    return Response(
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type",
+            "Access-Control-Max-Age": "86400",
+        }
+    )
 
 
 @app.get("/invoices/{ticket_number}/view")
@@ -967,6 +831,15 @@ async def update_invoice_fields(ticket_number: str, fields: dict):
         "memoDescription": "MEMO_DESCRIPTION",
     }
 
+    # Fields that are numeric and should convert empty strings to None
+    numeric_fields = {
+        "totalAmount",
+        "taxAmount",
+        "unitPrice",
+        "quantity",
+        "freightShippingAmount",
+    }
+
     # Build SET clause for SQL
     set_clauses = []
     params = []
@@ -978,6 +851,9 @@ async def update_invoice_fields(ticket_number: str, fields: dict):
 
         db_column = field_mapping.get(field_name)
         if db_column:
+            # Convert empty strings to None for numeric fields
+            if field_name in numeric_fields and value == "":
+                value = None
             set_clauses.append(f"{db_column} = %s")
             params.append(value)
 
@@ -1077,6 +953,84 @@ async def reprocess_invoice(ticket_number: str):
         raise
     except Exception as e:
         logger.error(f"Error reprocessing invoice: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/invoices/generate-email", response_model=GenerateEmailResponse)
+async def generate_email_template(request: GenerateEmailRequest):
+    """
+    Generate an email template for a rejected invoice using Snowflake's COMPLETE function.
+    Uses AI reasoning to create a professional email to send to the supplier.
+
+    Body:
+    - ai_reasoning: The AI reasoning for why the invoice was rejected
+    - vendor_name: Optional vendor name to personalize the email
+    - invoice_number: Optional invoice number to reference in the email
+    """
+    logger.info(
+        f"Generating email template for vendor: {request.vendor_name}, invoice: {request.invoice_number}"
+    )
+
+    if not request.ai_reasoning or request.ai_reasoning.strip() == "":
+        raise HTTPException(status_code=400, detail="ai_reasoning cannot be empty")
+
+    try:
+        with get_snowflake_connection() as conn:
+            cursor = conn.cursor(DictCursor)
+
+            # Build the prompt for email generation
+            vendor_info = f" to {request.vendor_name}" if request.vendor_name else ""
+            invoice_ref = (
+                f" regarding invoice #{request.invoice_number}"
+                if request.invoice_number
+                else ""
+            )
+
+            prompt = f"""Generate a professional and polite email{vendor_info}{invoice_ref} explaining why their invoice was rejected.
+
+AI Reasoning for rejection:
+{request.ai_reasoning}
+
+The email should:
+1. Be professional and courteous
+2. Clearly explain the issues found
+3. Request specific corrections or clarifications
+4. Provide a clear path forward
+5. Include a professional closing
+
+Format the email with proper greeting, body paragraphs, and closing."""
+
+            # Use Snowflake's COMPLETE function to generate the email
+            # COMPLETE is part of Snowflake Cortex AI functions
+            # Using simple string prompt (single argument version)
+            query = """
+                SELECT SNOWFLAKE.CORTEX.COMPLETE(
+                    'claude-4-sonnet',
+                    %s
+                ) AS email_template
+            """
+
+            logger.info(f"Executing COMPLETE query with prompt length: {len(prompt)}")
+            cursor.execute(query, (prompt,))
+            result = cursor.fetchone()
+
+            if not result or not result.get("EMAIL_TEMPLATE"):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to generate email template from Snowflake COMPLETE",
+                )
+
+            email_template = result["EMAIL_TEMPLATE"]
+            logger.info(
+                f"Successfully generated email template (length: {len(email_template)})"
+            )
+
+            return GenerateEmailResponse(success=True, email_template=email_template)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating email template: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

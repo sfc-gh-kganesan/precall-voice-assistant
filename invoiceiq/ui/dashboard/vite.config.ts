@@ -87,6 +87,9 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    headers: {
+      'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: https://unpkg.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; worker-src 'self' blob: https://unpkg.com; connect-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'self' https://m737yt-sfengineering-aifde.snowflakecomputing.app;",
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8001',

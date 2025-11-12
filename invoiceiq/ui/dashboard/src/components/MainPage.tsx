@@ -1,4 +1,4 @@
-import { useAllInvoices, useInvoiceStats } from "@/services/hooks";
+import { useAllInvoices } from "@/services/hooks";
 import { Flex, Heading } from "@snowflake/stellar-components";
 import { useMemo, useState } from "react";
 import { InvoiceStatistics } from "./stellar/InvoiceStatistics";
@@ -6,6 +6,7 @@ import { InvoiceControlBar } from "./stellar/InvoiceControlBar";
 import { InvoicesTable } from "./stellar/InvoicesTable";
 import { baltoTheme } from "@snowflake/balto-themes/baltoTheme.stylex.js";
 import { InvoiceResponse } from "@/services/types";
+import logo from "../assets/logo.svg";
 
 /**
  * Search function that filters invoices based on invoice number, lift ticket number, and PO number
@@ -38,13 +39,29 @@ export function MainPage() {
     >("all");
     const [searchString, setSearchString] = useState<string>("");
 
-    const { data: invoiceStats, isFetching: isLoadingStats } =
-        useInvoiceStats();
     const {
         data: invoices,
         isFetching: isLoadingInvoices,
         refetch: refetchInvoices,
     } = useAllInvoices();
+
+    // Derive stats from invoices data
+    const invoiceStats = useMemo(() => {
+        if (!invoices) {
+            return {
+                total: 0,
+                approved: 0,
+                pending: 0,
+                rejected: 0,
+            };
+        }
+        return {
+            total: invoices.approved.length + invoices.pending.length + invoices.rejected.length,
+            approved: invoices.approved.length,
+            pending: invoices.pending.length,
+            rejected: invoices.rejected.length,
+        };
+    }, [invoices]);
 
     const filteredInvoices = useMemo(() => {
         if (!invoices) {
@@ -100,8 +117,9 @@ export function MainPage() {
         >
             <Flex
                 direction="row"
-                style={{ padding: "24px 32px 16px 32px", gap: "16px" }}
+                style={{ padding: "24px 32px 16px 32px", gap: "16px", alignItems: "center" }}
             >
+                <img src={logo} alt="Logo" style={{ width: "32px", height: "32px" }} />
                 <Heading size="pageHeader">InvoiceIQ Dashboard</Heading>
             </Flex>
             <Flex
@@ -109,11 +127,11 @@ export function MainPage() {
                 style={{ rowGap: "36px", flexGrow: 1, minHeight: 0 }}
             >
                 <InvoiceStatistics
-                    totalInvoices={invoiceStats?.total}
-                    approvedCount={invoiceStats?.approved}
-                    pendingCount={invoiceStats?.pending}
-                    rejectedCount={invoiceStats?.rejected}
-                    isLoading={isLoadingStats}
+                    totalInvoices={invoiceStats.total}
+                    approvedCount={invoiceStats.approved}
+                    pendingCount={invoiceStats.pending}
+                    rejectedCount={invoiceStats.rejected}
+                    isLoading={isLoadingInvoices}
                 />
                 <Flex
                     direction="column"
@@ -128,7 +146,7 @@ export function MainPage() {
                     <InvoiceControlBar
                         status={status}
                         onStatusChange={handleStatusChange}
-                        invoices={invoiceStats?.total ?? 0}
+                        invoices={invoiceStats.total}
                         searchString={searchString}
                         onSearchStringChange={handleSearchStringChange}
                         onRefresh={handleRefresh}

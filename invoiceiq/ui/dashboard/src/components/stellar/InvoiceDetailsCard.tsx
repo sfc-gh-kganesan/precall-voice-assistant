@@ -5,11 +5,9 @@ import {
     SingleLine,
 } from "@snowflake/stellar-components";
 import { baltoTheme } from "@snowflake/balto-themes/baltoTheme.stylex.js";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-    CheckCircleAutoIcon,
     CheckCircleBoldIcon,
-    CheckIcon,
     EditIcon,
     IconContextProvider,
     XSmallIcon,
@@ -150,9 +148,8 @@ export function InvoiceDetailsCard(props: InvoiceDetailsCardProps) {
             </Flex>
             <Flex direction="column" style={{ rowGap: "12px" }}>
                 {fields.map((field, index) => (
-                    <>
+                    <React.Fragment key={field.field}>
                         <EditableField
-                            key={field.field}
                             field={field.field}
                             label={field.label}
                             value={field.value}
@@ -163,7 +160,7 @@ export function InvoiceDetailsCard(props: InvoiceDetailsCardProps) {
                             }
                         />
                         {index !== fields.length - 1 && <Divider />}
-                    </>
+                    </React.Fragment>
                 ))}
             </Flex>
         </Flex>

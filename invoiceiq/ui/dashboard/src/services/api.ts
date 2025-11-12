@@ -20,7 +20,6 @@ export { getViewPdfUrl, getDownloadPdfUrl, downloadPdf } from "./hooks";
 // For backward compatibility, export legacy functions that use the hooks internally
 // These should be migrated to use the hooks directly in components
 import {
-    InvoiceStatsResponse,
     InvoicesByStatusResponse,
     InvoiceListResponse,
     UpdateStatusResponse,
@@ -29,20 +28,6 @@ import {
 } from "./types";
 
 const API_BASE_URL = "/api";
-
-/**
- * @deprecated Use useInvoiceStats hook instead
- */
-export async function fetchInvoiceStats(): Promise<InvoiceStatsResponse> {
-    const url = `${API_BASE_URL}/invoices/stats`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-}
 
 /**
  * @deprecated Use useAllInvoices hook instead
@@ -55,33 +40,6 @@ export async function fetchAllInvoices(
     });
 
     const url = `${API_BASE_URL}/invoices/all?${params.toString()}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-}
-
-/**
- * @deprecated Use useInvoices hook instead
- */
-export async function fetchInvoices(
-    status?: string,
-    limit: number = 100,
-    offset: number = 0,
-): Promise<InvoiceListResponse> {
-    const params = new URLSearchParams({
-        limit: limit.toString(),
-        offset: offset.toString(),
-    });
-
-    if (status) {
-        params.append("status", status);
-    }
-
-    const url = `${API_BASE_URL}/invoices?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
