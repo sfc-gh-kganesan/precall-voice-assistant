@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -12,7 +12,7 @@ import { useAppStore } from '@/stores/appStore'
 import { TicketRow } from '@/components/tickets/TicketRow'
 import { X } from 'lucide-react'
 
-export default function TicketsPage() {
+function TicketsContent() {
   const searchParams = useSearchParams()
   const [page, setPage] = useState(1)
   const [pageSize] = useState(20)
@@ -23,11 +23,15 @@ export default function TicketsPage() {
   const configId = useAppStore((state) => state.activeConfigId)
   const isInitializing = useAppStore((state) => state.isInitializing)
 
-  // Read product filter from URL on mount
+  // Read product filter and caseNumber from URL on mount
   useEffect(() => {
     const product = searchParams.get('product')
+    const caseNumber = searchParams.get('caseNumber')
     if (product) {
       setProductFilter(product)
+    }
+    if (caseNumber) {
+      setSearchTerm(caseNumber)
     }
   }, [searchParams])
 
@@ -251,6 +255,7 @@ export default function TicketsPage() {
                           getStatusColor={getStatusColor}
                           getSeverityColor={getSeverityColor}
                           getSeverityLabel={getSeverityLabel}
+                          shouldAutoExpand={searchParams.get('caseNumber') === ticket.case_number}
                         />
                       ))
                     ) : (
@@ -295,5 +300,17 @@ export default function TicketsPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function TicketsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    }>
+      <TicketsContent />
+    </Suspense>
   )
 }

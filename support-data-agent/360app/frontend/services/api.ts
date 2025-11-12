@@ -1,4 +1,4 @@
-import { Filters, KPIMetric, ProductMetrics, SupportTicket, TableInfo, GenerationJob, FieldMapping, TopicMetrics, PerformanceData } from '@/types'
+import { Filters, KPIMetric, ProductMetrics, SupportTicket, TableInfo, GenerationJob, FieldMapping, TopicMetrics, PerformanceData, CategoryMetrics, SubcategoryMetrics, BenchmarkData, ProductSearchResult } from '@/types'
 import { apiRequest, buildQueryParams } from '@/lib/api-error-handler'
 import { API_CONFIG } from '@/lib/constants'
 
@@ -53,6 +53,16 @@ export const dashboardApi = {
   async getTopicPerformance(filters: Filters): Promise<PerformanceData> {
     const queryParams = buildFiltersQueryParams(filters)
     return await apiRequest<PerformanceData>(`${API_BASE}/api/v1/dashboard/topics/performance?${queryParams}`)
+  },
+
+  async getCategoryMetrics(filters: Filters): Promise<CategoryMetrics[]> {
+    const queryParams = buildFiltersQueryParams(filters)
+    return await apiRequest<CategoryMetrics[]>(`${API_BASE}/api/v1/dashboard/categories?${queryParams}`)
+  },
+
+  async getSubcategoryMetrics(category: string, filters: Filters): Promise<SubcategoryMetrics[]> {
+    const queryParams = buildFiltersQueryParams(filters)
+    return await apiRequest<SubcategoryMetrics[]>(`${API_BASE}/api/v1/dashboard/categories/${encodeURIComponent(category)}/subcategories?${queryParams}`)
   },
 }
 
@@ -300,6 +310,7 @@ export const ticketsApi = {
     sortBy?: string
     sortOrder?: 'asc' | 'desc'
     product?: string
+    severity?: string
   } & Partial<Filters>): Promise<{
     tickets: SupportTicket[]
     total: number
@@ -319,6 +330,9 @@ export const ticketsApi = {
     if (filters.product) {
       params.append('product', filters.product)
     }
+    if (filters.severity) {
+      params.append('severity', filters.severity)
+    }
 
     return await apiRequest<{
       tickets: SupportTicket[]
@@ -326,5 +340,37 @@ export const ticketsApi = {
       page: number
       pageSize: number
     }>(`${API_BASE}/api/v1/tickets?${params.toString()}`)
+  },
+}
+
+export const productsApi = {
+  async getBenchmarks(filters: Filters & {
+    category?: string
+    subcategory?: string
+    productId?: string
+  }): Promise<BenchmarkData> {
+    const queryParams = buildQueryParams({
+      period: filters.period,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      category: filters.category,
+      subcategory: filters.subcategory,
+      productId: filters.productId,
+    })
+    return await apiRequest<BenchmarkData>(`${API_BASE}/api/v1/products/benchmarks?${queryParams}`)
+  },
+
+  async searchProducts(query: string, category?: string, subcategory?: string): Promise<ProductSearchResult[]> {
+    const queryParams = buildQueryParams({
+      query,
+      category,
+      subcategory,
+    })
+    return await apiRequest<ProductSearchResult[]>(`${API_BASE}/api/v1/products/search?${queryParams}`)
+  },
+
+  async getBenchmarkContext(productId: string, period: string = 'week'): Promise<any> {
+    const queryParams = buildQueryParams({ period })
+    return await apiRequest<any>(`${API_BASE}/api/v1/products/${productId}/benchmark-context?${queryParams}`)
   },
 }

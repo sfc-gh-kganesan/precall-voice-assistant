@@ -76,6 +76,11 @@ class EnrichmentService:
 
         self.session.sql(f"""
             ALTER TABLE {output_table}
+            ADD COLUMN IF NOT EXISTS GENERATED_PRODUCT_SUBCATEGORY VARCHAR
+        """).collect()
+
+        self.session.sql(f"""
+            ALTER TABLE {output_table}
             ADD COLUMN IF NOT EXISTS GENERATED_SENTIMENT FLOAT
         """).collect()
 
@@ -119,6 +124,26 @@ class EnrichmentService:
             print(f"Traceback: {traceback.format_exc()}")
             raise
 
+    def _create_product_hierarchy_mapping(self):
+        """Create a single temporary table with the complete product hierarchy."""
+        from .product_mappings import PRODUCT_MAPPINGS
+
+        # Build all mappings in one list
+        mapping_data = []
+        for category, config in PRODUCT_MAPPINGS.items():
+            for subcategory, subcat_config in config["subcategories"].items():
+                for product in subcat_config["products"]:
+                    mapping_data.append((category, subcategory, product))
+
+        # Create single mapping table
+        rows = [Row(CATEGORY=cat, SUBCATEGORY=sub, PRODUCT=prod) for cat, sub, prod in mapping_data]
+        mapping_df = self.session.create_dataframe(rows)
+
+        # Save as temp table
+        mapping_df.write.mode("overwrite").save_as_table("TEMP_PRODUCT_HIERARCHY", table_type="temporary")
+
+        print(f"Created mapping table with {len(mapping_data)} product mappings")
+
     def _materialize_analytics(self, job_id: str, output_table: str, analytics_only: bool = False):
         print(f"Starting {'analytics materialization' if analytics_only else 'AI enrichment and analytics'} (job: {job_id})")
         print(f"Using output table: {output_table}")
@@ -138,13 +163,17 @@ class EnrichmentService:
                 SET GENERATED_TOPIC = NULL,
                     GENERATED_PRODUCT = NULL,
                     GENERATED_PRODUCT_CATEGORY = NULL,
+                    GENERATED_PRODUCT_SUBCATEGORY = NULL,
                     GENERATED_SENTIMENT = NULL
             """).collect()
 
-            print("AI classifying cases...")
-            cases_df = self.session.table(output_table)
+            # Create product hierarchy mapping table
+            print("Creating product hierarchy mapping...")
+            self._create_product_hierarchy_mapping()
 
-            # transformed_cases.select(F.ai_agg(F.col("CONTENT_SUBJECT"),"give me a python list with concise topics that people are complaining about"))
+            print("Starting 3-step hierarchical classification...")
+
+            # Topic classification (keep existing topics approach)
             topic_categories = [
                 "Security and Authentication",
                 "Performance Issues",
@@ -167,183 +196,137 @@ class EnrichmentService:
                 "Replication Issues",
             ]
 
-            products = [
-                "AI-Driven Applications",
-                "Streams & Tasks (Batch & Streaming Ingestion)",
-                "Encryption & Secure Connectivity",
-                "SQL Analytics (Query Development & Execution + Advanced Analytics (SQL))",
-                "Data Lineage & Monitoring",
-                "Data Loading & Unloading (Copy)",
-                "AI/ML-Powered Functions",
-                "Event Logging Tracing & Telemetry",
-                "Hybrid Tables",
-                "Organization & Account Level Management (Account & Organization Management)",
-                "Iceberg Tables (Data Lake Querying)",
-                "Snowpark Container Services",
-                "Programming Language Drivers",
-                "User Authorization & Access Control",
-                "Query Performance & Optimization (Resource Provisioning & Management)",
-                "Snowflake Database & Information Schema (Metadata & Schema Management)",
-                "Snowpark Dev Framework & Code Execution (Snowpark & Development Frameworks)",
-                "Billing Discrepancies & Refunds",
-                "External Tables",
-                "Notebooks (Collaborative Analytics & Notebook Environment)",
-                "Cost Management & Monitoring (Monitoring & Alerts)",
-                "Data Sharing",
-                "User Access & Password Reset (User Support & Access)",
-                "General Billing Support",
-                "Account Authentication Setup & Management",
-                "Data Clean Rooms",
-                "Native Apps (Native Managed Connected Applications Development & Deployment)",
-                "Storage (Stages & Integrations) (Storage Management)",
-                "Openflow",
-                "Streamlit (SiS & Community Cloud) Streamlit Application Development & Deployment",
-                "Security Monitoring & Compliance",
-                "Dynamic Tables",
-                "Programmatic Extensions",
-                "Payment & Account Access",
-                "DevOps & Tools",
-                "External Platform Connectors",
-                "Data Marketplace",
-                "User Interface",
-                "Core Clients & Drivers (Core Drivers)",
-                "ML Platform (Machine Learning Development & Deployment)",
-                "Backup & Recovery",
-                "Snowpipe & Snowpipe Streaming (Batch & Streaming Ingestion)",
-                "Data Protection & Privacy",
-            ]
+            cases_df = self.session.table(output_table)
+            cases_to_classify = cases_df.filter(F.col("GENERATED_TOPIC").is_null())
 
-            print("Using AI functions for topic and product extraction...")
+            if cases_to_classify.count() > 0:
+                print("Classifying topics...")
+                topic_classified = cases_to_classify.select(
+                    F.col("CASE_ID"), F.ai_classify(F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION")), F.array_construct(*[F.lit(cat) for cat in topic_categories]), task_description="Classify this support case into ONE topic category.")["labels"][0].cast(T.StringType()).alias("GENERATED_TOPIC")
+                )
 
-            # Get all cases that need classification (no limit - process everything)
-            cases_to_classify = cases_df.filter(F.col("GENERATED_TOPIC").is_null() | F.col("GENERATED_PRODUCT").is_null())
+                output_table_df = self.session.table(output_table)
+                output_table_df.update({"GENERATED_TOPIC": topic_classified["GENERATED_TOPIC"]}, output_table_df["CASE_ID"] == topic_classified["CASE_ID"], topic_classified)
+                print(f"Topics classified for {topic_classified.count()} cases")
 
-            # Apply AI classification to create enriched DataFrame
-            classified_df = cases_to_classify.with_column("combined_text", F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION"))).select(
-                F.col("CASE_ID"),
-                F.ai_classify(F.col("combined_text"), topic_categories)["labels"][0].cast(T.StringType()).alias("GENERATED_TOPIC"),
-                F.ai_classify(
-                    F.col("combined_text"),
-                    products,
-                )["labels"][0]
-                .cast(T.StringType())
-                .alias("GENERATED_PRODUCT"),
-            )
+            # Step 1: Category classification
+            print("\nStep 1: Classifying product categories...")
+            categories = self.session.table("TEMP_PRODUCT_HIERARCHY").select("CATEGORY").distinct().collect()
+            category_list = [row["CATEGORY"] for row in categories]
+            print(f"Categories to classify into: {len(category_list)} categories")
 
-            # Get output table as Snowpark Table
-            output_table_df = self.session.table(output_table)
+            df = self.session.table(output_table)
+            to_classify = df.filter(F.col("GENERATED_PRODUCT_CATEGORY").is_null()).count()
+            print(f"Records to classify: {to_classify}")
 
-            # Use Table.update() to populate classifications in bulk
-            print("Updating topic and product classifications...")
-            output_table_df.update(
-                {
-                    "GENERATED_TOPIC": classified_df["GENERATED_TOPIC"],
-                    "GENERATED_PRODUCT": classified_df["GENERATED_PRODUCT"],
-                    "ENRICHED_AT": F.current_timestamp(),
-                },
-                output_table_df["CASE_ID"] == classified_df["CASE_ID"],
-                classified_df,
-            )
+            if to_classify > 0:
+                category_updates = df.filter(F.col("GENERATED_PRODUCT_CATEGORY").is_null()).select(
+                    F.col("CASE_ID"),
+                    F.ai_classify(
+                        F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION")),
+                        F.array_construct(*[F.lit(cat) for cat in category_list]),
+                        task_description="Classify ticket into ONE category, never Unknown or Null. If issue involves security, authentication, RBAC, encryption, data privacy, access policies, compliance, or data governance, choose Governance | Manageability | Privacy | Security. Otherwise select best matching category: AI, Analytics, Engineering, Infrastructure, Billing, Apps, Lakehouse, Metadata, or UI.",
+                    )["labels"][0]
+                    .cast(T.StringType())
+                    .alias("GENERATED_PRODUCT_CATEGORY"),
+                )
+
+                df.update({"GENERATED_PRODUCT_CATEGORY": category_updates["GENERATED_PRODUCT_CATEGORY"]}, df["CASE_ID"] == category_updates["CASE_ID"], category_updates)
+
+                classified = self.session.table(output_table).filter(F.col("GENERATED_PRODUCT_CATEGORY").is_not_null()).count()
+                print(f"Categories classified: {classified}/{to_classify}")
+
+            # Step 2: Subcategory classification
+            print("\nStep 2: Classifying product subcategories...")
+            subcat_options = self.session.table("TEMP_PRODUCT_HIERARCHY").group_by("CATEGORY").agg(F.array_unique_agg("SUBCATEGORY").alias("OPTIONS"), F.count_distinct("SUBCATEGORY").alias("NUM_OPTIONS"))
+
+            df = self.session.table(output_table)
+            to_classify = df.filter(F.col("GENERATED_PRODUCT_CATEGORY").is_not_null() & F.col("GENERATED_PRODUCT_SUBCATEGORY").is_null()).count()
+            print(f"Records to classify: {to_classify}")
+
+            if to_classify > 0:
+                # Auto-assign single subcategories
+                single_subcat = (
+                    df.filter(F.col("GENERATED_PRODUCT_CATEGORY").is_not_null() & F.col("GENERATED_PRODUCT_SUBCATEGORY").is_null())
+                    .join(subcat_options.filter(F.col("NUM_OPTIONS") == 1), df["GENERATED_PRODUCT_CATEGORY"] == subcat_options["CATEGORY"])
+                    .select(F.col("CASE_ID"), subcat_options["OPTIONS"][0].alias("GENERATED_PRODUCT_SUBCATEGORY"))
+                )
+
+                single_count = single_subcat.count()
+                if single_count > 0:
+                    df.update({"GENERATED_PRODUCT_SUBCATEGORY": single_subcat["GENERATED_PRODUCT_SUBCATEGORY"]}, df["CASE_ID"] == single_subcat["CASE_ID"], single_subcat)
+                    print(f"  Auto-assigned {single_count} single-subcategory cases")
+
+                # AI classify multi-subcategory cases
+                df = self.session.table(output_table)  # Refresh
+                multi_subcat = (
+                    df.filter(F.col("GENERATED_PRODUCT_CATEGORY").is_not_null() & F.col("GENERATED_PRODUCT_SUBCATEGORY").is_null())
+                    .join(subcat_options.filter(F.col("NUM_OPTIONS") > 1), df["GENERATED_PRODUCT_CATEGORY"] == subcat_options["CATEGORY"])
+                    .select(
+                        F.col("CASE_ID"),
+                        F.ai_classify(F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION")), F.col("OPTIONS"), task_description="Classify this support case into the most relevant subcategory. you MUST classify into one of the provided subcategories, not NULL or unclassified..etc")["labels"][0]
+                        .cast(T.StringType())
+                        .alias("GENERATED_PRODUCT_SUBCATEGORY"),
+                    )
+                )
+
+                multi_count = multi_subcat.count()
+                if multi_count > 0:
+                    df.update({"GENERATED_PRODUCT_SUBCATEGORY": multi_subcat["GENERATED_PRODUCT_SUBCATEGORY"]}, df["CASE_ID"] == multi_subcat["CASE_ID"], multi_subcat)
+                    print(f"  AI classified {multi_count} multi-subcategory cases")
+
+            # Step 3: Product classification
+            print("\nStep 3: Classifying specific products...")
+            product_options = self.session.table("TEMP_PRODUCT_HIERARCHY").group_by("CATEGORY", "SUBCATEGORY").agg(F.array_unique_agg("PRODUCT").alias("OPTIONS"), F.count_distinct("PRODUCT").alias("NUM_OPTIONS"))
+
+            df = self.session.table(output_table)
+            to_classify = df.filter(F.col("GENERATED_PRODUCT_SUBCATEGORY").is_not_null() & F.col("GENERATED_PRODUCT").is_null()).count()
+            print(f"Records to classify: {to_classify}")
+
+            if to_classify > 0:
+                # Auto-assign single products
+                single_products = (
+                    df.filter(F.col("GENERATED_PRODUCT_SUBCATEGORY").is_not_null() & F.col("GENERATED_PRODUCT").is_null())
+                    .join(product_options.filter(F.col("NUM_OPTIONS") == 1), (df["GENERATED_PRODUCT_CATEGORY"] == product_options["CATEGORY"]) & (df["GENERATED_PRODUCT_SUBCATEGORY"] == product_options["SUBCATEGORY"]))
+                    .select(F.col("CASE_ID"), product_options["OPTIONS"][0].alias("GENERATED_PRODUCT"))
+                )
+
+                single_count = single_products.count()
+                if single_count > 0:
+                    df.update({"GENERATED_PRODUCT": single_products["GENERATED_PRODUCT"]}, df["CASE_ID"] == single_products["CASE_ID"], single_products)
+                    print(f"  Auto-assigned {single_count} single-product cases")
+
+                # AI classify multi-product cases
+                df = self.session.table(output_table)  # Refresh
+                multi_products = (
+                    df.filter(F.col("GENERATED_PRODUCT_SUBCATEGORY").is_not_null() & F.col("GENERATED_PRODUCT").is_null())
+                    .join(product_options.filter(F.col("NUM_OPTIONS") > 1), (df["GENERATED_PRODUCT_CATEGORY"] == product_options["CATEGORY"]) & (df["GENERATED_PRODUCT_SUBCATEGORY"] == product_options["SUBCATEGORY"]))
+                    .select(
+                        F.col("CASE_ID"),
+                        F.ai_classify(F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION")), F.col("OPTIONS"), task_description="you MUST Classify this support case into the ONE most relevant product from the given options. do not categorize as NULL or unclassified.")["labels"][0]
+                        .cast(T.StringType())
+                        .alias("GENERATED_PRODUCT"),
+                    )
+                )
+
+                multi_count = multi_products.count()
+                if multi_count > 0:
+                    df.update({"GENERATED_PRODUCT": multi_products["GENERATED_PRODUCT"]}, df["CASE_ID"] == multi_products["CASE_ID"], multi_products)
+                    print(f"  AI classified {multi_count} multi-product cases")
 
             # Process sentiment for all cases that need it
-            print("Processing sentiment analysis...")
-            sentiment_cases = cases_df.filter(F.col("GENERATED_SENTIMENT").is_null())
+            print("\nProcessing sentiment analysis...")
+            sentiment_cases = self.session.table(output_table).filter(F.col("GENERATED_SENTIMENT").is_null())
+            sentiment_count = sentiment_cases.count()
 
-            sentiment_df = sentiment_cases.with_column("combined_text", F.concat_ws(F.lit(" "), F.col("SUBJECT"), F.col("DESCRIPTION"))).select(
-                F.col("CASE_ID"),
-                F.call_function("SNOWFLAKE.CORTEX.SENTIMENT", F.col("combined_text")).alias("GENERATED_SENTIMENT"),
-            )
+            if sentiment_count > 0:
+                sentiment_df = sentiment_cases.select(F.col("CASE_ID"), F.call_function("SNOWFLAKE.CORTEX.SENTIMENT", F.concat_ws(F.lit(" "), F.col("SUBJECT"), F.col("DESCRIPTION"))).alias("GENERATED_SENTIMENT"))
 
-            # Update using Table.update()
-            output_table_df.update(
-                {"GENERATED_SENTIMENT": sentiment_df["GENERATED_SENTIMENT"], "ENRICHED_AT": F.current_timestamp()},
-                output_table_df["CASE_ID"] == sentiment_df["CASE_ID"],
-                sentiment_df,
-            )
+                output_table_df = self.session.table(output_table)
+                output_table_df.update({"GENERATED_SENTIMENT": sentiment_df["GENERATED_SENTIMENT"], "ENRICHED_AT": F.current_timestamp()}, output_table_df["CASE_ID"] == sentiment_df["CASE_ID"], sentiment_df)
+                print(f"Sentiment analyzed for {sentiment_count} cases")
 
-            print("AI classification and sentiment analysis completed")
-
-            print("Setting product categories...")
-
-            # Define mapping data as list of tuples (Feature, DOMAIN)
-            mapping_data = [
-                ("Snowpark Container Services", "Application Platform"),
-                ("User Interface", "Product Experiences"),
-                (
-                    "Streamlit (SiS & Community Cloud) Streamlit Application Development & Deployment",
-                    "Product Experiences",
-                ),
-                ("Data Marketplace", "Application Platform"),
-                ("Snowflake Database & Information Schema (Metadata & Schema Management)", "Metadata"),
-                ("Account Authentication Setup & Management", "Governance | Manageability | Privacy | Security"),
-                ("Billing Discrepancies & Refunds", "Billing & Monetization Platform"),
-                ("DevOps & Tools", "Data Engineering"),
-                ("Event Logging Tracing & Telemetry", "Data Engineering"),
-                (
-                    "Organization & Account Level Management (Account & Organization Management)",
-                    "Governance | Manageability | Privacy | Security",
-                ),
-                ("Payment & Account Access", "Billing & Monetization Platform"),
-                ("Snowpipe & Snowpipe Streaming (Batch & Streaming Ingestion)", "Data Engineering"),
-                (
-                    "Cost Management & Monitoring (Monitoring & Alerts)",
-                    "Governance | Manageability | Privacy | Security",
-                ),
-                ("ML Platform (Machine Learning Development & Deployment)", "AI & Machine Learning"),
-                ("Data Sharing", "Application Platform"),
-                ("External Platform Connectors", "Data Engineering"),
-                ("Data Loading & Unloading (Copy)", "Data Engineering"),
-                ("Core Clients & Drivers (Core Drivers)", "Data Analytics"),
-                ("Security Monitoring & Compliance", "Governance | Manageability | Privacy | Security"),
-                ("Programmatic Extensions", "Data Engineering"),
-                ("Programming Language Drivers", "Data Analytics"),
-                ("Query Performance & Optimization (Resource Provisioning & Management)", "Data Analytics"),
-                (
-                    "User Access & Password Reset (User Support & Access)",
-                    "Governance | Manageability | Privacy | Security",
-                ),
-                ("Backup & Recovery", "Metadata"),
-                ("Data Protection & Privacy", "Governance | Manageability | Privacy | Security"),
-                ("Iceberg Tables (Data Lake Querying)", "Open Lakehouse"),
-                ("Notebooks (Collaborative Analytics & Notebook Environment)", "Product Experiences"),
-                ("Storage (Stages & Integrations) (Storage Management)", "Open Lakehouse"),
-                ("Streams & Tasks (Batch & Streaming Ingestion)", "Data Engineering"),
-                ("Data Clean Rooms", "Governance | Manageability | Privacy | Security"),
-                ("Hybrid Tables", "Data Analytics"),
-                ("Data Lineage & Monitoring", "Governance | Manageability | Privacy | Security"),
-                ("General Billing Support", "Billing & Monetization Platform"),
-                ("SQL Analytics (Query Development & Execution + Advanced Analytics (SQL))", "Data Analytics"),
-                ("AI-Driven Applications", "AI & Machine Learning"),
-                ("Snowpark Dev Framework & Code Execution (Snowpark & Development Frameworks)", "Data Engineering"),
-                ("Dynamic Tables", "Data Engineering"),
-                ("External Tables", "Open Lakehouse"),
-                ("Encryption & Secure Connectivity", "Governance | Manageability | Privacy | Security"),
-                (
-                    "Native Apps (Native Managed Connected Applications Development & Deployment)",
-                    "Application Platform",
-                ),
-                ("User Authorization & Access Control", "Governance | Manageability | Privacy | Security"),
-                ("AI/ML-Powered Functions", "AI & Machine Learning"),
-                ("Openflow", "Data Engineering"),
-            ]
-
-            # Create Snowpark DataFrame directly from list of Row objects
-            rows = [Row(Feature=feature, DOMAIN=domain) for feature, domain in mapping_data]
-            mapping_df = self.session.create_dataframe(rows)
-
-            # Get output table as Snowpark Table
-            output_table_df = self.session.table(output_table)
-
-            # Use Table.update() to populate GENERATED_PRODUCT_CATEGORY from mapping
-            output_table_df.update(
-                {"GENERATED_PRODUCT_CATEGORY": mapping_df["DOMAIN"]},
-                output_table_df["GENERATED_PRODUCT"] == mapping_df["Feature"],
-                mapping_df,
-            )
-
-            # Set default category for any products that didn't match mapping
-            print("Setting default category for unmapped products...")
-            output_table_df.update({"GENERATED_PRODUCT_CATEGORY": F.lit("Unknown")}, F.col("GENERATED_PRODUCT_CATEGORY").is_null())
+            print("\nAI classification completed!")
 
         print("Materializing PRODUCTS analytics...")
         self._materialize_products_df(output_table, products_table)
@@ -370,64 +353,71 @@ class EnrichmentService:
         Generates METRICS (week/month current/previous/change) and TREND_DATA (weekly/monthly/quarterly arrays).
         """
         metrics_sql = f"""
-        WITH product_metrics AS (
+        WITH data_date_range AS (
+          -- Get the actual date range of the data
+          SELECT MAX(CREATED_AT)::DATE AS reference_date
+          FROM {base_table}
+          WHERE GENERATED_PRODUCT IS NOT NULL
+        ),
+        product_metrics AS (
           SELECT
             GENERATED_PRODUCT,
             GENERATED_PRODUCT_CATEGORY,
+            GENERATED_PRODUCT_SUBCATEGORY,
 
-            -- Current week metrics (last 7 days)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE())
+            -- Current week metrics (last 7 days from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS week_current_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS week_current_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE()) AND STATUS = 'Closed'
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range)) AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE()) THEN 1 ELSE 0 END), 0)
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range)) THEN 1 ELSE 0 END), 0)
             ) AS week_current_resolution_rate,
 
-            -- Previous week metrics (days 8-14 ago)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+            -- Previous week metrics (days 8-14 ago from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS week_previous_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS week_previous_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                           AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                           AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                            AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                                  AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                                  AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                              THEN 1 ELSE 0 END), 0)
             ) AS week_previous_resolution_rate,
 
-            -- Current month metrics (last 30 days)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE())
+            -- Current month metrics (last 30 days from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS month_current_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS month_current_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE()) AND STATUS = 'Closed'
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range)) AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE()) THEN 1 ELSE 0 END), 0)
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range)) THEN 1 ELSE 0 END), 0)
             ) AS month_current_resolution_rate,
 
-            -- Previous month metrics (days 31-60 ago)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+            -- Previous month metrics (days 31-60 ago from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS month_previous_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS month_previous_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                           AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                           AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                            AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                                  AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                                  AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                              THEN 1 ELSE 0 END), 0)
             ) AS month_previous_resolution_rate,
 
@@ -437,10 +427,10 @@ class EnrichmentService:
 
           FROM {base_table}
           WHERE GENERATED_PRODUCT IS NOT NULL
-          GROUP BY 1, 2
+          GROUP BY 1, 2, 3
         ),
 
-        -- Weekly trend (last 16 weeks)
+        -- Weekly trend (last 16 weeks from max data date)
         weekly_trend AS (
           SELECT
             GENERATED_PRODUCT,
@@ -462,14 +452,14 @@ class EnrichmentService:
               AVG(DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))) AS weekly_avg_resolution,
               (SUM(CASE WHEN STATUS = 'Closed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS weekly_resolution_rate
             FROM {base_table}
-            WHERE CREATED_AT >= DATEADD('week', -16, CURRENT_DATE())
+            WHERE CREATED_AT >= DATEADD('week', -16, (SELECT reference_date FROM data_date_range))
               AND GENERATED_PRODUCT IS NOT NULL
             GROUP BY 1, 2, 3
           )
           GROUP BY 1
         ),
 
-        -- Monthly trend (last 12 months)
+        -- Monthly trend (last 12 months from max data date)
         monthly_trend AS (
           SELECT
             GENERATED_PRODUCT,
@@ -491,14 +481,14 @@ class EnrichmentService:
               AVG(DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))) AS monthly_avg_resolution,
               (SUM(CASE WHEN STATUS = 'Closed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS monthly_resolution_rate
             FROM {base_table}
-            WHERE CREATED_AT >= DATEADD('month', -12, CURRENT_DATE())
+            WHERE CREATED_AT >= DATEADD('month', -12, (SELECT reference_date FROM data_date_range))
               AND GENERATED_PRODUCT IS NOT NULL
             GROUP BY 1, 2
           )
           GROUP BY 1
         ),
 
-        -- Quarterly trend (up to 12 quarters / 3 years if available)
+        -- Quarterly trend (up to 12 quarters / 3 years if available from max data date)
         quarterly_trend AS (
           SELECT
             GENERATED_PRODUCT,
@@ -520,14 +510,14 @@ class EnrichmentService:
               AVG(DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))) AS quarterly_avg_resolution,
               (SUM(CASE WHEN STATUS = 'Closed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS quarterly_resolution_rate
             FROM {base_table}
-            WHERE CREATED_AT >= DATEADD('quarter', -12, CURRENT_DATE())
+            WHERE CREATED_AT >= DATEADD('quarter', -12, (SELECT reference_date FROM data_date_range))
               AND GENERATED_PRODUCT IS NOT NULL
             GROUP BY 1, 2
           )
           GROUP BY 1
         ),
 
-        -- Top issues (top 3 per product from last 30 days)
+        -- Top issues (top 3 per product from last 30 days relative to max data date)
         top_issues AS (
           SELECT
             GENERATED_PRODUCT,
@@ -544,11 +534,69 @@ class EnrichmentService:
               COUNT(*) AS issue_count
             FROM {base_table}
             WHERE GENERATED_PRODUCT IS NOT NULL
-              AND CREATED_AT >= DATEADD('day', -30, CURRENT_DATE())
+              AND CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
             GROUP BY 1, 2
             QUALIFY ROW_NUMBER() OVER (PARTITION BY GENERATED_PRODUCT ORDER BY COUNT(*) DESC) <= 3
           )
           GROUP BY 1
+        ),
+
+        -- AI Aggregation for product insights
+        ai_summaries AS (
+          SELECT
+            GENERATED_PRODUCT,
+            AI_AGG(
+              CONCAT(
+                'Severity: ', COALESCE(CURRENT_SEVERITY, 'Unknown'),
+                ' | Case: ', COALESCE(CASE_NUMBER, 'N/A'),
+                ' | Subject: ', COALESCE(SUBJECT, 'N/A'),
+                ' | Description: ', COALESCE(DESCRIPTION, 'N/A'),
+                ' | Customer: ', COALESCE(ACCOUNT_NAME, 'N/A'),
+                ' | Resolution Time: ', COALESCE(DATEDIFF('hour', CREATED_AT, CLOSED_AT), 0), 'h'
+              ),
+              'Analyze customer sentiment and provide response in EXACTLY this format:
+
+**Sentiment**: [Overall: Positive/Neutral/Negative - one sentence why]
+
+**What Customers Enjoy**:
+- [Bullet point 1]
+- [Bullet point 2 or "No explicit positive feedback in cases"]
+
+**Common Pain Points**:
+- [Bullet point 1]
+- [Bullet point 2]
+- [Bullet point 3]
+
+Keep under 150 words total.'
+            ) AS AI_SUMMARY,
+            AI_AGG(
+              CONCAT(
+                'Issue: ', COALESCE(SUBJECT, 'N/A'),
+                ' | Details: ', COALESCE(DESCRIPTION, 'N/A')
+              ),
+              'Analyze root causes and categorize ALL issues. Use this EXACT format:
+
+**Product Gaps** (missing features/bugs/technical limitations):
+- [Issue description] OR "None identified"
+
+**Documentation Issues** (unclear/missing/incorrect documentation):
+- [Issue description] OR "None identified"
+
+**Design/Usability Issues** (confusing UX, unintuitive workflows, users attempting unintended usage patterns):
+- [Issue description] OR "None identified"
+
+**Other** (infrastructure/performance/external dependencies):
+- [Issue description] OR "None identified"
+
+Note: If users are confused about how to use a feature, categorize as Documentation Issue if docs are lacking, or Design/Usability Issue if the product itself is unintuitive.
+
+Max 200 words total.'
+            ) AS ROOT_CAUSES,
+            COUNT(*) AS TOTAL_CASE_COUNT
+          FROM {base_table}
+          WHERE GENERATED_PRODUCT IS NOT NULL
+            AND CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
+          GROUP BY GENERATED_PRODUCT
         )
 
         SELECT
@@ -556,18 +604,19 @@ class EnrichmentService:
           LOWER(REPLACE(pm.GENERATED_PRODUCT, ' ', '-')) AS PRODUCT_SLUG,
           pm.GENERATED_PRODUCT AS PRODUCT_NAME,
           COALESCE(pm.GENERATED_PRODUCT_CATEGORY, 'Unknown') AS PRODUCT_CATEGORY,
+          COALESCE(pm.GENERATED_PRODUCT_SUBCATEGORY, 'Unknown') AS PRODUCT_SUBCATEGORY,
           'multi' AS PERIOD,
           pm.earliest_case_date::DATE AS START_DATE,
           pm.latest_case_date::DATE AS END_DATE,
 
-          -- Build nested METRICS JSON
+          -- Build nested METRICS JSON (using reference_date instead of CURRENT_DATE)
           OBJECT_CONSTRUCT(
             'week', OBJECT_CONSTRUCT(
               'current', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', pm.week_current_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -7, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(CURRENT_DATE(), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -7, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR((SELECT reference_date FROM data_date_range), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.week_current_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.week_current_resolution_rate, 0), 1))
@@ -575,8 +624,8 @@ class EnrichmentService:
               'previous', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', pm.week_previous_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -14, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(DATEADD('day', -7, CURRENT_DATE()), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -14, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR(DATEADD('day', -7, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.week_previous_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.week_previous_resolution_rate, 0), 1))
@@ -600,8 +649,8 @@ class EnrichmentService:
               'current', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', pm.month_current_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -30, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(CURRENT_DATE(), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -30, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR((SELECT reference_date FROM data_date_range), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.month_current_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.month_current_resolution_rate, 0), 1))
@@ -609,8 +658,8 @@ class EnrichmentService:
               'previous', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', pm.month_previous_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -60, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(DATEADD('day', -30, CURRENT_DATE()), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -60, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR(DATEADD('day', -30, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.month_previous_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(pm.month_previous_resolution_rate, 0), 1))
@@ -642,10 +691,9 @@ class EnrichmentService:
           -- Top issues
           COALESCE(ti.issues_data, PARSE_JSON('[]')) AS TOP_ISSUES,
 
-          -- AI-generated text fields (placeholder for now)
-          CONCAT('Analysis of ', pm.GENERATED_PRODUCT, ' based on ', COALESCE(pm.week_current_cases, 0) + COALESCE(pm.week_previous_cases, 0), ' recent cases.') AS AI_SUMMARY,
-          CONCAT('Customer feedback from ', COALESCE(pm.week_current_cases, 0) + COALESCE(pm.week_previous_cases, 0), ' support interactions.') AS CUSTOMER_FEEDBACK,
-          'Root cause analysis from case patterns.' AS ROOT_CAUSES,
+          -- AI-generated text fields from AI_AGG
+          COALESCE(ai.AI_SUMMARY, 'No cases in analysis period (last 30 days)') AS AI_SUMMARY,
+          COALESCE(ai.ROOT_CAUSES, 'No cases in analysis period (last 30 days)') AS ROOT_CAUSES,
 
           CURRENT_TIMESTAMP() AS CREATED_AT
 
@@ -654,6 +702,7 @@ class EnrichmentService:
         LEFT JOIN monthly_trend mt ON pm.GENERATED_PRODUCT = mt.GENERATED_PRODUCT
         LEFT JOIN quarterly_trend qt ON pm.GENERATED_PRODUCT = qt.GENERATED_PRODUCT
         LEFT JOIN top_issues ti ON pm.GENERATED_PRODUCT = ti.GENERATED_PRODUCT
+        LEFT JOIN ai_summaries ai ON pm.GENERATED_PRODUCT = ai.GENERATED_PRODUCT
         """
 
         # Execute SQL and save to table
@@ -666,63 +715,69 @@ class EnrichmentService:
         Generates METRICS (week/month current/previous/change) and TREND_DATA (weekly/monthly/quarterly arrays).
         """
         metrics_sql = f"""
-        WITH topic_metrics AS (
+        WITH data_date_range AS (
+          -- Get the actual date range of the data
+          SELECT MAX(CREATED_AT)::DATE AS reference_date
+          FROM {base_table}
+          WHERE GENERATED_TOPIC IS NOT NULL
+        ),
+        topic_metrics AS (
           SELECT
             GENERATED_TOPIC,
 
-            -- Current week metrics (last 7 days)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE())
+            -- Current week metrics (last 7 days from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS week_current_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS week_current_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE()) AND STATUS = 'Closed'
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range)) AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, CURRENT_DATE()) THEN 1 ELSE 0 END), 0)
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -7, (SELECT reference_date FROM data_date_range)) THEN 1 ELSE 0 END), 0)
             ) AS week_current_resolution_rate,
 
-            -- Previous week metrics (days 8-14 ago)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+            -- Previous week metrics (days 8-14 ago from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS week_previous_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS week_previous_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                           AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                           AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                            AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, CURRENT_DATE())
-                                  AND CREATED_AT < DATEADD('day', -7, CURRENT_DATE())
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -14, (SELECT reference_date FROM data_date_range))
+                                  AND CREATED_AT < DATEADD('day', -7, (SELECT reference_date FROM data_date_range))
                              THEN 1 ELSE 0 END), 0)
             ) AS week_previous_resolution_rate,
 
-            -- Current month metrics (last 30 days)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE())
+            -- Current month metrics (last 30 days from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS month_current_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS month_current_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE()) AND STATUS = 'Closed'
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range)) AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, CURRENT_DATE()) THEN 1 ELSE 0 END), 0)
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range)) THEN 1 ELSE 0 END), 0)
             ) AS month_current_resolution_rate,
 
-            -- Previous month metrics (days 31-60 ago)
-            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+            -- Previous month metrics (days 31-60 ago from max data date)
+            SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN 1 ELSE 0 END) AS month_previous_cases,
-            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                          AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+            AVG(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                          AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                      THEN DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))
                      END) AS month_previous_avg_resolution,
-            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                           AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+            (SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                           AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                            AND STATUS = 'Closed'
                       THEN 1 ELSE 0 END) * 100.0 /
-             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, CURRENT_DATE())
-                                  AND CREATED_AT < DATEADD('day', -30, CURRENT_DATE())
+             NULLIF(SUM(CASE WHEN CREATED_AT >= DATEADD('day', -60, (SELECT reference_date FROM data_date_range))
+                                  AND CREATED_AT < DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
                              THEN 1 ELSE 0 END), 0)
             ) AS month_previous_resolution_rate,
 
@@ -735,7 +790,7 @@ class EnrichmentService:
           GROUP BY 1
         ),
 
-        -- Weekly trend (last 16 weeks)
+        -- Weekly trend (last 16 weeks from max data date)
         weekly_trend AS (
           SELECT
             GENERATED_TOPIC,
@@ -757,14 +812,14 @@ class EnrichmentService:
               AVG(DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))) AS weekly_avg_resolution,
               (SUM(CASE WHEN STATUS = 'Closed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS weekly_resolution_rate
             FROM {base_table}
-            WHERE CREATED_AT >= DATEADD('week', -16, CURRENT_DATE())
+            WHERE CREATED_AT >= DATEADD('week', -16, (SELECT reference_date FROM data_date_range))
               AND GENERATED_TOPIC IS NOT NULL
             GROUP BY 1, 2, 3
           )
           GROUP BY 1
         ),
 
-        -- Monthly trend (last 12 months)
+        -- Monthly trend (last 12 months from max data date)
         monthly_trend AS (
           SELECT
             GENERATED_TOPIC,
@@ -786,14 +841,14 @@ class EnrichmentService:
               AVG(DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))) AS monthly_avg_resolution,
               (SUM(CASE WHEN STATUS = 'Closed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS monthly_resolution_rate
             FROM {base_table}
-            WHERE CREATED_AT >= DATEADD('month', -12, CURRENT_DATE())
+            WHERE CREATED_AT >= DATEADD('month', -12, (SELECT reference_date FROM data_date_range))
               AND GENERATED_TOPIC IS NOT NULL
             GROUP BY 1, 2
           )
           GROUP BY 1
         ),
 
-        -- Quarterly trend (up to 12 quarters / 3 years if available)
+        -- Quarterly trend (up to 12 quarters / 3 years if available from max data date)
         quarterly_trend AS (
           SELECT
             GENERATED_TOPIC,
@@ -815,14 +870,14 @@ class EnrichmentService:
               AVG(DATEDIFF('hour', CREATED_AT, COALESCE(CLOSED_AT, CURRENT_TIMESTAMP()))) AS quarterly_avg_resolution,
               (SUM(CASE WHEN STATUS = 'Closed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS quarterly_resolution_rate
             FROM {base_table}
-            WHERE CREATED_AT >= DATEADD('quarter', -12, CURRENT_DATE())
+            WHERE CREATED_AT >= DATEADD('quarter', -12, (SELECT reference_date FROM data_date_range))
               AND GENERATED_TOPIC IS NOT NULL
             GROUP BY 1, 2
           )
           GROUP BY 1
         ),
 
-        -- Top products (top 3 per topic from last 30 days)
+        -- Top products (top 3 per topic from last 30 days relative to max data date)
         top_products AS (
           SELECT
             GENERATED_TOPIC,
@@ -839,7 +894,7 @@ class EnrichmentService:
               COUNT(*) AS product_count
             FROM {base_table}
             WHERE GENERATED_TOPIC IS NOT NULL
-              AND CREATED_AT >= DATEADD('day', -30, CURRENT_DATE())
+              AND CREATED_AT >= DATEADD('day', -30, (SELECT reference_date FROM data_date_range))
             GROUP BY 1, 2
             QUALIFY ROW_NUMBER() OVER (PARTITION BY GENERATED_TOPIC ORDER BY COUNT(*) DESC) <= 3
           )
@@ -854,14 +909,14 @@ class EnrichmentService:
           tm.earliest_case_date::DATE AS START_DATE,
           tm.latest_case_date::DATE AS END_DATE,
 
-          -- Build nested METRICS JSON
+          -- Build nested METRICS JSON (using reference_date instead of CURRENT_DATE)
           OBJECT_CONSTRUCT(
             'week', OBJECT_CONSTRUCT(
               'current', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', tm.week_current_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -7, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(CURRENT_DATE(), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -7, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR((SELECT reference_date FROM data_date_range), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.week_current_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.week_current_resolution_rate, 0), 1))
@@ -869,8 +924,8 @@ class EnrichmentService:
               'previous', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', tm.week_previous_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -14, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(DATEADD('day', -7, CURRENT_DATE()), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -14, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR(DATEADD('day', -7, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.week_previous_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.week_previous_resolution_rate, 0), 1))
@@ -894,8 +949,8 @@ class EnrichmentService:
               'current', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', tm.month_current_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -30, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(CURRENT_DATE(), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -30, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR((SELECT reference_date FROM data_date_range), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.month_current_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.month_current_resolution_rate, 0), 1))
@@ -903,8 +958,8 @@ class EnrichmentService:
               'previous', OBJECT_CONSTRUCT(
                 'totalCases', OBJECT_CONSTRUCT(
                   'value', tm.month_previous_cases,
-                  'startDate', TO_VARCHAR(DATEADD('day', -60, CURRENT_DATE()), 'YYYY-MM-DD'),
-                  'endDate', TO_VARCHAR(DATEADD('day', -30, CURRENT_DATE()), 'YYYY-MM-DD')
+                  'startDate', TO_VARCHAR(DATEADD('day', -60, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD'),
+                  'endDate', TO_VARCHAR(DATEADD('day', -30, (SELECT reference_date FROM data_date_range)), 'YYYY-MM-DD')
                 ),
                 'avgCaseLife', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.month_previous_avg_resolution, 0), 1)),
                 'resolutionRate', OBJECT_CONSTRUCT('value', ROUND(COALESCE(tm.month_previous_resolution_rate, 0), 1))

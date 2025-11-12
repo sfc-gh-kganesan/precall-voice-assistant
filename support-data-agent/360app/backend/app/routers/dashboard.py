@@ -133,3 +133,64 @@ async def get_topic_performance(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/categories")
+async def get_categories(
+    period: str = Query(..., pattern="^(week|month|custom)$"),
+    startDate: str | None = None,
+    endDate: str | None = None,
+):
+    """
+    Get category-level metrics by aggregating all products within each category.
+
+    Returns list of categories with:
+    - Total cases
+    - Case change and change percentage
+    - Average resolution time
+    - Resolution rate
+    - Product count
+    """
+    try:
+        category_metrics = await run_in_threadpool(
+            analytics.get_category_metrics,
+            period,
+            startDate,
+            endDate,
+        )
+        return category_metrics
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/categories/{category}/subcategories")
+async def get_subcategories(
+    category: str,
+    period: str = Query(..., pattern="^(week|month|custom)$"),
+    startDate: str | None = None,
+    endDate: str | None = None,
+):
+    """
+    Get subcategory-level metrics for a specific category.
+
+    Returns list of subcategories within the specified category with:
+    - Total cases
+    - Case change and change percentage
+    - Average resolution time
+    - Resolution rate
+    """
+    try:
+        subcategory_metrics = await run_in_threadpool(
+            analytics.get_subcategory_metrics,
+            period,
+            category,
+            startDate,
+            endDate,
+        )
+        return subcategory_metrics
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

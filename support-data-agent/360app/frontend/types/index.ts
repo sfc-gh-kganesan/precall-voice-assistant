@@ -178,6 +178,7 @@ export interface ProductMetrics {
   productId: string
   productName: string
   productCategory: string
+  productSubcategory?: string
   parentProduct?: string
   metrics: {
     totalCases: KPIMetric
@@ -186,6 +187,8 @@ export interface ProductMetrics {
   }
   topIssues: Issue[]
   trend: TrendData[]
+  aiSummary?: string      // AI-generated customer sentiment summary (markdown formatted)
+  rootCauses?: string     // AI-generated root cause analysis (markdown formatted)
 }
 
 export interface Issue {
@@ -329,4 +332,67 @@ export interface Filters {
   products?: string[]
   topics?: string[]
   categories?: string[]
+}
+
+// Category Metrics Types
+export interface CategoryMetrics {
+  categoryName: string
+  totalCases: number
+  casesChange: number
+  casesChangePercentage: number
+  changeType: 'increase' | 'decrease' | 'neutral'
+  avgResolution: number
+  resolutionRate: number
+  productCount: number
+}
+
+// Subcategory Metrics Types
+export interface SubcategoryMetrics {
+  subcategoryName: string
+  categoryName: string
+  totalCases: number
+  casesChange: number
+  casesChangePercentage: number
+  changeType: 'increase' | 'decrease' | 'neutral'
+  avgResolution: number
+  resolutionRate: number
+}
+
+// Product Benchmarking Types
+export interface ProductBenchmark {
+  id: string
+  name: string
+  cases?: number
+  time?: number
+  rate?: number
+}
+
+export interface BenchmarkData {
+  scope: string
+  average: {
+    cases: number
+    time: number
+    rate: number
+  }
+  topPerformer: ProductBenchmark
+  bottomPerformer: ProductBenchmark
+  bestTimePerformer?: ProductBenchmark
+  bestRatePerformer?: ProductBenchmark
+  yourProduct?: ProductBenchmark
+}
+
+// Product Search Types
+export interface ProductSearchResult {
+  productId: string
+  productName: string
+  productCategory: string
+  productSubcategory: string | null
+}
+
+// Product Filter State
+export interface ProductFilters {
+  categories: string[]
+  subcategories: string[]
+  searchQuery: string
+  selectedProducts: string[]
 }

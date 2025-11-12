@@ -148,8 +148,7 @@ async def delete_simulation(simulation_id: int, db: Session = Depends(get_db)):
     # Can't delete a running simulation - must stop it first
     if simulation.status == SimulationStatus.RUNNING:
         raise HTTPException(
-            status_code=400,
-            detail="Cannot delete running simulation. Stop it first."
+            status_code=400, detail="Cannot delete running simulation. Stop it first."
         )
 
     # Delete related conversations (cascade should handle metrics/messages)
@@ -173,7 +172,7 @@ async def stop_simulation(simulation_id: int, db: Session = Depends(get_db)):
     if simulation.status != SimulationStatus.RUNNING:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot stop simulation with status: {simulation.status.value}"
+            detail=f"Cannot stop simulation with status: {simulation.status.value}",
         )
 
     # Mark as failed with cancellation message

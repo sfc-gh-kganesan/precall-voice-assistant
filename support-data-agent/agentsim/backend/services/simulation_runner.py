@@ -266,7 +266,9 @@ class SimulationRunner:
                 persona_dict = scenario_dict.get("persona", {})
 
                 # Extract knowledge_base - can be at persona level or scenario level
-                knowledge_base = persona_dict.get("knowledge_base") or scenario_dict.get("knowledge_base")
+                knowledge_base = persona_dict.get(
+                    "knowledge_base"
+                ) or scenario_dict.get("knowledge_base")
 
                 persona = Persona(
                     name=persona_dict.get("name", "Custom User"),

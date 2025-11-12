@@ -270,9 +270,12 @@ def get_product_metrics(
         PRODUCT_ID,
         PRODUCT_NAME,
         COALESCE(PRODUCT_CATEGORY, 'Unknown') AS PRODUCT_CATEGORY,
+        PRODUCT_SUBCATEGORY,
         METRICS,
         TOP_ISSUES,
-        TREND_DATA
+        TREND_DATA,
+        AI_SUMMARY,
+        ROOT_CAUSES
     FROM {tables["products"]}
     WHERE {where_clause}
     ORDER BY PRODUCT_NAME
@@ -285,9 +288,12 @@ def get_product_metrics(
 
     product_metrics = []
     for row in results:
-        metrics_json = json.loads(str(row[3])) if isinstance(row[3], str) else row[3]
-        top_issues_json = json.loads(str(row[4])) if row[4] and isinstance(row[4], str) else row[4]
-        trend_data_json = json.loads(str(row[5])) if row[5] and isinstance(row[5], str) else row[5]
+        product_subcategory = row[3] if len(row) > 3 else None
+        metrics_json = json.loads(str(row[4])) if isinstance(row[4], str) else row[4]
+        top_issues_json = json.loads(str(row[5])) if row[5] and isinstance(row[5], str) else row[5]
+        trend_data_json = json.loads(str(row[6])) if row[6] and isinstance(row[6], str) else row[6]
+        ai_summary = str(row[7]) if len(row) > 7 and row[7] is not None else None
+        root_causes = str(row[8]) if len(row) > 8 and row[8] is not None else None
 
         # Extract period-specific metrics from nested structure
         period_metrics = metrics_json.get(display_period, {})
@@ -387,10 +393,13 @@ def get_product_metrics(
                 "productId": row[0],
                 "productName": row[1],
                 "productCategory": row[2],
+                "productSubcategory": product_subcategory,
                 "parentProduct": None,
                 "metrics": flat_metrics,
                 "topIssues": top_issues_json if top_issues_json else [],
                 "trend": transformed_trend,
+                "aiSummary": ai_summary,
+                "rootCauses": root_causes,
             }
         )
 
@@ -664,3 +673,373 @@ def get_topic_performance(
             "bottomPerformers": list(reversed(resolution_rate_sorted[-3:])),
         },
     }
+
+
+def get_category_metrics(
+    period: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Get category-level metrics by aggregating all products within each category.
+
+    Args:
+        period: Time period ('week', 'month', 'custom')
+        start_date: Start date for custom period (ISO format)
+        end_date: End date for custom period (ISO format)
+
+    Returns:
+        List of category metrics dictionaries
+    """
+    # Get all products first
+    product_metrics = get_product_metrics(period, start_date, end_date, None, None, None)
+
+    # Group by category and aggregate
+    category_map: dict[str, dict[str, Any]] = {}
+
+    for product in product_metrics:
+        category = product["productCategory"]
+
+        if category not in category_map:
+            category_map[category] = {
+                "categoryName": category,
+                "totalCases": 0,
+                "totalCasesCurrent": 0,
+                "totalCasesPrevious": 0,
+                "avgResolutionSum": 0.0,
+                "avgResolutionCount": 0,
+                "resolutionRateSum": 0.0,
+                "resolutionRateCount": 0,
+                "products": [],
+            }
+
+        cat = category_map[category]
+        metrics = product["metrics"]
+
+        # Aggregate metrics
+        cat["totalCases"] += metrics["totalCases"]["value"]
+        cat["totalCasesCurrent"] += metrics["totalCases"]["value"]
+        cat["totalCasesPrevious"] += metrics["totalCases"]["previousValue"]
+
+        if metrics["avgCaseLife"]["value"] > 0:
+            cat["avgResolutionSum"] += metrics["avgCaseLife"]["value"]
+            cat["avgResolutionCount"] += 1
+
+        if metrics["resolutionRate"]["value"] > 0:
+            cat["resolutionRateSum"] += metrics["resolutionRate"]["value"]
+            cat["resolutionRateCount"] += 1
+
+        cat["products"].append(product)
+
+    # Calculate averages and format response
+    category_metrics = []
+    for category_name, cat in category_map.items():
+        avg_resolution = (cat["avgResolutionSum"] / cat["avgResolutionCount"]) if cat["avgResolutionCount"] > 0 else 0
+        avg_resolution_rate = (cat["resolutionRateSum"] / cat["resolutionRateCount"]) if cat["resolutionRateCount"] > 0 else 0
+
+        # Calculate trend
+        change = cat["totalCasesCurrent"] - cat["totalCasesPrevious"]
+        change_pct = (change / cat["totalCasesPrevious"] * 100) if cat["totalCasesPrevious"] > 0 else 0
+        change_type = "increase" if change > 0 else ("decrease" if change < 0 else "neutral")
+
+        category_metrics.append(
+            {
+                "categoryName": category_name,
+                "totalCases": cat["totalCases"],
+                "casesChange": change,
+                "casesChangePercentage": round(change_pct, 1),
+                "changeType": change_type,
+                "avgResolution": round(avg_resolution, 1),
+                "resolutionRate": round(avg_resolution_rate, 1),
+                "productCount": len(cat["products"]),
+            }
+        )
+
+    # Sort by total cases descending
+    category_metrics.sort(key=lambda x: x["totalCases"], reverse=True)
+
+    return category_metrics
+
+
+def get_subcategory_metrics(
+    period: str,
+    category: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Get subcategory-level metrics for a specific category.
+
+    Args:
+        period: Time period ('week', 'month', 'custom')
+        category: Parent category name
+        start_date: Start date for custom period (ISO format)
+        end_date: End date for custom period (ISO format)
+
+    Returns:
+        List of subcategory metrics dictionaries
+    """
+    session = snowflake_service._get_session()
+    tables = get_active_configuration()
+
+    # Map custom period to week (default behavior)
+    display_period = "week" if period == "custom" else period
+
+    # Query products table filtered by category
+    query = f"""
+    SELECT
+        PRODUCT_SUBCATEGORY,
+        PRODUCT_CATEGORY,
+        METRICS
+    FROM {tables["products"]}
+    WHERE PRODUCT_CATEGORY = '{category.replace("'", "''")}'
+    """
+
+    results = session.sql(query).collect()
+
+    # Group by subcategory and aggregate
+    subcategory_map: dict[str, dict[str, Any]] = {}
+
+    for row in results:
+        subcategory = row[0]
+        if not subcategory:
+            continue
+
+        metrics_json = json.loads(str(row[2])) if isinstance(row[2], str) else row[2]
+        period_metrics = metrics_json.get(display_period, {})
+        current_metrics = period_metrics.get("current", {})
+        previous_metrics = period_metrics.get("previous", {})
+
+        if subcategory not in subcategory_map:
+            subcategory_map[subcategory] = {
+                "subcategoryName": subcategory,
+                "categoryName": category,
+                "totalCasesCurrent": 0,
+                "totalCasesPrevious": 0,
+                "avgResolutionSum": 0.0,
+                "avgResolutionCount": 0,
+                "resolutionRateSum": 0.0,
+                "resolutionRateCount": 0,
+            }
+
+        subcat = subcategory_map[subcategory]
+
+        # Aggregate
+        total_cases_current = current_metrics.get("totalCases", {}).get("value", 0)
+        total_cases_previous = previous_metrics.get("totalCases", {}).get("value", 0)
+        avg_case_life = current_metrics.get("avgCaseLife", {}).get("value", 0)
+        resolution_rate = current_metrics.get("resolutionRate", {}).get("value", 0)
+
+        subcat["totalCasesCurrent"] += total_cases_current
+        subcat["totalCasesPrevious"] += total_cases_previous
+
+        if avg_case_life > 0:
+            subcat["avgResolutionSum"] += avg_case_life
+            subcat["avgResolutionCount"] += 1
+
+        if resolution_rate > 0:
+            subcat["resolutionRateSum"] += resolution_rate
+            subcat["resolutionRateCount"] += 1
+
+    # Calculate averages and format response
+    subcategory_metrics = []
+    for subcategory_name, subcat in subcategory_map.items():
+        avg_resolution = (subcat["avgResolutionSum"] / subcat["avgResolutionCount"]) if subcat["avgResolutionCount"] > 0 else 0
+        avg_resolution_rate = (subcat["resolutionRateSum"] / subcat["resolutionRateCount"]) if subcat["resolutionRateCount"] > 0 else 0
+
+        # Calculate trend
+        change = subcat["totalCasesCurrent"] - subcat["totalCasesPrevious"]
+        change_pct = (change / subcat["totalCasesPrevious"] * 100) if subcat["totalCasesPrevious"] > 0 else 0
+        change_type = "increase" if change > 0 else ("decrease" if change < 0 else "neutral")
+
+        subcategory_metrics.append(
+            {
+                "subcategoryName": subcategory_name,
+                "categoryName": category,
+                "totalCases": subcat["totalCasesCurrent"],
+                "casesChange": change,
+                "casesChangePercentage": round(change_pct, 1),
+                "changeType": change_type,
+                "avgResolution": round(avg_resolution, 1),
+                "resolutionRate": round(avg_resolution_rate, 1),
+            }
+        )
+
+    # Sort by total cases descending
+    subcategory_metrics.sort(key=lambda x: x["totalCases"], reverse=True)
+
+    return subcategory_metrics
+
+
+def get_product_benchmarks(
+    period: str,
+    category: str | None = None,
+    subcategory: str | None = None,
+    product_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> dict[str, Any]:
+    """
+    Get benchmarking data showing top/bottom performers and averages.
+
+    Args:
+        period: Time period ('week', 'month', 'custom')
+        category: Optional category filter
+        subcategory: Optional subcategory filter
+        product_id: Optional specific product to benchmark
+        start_date: Start date for custom period (ISO format)
+        end_date: End date for custom period (ISO format)
+
+    Returns:
+        Dictionary with scope, average, top/bottom performers, and optional yourProduct
+    """
+    # Get all products
+    product_metrics = get_product_metrics(period, start_date, end_date, None, None, None if not category else [category])
+
+    # Filter by subcategory if provided
+    if subcategory:
+        product_metrics = [p for p in product_metrics if p.get("productSubcategory") == subcategory]
+
+    if len(product_metrics) == 0:
+        return {
+            "scope": subcategory or category or "All Products",
+            "average": {"cases": 0, "time": 0, "rate": 0},
+            "topPerformer": None,
+            "bottomPerformer": None,
+            "yourProduct": None,
+        }
+
+    # Calculate averages
+    total_cases_sum = sum(p["metrics"]["totalCases"]["value"] for p in product_metrics)
+    avg_cases = total_cases_sum / len(product_metrics)
+
+    avg_time_sum = sum(p["metrics"]["avgCaseLife"]["value"] for p in product_metrics if p["metrics"]["avgCaseLife"]["value"] > 0)
+    avg_time_count = len([p for p in product_metrics if p["metrics"]["avgCaseLife"]["value"] > 0])
+    avg_time = avg_time_sum / avg_time_count if avg_time_count > 0 else 0
+
+    avg_rate_sum = sum(p["metrics"]["resolutionRate"]["value"] for p in product_metrics if p["metrics"]["resolutionRate"]["value"] > 0)
+    avg_rate_count = len([p for p in product_metrics if p["metrics"]["resolutionRate"]["value"] > 0])
+    avg_rate = avg_rate_sum / avg_rate_count if avg_rate_count > 0 else 0
+
+    # Find top/bottom performers by case volume
+    sorted_by_cases = sorted(product_metrics, key=lambda p: p["metrics"]["totalCases"]["value"], reverse=True)
+    top_performer = {
+        "id": sorted_by_cases[0]["productId"],
+        "name": sorted_by_cases[0]["productName"],
+        "cases": sorted_by_cases[0]["metrics"]["totalCases"]["value"],
+        "time": sorted_by_cases[0]["metrics"]["avgCaseLife"]["value"],
+        "rate": sorted_by_cases[0]["metrics"]["resolutionRate"]["value"],
+    }
+    bottom_performer = {
+        "id": sorted_by_cases[-1]["productId"],
+        "name": sorted_by_cases[-1]["productName"],
+        "cases": sorted_by_cases[-1]["metrics"]["totalCases"]["value"],
+        "time": sorted_by_cases[-1]["metrics"]["avgCaseLife"]["value"],
+        "rate": sorted_by_cases[-1]["metrics"]["resolutionRate"]["value"],
+    }
+
+    # Find best performer by resolution time (fastest = lowest time)
+    sorted_by_time = sorted([p for p in product_metrics if p["metrics"]["avgCaseLife"]["value"] > 0], key=lambda p: p["metrics"]["avgCaseLife"]["value"])
+    best_time_performer = None
+    if len(sorted_by_time) > 0:
+        best_time_performer = {
+            "id": sorted_by_time[0]["productId"],
+            "name": sorted_by_time[0]["productName"],
+            "time": sorted_by_time[0]["metrics"]["avgCaseLife"]["value"],
+        }
+
+    # Find best performer by resolution rate (highest rate)
+    sorted_by_rate = sorted([p for p in product_metrics if p["metrics"]["resolutionRate"]["value"] > 0], key=lambda p: p["metrics"]["resolutionRate"]["value"], reverse=True)
+    best_rate_performer = None
+    if len(sorted_by_rate) > 0:
+        best_rate_performer = {
+            "id": sorted_by_rate[0]["productId"],
+            "name": sorted_by_rate[0]["productName"],
+            "rate": sorted_by_rate[0]["metrics"]["resolutionRate"]["value"],
+        }
+
+    # If product_id provided, find that specific product
+    your_product = None
+    if product_id:
+        for p in product_metrics:
+            if p["productId"] == product_id:
+                your_product = {
+                    "id": p["productId"],
+                    "name": p["productName"],
+                    "cases": p["metrics"]["totalCases"]["value"],
+                    "time": p["metrics"]["avgCaseLife"]["value"],
+                    "rate": p["metrics"]["resolutionRate"]["value"],
+                }
+                break
+
+    return {
+        "scope": subcategory or category or "All Products",
+        "average": {
+            "cases": round(avg_cases, 1),
+            "time": round(avg_time, 1),
+            "rate": round(avg_rate, 1),
+        },
+        "topPerformer": top_performer,
+        "bottomPerformer": bottom_performer,
+        "bestTimePerformer": best_time_performer,
+        "bestRatePerformer": best_rate_performer,
+        "yourProduct": your_product,
+    }
+
+
+def search_products(
+    query: str,
+    category: str | None = None,
+    subcategory: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Search products by name with optional category/subcategory filters.
+
+    Args:
+        query: Search query string
+        category: Optional category filter
+        subcategory: Optional subcategory filter
+
+    Returns:
+        List of matching products with id and name
+    """
+    session = snowflake_service._get_session()
+    tables = get_active_configuration()
+
+    # Build filter conditions
+    escaped_query = query.replace("'", "''")
+    filter_conditions = [f"UPPER(PRODUCT_NAME) LIKE UPPER('%{escaped_query}%')"]
+
+    if category:
+        escaped_category = category.replace("'", "''")
+        filter_conditions.append(f"PRODUCT_CATEGORY = '{escaped_category}'")
+
+    if subcategory:
+        escaped_subcategory = subcategory.replace("'", "''")
+        filter_conditions.append(f"GENERATED_PRODUCT_SUBCATEGORY = '{escaped_subcategory}'")
+
+    where_clause = " AND ".join(filter_conditions)
+
+    search_query = f"""
+    SELECT
+        PRODUCT_ID,
+        PRODUCT_NAME,
+        PRODUCT_CATEGORY,
+        GENERATED_PRODUCT_SUBCATEGORY
+    FROM {tables["products"]}
+    WHERE {where_clause}
+    ORDER BY PRODUCT_NAME
+    LIMIT 50
+    """
+
+    results = session.sql(search_query).collect()
+
+    return [
+        {
+            "productId": row[0],
+            "productName": row[1],
+            "productCategory": row[2],
+            "productSubcategory": row[3],
+        }
+        for row in results
+    ]

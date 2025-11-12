@@ -9,7 +9,6 @@ This API wraps the PydanticAI agent and provides HTTP endpoints for:
 Intended for integration with agentsim and other services.
 """
 
-import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional, Union
@@ -17,7 +16,7 @@ from typing import Any, Dict, List, Optional, Union
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 from pydantic_ai import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,

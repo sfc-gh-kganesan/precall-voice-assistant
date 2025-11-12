@@ -80,7 +80,9 @@ async def setup_glean_proxy():
             params = kwargs.copy()
             if args:
                 # If positional args are provided, try to match them with input schema
-                logger.warning(f"Positional args provided for {_tool_name}, using kwargs only")
+                logger.warning(
+                    f"Positional args provided for {_tool_name}, using kwargs only"
+                )
 
             logger.info(f"Calling Glean tool: {_tool_name} with params: {params}")
             result = await glean_client.call_tool(_tool_name, params)
@@ -95,13 +97,19 @@ async def setup_glean_proxy():
 
         # Set function metadata
         tool_wrapper.__name__ = tool_name
-        tool_wrapper.__doc__ = tool.description if hasattr(tool, "description") else f"Glean tool: {tool_name}"
+        tool_wrapper.__doc__ = (
+            tool.description
+            if hasattr(tool, "description")
+            else f"Glean tool: {tool_name}"
+        )
 
         # Register the wrapper as a tool on the proxy
         proxy.tool(tool_wrapper)
         logger.info(f"  ✓ Registered tool: {tool_name}")
 
-    logger.info(f"\nSummary: Registered {len(tools) - excluded_count} tools, excluded {excluded_count} tools")
+    logger.info(
+        f"\nSummary: Registered {len(tools) - excluded_count} tools, excluded {excluded_count} tools"
+    )
 
     return proxy
 
@@ -125,7 +133,9 @@ def main():
         logger.info("Starting HTTP server...")
 
         # Run the proxy on HTTP transport
-        await proxy.run_async(transport="http", host="127.0.0.1", port=8001, path="/mcp")
+        await proxy.run_async(
+            transport="http", host="127.0.0.1", port=8001, path="/mcp"
+        )
 
     asyncio.run(run_proxy())
 

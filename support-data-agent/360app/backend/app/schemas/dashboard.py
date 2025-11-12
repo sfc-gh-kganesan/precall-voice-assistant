@@ -17,10 +17,13 @@ class ProductMetrics(BaseModel):
     productId: str
     productName: str
     productCategory: str
+    productSubcategory: str | None = None
     parentProduct: str | None = None
     metrics: dict
     topIssues: list[Issue]
     trend: list[TrendPoint]
+    aiSummary: str | None = None
+    rootCauses: str | None = None
 
 
 class TopicSentiment(BaseModel):

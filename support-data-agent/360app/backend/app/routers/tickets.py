@@ -9,7 +9,7 @@ from ..services.configuration import get_active_configuration
 router = APIRouter()
 
 
-def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: str, product: str | None = None) -> tuple[list[SupportTicket], int]:
+def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: str, product: str | None = None, severity: str | None = None) -> tuple[list[SupportTicket], int]:
     """
     Fetch paginated tickets from the active configuration's base table.
 
@@ -19,6 +19,7 @@ def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: s
         sort_by: Column to sort by (default: CREATED_AT)
         sort_order: Sort direction ('asc' or 'desc')
         product: Optional product name to filter by
+        severity: Optional comma-separated severity levels to filter by (e.g., "Severity-1,Severity-2")
 
     Returns:
         Tuple of (list of tickets, total count)
@@ -47,10 +48,22 @@ def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: s
     # Calculate offset
     offset = (page - 1) * page_size
 
-    where_clause = ""
+    # Build WHERE clause
+    where_conditions = []
     if product:
         safe_product = product.replace("'", "''")
-        where_clause = f" WHERE GENERATED_PRODUCT = '{safe_product}'"
+        where_conditions.append(f"GENERATED_PRODUCT = '{safe_product}'")
+
+    if severity:
+        # Parse comma-separated severity levels and escape them
+        severity_levels = [s.strip().replace("'", "''") for s in severity.split(",")]
+        # Use LIKE to match severity prefix (e.g., "Severity-1" matches "Severity-1: Critical outage")
+        severity_conditions = [f"CURRENT_SEVERITY LIKE '{level}%'" for level in severity_levels]
+        where_conditions.append(f"({' OR '.join(severity_conditions)})")
+
+    where_clause = ""
+    if where_conditions:
+        where_clause = " WHERE " + " AND ".join(where_conditions)
 
     count_query = f"SELECT COUNT(*) FROM {base_table}{where_clause}"
     total = int(session.sql(count_query).collect()[0][0])
@@ -71,6 +84,7 @@ def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: s
         TOTAL_COMMENTS,
         GENERATED_TOPIC,
         GENERATED_PRODUCT_CATEGORY,
+        GENERATED_PRODUCT_SUBCATEGORY,
         GENERATED_PRODUCT,
         ENRICHED_AT
     FROM {base_table}{where_clause}
@@ -96,9 +110,9 @@ def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: s
             id=row[0],  # CASE_ID
             case_number=row[1],  # CASE_NUMBER
             created_at=row[2].isoformat() if row[2] else "",  # CREATED_AT
-            updated_at=row[16].isoformat() if row[16] else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
+            updated_at=row[17].isoformat() if row[17] else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
             closed_at=row[3].isoformat() if row[3] else None,  # CLOSED_AT
-            last_modified_at=row[16].isoformat() if row[16] else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
+            last_modified_at=row[17].isoformat() if row[17] else (row[2].isoformat() if row[2] else ""),  # ENRICHED_AT or CREATED_AT
             status=row[4] or "",  # STATUS
             severity=row[5] or "",  # CURRENT_SEVERITY
             initial_severity=None,
@@ -114,7 +128,8 @@ def _fetch_tickets(page: int, page_size: int, sort_by: str | None, sort_order: s
             has_collaborations=None,
             generated_topic=row[13],  # GENERATED_TOPIC
             generated_product_category=row[14],  # GENERATED_PRODUCT_CATEGORY
-            generated_product=row[15],  # GENERATED_PRODUCT
+            generated_product_subcategory=row[15],  # GENERATED_PRODUCT_SUBCATEGORY
+            generated_product=row[16],  # GENERATED_PRODUCT
             generated_feature=None,
             sentiment=None,
             resolution_time_hours=resolution_hours,
@@ -132,6 +147,7 @@ async def get_tickets(
     sortBy: str | None = None,
     sortOrder: str = Query("desc", pattern="^(asc|desc)$"),
     product: str | None = Query(None, description="Filter by product name"),
+    severity: str | None = Query(None, description="Filter by severity (comma-separated, e.g., 'Severity-1,Severity-2')"),
 ):
     """
     Get paginated list of support tickets from the active configuration's base table.
@@ -142,13 +158,14 @@ async def get_tickets(
         sortBy: Column to sort by (created_at, status, severity, case_number, subject, account_name, generated_product)
         sortOrder: Sort direction (asc or desc)
         product: Optional product name to filter by
+        severity: Optional comma-separated severity levels to filter by
 
     Returns:
         Paginated tickets response with total count
     """
     try:
         # Run blocking Snowpark operation in thread pool
-        tickets, total = await asyncio.to_thread(_fetch_tickets, page, pageSize, sortBy, sortOrder, product)
+        tickets, total = await asyncio.to_thread(_fetch_tickets, page, pageSize, sortBy, sortOrder, product, severity)
 
         return PaginatedTickets(
             tickets=tickets,

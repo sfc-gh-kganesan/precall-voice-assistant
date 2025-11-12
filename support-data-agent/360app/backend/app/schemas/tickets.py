@@ -23,6 +23,7 @@ class SupportTicket(BaseModel):
     has_collaborations: bool | None = None
     generated_topic: str | None = None
     generated_product_category: str | None = None
+    generated_product_subcategory: str | None = None
     generated_product: str | None = None
     generated_feature: str | None = None
     sentiment: str | None = None

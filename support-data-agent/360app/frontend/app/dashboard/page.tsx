@@ -7,7 +7,7 @@ import { dashboardApi } from '@/services/api'
 import { KPICard } from '@/components/dashboard/KPICard'
 import { FilterBar } from '@/components/common/FilterBar'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
-import { ProductPerformanceSection } from '@/components/dashboard/ProductPerformanceSection'
+import { CategorySummary } from '@/components/dashboard/CategorySummary'
 import { TopicPerformanceSection } from '@/components/dashboard/TopicPerformanceSection'
 import { SnowflakeLogo } from '@/components/ui/SnowflakeLogo'
 import { NoConfigurationAlert } from '@/components/common/NoConfigurationAlert'
@@ -71,23 +71,25 @@ export default function DashboardPage() {
             {/* Filter Bar */}
             <FilterBar className="mb-6" />
 
-            {/* KPI Cards */}
-            <div className="mb-6">
+            {/* KPI Cards & Category Summary */}
+            <div className="mb-6 space-y-6">
               {kpisLoading ? (
                 <LoadingSpinner size="lg" className="h-32" />
               ) : kpis ? (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <KPICard metric={kpis.avgCases} />
-                  <KPICard metric={kpis.avgCaseLife} />
-                  <KPICard metric={kpis.resolutionRate} />
-                  <KPICard metric={kpis.firstResponseTime} />
-                </div>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <KPICard metric={kpis.avgCases} />
+                    <KPICard metric={kpis.avgCaseLife} />
+                    <KPICard metric={kpis.resolutionRate} />
+                    <KPICard metric={kpis.firstResponseTime} />
+                  </div>
+                  <CategorySummary />
+                </>
               ) : null}
             </div>
 
-            {/* Product & Topic Metrics */}
+            {/* Topic Metrics */}
             <div className="space-y-6">
-              <ProductPerformanceSection />
               <TopicPerformanceSection />
             </div>
           </>

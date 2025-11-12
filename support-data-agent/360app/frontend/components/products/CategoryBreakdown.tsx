@@ -59,7 +59,7 @@ export function CategoryBreakdown({ products, selectedCategory, onCategorySelect
       percentOfTotal: (cat.totalCases / totalCases) * 100,
       avgResolutionTime: avgResolution,
       trend: avgTrend,
-      trendType: avgTrend > 0 ? 'increase' : avgTrend < 0 ? 'decrease' : 'neutral',
+      trendType: (avgTrend > 0 ? 'increase' : avgTrend < 0 ? 'decrease' : 'neutral') as 'neutral' | 'increase' | 'decrease',
     }
   }).sort((a, b) => b.totalCases - a.totalCases).slice(0, 4)
 

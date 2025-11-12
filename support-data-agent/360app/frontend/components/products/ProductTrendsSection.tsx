@@ -54,7 +54,7 @@ export function ProductTrendsSection() {
               </div>
               <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                 <span className="text-error font-medium">{item.changePercentage > 0 ? '+' : ''}{item.changePercentage}%</span>
-                <span className="text-muted-foreground">{item.value}</span>
+                <span className="text-muted-foreground">{item.currentValue}</span>
               </div>
             </div>
           ))}
@@ -75,7 +75,7 @@ export function ProductTrendsSection() {
               </div>
               <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                 <span className="text-error font-medium">{item.changePercentage > 0 ? '+' : ''}{item.changePercentage}%</span>
-                <span className="text-muted-foreground">{item.value}h</span>
+                <span className="text-muted-foreground">{item.currentValue}h</span>
               </div>
             </div>
           ))}
@@ -96,7 +96,7 @@ export function ProductTrendsSection() {
               </div>
               <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                 <span className="text-error font-medium">{item.changePercentage > 0 ? '+' : ''}{item.changePercentage}%</span>
-                <span className="text-muted-foreground">{item.value}%</span>
+                <span className="text-muted-foreground">{item.currentValue}%</span>
               </div>
             </div>
           ))}

@@ -11,15 +11,17 @@ interface TicketRowProps {
   getStatusColor: (status: string) => string
   getSeverityColor: (severity: string) => string
   getSeverityLabel: (severity: string) => string
+  shouldAutoExpand?: boolean
 }
 
 export function TicketRow({
   ticket,
   getStatusColor,
   getSeverityColor,
-  getSeverityLabel
+  getSeverityLabel,
+  shouldAutoExpand = false
 }: TicketRowProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(shouldAutoExpand)
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded)

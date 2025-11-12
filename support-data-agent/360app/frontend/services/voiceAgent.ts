@@ -255,7 +255,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
               }
             }
           }
-        } as unknown)
+        } as any)
 
         console.log('[Voice Agent] VAD disabled successfully for PTT mode')
       } catch (error) {
@@ -352,7 +352,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
           }
         }
       }
-    } as unknown) // Cast to unknown because we're using snake_case for server format
+    } as any) // Cast to any because we're using snake_case for server format
 
     console.log(`[Voice Agent] Continuous listening ${enabled ? 'enabled' : 'disabled'}`)
   }
@@ -387,7 +387,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
     // User speech transcription (via transport events)
     session.on('transport_event', (event: Record<string, unknown>) => {
       // Log all transport events during development to debug issues
-      if (event.type.includes('error')) {
+      if (typeof event.type === 'string' && event.type.includes('error')) {
         console.error('[Voice Agent] Transport error event:', JSON.stringify(event, null, 2))
       }
 
@@ -398,7 +398,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
           this.callbacks.onMessage?.({
             id: `user-${Date.now()}`,
             role: 'user',
-            content: event.transcript,
+            content: event.transcript as string,
             timestamp: new Date()
           })
         }
@@ -420,9 +420,9 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
         if (event.transcript) {
           console.log('[Voice Agent] Assistant said:', event.transcript)
           this.callbacks.onMessage?.({
-            id: event.item_id || `assistant-${Date.now()}`,
+            id: (event.item_id as string) || `assistant-${Date.now()}`,
             role: 'assistant',
-            content: event.transcript,
+            content: event.transcript as string,
             timestamp: new Date()
           })
         }
@@ -444,7 +444,7 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
         if (textContent) {
           console.log('[Voice Agent] Assistant response:', textContent)
           this.callbacks.onMessage?.({
-            id: item.id || `assistant-${Date.now()}`,
+            id: (item.id as string) || `assistant-${Date.now()}`,
             role: 'assistant',
             content: textContent,
             timestamp: new Date()
@@ -469,10 +469,11 @@ Remember: WAIT for tool results. If it's taking time, tell the user you're still
 
       // Try to extract error message from various possible structures
       let errorMessage = 'Unknown session error'
-      if (error?.error?.message) {
-        errorMessage = error.error.message
+      if (error?.error && typeof error.error === 'object' &&
+          (error.error as Record<string, unknown>).message) {
+        errorMessage = (error.error as Record<string, unknown>).message as string
       } else if (error?.message) {
-        errorMessage = error.message
+        errorMessage = error.message as string
       } else if (typeof error === 'string') {
         errorMessage = error
       } else if (Object.keys(error || {}).length > 0) {

@@ -64,8 +64,8 @@ class SchemaManager:
             self.session.sql("""
                 UPDATE CASES
                 SET GENERATED_TOPIC = NULL, GENERATED_PRODUCT = NULL,
-                    GENERATED_PRODUCT_CATEGORY = NULL, GENERATED_SENTIMENT = NULL,
-                    ENRICHED_AT = NULL
+                    GENERATED_PRODUCT_CATEGORY = NULL, GENERATED_PRODUCT_SUBCATEGORY = NULL,
+                    GENERATED_SENTIMENT = NULL, ENRICHED_AT = NULL
             """).collect()
 
             self._create_topics_table()
@@ -113,6 +113,7 @@ class SchemaManager:
             HAS_COLLABORATIONS BOOLEAN,
             GENERATED_TOPIC VARCHAR(100),
             GENERATED_PRODUCT_CATEGORY VARCHAR(100),
+            GENERATED_PRODUCT_SUBCATEGORY VARCHAR(100),
             GENERATED_PRODUCT VARCHAR(100),
             GENERATED_FEATURE VARCHAR(100),
             GENERATED_SENTIMENT VARCHAR(20),
@@ -158,7 +159,6 @@ class SchemaManager:
             TOP_ISSUES VARIANT,
             TREND_DATA VARIANT,
             AI_SUMMARY TEXT,
-            CUSTOMER_FEEDBACK TEXT,
             ROOT_CAUSES TEXT,
             CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
         )
