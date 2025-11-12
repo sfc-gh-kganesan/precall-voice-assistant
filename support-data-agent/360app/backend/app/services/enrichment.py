@@ -547,23 +547,32 @@ class EnrichmentService:
             GENERATED_PRODUCT,
             AI_AGG(
               CONCAT(
-                'Severity: ', COALESCE(CURRENT_SEVERITY, 'Unknown'),
+                'Product: ', COALESCE(GENERATED_PRODUCT, 'N/A'),
+                ' | Severity: ', COALESCE(CURRENT_SEVERITY, 'Unknown'),
                 ' | Case: ', COALESCE(CASE_NUMBER, 'N/A'),
                 ' | Subject: ', COALESCE(SUBJECT, 'N/A'),
                 ' | Description: ', COALESCE(DESCRIPTION, 'N/A'),
                 ' | Customer: ', COALESCE(ACCOUNT_NAME, 'N/A'),
                 ' | Resolution Time: ', COALESCE(DATEDIFF('hour', CREATED_AT, CLOSED_AT), 0), 'h'
               ),
-              'Analyze customer sentiment and provide response in EXACTLY this format:
+              'You are analyzing support cases for a SPECIFIC PRODUCT. Focus on customer sentiment about THIS PRODUCT.
+
+When customers mention other products or features, INCLUDE that feedback ONLY if it relates to:
+- How THIS PRODUCT integrates or works with other products/tools
+- Compatibility issues with THIS PRODUCT
+- Comparison feedback about THIS PRODUCT vs alternatives
+- Workflows involving THIS PRODUCT and other components
+
+Analyze customer sentiment for THIS PRODUCT and provide response in EXACTLY this format:
 
 **Sentiment**: [Overall: Positive/Neutral/Negative - one sentence why]
 
 **What Customers Enjoy**:
-- [Bullet point 1]
+- [Bullet point 1 - can mention other products if relevant to THIS product''s usage]
 - [Bullet point 2 or "No explicit positive feedback in cases"]
 
 **Common Pain Points**:
-- [Bullet point 1]
+- [Bullet point 1 - can mention integration/compatibility issues with other products]
 - [Bullet point 2]
 - [Bullet point 3]
 
@@ -571,24 +580,33 @@ Keep under 150 words total.'
             ) AS AI_SUMMARY,
             AI_AGG(
               CONCAT(
-                'Issue: ', COALESCE(SUBJECT, 'N/A'),
+                'Product: ', COALESCE(GENERATED_PRODUCT, 'N/A'),
+                ' | Issue: ', COALESCE(SUBJECT, 'N/A'),
                 ' | Details: ', COALESCE(DESCRIPTION, 'N/A')
               ),
-              'Analyze root causes and categorize ALL issues. Use this EXACT format:
+              'You are analyzing root causes for a SPECIFIC PRODUCT. Focus on issues related to THIS PRODUCT.
 
-**Product Gaps** (missing features/bugs/technical limitations):
+When customers mention other products or features, INCLUDE that information ONLY if it relates to:
+- Integration issues between THIS PRODUCT and other tools
+- Compatibility problems with THIS PRODUCT
+- Difficulty using THIS PRODUCT alongside other components
+- Missing features in THIS PRODUCT that affect interoperability
+
+Analyze root causes for THIS PRODUCT and categorize ALL issues. Use this EXACT format:
+
+**Product Gaps** (missing features/bugs/technical limitations in THIS product, including integration gaps):
 - [Issue description] OR "None identified"
 
-**Documentation Issues** (unclear/missing/incorrect documentation):
+**Documentation Issues** (unclear/missing/incorrect documentation for THIS product):
 - [Issue description] OR "None identified"
 
-**Design/Usability Issues** (confusing UX, unintuitive workflows, users attempting unintended usage patterns):
+**Design/Usability Issues** (confusing UX, unintuitive workflows, integration complexity for THIS product):
 - [Issue description] OR "None identified"
 
-**Other** (infrastructure/performance/external dependencies):
+**Other** (infrastructure/performance/external dependencies affecting THIS product):
 - [Issue description] OR "None identified"
 
-Note: If users are confused about how to use a feature, categorize as Documentation Issue if docs are lacking, or Design/Usability Issue if the product itself is unintuitive.
+Note: If users struggle to integrate THIS product with other tools, categorize based on root cause (missing feature vs bad docs vs poor UX).
 
 Max 200 words total.'
             ) AS ROOT_CAUSES,
