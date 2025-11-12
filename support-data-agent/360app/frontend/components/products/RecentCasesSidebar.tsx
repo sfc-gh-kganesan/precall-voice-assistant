@@ -103,7 +103,7 @@ export function RecentCasesSidebar({ productName }: RecentCasesSidebarProps) {
                 <div
                   key={ticket.case_number}
                   onClick={() => handleCaseClick(ticket)}
-                  className="cursor-pointer hover:bg-accent/50 p-3 rounded-lg transition-all border border-border hover:border-primary/20 hover:shadow-sm"
+                  className="cursor-pointer bg-background hover:bg-accent/50 p-3 rounded-lg transition-all border border-border hover:border-primary/20 hover:shadow-sm"
                 >
                   {/* Subject - Most Prominent */}
                   <div className="mb-2">

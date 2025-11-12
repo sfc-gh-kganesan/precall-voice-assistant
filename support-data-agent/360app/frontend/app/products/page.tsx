@@ -69,6 +69,19 @@ function ProductsContent() {
     setSelectedProducts([])
   }
 
+  // Handler to toggle filters visibility
+  const [showFilters, setShowFilters] = useState(true)
+  const isDetailView = selectedProducts.length === 1
+
+  // Auto-hide filters when entering detail view
+  useEffect(() => {
+    if (isDetailView) {
+      setShowFilters(false)
+    } else {
+      setShowFilters(true)
+    }
+  }, [isDetailView])
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -118,22 +131,34 @@ function ProductsContent() {
             <FilterBar className="mb-6" />
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Filters Sidebar */}
-              <div className="lg:col-span-1">
-                <ProductFilters
-                  selectedCategories={selectedCategories}
-                  selectedSubcategories={selectedSubcategories}
-                  selectedProducts={selectedProducts}
-                  searchQuery={searchQuery}
-                  onCategoriesChange={setSelectedCategories}
-                  onSubcategoriesChange={setSelectedSubcategories}
-                  onProductsChange={setSelectedProducts}
-                  onSearchQueryChange={setSearchQuery}
-                />
-              </div>
+              {/* Filters Sidebar - Hide on detail view */}
+              {(!isDetailView || showFilters) && (
+                <div className="lg:col-span-1">
+                  <ProductFilters
+                    selectedCategories={selectedCategories}
+                    selectedSubcategories={selectedSubcategories}
+                    selectedProducts={selectedProducts}
+                    searchQuery={searchQuery}
+                    onCategoriesChange={setSelectedCategories}
+                    onSubcategoriesChange={setSelectedSubcategories}
+                    onProductsChange={setSelectedProducts}
+                    onSearchQueryChange={setSearchQuery}
+                  />
+                </div>
+              )}
 
-              {/* Main Content */}
-              <div className="lg:col-span-3 space-y-6">
+              {/* Main Content - Full width on detail view when filters hidden */}
+              <div className={`space-y-6 ${isDetailView && !showFilters ? 'lg:col-span-4' : 'lg:col-span-3'}`}>
+                {/* Show Filters Button - Only visible on detail view when filters are hidden */}
+                {isDetailView && !showFilters && (
+                  <button
+                    onClick={() => setShowFilters(true)}
+                    className="mb-4 px-4 py-2 bg-card border border-border rounded-lg text-sm font-medium text-foreground hover:bg-accent/20 transition-colors"
+                  >
+                    Show Filters
+                  </button>
+                )}
+
                 {/* Product Discovery or Detail View */}
                 {selectedProducts.length === 1 ? (
                   <ProductDetailView
