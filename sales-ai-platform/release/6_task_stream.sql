@@ -19,6 +19,7 @@ BEGIN
     activity_id VARCHAR,
     owner_id VARCHAR,
     salesforce_account_id VARCHAR,
+    activity_date DATE,
     processed_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
   );
   
@@ -27,8 +28,8 @@ BEGIN
   
   -- INSERT from stream to advance it (and persist the batch)
   INSERT INTO ai_fde.sales_ai_platform.processed_engagement_details 
-    (activity_id, owner_id, salesforce_account_id)
-  SELECT activity_id, owner_id, salesforce_account_id
+    (activity_id, owner_id, salesforce_account_id, activity_date)
+  SELECT activity_id, owner_id, salesforce_account_id, activity_date
   FROM ai_fde.sales_ai_platform.all_engagement_details_stream
   WHERE type='MEETING' 
   AND raw_content IS NOT NULL

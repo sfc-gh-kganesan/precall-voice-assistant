@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION ${DATABASE}.${SCHEMA}.sales_ai_meetings_analyze(activ
   AS '/v1/meetings/analyze';
 
 -- Submit meeting intelligence jobs
-CREATE OR REPLACE FUNCTION ${DATABASE}.${SCHEMA}.sales_ai_meetings_jobs(args VARIANT)
+CREATE OR REPLACE FUNCTION ${DATABASE}.${SCHEMA}.sales_ai_meetings_jobs(activity_id VARCHAR, owner_id VARCHAR, salesforce_account_id VARCHAR)
   RETURNS VARIANT
   SERVICE=${DATABASE}.${SCHEMA}.${SERVICE_NAME}
   ENDPOINT=api
@@ -20,7 +20,7 @@ EXECUTE IMMEDIATE $$
     FOR i IN 0 TO ARRAY_SIZE(:role_array) - 1 DO
       LET current_role STRING := TRIM(GET(:role_array, :i));
       EXECUTE IMMEDIATE 'GRANT USAGE ON FUNCTION ${DATABASE}.${SCHEMA}.sales_ai_meetings_analyze(VARCHAR, VARCHAR, VARCHAR) TO ROLE ' || :current_role;
-      EXECUTE IMMEDIATE 'GRANT USAGE ON FUNCTION ${DATABASE}.${SCHEMA}.sales_ai_meetings_jobs(VARIANT) TO ROLE ' || :current_role;
+      EXECUTE IMMEDIATE 'GRANT USAGE ON FUNCTION ${DATABASE}.${SCHEMA}.sales_ai_meetings_jobs(VARCHAR, VARCHAR, VARCHAR) TO ROLE ' || :current_role;
     END FOR;
   END;
 $$;

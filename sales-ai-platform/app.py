@@ -280,12 +280,14 @@ async def meetings_jobs(request: MeetingsAnalyzeRequest):
     for row in request.data:
         row_index, activity_id, owner_id, salesforce_account_id = row[0], row[1], row[2], row[3]
         handle = await dbos_meetings_jobs_queue.enqueue_async(meetings_durable_workflow, MeetingsJobParams(activity_id=activity_id, owner_id=owner_id, salesforce_account_id=salesforce_account_id))
+        workflow_id = handle.get_workflow_id()
+        DBOS.logger.info(f"Enqueued post-meeting intelligence workflow. Activity ID: {activity_id}, Workflow ID: {workflow_id}")
         result_data.append(
             [
                 row_index,
                 {
                     "message": "Successfully enqueued post-meeting intelligence workflow",
-                    "workflow_id": handle.get_workflow_id(),
+                    "workflow_id": workflow_id,
                 },
             ]
         )
