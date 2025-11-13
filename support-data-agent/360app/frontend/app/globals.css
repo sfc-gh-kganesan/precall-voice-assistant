@@ -1,34 +1,13 @@
+/* Import the centralized design system */
+@import './design-system.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    /* Snowflake brand colors - Dark mode */
-    --background: 222 47% 11%;          /* Dark blue-gray #111827 */
-    --foreground: 210 20% 98%;          /* Off-white #F9FAFB */
-    --card: 217 33% 17%;                /* #1E293B */
-    --card-foreground: 210 20% 98;      /* #F9FAFB */
-    --popover: 217 33% 17%;             /* #1E293B */
-    --popover-foreground: 210 20% 98;
-    --primary: 193 82% 53%;             /* Snowflake blue #29B5E8 */
-    --primary-foreground: 222 47% 11%;  /* Dark text on bright bg */
-    --secondary: 195 100% 39%;          /* Deeper blue #0078C8 */
-    --secondary-foreground: 210 20% 98%;
-    --muted: 215 20% 35%;               /* Muted gray-blue */
-    --muted-foreground: 217 10% 65%;    /* Light muted */
-    --accent: 180 67% 47%;              /* Accent cyan #29B5A8 */
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 84% 60%;           /* #F44336 */
-    --destructive-foreground: 210 20% 98%;
-    --success: 142 76% 36%;             /* #16A34A */
-    --warning: 38 92% 50%;              /* #FF9800 */
-    --error: 0 84% 60%;                 /* #F44336 */
-    --border: 217 20% 25%;              /* Subtle border */
-    --input: 217 33% 17%;
-    --ring: 193 82% 53%;                /* Snowflake blue ring */
-    --radius: 0.5rem;
-  }
+  /* Tailwind compatibility layer is now provided by each theme */
+  /* See themes/*.css files for theme-specific color definitions */
 
   * {
     @apply border-border;
@@ -36,7 +15,12 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 

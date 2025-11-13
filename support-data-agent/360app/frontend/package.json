@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "theme": "node app/themes/switch-theme.js"
   },
   "dependencies": {
     "@openai/agents": "^0.2.1",

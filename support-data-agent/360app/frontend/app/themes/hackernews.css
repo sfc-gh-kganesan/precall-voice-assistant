@@ -1,0 +1,128 @@
+/**
+ * Hacker News Theme
+ *
+ * Minimal, classic design inspired by Hacker News
+ * - Orange header bar (#ff6600)
+ * - Beige background (#f6f6ef)
+ * - Verdana font family
+ * - Simple, flat design with minimal shadows
+ */
+
+:root {
+  /* === TAILWIND COMPATIBILITY LAYER === */
+  /* These map to Tailwind's expected HSL format for @apply classes */
+  --background: 60 5% 96%;            /* Beige #f6f6ef */
+  --foreground: 0 0% 0%;              /* Black #000000 */
+  --card: 0 0% 100%;                  /* White #ffffff */
+  --card-foreground: 0 0% 0%;         /* Black #000000 */
+  --popover: 60 17% 98%;              /* Light beige #fafaf5 */
+  --popover-foreground: 0 0% 0%;      /* Black */
+  --primary: 20 100% 50%;             /* HN Orange #ff6600 */
+  --primary-foreground: 0 0% 100%;    /* White text on orange */
+  --secondary: 0 0% 51%;              /* Gray #828282 */
+  --secondary-foreground: 0 0% 100%;  /* White */
+  --muted: 60 5% 90%;                 /* Light beige #e6e6df */
+  --muted-foreground: 0 0% 51%;       /* Gray #828282 */
+  --accent: 20 100% 50%;              /* HN Orange #ff6600 */
+  --accent-foreground: 0 0% 100%;     /* White */
+  --destructive: 0 65% 55%;           /* Red #dd4444 */
+  --destructive-foreground: 0 0% 100%;
+  --success: 120 28% 50%;             /* Green #5a9f5a */
+  --warning: 40 100% 50%;             /* Yellow #ffaa00 */
+  --error: 0 65% 55%;                 /* Red #dd4444 */
+  --border: 60 5% 90%;                /* Light beige border #e6e6df */
+  --input: 0 0% 100%;                 /* White */
+  --ring: 20 100% 50%;                /* HN Orange ring */
+  --radius: 0.125rem;                 /* 2px - minimal rounded corners */
+
+  /* === COLORS === */
+  /* Hacker News Orange Theme */
+  --color-hn-orange: #ff6600;
+  --color-hn-orange-dark: #ff5500;
+  --color-hn-beige: #f6f6ef;
+
+  /* Background Colors */
+  --color-bg-primary: #f6f6ef;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #fafaf5;
+  --color-bg-muted: #e6e6df;
+  --color-bg-hover: #f0f0eb;
+
+  /* Text Colors */
+  --color-text-primary: #000000;
+  --color-text-secondary: #828282;
+  --color-text-muted: #999999;
+  --color-text-disabled: #cccccc;
+  --color-text-on-primary: #ffffff;
+
+  /* Interactive Colors */
+  --color-primary: #ff6600;
+  --color-primary-hover: #ff5500;
+  --color-primary-active: #ff4400;
+  --color-primary-light: #ffe8d9;
+  --color-secondary: #828282;
+  --color-accent: #ff6600;
+
+  /* Semantic Colors */
+  --color-success: #5a9f5a;
+  --color-warning: #ffaa00;
+  --color-error: #dd4444;
+  --color-info: var(--color-primary);
+
+  /* Border Colors */
+  --color-border-default: #ff6600;
+  --color-border-light: #e6e6df;
+  --color-border-focus: var(--color-primary);
+
+  /* === TYPOGRAPHY === */
+  --font-sans: Verdana, Geneva, sans-serif;
+  --font-mono: 'Courier New', Courier, monospace;
+
+  /* === BORDERS & RADII === */
+  --border-radius-sm: 2px;
+  --border-radius-md: 3px;
+  --border-radius-lg: 4px;
+  --border-radius-xl: 5px;
+  --border-radius-full: 3px;
+
+  /* === SHADOWS === */
+  --shadow-sm: none;
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 4px 8px rgba(0, 0, 0, 0.1);
+
+  /* === LOGO & BRANDING === */
+  --logo-primary-color: #ffffff;
+}
+
+/* Orange header styling for HN theme */
+.nav-header {
+  background-color: var(--color-primary);
+  box-shadow: none;
+  padding: var(--spacing-xs) 0;
+}
+
+.nav-container {
+  padding: var(--spacing-xs) var(--spacing-md);
+}
+
+.nav-brand-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.nav-brand-subtitle {
+  line-height: 1;
+}
+
+.nav-link {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.nav-link-active {
+  background-color: rgba(255, 255, 255, 0.15);
+  font-weight: var(--font-weight-semibold);
+}

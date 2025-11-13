@@ -1,0 +1,126 @@
+/**
+ * Snowflake Theme (Original)
+ *
+ * The original dark mode design with Snowflake branding
+ * - Dark blue-gray backgrounds
+ * - Snowflake Blue (#29B5E8) primary color
+ * - Inter font family
+ * - Modern design system with HSL color space
+ */
+
+:root {
+  /* === TAILWIND COMPATIBILITY LAYER === */
+  /* These map to Tailwind's expected HSL format for @apply classes */
+  --background: 222 47% 11%;          /* Dark blue-gray #111827 */
+  --foreground: 210 20% 98%;          /* Off-white #F9FAFB */
+  --card: 217 33% 17%;                /* #1E293B */
+  --card-foreground: 210 20% 98%;     /* #F9FAFB */
+  --popover: 217 33% 17%;             /* #1E293B */
+  --popover-foreground: 210 20% 98%;
+  --primary: 193 82% 53%;             /* Snowflake blue #29B5E8 */
+  --primary-foreground: 222 47% 11%;  /* Dark text on bright bg */
+  --secondary: 195 100% 39%;          /* Deeper blue #0078C8 */
+  --secondary-foreground: 210 20% 98%;
+  --muted: 215 20% 35%;               /* Muted gray-blue */
+  --muted-foreground: 217 10% 65%;    /* Light muted */
+  --accent: 180 67% 47%;              /* Accent cyan #29B5A8 */
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;           /* #F44336 */
+  --destructive-foreground: 210 20% 98%;
+  --success: 142 76% 36%;             /* #16A34A */
+  --warning: 38 92% 50%;              /* #FF9800 */
+  --error: 0 84% 60%;                 /* #F44336 */
+  --border: 217 20% 25%;              /* Subtle border */
+  --input: 217 33% 17%;
+  --ring: 193 82% 53%;                /* Snowflake blue ring */
+  --radius: 0.5rem;
+
+  /* === COLORS === */
+  /* Snowflake Brand Colors - HSL format matching original design system */
+  --color-snowflake-blue: hsl(193, 82%, 53%);      /* #29B5E8 */
+  --color-snowflake-deep-blue: hsl(195, 100%, 39%); /* #0078C8 */
+  --color-snowflake-cyan: hsl(180, 67%, 47%);      /* #29B5A8 */
+
+  /* Background Colors - Dark Mode */
+  --color-bg-primary: hsl(222, 47%, 11%);          /* #111827 - Dark blue-gray */
+  --color-bg-secondary: hsl(217, 33%, 17%);        /* #1E293B - Card background */
+  --color-bg-tertiary: hsl(217, 33%, 17%);         /* #1E293B - Popover */
+  --color-bg-muted: hsl(215, 20%, 35%);            /* Muted gray-blue */
+  --color-bg-hover: hsl(215, 25%, 25%);            /* Hover state */
+
+  /* Text Colors */
+  --color-text-primary: hsl(210, 20%, 98%);        /* #F9FAFB - Off-white */
+  --color-text-secondary: hsl(217, 10%, 65%);      /* Light muted */
+  --color-text-muted: hsl(215, 15%, 50%);          /* Muted text */
+  --color-text-disabled: hsl(215, 15%, 40%);       /* Disabled text */
+  --color-text-on-primary: hsl(222, 47%, 11%);     /* Dark text on bright bg */
+
+  /* Interactive Colors */
+  --color-primary: hsl(193, 82%, 53%);             /* Snowflake blue #29B5E8 */
+  --color-primary-hover: hsl(193, 82%, 45%);       /* Darker on hover */
+  --color-primary-active: hsl(193, 82%, 38%);      /* Even darker when active */
+  --color-primary-light: hsl(193, 82%, 90%);       /* Light version */
+  --color-secondary: hsl(195, 100%, 39%);          /* Deeper blue #0078C8 */
+  --color-accent: hsl(180, 67%, 47%);              /* Accent cyan #29B5A8 */
+
+  /* Semantic Colors */
+  --color-success: hsl(142, 76%, 36%);             /* #16A34A - Green */
+  --color-warning: hsl(38, 92%, 50%);              /* #FF9800 - Orange */
+  --color-error: hsl(0, 84%, 60%);                 /* #F44336 - Red */
+  --color-info: var(--color-primary);              /* Snowflake blue */
+
+  /* Border Colors */
+  --color-border-default: hsl(217, 20%, 25%);      /* Subtle border */
+  --color-border-light: hsl(217, 20%, 30%);        /* Lighter border */
+  --color-border-focus: var(--color-primary);      /* Focus ring */
+
+  /* === TYPOGRAPHY === */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+
+  /* === BORDERS & RADII === */
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.5rem;    /* Original used 0.5rem */
+  --border-radius-lg: 0.75rem;
+  --border-radius-xl: 1rem;
+  --border-radius-full: 9999px;
+
+  /* === SHADOWS === */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* === LOGO & BRANDING === */
+  --logo-primary-color: var(--color-primary);
+}
+
+/* Snowflake theme header styling - Dark mode */
+.nav-header {
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border-width-thin) solid var(--color-border-default);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-brand-title {
+  color: var(--color-text-primary);
+}
+
+.nav-brand-subtitle {
+  color: var(--color-text-secondary);
+}
+
+.nav-link {
+  color: var(--color-text-secondary);
+}
+
+.nav-link:hover {
+  color: var(--color-text-primary);
+  background-color: transparent;
+}
+
+.nav-link-active {
+  color: var(--color-primary);
+  background-color: transparent;
+  border-bottom: 2px solid var(--color-primary);
+}

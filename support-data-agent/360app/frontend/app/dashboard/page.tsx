@@ -1,7 +1,6 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
 import { useAppStore } from '@/stores/appStore'
 import { dashboardApi } from '@/services/api'
 import { KPICard } from '@/components/dashboard/KPICard'
@@ -9,8 +8,8 @@ import { FilterBar } from '@/components/common/FilterBar'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { CategorySummary } from '@/components/dashboard/CategorySummary'
 import { TopicPerformanceSection } from '@/components/dashboard/TopicPerformanceSection'
-import { SnowflakeLogo } from '@/components/ui/SnowflakeLogo'
 import { NoConfigurationAlert } from '@/components/common/NoConfigurationAlert'
+import { AppHeader } from '@/components/common/AppHeader'
 
 export default function DashboardPage() {
   const { filters, activeConfigId, isInitializing } = useAppStore()
@@ -25,38 +24,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <SnowflakeLogo size={36} />
-              <div>
-                <h1 className="text-xl font-bold text-foreground">
-                  Support Intelligence
-                </h1>
-                <p className="text-xs text-muted-foreground">Powered by Snowflake</p>
-              </div>
-            </div>
-            <nav className="flex gap-6">
-              <Link href="/dashboard" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
-                Dashboard
-              </Link>
-              <Link href="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Products
-              </Link>
-              <Link href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Topics
-              </Link>
-              <Link href="/tickets" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Cases
-              </Link>
-              <Link href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Admin
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       {/* Main Content */}
       <main className="container mx-auto px-3 py-6">

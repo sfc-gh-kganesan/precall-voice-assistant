@@ -2,11 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { dashboardApi } from '@/services/api'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
-import { SnowflakeLogo } from '@/components/ui/SnowflakeLogo'
 import { NoConfigurationAlert } from '@/components/common/NoConfigurationAlert'
 import { useAppStore } from '@/stores/appStore'
 import { ProductFilters } from '@/components/products/ProductFilters'
@@ -15,6 +13,7 @@ import { ProductDetailView } from '@/components/products/ProductDetailView'
 import { BenchmarkingSection } from '@/components/products/BenchmarkingSection'
 import { ProductComparison } from '@/components/products/ProductComparison'
 import { FilterBar } from '@/components/common/FilterBar'
+import { AppHeader } from '@/components/common/AppHeader'
 
 function ProductsContent() {
   const searchParams = useSearchParams()
@@ -85,38 +84,7 @@ function ProductsContent() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <SnowflakeLogo size={36} />
-              <div>
-                <h1 className="text-xl font-bold text-foreground">
-                  Product Analytics
-                </h1>
-                <p className="text-xs text-muted-foreground">Powered by Snowflake</p>
-              </div>
-            </div>
-            <nav className="flex gap-6">
-              <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Dashboard
-              </Link>
-              <Link href="/products" className="text-sm font-medium text-primary border-b-2 border-primary pb-1">
-                Products
-              </Link>
-              <Link href="/topics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Topics
-              </Link>
-              <Link href="/tickets" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Cases
-              </Link>
-              <Link href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Admin
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <AppHeader title="Product Analytics" />
 
       <main className="container mx-auto px-4 py-8">
         {isInitializing ? (
