@@ -4,6 +4,7 @@ Post Meeting Workflow Graph
 This workflow processes a call transcipt to extract specific information.
 """
 
+import os
 from typing import TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -34,39 +35,6 @@ class OverallState(TypedDict):
     objections: list[str]
 
 
-# class SFDCOutputState(TypedDict):
-#     next_steps: list[str]
-#     opportunity_comments: list[str]
-#     deal_stage: str
-#     close_date: str
-#     opportunity_meddpicc_status: str
-#     new_use_cases: list[str]
-#     objections: list[str]
-
-
-# class SFDCOutputState(BaseModel):
-#     next_steps: Annotated[
-#         list[str],
-#         Field(description="List of next steps. If a value is not found in the call transcript, assign an empty list"),
-#     ]
-#     close_date: Annotated[
-#         str,
-#         Field(description="Close date (in date format YYYY-MM-DD). If a value is not found in the call transcript, assign an empty string"),
-#     ]
-#     new_use_cases: Annotated[
-#         list[str],
-#         Field(description="List of new use cases. If a value is not found in the call transcript, assign an empty list"),
-#     ]
-#     objections: Annotated[
-#         list[str],
-#         Field(description="List of objections. If a value is not found in the call transcript, assign an empty list"),
-#     ]
-#     opportunity_comments: Annotated[
-#         list[str],
-#         Field(description="List of opportunity comments. If a value is not found in the call transcript, assign an empty list"),
-#     ]
-
-
 class SFDCOutputState(BaseModel):
     next_steps: list[str] = Field(default_factory=list, description="List of next steps from the call")
     close_date: str = Field(default="", description="Expected close date (YYYY-MM-DD)")
@@ -90,10 +58,13 @@ def extract_transcript(state: OverallState) -> OverallState:
     """
 
     session = get_snowflake_session()
-    # NOTE: We are hard-coding the fully-qualified table name for now.
+
+    # Use synthetic data table for demo mode, otherwise use production table
+    table_name = "ai_fde.sales_ai_platform.all_engagement_details_synthetic" if os.getenv("DEMO_MODE", "false").lower() == "true" else "sales.engagement360_pitch.all_engagement_details"
+
     query = f"""
     SELECT RAW_CONTENT, TAKEAWAYS
-    FROM sales.engagement360_pitch.all_engagement_details
+    FROM {table_name}
     WHERE activity_id = '{state["activity_id"]}'
     AND salesforce_account_id = '{state["salesforce_account_id"]}'
     AND owner_id = '{state["owner_id"]}'

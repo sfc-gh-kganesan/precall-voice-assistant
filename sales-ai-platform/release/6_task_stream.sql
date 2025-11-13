@@ -1,3 +1,4 @@
+-- NOTE: Change to CREATE IF NOT EXISTS once we are confident in the workflow
 CREATE OR REPLACE STREAM ai_fde.sales_ai_platform.all_engagement_details_stream
 ON TABLE sales.engagement360_pitch.all_engagement_details
 APPEND_ONLY = TRUE          
