@@ -396,3 +396,55 @@ export interface ProductFilters {
   searchQuery: string
   selectedProducts: string[]
 }
+
+// Usage Metrics Types
+export interface UsageTrendPoint {
+  ds: string
+  credits: number
+  rolling_avg_7d: number
+}
+
+export interface BiggestMover {
+  salesforce_account_name: string
+  salesforce_account_id: string
+  l7_total_credits: number
+  delta: number
+  pct_change: number | null
+  sales_engineer_email: string | null
+  is_cap1: boolean | null
+  agreement_type: string | null
+}
+
+export interface BiggestMoversResponse {
+  gainers: BiggestMover[]
+  decliners: BiggestMover[]
+}
+
+export interface TopAccount {
+  ds: string
+  salesforce_account_name: string
+  salesforce_account_id: string
+  total_indexed_rows: number
+  total_active_serving_rows: number
+  num_services: number
+  snowflake_account_type: string
+  acct_first_svc_creation_date: string
+  sales_engineer_email: string | null
+  accounts: any[]
+}
+
+export interface UsageMetrics {
+  total_credits: number
+  total_credits_change: number
+  total_credits_change_pct: number
+  active_accounts: number
+  active_accounts_change: number
+  seven_day_change_pct: number
+}
+
+export interface HighValueCustomer {
+  salesforce_account_name: string
+  salesforce_account_id: string
+  total_active_serving_rows: number
+  cases_last_30_days: number
+}

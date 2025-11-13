@@ -59,7 +59,7 @@ export function AIInsightsPanel({ aiSummary, rootCauses }: AIInsightsPanelProps)
         {/* Customer Sentiment Section */}
         {!isPlaceholder(aiSummary) && (
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <h4 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
               <span>📊</span> Customer Sentiment
             </h4>
             <div className="text-sm text-muted-foreground whitespace-pre-wrap">
@@ -70,8 +70,8 @@ export function AIInsightsPanel({ aiSummary, rootCauses }: AIInsightsPanelProps)
 
         {/* Root Cause Analysis Section */}
         {!isPlaceholder(rootCauses) && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <div className="space-y-3 pt-4 border-t border-border">
+            <h4 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
               <span>🔍</span> Root Cause Analysis
             </h4>
             <div className="text-sm text-muted-foreground whitespace-pre-wrap">

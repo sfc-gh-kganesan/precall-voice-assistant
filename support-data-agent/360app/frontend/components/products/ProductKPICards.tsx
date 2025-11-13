@@ -13,9 +13,17 @@ interface ProductKPICardsProps {
   totalCases: MetricValue;
   avgCaseLife: MetricValue;
   resolutionRate: MetricValue;
+  totalConsumption?: number;
+  timePeriod?: 'week' | 'month';
 }
 
-export function ProductKPICards({ totalCases, avgCaseLife, resolutionRate }: ProductKPICardsProps) {
+export function ProductKPICards({
+  totalCases,
+  avgCaseLife,
+  resolutionRate,
+  totalConsumption,
+  timePeriod
+}: ProductKPICardsProps) {
   const getTrendIcon = (changeType: string) => {
     switch (changeType) {
       case 'increase':
@@ -40,9 +48,38 @@ export function ProductKPICards({ totalCases, avgCaseLife, resolutionRate }: Pro
   }
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className={cn(
+      "grid gap-4",
+      totalConsumption !== undefined ? "grid-cols-4" : "grid-cols-3"
+    )}>
+      {/* Total Consumption - First card for Cortex Search */}
+      {totalConsumption !== undefined && (
+        <div className={cn(
+          "border border-border rounded-lg p-6 hover:shadow-md transition-shadow",
+          totalConsumption !== undefined ? "bg-background" : "bg-card"
+        )}>
+          <div className="text-sm font-medium text-muted-foreground mb-2">
+            Total Consumption
+          </div>
+          <div className="flex items-baseline gap-2 mb-1">
+            <div className="text-3xl font-bold text-foreground">
+              {totalConsumption.toLocaleString()}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              credits
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {timePeriod === 'week' ? 'Last 7 days' : 'Last 30 days'}
+          </div>
+        </div>
+      )}
+
       {/* Total Cases */}
-      <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+      <div className={cn(
+        "border border-border rounded-lg p-6 hover:shadow-md transition-shadow",
+        totalConsumption !== undefined ? "bg-background" : "bg-card"
+      )}>
         <div className="flex items-start justify-between mb-2">
           <div className="text-sm font-medium text-muted-foreground">Total Cases</div>
           <div className={cn(
@@ -70,7 +107,10 @@ export function ProductKPICards({ totalCases, avgCaseLife, resolutionRate }: Pro
       </div>
 
       {/* Avg Resolution Time */}
-      <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+      <div className={cn(
+        "border border-border rounded-lg p-6 hover:shadow-md transition-shadow",
+        totalConsumption !== undefined ? "bg-background" : "bg-card"
+      )}>
         <div className="flex items-start justify-between mb-2">
           <div className="text-sm font-medium text-muted-foreground">Avg Resolution Time</div>
           <div className={cn(
@@ -99,7 +139,10 @@ export function ProductKPICards({ totalCases, avgCaseLife, resolutionRate }: Pro
       </div>
 
       {/* Resolution Rate */}
-      <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+      <div className={cn(
+        "border border-border rounded-lg p-6 hover:shadow-md transition-shadow",
+        totalConsumption !== undefined ? "bg-background" : "bg-card"
+      )}>
         <div className="flex items-start justify-between mb-2">
           <div className="text-sm font-medium text-muted-foreground">Resolution Rate</div>
           <div className={cn(

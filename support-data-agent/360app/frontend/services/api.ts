@@ -374,3 +374,50 @@ export const productsApi = {
     return await apiRequest<any>(`${API_BASE}/api/v1/products/${productId}/benchmark-context?${queryParams}`)
   },
 }
+
+export const usageApi = {
+  async getCreditsTimeline(params?: {
+    date_range?: string
+    certified_organization_type?: string
+    certified_deployment?: string
+    certified_salesforce_account_id?: string
+    certified_salesforce_account_name?: string
+    include_coda?: boolean
+  }): Promise<import('@/types').UsageTrendPoint[]> {
+    const queryParams = buildQueryParams(params || {})
+    return await apiRequest<import('@/types').UsageTrendPoint[]>(`${API_BASE}/api/v1/usage/credits-timeline?${queryParams}`)
+  },
+
+  async getTopAccounts(params?: {
+    certified_organization_type?: string
+    certified_deployment?: string
+    certified_salesforce_account_name?: string
+  }): Promise<import('@/types').TopAccount[]> {
+    const queryParams = buildQueryParams(params || {})
+    return await apiRequest<import('@/types').TopAccount[]>(`${API_BASE}/api/v1/usage/top-accounts?${queryParams}`)
+  },
+
+  async getBiggestMovers(params?: {
+    period?: string
+    certified_organization_type?: string
+    certified_deployment?: string
+    certified_salesforce_account_id?: string
+    certified_salesforce_account_name?: string
+    include_coda?: boolean
+  }): Promise<import('@/types').BiggestMoversResponse> {
+    const queryParams = buildQueryParams(params || {})
+    return await apiRequest<import('@/types').BiggestMoversResponse>(`${API_BASE}/api/v1/usage/biggest-movers?${queryParams}`)
+  },
+
+  async getMetricsSummary(): Promise<import('@/types').UsageMetrics> {
+    return await apiRequest<import('@/types').UsageMetrics>(`${API_BASE}/api/v1/usage/metrics-summary`)
+  },
+
+  async getCaseCounts(params: {
+    product_name: string
+    days?: number
+  }): Promise<Record<string, number>> {
+    const queryParams = buildQueryParams(params)
+    return await apiRequest<Record<string, number>>(`${API_BASE}/api/v1/usage/case-counts?${queryParams}`)
+  },
+}
