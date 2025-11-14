@@ -1,4 +1,4 @@
-.phony: check fix format install lint dev test typecheck
+.phony: check fix format install lint dev test typecheck submit-local submit-spcs
 
 check: lint typecheck
 	uv run ruff format --diff
@@ -23,3 +23,9 @@ test: install
 
 typecheck: install
 	uv run pyright
+
+submit-local:
+	./scripts/test_submit_local.sh
+
+submit-spcs:
+	./scripts/test_submit_spcs.sh

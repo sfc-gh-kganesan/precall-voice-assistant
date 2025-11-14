@@ -4,7 +4,7 @@ set -e
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
 SPCS_ENDPOINT="$($ROOT/invoiceiq/collector/scripts/get_spcs_endpoint.sh)"
-EMAIL=$(printf %q $(cat $ROOT/invoiceiq/collector/scripts/example_email.eml))
+EMAIL_CONTENT="$(cat "$ROOT/invoiceiq/collector/scripts/example_email.eml")"
 ZIP_DIR="$ROOT/invoiceiq/collector/samples"
 LIMIT=${1:-}  # Pass a number to limit files processed, default is no limit
 
@@ -63,8 +63,15 @@ while IFS= read -r file; do
     response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
       -F "ticket_number=$ticket_num" \
       -F "files=@$file" \
-      -F "email=\"$EMAIL\"" \
-      -H "Authorization: Snowflake Token=\"$SNOWFLAKE_PAT\"" \
+      --form-string "email=$EMAIL_CONTENT" \
+      -F "snowflake_database=${SNOWFLAKE_DATABASE:-}" \
+      -F "snowflake_schema=${SNOWFLAKE_SCHEMA:-}" \
+      -F "snowflake_stage=${SNOWFLAKE_STAGE:-}" \
+      -F "snowflake_warehouse=${SNOWFLAKE_WAREHOUSE:-}" \
+      -F "snowflake_role=${SNOWFLAKE_ROLE:-}" \
+      -F "snowflake_account=${SNOWFLAKE_ACCOUNT:-}" \
+      -F "snowflake_user=${SNOWFLAKE_USER:-}" \
+      -H "Authorization: Snowflake Token=\"${SNOWFLAKE_PAT}\"" \
       "$URL")
 
     http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)

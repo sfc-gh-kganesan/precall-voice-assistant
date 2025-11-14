@@ -74,3 +74,30 @@ This script will build the image with docker, push it to the remote repository, 
 ./release/build_and_deploy.sh
 ```
 
+### Manual testing
+
+- Kick off the local smoke test (submits a canned PDF using defaults from your environment):
+
+  ```bash
+  make submit-local
+  ```
+
+- Submit directly against the dev server with explicit Snowflake parameters (values shown match `service_spec.yml`):
+
+  ```bash
+  curl -X POST http://127.0.0.1:8000/submit \
+    -F ticket_number=INC123456 \
+    -F email=someone@example.com \
+    -F files=@test_files/invoice_01.pdf \
+    -F snowflake_database="${SNOWFLAKE_DATABASE}" \
+    -F snowflake_schema="${SNOWFLAKE_SCHEMA}" \
+    -F snowflake_stage="${SNOWFLAKE_STAGE}" \
+    -F snowflake_warehouse="${SNOWFLAKE_WAREHOUSE}" \
+    -F snowflake_role="${SNOWFLAKE_ROLE}" \
+    -F snowflake_account="${SNOWFLAKE_ACCOUNT}" \
+    -F snowflake_user="${SNOWFLAKE_USER}" \
+    -F snowflake_password="${SNOWFLAKE_PAT}"
+  ```
+
+  Omit any credential fields already covered by the running service’s environment.
+

@@ -10,32 +10,51 @@ load_dotenv()
 
 
 @contextmanager
-def connection():
-    if os.path.isfile("/snowflake/session/token"):
-        creds = {
-            "host": os.getenv("SNOWFLAKE_HOST"),
-            "port": os.getenv("SNOWFLAKE_PORT"),
-            "protocol": "https",
-            "account": os.getenv("SNOWFLAKE_ACCOUNT"),
-            "authenticator": "oauth",
-            "token": open("/snowflake/session/token").read(),
-            "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
-            "database": os.getenv("SNOWFLAKE_DATABASE"),
-            "schema": os.getenv("SNOWFLAKE_SCHEMA"),
-            "role": os.getenv("SNOWFLAKE_ROLE", "invoiceiq_admin"),
-            "client_session_keep_alive": True,
-        }
+def connection(
+    *,
+    account: str,
+    user: str | None = None,
+    password: str | None = None,
+    warehouse: str,
+    role: str,
+    database: str | None = None,
+    schema: str | None = None,
+):
+    token_path = Path("/snowflake/session/token")
+    using_token = token_path.is_file()
+
+    creds = {
+        "account": account,
+        "warehouse": warehouse,
+        "role": role,
+        "client_session_keep_alive": True,
+    }
+
+    if not using_token:
+        if not user:
+            raise ValueError("Snowflake user must be provided")
+        if not password:
+            raise ValueError("Snowflake password must be provided")
+        creds["user"] = user
+        creds["password"] = password
     else:
-        creds = {
-            "account": os.getenv("SNOWFLAKE_ACCOUNT"),
-            "user": os.getenv("SNOWFLAKE_USER"),
-            "password": os.getenv("SNOWFLAKE_PAT"),
-            "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE", "compute_wh"),
-            "database": os.getenv("SNOWFLAKE_DATABASE", "invoiceiq"),
-            "schema": os.getenv("SNOWFLAKE_SCHEMA", "service"),
-            "role": os.getenv("SNOWFLAKE_ROLE", "invoiceiq_admin"),
-            "client_session_keep_alive": True,
-        }
+        token_value = token_path.read_text().strip()
+        creds["authenticator"] = "oauth"
+        creds["token"] = token_value
+        creds["protocol"] = "https"
+
+        host = os.getenv("SNOWFLAKE_HOST")
+        port = os.getenv("SNOWFLAKE_PORT")
+        if host:
+            creds["host"] = host
+        if port:
+            creds["port"] = port
+
+    if database:
+        creds["database"] = database
+
+    if schema:
+        creds["schema"] = schema
 
     conn = snowflake.connector.connect(**creds)
 
@@ -45,9 +64,9 @@ def connection():
         conn.close()
 
 
-def whoami():
+def whoami(**connection_kwargs):
     try:
-        with connection() as conn:
+        with connection(**connection_kwargs) as conn:
             with conn.cursor() as cur:
                 cur.execute("select current_user(), current_role(), current_warehouse()")
                 result = cur.fetchone()
@@ -59,7 +78,15 @@ def whoami():
         logger.error(e)
 
 
-def stage_put_files(local_dir: Path, file_glob: str) -> list[str]:
+def stage_put_files(
+    local_dir: Path,
+    file_glob: str,
+    *,
+    database: str,
+    schema: str,
+    stage: str,
+    **connection_kwargs,
+) -> list[str]:
     """
     Upload local files to remote Snowflake stage
 
@@ -67,13 +94,13 @@ def stage_put_files(local_dir: Path, file_glob: str) -> list[str]:
       local_dir: absolute path to local directory on disk containing files
         file_glob: glob expression to select which files to upload
     """
-    db = os.getenv("SNOWFLAKE_DATABASE", "invoiceiq")
-    schema = os.getenv("SNOWFLAKE_SCHEMA", "service")
-    stage = os.getenv("SNOWFLAKE_STAGE", "ticket_attachments")
-    stage_path = f"@{db}.{schema}.{stage}"
+    stage_path = f"@{database}.{schema}.{stage}"
     file_str = f"{local_dir}/{file_glob}"
     result_files = []
-    with connection() as conn:
+    conn_kwargs = {**connection_kwargs}
+    conn_kwargs.setdefault("database", database)
+    conn_kwargs.setdefault("schema", schema)
+    with connection(**conn_kwargs) as conn:
         with conn.cursor() as cur:
             query = f"put file://{file_str} {stage_path} auto_compress=false"
             logger.debug(f"⚡{query}")
@@ -85,9 +112,19 @@ def stage_put_files(local_dir: Path, file_glob: str) -> list[str]:
             return result_files
 
 
-def insert_ticket_metadata(submission_id: str, ticket_number: str, email: str):
-    query = """
-        insert into invoiceiq.service.ticket_metadata (
+def insert_ticket_metadata(
+    submission_id: str,
+    ticket_number: str,
+    email: str,
+    *,
+    database: str,
+    schema: str,
+    table: str,
+    **connection_kwargs,
+):
+    table_ref = table
+    query = f"""
+        insert into {table_ref} (
             submission_id,
             ticket_number,
             email
@@ -100,16 +137,29 @@ def insert_ticket_metadata(submission_id: str, ticket_number: str, email: str):
 
     data = (submission_id, ticket_number, email)
 
-    with connection() as conn:
+    conn_kwargs = {**connection_kwargs}
+    conn_kwargs.setdefault("database", database)
+    conn_kwargs.setdefault("schema", schema)
+    with connection(**conn_kwargs) as conn:
         with conn.cursor() as cur:
             logger.debug(f"⚡{query} ({data})")
             cur.execute(query, data)
             logger.info(f"✅ Inserted metadata for ticket {ticket_number} in submission {submission_id}")
 
 
-def insert_file_metadata(submission_id: str, relative_path: str, ticket_number: str):
-    query = """
-        insert into invoiceiq.service.file_metadata (
+def insert_file_metadata(
+    submission_id: str,
+    relative_path: str,
+    ticket_number: str,
+    *,
+    database: str,
+    schema: str,
+    table: str,
+    **connection_kwargs,
+):
+    table_ref = table
+    query = f"""
+        insert into {table_ref} (
             submission_id,
             relative_path,
             ticket_number
@@ -122,7 +172,10 @@ def insert_file_metadata(submission_id: str, relative_path: str, ticket_number: 
 
     data = (submission_id, relative_path, ticket_number)
 
-    with connection() as conn:
+    conn_kwargs = {**connection_kwargs}
+    conn_kwargs.setdefault("database", database)
+    conn_kwargs.setdefault("schema", schema)
+    with connection(**conn_kwargs) as conn:
         with conn.cursor() as cur:
             logger.debug(f"⚡{query} ({data})")
             cur.execute(query, data)
