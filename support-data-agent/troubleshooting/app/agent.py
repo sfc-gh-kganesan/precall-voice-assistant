@@ -95,7 +95,7 @@ def create_dda_agent(
         glean_proxy_url: URL of the Glean proxy server (set to None to disable Glean)
 
     Returns:
-        Configured PydanticAI Agent with both DDA and Glean toolsets
+        Configured PydanticAI Agent with both DDA and Gelan toolsets
     """
     # Setup OpenAI-compatible client for Snowflake Cortex
     snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")

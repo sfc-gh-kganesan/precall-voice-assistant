@@ -14,8 +14,66 @@ services:
       # Mount app directory for hot reload during development
       - ./app:/app/app
     restart: unless-stopped
+    command: ["uv", "run", "app/dda_mcp_server.py"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dda-network
+
+  glean-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: glean-proxy
+    ports:
+      - "8001:8001"  # Main proxy server
+      - "8090:8090"  # OAuth callback (socat forwards to 127.0.0.1:8091)
+    env_file:
+      - .env
+    environment:
+      - OAUTH_INTERNAL_PORT=8091  # FastMCP binds here
+      - OAUTH_PUBLIC_PORT=8090    # Browser redirects here (via socat)
+    volumes:
+      - ./app:/app/app
+      - glean-tokens:/home/appuser/.local/share/fastmcp  # Persist OAuth tokens
+    restart: unless-stopped
+    command: >
+      sh -c "socat TCP-LISTEN:8090,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:8091 &
+      uv run app/glean_proxy.py"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - dda-network
+
+  agent-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dda-agent-api
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    volumes:
+      # Mount app directory for hot reload during development
+      - ./app:/app/app
+    restart: unless-stopped
+    command: ["uv", "run", "app/agent_api.py"]
+    depends_on:
+      fde-dda-service:
+        condition: service_healthy
+      glean-proxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -26,6 +84,10 @@ services:
 networks:
   dda-network:
     driver: bridge
+
+volumes:
+  glean-tokens:
+    driver: local
 
 # Note: Redis will be added in Phase 2 for distributed caching
 # volumes:

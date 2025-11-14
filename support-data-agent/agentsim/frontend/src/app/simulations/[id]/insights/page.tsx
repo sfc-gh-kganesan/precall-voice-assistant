@@ -3,14 +3,17 @@
 import { use, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { simulationsApi } from '@/lib/api'
-import type { SimulationResults, ConversationSummary } from '@/lib/types'
+import type { SimulationResults, ConversationSummary, ImprovementSuggestion } from '@/lib/types'
 
 export default function InsightsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const simulationId = parseInt(id)
   const [results, setResults] = useState<SimulationResults | null>(null)
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [aiInsights, setAiInsights] = useState<ImprovementSuggestion[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
+  const [aiInsightsError, setAiInsightsError] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -25,9 +28,40 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
       setResults(resRes.data)
       setConversations(convRes.data)
       setLoading(false)
+
+      // Load AI insights separately (may take a while if generating)
+      loadAIInsights()
     } catch (err) {
       console.error(err)
       setLoading(false)
+    }
+  }
+
+  const loadAIInsights = async () => {
+    setAiInsightsLoading(true)
+    setAiInsightsError(null)
+    try {
+      const response = await simulationsApi.getAIInsights(simulationId)
+      setAiInsights(response.data)
+    } catch (err: any) {
+      console.error('Failed to load AI insights:', err)
+      setAiInsightsError(err.response?.data?.detail || 'Failed to load AI insights')
+    } finally {
+      setAiInsightsLoading(false)
+    }
+  }
+
+  const regenerateInsights = async () => {
+    setAiInsightsLoading(true)
+    setAiInsightsError(null)
+    try {
+      const response = await simulationsApi.regenerateAIInsights(simulationId)
+      setAiInsights(response.data)
+    } catch (err: any) {
+      console.error('Failed to regenerate AI insights:', err)
+      setAiInsightsError(err.response?.data?.detail || 'Failed to regenerate AI insights')
+    } finally {
+      setAiInsightsLoading(false)
     }
   }
 
@@ -171,7 +205,7 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
 
       {/* Recommendations */}
       <div className="space-y-4">
-        <h2 className="text-lg font-serif font-semibold text-parchment-100">Recommendations</h2>
+        <h2 className="text-lg font-serif font-semibold text-parchment-100">Rule-Based Recommendations</h2>
         {recommendations.map((rec, i) => {
           const typeStyles = {
             critical: 'border-red-600 bg-red-900/30',
@@ -197,6 +231,106 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
                   ))}
                 </ul>
               </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* AI-Powered Insights */}
+      <div className="mt-8 space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-serif font-semibold text-parchment-100">AI-Powered Analysis</h2>
+          <button
+            onClick={regenerateInsights}
+            disabled={aiInsightsLoading}
+            className="px-3 py-1 text-sm border border-strategic-600 text-strategic-500 rounded hover:bg-strategic-600/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {aiInsightsLoading ? 'Generating...' : 'Regenerate'}
+          </button>
+        </div>
+
+        {aiInsightsLoading && (
+          <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 text-center">
+            <div className="text-parchment-300">Analyzing conversations with AI...</div>
+            <div className="text-sm text-parchment-400 mt-2">This may take a moment</div>
+          </div>
+        )}
+
+        {aiInsightsError && (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
+            <div className="text-red-300 font-medium">Failed to load AI insights</div>
+            <div className="text-sm text-red-400 mt-1">{aiInsightsError}</div>
+            <button
+              onClick={loadAIInsights}
+              className="mt-3 px-3 py-1 text-sm border border-red-600 text-red-400 rounded hover:bg-red-600/10 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!aiInsightsLoading && !aiInsightsError && aiInsights.length === 0 && (
+          <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 text-center text-parchment-300">
+            No AI insights available yet. They will be generated automatically after simulation completes.
+          </div>
+        )}
+
+        {!aiInsightsLoading && aiInsights.length > 0 && aiInsights.map((insight) => {
+          const priorityStyles = {
+            high: 'border-red-600 bg-red-900/30',
+            medium: 'border-amber-600 bg-amber-900/30',
+            low: 'border-blue-600 bg-blue-900/30'
+          }
+          const priorityColors = {
+            high: 'text-red-300',
+            medium: 'text-amber-300',
+            low: 'text-blue-300'
+          }
+          const categoryIcons: Record<string, string> = {
+            tool: '🔧',
+            prompt: '💬',
+            logic: '🧠',
+            error_handling: '⚠️',
+            ux: '✨',
+            performance: '⚡',
+            general: '📌'
+          }
+
+          return (
+            <div key={insight.id} className={`border-l-4 p-6 rounded ${priorityStyles[insight.priority]}`}>
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <h3 className={`font-serif font-semibold text-lg ${priorityColors[insight.priority]}`}>
+                  <span className="mr-2">{categoryIcons[insight.category] || '📌'}</span>
+                  {insight.title}
+                </h3>
+                <div className="flex gap-2">
+                  <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600">
+                    {insight.category}
+                  </span>
+                  <span className={`px-2 py-1 text-xs rounded font-medium ${priorityColors[insight.priority]}`}>
+                    {insight.priority.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-parchment-200 mb-4">{insight.description}</p>
+
+              {/* Evidence */}
+              {insight.evidence && (
+                <div className="mt-4 p-3 bg-slate-800/50 rounded border border-slate-700">
+                  <div className="text-xs font-medium text-parchment-300 mb-2">Evidence:</div>
+                  <div className="text-xs text-parchment-400 space-y-1">
+                    {insight.evidence.pattern && (
+                      <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
+                    )}
+                    {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
+                      <div><span className="text-parchment-300">Affected Conversations:</span> {insight.evidence.conversation_ids.length}</div>
+                    )}
+                    {insight.evidence.affected_personas && insight.evidence.affected_personas.length > 0 && (
+                      <div><span className="text-parchment-300">Affected Personas:</span> {insight.evidence.affected_personas.join(', ')}</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )
         })}

@@ -169,3 +169,27 @@ class PersonaTemplateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Improvement Suggestion schemas
+class ImprovementSuggestionResponse(BaseModel):
+    """Schema for AI-generated improvement suggestion response."""
+
+    id: int
+    simulation_id: int
+    category: str
+    title: str
+    description: str
+    priority: str
+    evidence: Dict[str, Any]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CombinedInsightsResponse(BaseModel):
+    """Schema for combined rule-based and AI insights."""
+
+    rule_based: List[Dict[str, Any]]  # From frontend calculations
+    ai_generated: List[ImprovementSuggestionResponse]

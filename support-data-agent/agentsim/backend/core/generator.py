@@ -29,6 +29,8 @@ class ScenarioGenerator:
             self.client = openai.AsyncOpenAI(api_key=api_key)
         elif provider == "anthropic":
             self.client = anthropic.AsyncAnthropic(api_key=api_key)
+        elif provider == "snowflake":
+            self.client = openai.AsyncOpenAI(api_key=api_key)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -73,9 +75,9 @@ class ScenarioGenerator:
 
     async def _call_llm(self, prompt: str) -> str:
         """Call the LLM provider."""
-        if self.provider == "openai":
+        if (self.provider == "openai") or (self.provider=="snowflake"):
             response = await self.client.chat.completions.create(
-                model="gpt-4",
+                model="openai-o4-mini",
                 messages=[
                     {
                         "role": "system",
@@ -89,7 +91,7 @@ class ScenarioGenerator:
 
         elif self.provider == "anthropic":
             response = await self.client.messages.create(
-                model="claude-3-sonnet-20240229",
+                model="claude-4-sonnet",
                 max_tokens=4000,
                 messages=[
                     {"role": "user", "content": prompt},

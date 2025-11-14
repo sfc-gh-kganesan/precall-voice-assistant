@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.12",
     "alembic>=1.13.0",
     "snowflake-snowpark-python>=1.11.0",
+    "snowflake-sqlalchemy>=1.5.0",
     "pydantic-ai>=0.0.14",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",

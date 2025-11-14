@@ -67,6 +67,30 @@ async def get_project_simulations(project_id: int, db: Session = Depends(get_db)
     return simulations
 
 
+@router.put("/{project_id}", response_model=ProjectResponse)
+async def update_project(
+    project_id: int, project_update: ProjectCreate, db: Session = Depends(get_db)
+):
+    """Update a project."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Update project fields
+    project.name = project_update.name
+    project.description = project_update.description
+    project.business_context = project_update.business_context
+    project.agent_endpoint = project_update.agent_endpoint
+    project.auth_type = AuthType(project_update.auth_type)
+    project.auth_credentials = project_update.auth_credentials
+    project.custom_headers = project_update.custom_headers
+    project.conversation_examples = project_update.conversation_examples
+
+    db.commit()
+    db.refresh(project)
+    return project
+
+
 @router.delete("/{project_id}")
 async def delete_project(project_id: int, db: Session = Depends(get_db)):
     """Delete a project."""

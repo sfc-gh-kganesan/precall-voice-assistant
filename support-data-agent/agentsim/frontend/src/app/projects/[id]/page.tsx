@@ -117,12 +117,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <span className="font-medium">Endpoint:</span> {project.agent_endpoint}
             </div>
           </div>
-          <Link
-            href={`/projects/${projectId}/simulate`}
-            className="inline-flex items-center rounded bg-green-700 px-4 py-2 text-sm font-medium text-parchment-50 shadow hover:bg-green-600 transition-colors"
-          >
-            Run New Simulation
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href={`/projects/${projectId}/edit`}
+              className="inline-flex items-center rounded bg-slate-700 px-4 py-2 text-sm font-medium text-parchment-50 shadow hover:bg-slate-600 transition-colors"
+            >
+              Edit Project
+            </Link>
+            <Link
+              href={`/projects/${projectId}/simulate`}
+              className="inline-flex items-center rounded bg-green-700 px-4 py-2 text-sm font-medium text-parchment-50 shadow hover:bg-green-600 transition-colors"
+            >
+              Run New Simulation
+            </Link>
+          </div>
         </div>
       </div>
 

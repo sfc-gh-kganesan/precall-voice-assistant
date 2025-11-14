@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import init_db
-from backend.api.routes import projects, simulations, conversations
+from backend.api.routes import projects, simulations, conversations, insights
 
 # Load environment variables from .env file
 load_dotenv()
@@ -34,6 +34,7 @@ app.add_middleware(
 # Include routers
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(simulations.router, prefix="/api/simulations", tags=["simulations"])
+app.include_router(insights.router, prefix="/api/simulations", tags=["insights"])
 app.include_router(conversations.router, prefix="/api", tags=["conversations"])
 
 
@@ -57,3 +58,9 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8080, reload=True)

@@ -136,3 +136,20 @@ export interface Conversation {
   completed_at?: string
   messages: Message[]
 }
+
+// AI Insights types
+export interface ImprovementSuggestion {
+  id: number
+  simulation_id: number
+  category: string
+  title: string
+  description: string
+  priority: 'high' | 'medium' | 'low'
+  evidence: {
+    conversation_ids?: number[]
+    affected_personas?: string[]
+    metrics?: Record<string, any>
+    pattern?: string
+  }
+  created_at: string
+}

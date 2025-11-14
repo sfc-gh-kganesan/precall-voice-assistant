@@ -10,19 +10,26 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     curl \
+    socat \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install Python dependencies using uv
+RUN uv pip install --system --no-cache -r pyproject.toml
 
 # Copy application code
 COPY app/ ./app/
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    mkdir -p /home/appuser/.local/share && \
+    chown -R appuser:appuser /home/appuser/.local
 
 USER appuser
 

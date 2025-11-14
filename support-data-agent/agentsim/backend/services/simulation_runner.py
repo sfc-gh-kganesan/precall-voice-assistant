@@ -148,6 +148,9 @@ class SimulationRunner:
 
             logger.info(f"Simulation {simulation_id} completed successfully")
 
+            # Trigger AI insights generation in the background
+            await self._generate_ai_insights_async(simulation_id)
+
         except Exception as e:
             logger.error(f"Simulation {simulation_id} failed: {e}", exc_info=True)
             simulation.status = SimulationStatus.FAILED
@@ -553,3 +556,34 @@ class SimulationRunner:
                 self.db.add(metric)
 
         self.db.commit()
+
+    async def _generate_ai_insights_async(self, simulation_id: int):
+        """Generate AI insights in the background after simulation completes."""
+        import os
+        from backend.core.insights_judge import InsightsJudge
+
+        try:
+            api_key = os.getenv("SNOWFLAKE_CORTEX_API_KEY")
+            base_url = os.getenv("SNOWFLAKE_CORTEX_BASE_URL")
+            model = os.getenv("SNOWFLAKE_CORTEX_MODEL", "snowflake-arctic")
+
+            if not api_key or not base_url:
+                logger.warning(
+                    "Snowflake Cortex not configured, skipping AI insights generation. "
+                    "Set SNOWFLAKE_CORTEX_API_KEY and SNOWFLAKE_CORTEX_BASE_URL to enable."
+                )
+                return
+
+            logger.info(f"Generating AI insights for simulation {simulation_id} in background")
+            judge = InsightsJudge(api_key=api_key, base_url=base_url, model=model)
+            insights = await judge.generate_insights(simulation_id, self.db)
+
+            logger.info(f"Successfully generated {len(insights)} AI insights for simulation {simulation_id}")
+
+        except Exception as e:
+            logger.error(
+                f"Failed to generate AI insights for simulation {simulation_id}: {e}",
+                exc_info=True,
+            )
+            # Do not raise - this is a background task, should not fail the simulation
+

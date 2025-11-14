@@ -139,11 +139,20 @@ class Simulation(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # LLM Insights tracking
+    llm_insights_generated: Mapped[bool] = mapped_column(default=False)
+    llm_insights_generated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
     project: Mapped["Project"] = relationship(back_populates="simulations")
     conversations: Mapped[List["Conversation"]] = relationship(
+        back_populates="simulation", cascade="all, delete-orphan"
+    )
+    improvement_suggestions: Mapped[List["ImprovementSuggestion"]] = relationship(
         back_populates="simulation", cascade="all, delete-orphan"
     )
 
@@ -236,3 +245,6 @@ class ImprovementSuggestion(Base):
     evidence: Mapped[Dict[str, Any]] = mapped_column(JSON)  # Supporting data
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    simulation: Mapped["Simulation"] = relationship(back_populates="improvement_suggestions")

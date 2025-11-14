@@ -59,10 +59,12 @@ cp .env.example .env
 
 3. Run the server:
 ```bash
-uvicorn backend.main:app --reload
+python -m backend.main
+# Or with uvicorn directly:
+uvicorn backend.main:app --reload --port 8080
 ```
 
-Backend will be available at http://localhost:8000
+Backend will be available at http://localhost:8080
 
 ### Frontend
 
@@ -82,8 +84,8 @@ Frontend will be available at http://localhost:3000
 ## API Documentation
 
 Once the backend is running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8080/docs
+- ReDoc: http://localhost:8080/redoc
 
 ## Key API Endpoints
 

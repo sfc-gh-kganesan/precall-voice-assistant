@@ -9,6 +9,7 @@ import type {
   Conversation,
   PersonaTemplate,
   PersonaTemplateCreate,
+  ImprovementSuggestion,
 } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'  // Changed from 8000 to 8080
@@ -25,6 +26,7 @@ export const projectsApi = {
   list: () => api.get<Project[]>('/api/projects/'),
   get: (id: number) => api.get<Project>(`/api/projects/${id}`),
   create: (data: ProjectCreate) => api.post<Project>('/api/projects/', data),
+  update: (id: number, data: ProjectCreate) => api.put<Project>(`/api/projects/${id}`, data),
   delete: (id: number) => api.delete(`/api/projects/${id}`),
   getSimulations: (id: number) => api.get<Simulation[]>(`/api/projects/${id}/simulations`),
 
@@ -44,6 +46,10 @@ export const simulationsApi = {
   getConversations: (id: number) => api.get<ConversationSummary[]>(`/api/simulations/${id}/conversations`),
   delete: (id: number) => api.delete(`/api/simulations/${id}`),
   stop: (id: number) => api.post(`/api/simulations/${id}/stop`),
+
+  // AI Insights
+  getAIInsights: (id: number) => api.get<ImprovementSuggestion[]>(`/api/simulations/${id}/ai-insights`),
+  regenerateAIInsights: (id: number) => api.post<ImprovementSuggestion[]>(`/api/simulations/${id}/ai-insights/regenerate`),
 }
 
 // Conversations API

@@ -124,8 +124,8 @@ async def startup_event():
     try:
         agent = create_dda_agent(
             model_name="claude-4-sonnet",
-            mcp_server_url="http://localhost:8000/mcp",
-            glean_proxy_url="http://localhost:8001/mcp",
+            mcp_server_url="http://fde-dda-service:8000/mcp",
+            glean_proxy_url="http://glean-proxy:8001/mcp",
         )
         logger.info("✓ Agent initialized successfully")
     except Exception as e:
@@ -141,8 +141,8 @@ async def health_check():
 
     return HealthResponse(
         status="healthy",
-        dda_server="http://localhost:8000/mcp",
-        glean_proxy="http://localhost:8001/mcp",
+        dda_server="http://fde-dda-service:8000/mcp",
+        glean_proxy="http://glean-proxy:8001/mcp",
     )
 
 
@@ -190,7 +190,21 @@ async def query_agent(request: QueryRequest):
     if agent is None:
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
-    logger.info(f"Received query: {request.message}")
+    # Parse message if it's a JSON string containing description/subject
+    message_text = request.message
+    try:
+        # Try to parse as JSON in case message contains structured data
+        import json as json_lib
+        parsed = json_lib.loads(request.message)
+        if isinstance(parsed, dict) and "description" in parsed and "subject" in parsed:
+            # Format as support ticket
+            message_text = f"Subject: {parsed['subject']}\n\nDescription: {parsed['description']}"
+            logger.info(f"Received structured ticket query with subject: {parsed['subject'][:50]}...")
+        else:
+            logger.info(f"Received query: {request.message[:100]}...")
+    except (json_lib.JSONDecodeError, TypeError):
+        # Not JSON, use as-is
+        logger.info(f"Received query: {request.message[:100]}...")
 
     if request.stream:
         # Streaming response using SSE
@@ -198,7 +212,7 @@ async def query_agent(request: QueryRequest):
             try:
                 full_response = ""
 
-                async for event in agent.run_stream_events(request.message):
+                async for event in agent.run_stream_events(message_text):
                     # Handle tool call events
                     if isinstance(event, FunctionToolCallEvent):
                         yield f"event: tool_call\ndata: {json.dumps({'tool': event.part.tool_name, 'args': event.part.args})}\n\n"
@@ -227,7 +241,7 @@ async def query_agent(request: QueryRequest):
                 logger.info("Query completed successfully")
 
             except Exception as e:
-                logger.error(f"Error processing query: {e}")
+                logger.error(f"Error processing query: {e}", exc_info=True)
                 yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 
         return StreamingResponse(
@@ -241,10 +255,10 @@ async def query_agent(request: QueryRequest):
     else:
         # Non-streaming response
         try:
-            result = await agent.run(request.message)
+            result = await agent.run(message_text)
             return {"content": result.output}
         except Exception as e:
-            logger.error(f"Error processing query: {e}")
+            logger.error(f"Error processing query: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=str(e))
 
 
