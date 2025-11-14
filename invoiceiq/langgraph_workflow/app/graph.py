@@ -2,7 +2,13 @@ import logging
 
 from langgraph.graph import StateGraph, START, END
 
-from app.utils import ContextSchema, get_persistent_connection, State, AI_Decision_Output, FRESH_OR_RERUN_OPTIONS
+from app.utils import (
+    ContextSchema,
+    get_persistent_connection,
+    State,
+    AI_Decision_Output,
+    FRESH_OR_RERUN_OPTIONS,
+)
 import app.nodes as nodes
 
 logging.basicConfig(level=logging.INFO)
@@ -18,31 +24,56 @@ def create_graph() -> StateGraph:
     """
 
     workflow = StateGraph(
-        State, 
-        context_schema = ContextSchema,
-        output_schema = AI_Decision_Output
-        )
+        State, context_schema=ContextSchema, output_schema=AI_Decision_Output
+    )
 
-    workflow.add_node("run_ai_extract", nodes.run_ai_extract)
     workflow.add_node("classify_invoice", nodes.classify_invoice)
+    workflow.add_node("detect_extraction_method", nodes.detect_extraction_method)
+    workflow.add_node("run_text_extract", nodes.run_text_extractor)
+    workflow.add_node("run_ocr_extract", nodes.run_ocr_extractor)
+    workflow.add_node("run_hybrid_extract", nodes.run_hybrid_extractor)
     workflow.add_node("get_ai_extract_metadata", nodes.get_ai_extract_metadata)
     workflow.add_node("record_to_table", nodes.record_to_table)
-    workflow.add_node("get_purchase_order_header_metadata", nodes.get_purchase_order_header_metadata)
-    workflow.add_node("get_purchase_order_line_item_metadata", nodes.get_purchase_order_line_item_metadata)
+    workflow.add_node(
+        "get_purchase_order_header_metadata", nodes.get_purchase_order_header_metadata
+    )
+    workflow.add_node(
+        "get_purchase_order_line_item_metadata",
+        nodes.get_purchase_order_line_item_metadata,
+    )
     workflow.add_node("call_model", nodes.call_model)
     workflow.add_node("record_ai_decision", nodes.record_ai_decision)
 
     # Entry point: Decide if need to run from scratch or use existing data and skip classification
-    workflow.add_conditional_edges(START, nodes.fresh_or_rerun_router, 
-        {FRESH_OR_RERUN_OPTIONS[0]: "classify_invoice", 
-        FRESH_OR_RERUN_OPTIONS[1]: "get_ai_extract_metadata"}
-        )
+    workflow.add_conditional_edges(
+        START,
+        nodes.fresh_or_rerun_router,
+        {
+            FRESH_OR_RERUN_OPTIONS[0]: "classify_invoice",
+            FRESH_OR_RERUN_OPTIONS[1]: "get_ai_extract_metadata",
+        },
+    )
 
-    # Fresh run: Classify invoice and run AI extract
+    # Fresh run: Classify invoice, detect extraction method, and run appropriate extractor
     workflow.add_conditional_edges("classify_invoice", nodes.class_router)
-    workflow.add_edge("run_ai_extract", "get_purchase_order_header_metadata")
-    workflow.add_edge("run_ai_extract", "get_purchase_order_line_item_metadata")
-    workflow.add_edge("run_ai_extract", "record_to_table")
+    workflow.add_conditional_edges(
+        "detect_extraction_method", nodes.extraction_method_router
+    )
+
+    # Text extraction path
+    workflow.add_edge("run_text_extract", "get_purchase_order_header_metadata")
+    workflow.add_edge("run_text_extract", "get_purchase_order_line_item_metadata")
+    workflow.add_edge("run_text_extract", "record_to_table")
+
+    # OCR extraction path
+    workflow.add_edge("run_ocr_extract", "get_purchase_order_header_metadata")
+    workflow.add_edge("run_ocr_extract", "get_purchase_order_line_item_metadata")
+    workflow.add_edge("run_ocr_extract", "record_to_table")
+
+    # Hybrid extraction path
+    workflow.add_edge("run_hybrid_extract", "get_purchase_order_header_metadata")
+    workflow.add_edge("run_hybrid_extract", "get_purchase_order_line_item_metadata")
+    workflow.add_edge("run_hybrid_extract", "record_to_table")
     workflow.add_edge("get_purchase_order_header_metadata", "call_model")
     workflow.add_edge("get_purchase_order_line_item_metadata", "call_model")
     workflow.add_edge("call_model", "record_ai_decision")
@@ -51,13 +82,20 @@ def create_graph() -> StateGraph:
 
     # Rerun: Use existing data and skip classification
     workflow.add_edge("get_ai_extract_metadata", "get_purchase_order_header_metadata")
-    workflow.add_edge("get_ai_extract_metadata", "get_purchase_order_line_item_metadata")
+    workflow.add_edge(
+        "get_ai_extract_metadata", "get_purchase_order_line_item_metadata"
+    )
 
     return workflow.compile()
 
 
-
-async def run_workflow(target_table: str, invoice_id: str, relative_path: str, stage_name: str, use_existing_ai_extract: bool = False) -> AI_Decision_Output | str:
+async def run_workflow(
+    target_table: str,
+    invoice_id: str,
+    relative_path: str,
+    stage_name: str,
+    use_existing_ai_extract: bool = False,
+) -> AI_Decision_Output | str:
     """
     Run the workflow graph.
 
@@ -82,7 +120,7 @@ async def run_workflow(target_table: str, invoice_id: str, relative_path: str, s
 
     try:
         graph = create_graph()
-        
+
         inputs = {
             "target_table": target_table,
             "invoice_id": invoice_id,
@@ -95,7 +133,7 @@ async def run_workflow(target_table: str, invoice_id: str, relative_path: str, s
         result = await graph.ainvoke(inputs, context={"connection": connection})
         logger.info("Graph result received")
         return result
-        
+
     except Exception as e:
         logger.error(f"Error running workflow: {str(e)}")
         return f"Error: Failed to run workflow: {str(e)}"

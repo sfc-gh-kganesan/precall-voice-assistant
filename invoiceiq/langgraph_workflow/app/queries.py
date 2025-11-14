@@ -2,8 +2,9 @@ CLASSIFY_QUERY = """with input_text as (
             SELECT AI_PARSE_DOCUMENT (
                 TO_FILE(%(stage_name)s, %(relative_path)s),
                 {{'mode': 'LAYOUT', 'page_split': false}}) AS content)
-            select SNOWFLAKE.CORTEX.CLASSIFY_TEXT(content:"content", [{class_options_list}])
-            as classification
+            select 
+                SNOWFLAKE.CORTEX.CLASSIFY_TEXT(content:"content", [{class_options_list}]) as classification,
+                content:"content"::string as parsed_text
             from input_text"""
 
 GET_AI_EXTRACT_METADATA_QUERY = """SELECT 
@@ -68,9 +69,10 @@ RECORD_METADATA_QUERY = """
             USING (
                 SELECT 
                     %(invoice_id)s as invoice_id,
-                    PARSE_DATE(extracted_data:due_date::string) as due_date,
-                    extracted_data:invoice_currency as invoice_currency,
-                    PARSE_DATE(extracted_data:invoice_date::string) as invoice_date,
+                    extracted_data:invoice_number::varchar as invoice_number,
+                    TRY_TO_DATE(extracted_data:due_date::string) as due_date,
+                    COALESCE(extracted_data:invoice_currency, extracted_data:currency)::varchar as invoice_currency,
+                    TRY_TO_DATE(extracted_data:invoice_date::string) as invoice_date,
                     extracted_data:memo_description::varchar as memo_description,
                     extracted_data:payment_terms::varchar as payment_terms,
                     extracted_data:purchase_order_number::varchar as purchase_order_number,
@@ -78,6 +80,8 @@ RECORD_METADATA_QUERY = """
                     extracted_data:tax_amount::decimal(38,2) as tax_amount,
                     extracted_data:total_amount::decimal(38,2) as total_amount,
                     extracted_data:vendor_name::varchar as vendor_name,
+                    PARSE_JSON(%(bounding_boxes_string)s) as bounding_boxes,
+                    PARSE_JSON(%(fields_with_bounding_boxes_string)s) as fields_with_bounding_boxes,
                     fm.ticket_number as ticket_number,
                     fm.relative_path as relative_path
                 FROM (SELECT PARSE_JSON(%(json_string)s) AS extracted_data) extract_data
@@ -86,6 +90,7 @@ RECORD_METADATA_QUERY = """
             ON target.invoice_id = source.invoice_id
             WHEN MATCHED THEN
                 UPDATE SET
+                    target.invoice_number = source.invoice_number,
                     target.due_date = source.due_date,
                     target.invoice_currency = source.invoice_currency,
                     target.invoice_date = source.invoice_date,
@@ -96,12 +101,15 @@ RECORD_METADATA_QUERY = """
                     target.tax_amount = source.tax_amount,
                     target.total_amount = source.total_amount,
                     target.vendor_name = source.vendor_name,
+                    target.bounding_boxes = source.bounding_boxes,
+                    target.fields_with_bounding_boxes = source.fields_with_bounding_boxes,
                     target.updated_at = current_timestamp()
             WHEN NOT MATCHED THEN
                 INSERT (
                     invoice_id, 
                     ticket_number,
                     relative_path,
+                    invoice_number,
                     due_date, 
                     invoice_currency, 
                     invoice_date, 
@@ -111,11 +119,14 @@ RECORD_METADATA_QUERY = """
                     snowflake_entity, 
                     tax_amount, 
                     total_amount, 
-                    vendor_name)
+                    vendor_name,
+                    bounding_boxes,
+                    fields_with_bounding_boxes)
                 VALUES (
                     source.invoice_id, 
                     source.ticket_number, 
                     source.relative_path,
+                    source.invoice_number,
                     source.due_date, 
                     source.invoice_currency, 
                     source.invoice_date, 
@@ -125,7 +136,9 @@ RECORD_METADATA_QUERY = """
                     source.snowflake_entity, 
                     source.tax_amount, 
                     source.total_amount, 
-                    source.vendor_name)"""
+                    source.vendor_name,
+                    source.bounding_boxes,
+                    source.fields_with_bounding_boxes)"""
 
 GET_PURCHASE_ORDER_HEADER_METADATA_QUERY = """SELECT 
         * 
@@ -141,3 +154,12 @@ RECORD_AI_DECISION_QUERY = """
         UPDATE identifier(%(target_table)s)
         SET AI_DECISION = %(ai_decision)s, AI_REASONING = %(ai_reasoning)s, AI_PROCESSED_AT = CURRENT_TIMESTAMP()
         WHERE INVOICE_ID = %(invoice_id)s"""
+
+GET_FULL_TEXT_QUERY = """
+        SELECT AI_PARSE_DOCUMENT (
+            TO_FILE(%(stage_name)s, %(relative_path)s),
+            {'mode': 'LAYOUT', 'page_split': false}
+        ) AS content"""
+
+GET_PDF_FILE_QUERY = """
+        SELECT GET_PRESIGNED_URL(%(stage_name)s, %(relative_path)s, 3600) AS presigned_url"""

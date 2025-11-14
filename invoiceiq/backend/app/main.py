@@ -155,6 +155,9 @@ class Invoice(BaseModel):
     updated_at: Optional[str] = None
     email_from: Optional[str] = None
     email_subject: Optional[str] = None
+    # Bounding boxes for UI highlighting
+    bounding_boxes: Optional[List[dict]] = None
+    fields_with_bounding_boxes: Optional[dict] = None
 
 
 class InvoiceListResponse(BaseModel):
@@ -304,6 +307,13 @@ def build_invoice_from_row(row: dict) -> Invoice:
         updated_at=str(row.get("UPDATED_AT", "")),
         email_from=row.get("EMAIL"),
         email_subject=None,
+        bounding_boxes=json.loads(row.get("BOUNDING_BOXES"))
+        if row.get("BOUNDING_BOXES") and isinstance(row.get("BOUNDING_BOXES"), str)
+        else row.get("BOUNDING_BOXES"),
+        fields_with_bounding_boxes=json.loads(row.get("FIELDS_WITH_BOUNDING_BOXES"))
+        if row.get("FIELDS_WITH_BOUNDING_BOXES")
+        and isinstance(row.get("FIELDS_WITH_BOUNDING_BOXES"), str)
+        else row.get("FIELDS_WITH_BOUNDING_BOXES"),
     )
 
 
@@ -449,6 +459,8 @@ async def get_all_invoices(
                     i.LAST_EDITED_AT,
                     i.CREATED_AT,
                     i.UPDATED_AT,
+                    i.BOUNDING_BOXES,
+                    i.FIELDS_WITH_BOUNDING_BOXES,
                     t.EMAIL
                 FROM INVOICES i
                 LEFT JOIN TICKET_METADATA t ON i.TICKET_NUMBER = t.TICKET_NUMBER
@@ -575,6 +587,8 @@ async def search_invoices(
                     i.LAST_EDITED_AT,
                     i.CREATED_AT,
                     i.UPDATED_AT,
+                    i.BOUNDING_BOXES,
+                    i.FIELDS_WITH_BOUNDING_BOXES,
                     t.EMAIL
                 FROM INVOICES i
                 LEFT JOIN TICKET_METADATA t ON i.TICKET_NUMBER = t.TICKET_NUMBER

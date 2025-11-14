@@ -15,17 +15,24 @@ logger = logging.getLogger(__name__)
 DATABASE_NAME = "INVOICEIQ"
 SCHEMA_NAME = "SERVICE"
 
-CLASS_OPTIONS = ["invoice", "not an invoice"] # TODO - Make ENUM
-FRESH_OR_RERUN_OPTIONS = ["fresh", "rerun"] # TODO - Make ENUM
+CLASS_OPTIONS = ["invoice", "not an invoice"]  # TODO - Make ENUM
+FRESH_OR_RERUN_OPTIONS = ["fresh", "rerun"]  # TODO - Make ENUM
+EXTRACTION_METHOD_OPTIONS = ["text", "ocr", "hybrid"]  # TODO - Make ENUM
 
 
 class State(TypedDict):
     classification: NotRequired[Literal[CLASS_OPTIONS[0], CLASS_OPTIONS[1]]]
+    extraction_method: NotRequired[Literal["text", "ocr", "hybrid"]]
+    parsed_text: NotRequired[
+        str
+    ]  # Full text from AI_PARSE_DOCUMENT (reused from classification)
     target_table: str
-    invoice_id: str # SUBMISSION_ID from ticket_metadata table
+    invoice_id: str  # SUBMISSION_ID from ticket_metadata table
     relative_path: str
     stage_name: str
     ai_extract_metadata: NotRequired[dict]
+    bounding_boxes: NotRequired[list[dict]]
+    fields_with_bounding_boxes: NotRequired[dict]
     purchase_order_header_metadata: NotRequired[dict | list[dict]]
     purchase_order_line_item_metadata: NotRequired[dict | list[dict]]
     use_existing_ai_extract: NotRequired[bool] = False
@@ -36,8 +43,11 @@ class State(TypedDict):
 
 class AIExtractMetadata(BaseModel):
     """Output structure of graph specifically for AI Extract Metadata"""
-    model_config = {"extra": "forbid"} # Cortex Model requires additionalProperties to be false
-    
+
+    model_config = {
+        "extra": "forbid"
+    }  # Cortex Model requires additionalProperties to be false
+
     company_name: str
     currency: str
     invoice_date: str
@@ -52,8 +62,11 @@ class AIExtractMetadata(BaseModel):
 
 class AI_Decision_Output(BaseModel):
     """Final output structure of graph for AI Decision"""
-    model_config = {"extra": "forbid"} # Cortex Model requires additionalProperties to be false
-    
+
+    model_config = {
+        "extra": "forbid"
+    }  # Cortex Model requires additionalProperties to be false
+
     ai_decision: str
     ai_reasoning: str
     ai_extract_metadata: AIExtractMetadata
@@ -70,6 +83,7 @@ class ContextSchema:
         connection: Snowflake Python connection
         thread_id: LangGraph Studio passes thread_id automatically
     """
+
     connection: Optional[Any] = None  # Use Any to avoid Pydantic serialization issues
     thread_id: Optional[str] = None  # LangGraph Studio passes thread_id automatically
 
@@ -108,6 +122,7 @@ def get_spcs_container_token() -> str:
     except Exception as e:
         raise
 
+
 def get_persistent_connection() -> connection:
     """
     Get a persistent Snowflake connection.
@@ -136,7 +151,6 @@ def get_persistent_connection() -> connection:
             }
 
         else:
-
             connection_params = {
                 "user": os.getenv("SNOWFLAKE_USER"),
                 "password": os.getenv("SNOWFLAKE_PAT"),
@@ -156,18 +170,18 @@ def get_persistent_connection() -> connection:
         raise
 
 
-def get_snowflake_connection() -> tuple[Union[connection,None], bool]:
+def get_snowflake_connection() -> tuple[Union[connection, None], bool]:
     """
     Gets a Snowflake Python connection from runtime context or creates a temporary one.
 
     Returns:
         connection: Snowflake Python connection
         close_connection: Boolean indicating if the connection should be closed
-    
+
     """
     connection = None
     close_connection = False
-    
+
     # Try to get connection from runtime context
     try:
         runtime = get_runtime(ContextSchema)
@@ -175,7 +189,7 @@ def get_snowflake_connection() -> tuple[Union[connection,None], bool]:
     except Exception as e:
         logger.info(f"Could not get connection from runtime: {str(e)}")
         connection = None
-    
+
     # If no connection in context, create a temporary one (for LangGraph Studio)
     if not connection:
         logger.info("No connection in context, creating temporary connection")
@@ -185,14 +199,14 @@ def get_snowflake_connection() -> tuple[Union[connection,None], bool]:
         except Exception as e:
             logger.error(f"Error creating connection: {str(e)}")
             raise e
-    
+
     return connection, close_connection
 
 
-def run_query(query: str, params: dict = None) -> list[Dict[str, str]]|str:
+def run_query(query: str, params: dict = None) -> list[Dict[str, str]] | str:
     """
     Run a query against the database.
-    
+
     Args:
         query: SQL query string with %(name)s placeholders for parameters
         params: Dictionary of parameters to bind to the query
@@ -207,7 +221,6 @@ def run_query(query: str, params: dict = None) -> list[Dict[str, str]]|str:
     try:
         if connection:
             with connection.cursor(DictCursor) as cursor:
-    
                 if params:
                     cursor.execute(query, params)
                 else:
@@ -253,7 +266,11 @@ def unpack_function_request(data: dict | Request) -> list[list]:
     else:
         response = data
 
-    if "data" in response and isinstance(response["data"], list) and len(response["data"]) > 0:
+    if (
+        "data" in response
+        and isinstance(response["data"], list)
+        and len(response["data"]) > 0
+    ):
         return response["data"]
     else:
         return response

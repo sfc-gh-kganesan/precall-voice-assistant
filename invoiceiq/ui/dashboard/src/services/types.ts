@@ -43,6 +43,22 @@ export interface InvoiceResponse {
     updated_at: string;
     email_from: string | null;
     email_subject: string | null;
+    // Bounding boxes
+    bounding_boxes: Array<{
+        bbox: { x0: number; x1: number; y0: number; y1: number };
+        page: number;
+        text: string;
+        type: string;
+    }> | null;
+    fields_with_bounding_boxes: Record<
+        string,
+        {
+            bbox: { x0: number; x1: number; y0: number; y1: number };
+            confidence: number;
+            page: number;
+            value: string;
+        }
+    > | null;
 }
 
 export interface InvoiceListResponse {

@@ -7,13 +7,7 @@ import {
 } from "@/services/hooks";
 import { InvoiceResponse } from "@/services/types";
 import { baltoTheme } from "@snowflake/balto-themes/baltoTheme.stylex.js";
-import {
-    Button,
-    Flex,
-    Heading,
-    Select,
-    Spinner,
-} from "@snowflake/stellar-components";
+import { Button, Flex, Heading, Select } from "@snowflake/stellar-components";
 import {
     CheckCircleIcon,
     ChevronLeftBoldIcon,
@@ -22,110 +16,13 @@ import {
     ErrorCircleIcon,
     IconContextProvider,
 } from "@snowflake/stellar-icons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { InvoiceDetailsCard } from "./stellar/InvoiceDetailsCard";
 import { ReadOnlyDetailsCard } from "./stellar/ReadOnlyDetailsCard";
-import {
-    AreaHighlight,
-    Content,
-    Highlight,
-    IHighlight,
-    PdfHighlighter,
-    PdfLoader,
-    Popup,
-    ScaledPosition,
-} from "react-pdf-highlighter";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
-const parseIdFromHash = () =>
-    document.location.hash.slice("#highlight-".length);
-
-const HighlightPopup = ({
-    comment,
-}: {
-    comment: { text: string; emoji: string };
-}) =>
-    comment.text ? (
-        <div className="Highlight__popup">
-            {comment.emoji} {comment.text}
-        </div>
-    ) : null;
-
-interface FieldMappingTipProps {
-    onConfirm: (fieldName: string) => void;
-    onOpen: () => void;
-}
-
-const FieldMappingTip = ({ onConfirm, onOpen }: FieldMappingTipProps) => {
-    const [selectedField, setSelectedField] = useState<string>("");
-
-    useEffect(() => {
-        onOpen();
-    }, [onOpen]);
-
-    const fieldOptions = [
-        { label: "Invoice Number", value: "invoice_number" },
-        { label: "Purchase Order Number", value: "purchase_order_number" },
-        { label: "Invoice Date", value: "invoice_date" },
-        { label: "Due Date", value: "due_date" },
-        { label: "Currency", value: "invoice_currency" },
-        { label: "Vendor Name", value: "vendor_name" },
-        { label: "Vendor Tax ID", value: "vendor_tax_id" },
-        { label: "Vendor Address", value: "vendor_address" },
-        { label: "Total Amount", value: "total_amount" },
-        { label: "Tax Amount", value: "tax_amount" },
-        { label: "Unit Price", value: "unit_price" },
-        { label: "Quantity", value: "quantity" },
-        { label: "Freight/Shipping", value: "freight_shipping_amount" },
-        { label: "Payment Terms", value: "payment_terms" },
-        { label: "Payment Type", value: "payment_type" },
-        { label: "Banking Details", value: "banking_details" },
-        { label: "Service Start Date", value: "service_start_date" },
-        { label: "Service End Date", value: "service_end_date" },
-        { label: "Shipped To", value: "shipped_to_address" },
-        { label: "Snowflake Entity", value: "snowflake_entity" },
-        { label: "Snowflake Tax ID", value: "snowflake_tax_id" },
-        { label: "Memo", value: "memo_description" },
-    ];
-
-    // Create a map from label to value (snake_case field name)
-    const labelToValueMap: Record<string, string> = {};
-    fieldOptions.forEach((option) => {
-        labelToValueMap[option.label] = option.value;
-    });
-
-    const handleFieldSelect = (label: string) => {
-        setSelectedField(label);
-        const fieldValue = labelToValueMap[label];
-        if (fieldValue) {
-            onConfirm(fieldValue);
-        }
-    };
-
-    return (
-        <div
-            style={{
-                background: "white",
-                padding: "8px",
-                borderRadius: "8px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            }}
-        >
-            <Select.Root
-                value={selectedField}
-                onValueChange={handleFieldSelect}
-                placeholder="Add to invoice details"
-                aria-label="Select field to map"
-            >
-                {fieldOptions.map((option) => (
-                    <Select.Option key={option.value} label={option.label} />
-                ))}
-            </Select.Root>
-        </div>
-    );
-};
+import { IHighlight } from "react-pdf-highlighter";
+import { InvoicePdfHighlighter } from "./InvoicePdfHighlighter";
 
 export function InvoicePage() {
     const { invoiceNumber = "", ticketNumber = "" } = useParams();
@@ -141,8 +38,6 @@ export function InvoicePage() {
     const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
     const updateStatus = useUpdateInvoiceStatus();
     const updateFields = useUpdateInvoiceFields();
-    const [highlights, setHighlights] = useState<Array<IHighlight>>([]);
-    const scrollViewerTo = useRef((_highlight: IHighlight) => {});
 
     const statusMap = {
         approved: "Approved",
@@ -248,21 +143,10 @@ export function InvoicePage() {
         }));
     };
 
-    const resetHash = () => {
-        document.location.hash = "";
-    };
-
-    const addHighlight = (
-        highlight: Omit<IHighlight, "id">,
+    const handleHighlightAdded = (
+        highlight: IHighlight,
         fieldName?: string,
     ) => {
-        console.log("Adding highlight", highlight, "to field", fieldName);
-        const newHighlight: IHighlight = {
-            ...highlight,
-            id: String(Date.now()),
-        };
-        setHighlights((prevHighlights) => [...prevHighlights, newHighlight]);
-
         // If a field name is provided, update the corresponding field with the highlighted text
         if (fieldName && highlight.content.text) {
             // Convert snake_case to camelCase for backend
@@ -326,54 +210,11 @@ export function InvoicePage() {
                             `Failed to update ${fieldLabel}: ${error.message}`,
                             { id: loadingToast },
                         );
-                        // Remove the highlight on error
-                        setHighlights((prevHighlights) =>
-                            prevHighlights.filter(
-                                (h) => h.id !== newHighlight.id,
-                            ),
-                        );
                     },
                 },
             );
         }
     };
-
-    const updateHighlight = (
-        highlightId: string,
-        position: Partial<ScaledPosition>,
-        content: Partial<Content>,
-    ) => {
-        console.log("Updating highlight", highlightId, position, content);
-        setHighlights((prevHighlights) =>
-            prevHighlights.map((h) => {
-                const {
-                    id,
-                    position: originalPosition,
-                    content: originalContent,
-                    ...rest
-                } = h;
-                return id === highlightId
-                    ? {
-                          id,
-                          position: { ...originalPosition, ...position },
-                          content: { ...originalContent, ...content },
-                          ...rest,
-                      }
-                    : h;
-            }),
-        );
-    };
-
-    const getHighlightById = (id: string) => {
-        return highlights.find((highlight) => highlight.id === id);
-    };
-
-    const scrollToHighlightFromHash = useCallback(() => {
-        const highlight = getHighlightById(parseIdFromHash());
-        if (highlight) {
-            scrollViewerTo.current(highlight);
-        }
-    }, []);
 
     return (
         <Flex
@@ -487,10 +328,7 @@ export function InvoicePage() {
                     </Flex>
                 </Flex>
             </Flex>
-            <Flex
-                direction="row"
-                style={{ flex: 1, overflow: "hidden" }}
-            >
+            <Flex direction="row" style={{ flex: 1, overflow: "hidden" }}>
                 <Flex
                     direction="column"
                     style={{
@@ -499,144 +337,11 @@ export function InvoicePage() {
                         marginBottom: "16px",
                     }}
                 >
-                    <PdfLoader
-                        url={pdfUrl}
-                        workerSrc={pdfWorkerUrl}
-                        beforeLoad={
-                            <Spinner
-                                style={{
-                                    position: "absolute",
-                                    top: "45%",
-                                    left: "50%",
-                                    transform: "translate(-50%, -50%)",
-                                }}
-                            />
-                        }
-                    >
-                        {(pdfDocument) => {
-                            return (
-                                <PdfHighlighter
-                                    pdfDocument={pdfDocument}
-                                    enableAreaSelection={(event) =>
-                                        event.altKey
-                                    }
-                                    onScrollChange={resetHash}
-                                    highlights={highlights}
-                                    scrollRef={(scrollTo) => {
-                                        scrollViewerTo.current = scrollTo;
-                                        scrollToHighlightFromHash();
-                                    }}
-                                    onSelectionFinished={(
-                                        position,
-                                        content,
-                                        hideTipAndSelection,
-                                        transformSelection,
-                                    ) => (
-                                        <FieldMappingTip
-                                            onOpen={transformSelection}
-                                            onConfirm={(fieldName) => {
-                                                addHighlight(
-                                                    {
-                                                        content,
-                                                        position,
-                                                        comment: {
-                                                            text: fieldName,
-                                                            emoji: "📝",
-                                                        },
-                                                    },
-                                                    fieldName,
-                                                );
-                                                hideTipAndSelection();
-                                            }}
-                                        />
-                                    )}
-                                    highlightTransform={(
-                                        highlight,
-                                        index,
-                                        setTip,
-                                        hideTip,
-                                        viewportToScaled,
-                                        screenshot,
-                                        isScrolledTo,
-                                    ) => {
-                                        const isTextHighlight =
-                                            !highlight.content?.image;
-
-                                        const component = isTextHighlight ? (
-                                            <Highlight
-                                                isScrolledTo={isScrolledTo}
-                                                position={highlight.position}
-                                                comment={highlight.comment}
-                                            />
-                                        ) : (
-                                            <AreaHighlight
-                                                isScrolledTo={isScrolledTo}
-                                                highlight={highlight}
-                                                onChange={(boundingRect) => {
-                                                    updateHighlight(
-                                                        highlight.id,
-                                                        {
-                                                            boundingRect:
-                                                                viewportToScaled(
-                                                                    boundingRect,
-                                                                ),
-                                                        },
-                                                        {
-                                                            image: screenshot(
-                                                                boundingRect,
-                                                            ),
-                                                        },
-                                                    );
-                                                }}
-                                            />
-                                        );
-
-                                        return (
-                                            <Popup
-                                                popupContent={
-                                                    <HighlightPopup
-                                                        {...highlight}
-                                                    />
-                                                }
-                                                onMouseOver={(popupContent) =>
-                                                    setTip(
-                                                        highlight,
-                                                        (_) => popupContent,
-                                                    )
-                                                }
-                                                onMouseOut={hideTip}
-                                                key={index}
-                                            >
-                                                {component}
-                                            </Popup>
-                                        );
-                                    }}
-                                />
-                            );
-                        }}
-                    </PdfLoader>
-                    {/* <Spinner style={{ position: "absolute", top: "45%", left: "50%", transform: "translate(-50%, -50%)" }} />
-                    <div
-                        style={{
-                            height: "100%",
-                            paddingTop: "8px",
-                            paddingBottom: "16px",
-                            position: "relative",
-                        }}
-                    >
-                        <iframe
-                            src={`${pdfUrl}#navpanes=0&scrollbar=0#view=FitW#zoom=page-fit`}
-                            className="w-full h-full rounded-lg shadow-lg bg-white"
-                            title={`Invoice id`}
-                            style={{ minHeight: "100%", border: "none" }}
-                            onLoad={() =>
-                                console.log("PDF iframe loaded successfully!!!")
-                            }
-                            onError={(e) => {
-                                console.error("PDF iframe error:", e);
-                            }}
-                        />
-                    </div> */}
+                    <InvoicePdfHighlighter
+                        pdfUrl={pdfUrl}
+                        invoice={invoice}
+                        onHighlightAdded={handleHighlightAdded}
+                    />
                 </Flex>
                 <Flex
                     direction="column"
