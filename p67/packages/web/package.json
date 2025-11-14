@@ -9,8 +9,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "preview": "vite preview",
-    "type-check": "tsc -b --noEmit"
+    "type:check": "tsc -b --noEmit"
   },
   "dependencies": {
     "@snowflake/balto-themes": "^0.20.2",
