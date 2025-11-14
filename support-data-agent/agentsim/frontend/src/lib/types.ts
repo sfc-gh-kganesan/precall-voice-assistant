@@ -26,6 +26,7 @@ export interface Simulation {
   id: number
   project_id: number
   num_simulations: number
+  conversation_timeout_seconds: number
   status: 'pending' | 'running' | 'completed' | 'failed'
   started_at?: string
   completed_at?: string
@@ -38,6 +39,7 @@ export interface SimulationCreate {
   concurrency?: number
   max_turns?: number
   timeout_seconds?: number
+  conversation_timeout_seconds?: number
   stop_conditions?: string[]
   metrics_config?: string[]
   edge_case_ratio?: number

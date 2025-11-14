@@ -29,6 +29,7 @@ export default function SimulatePage({ params }: { params: Promise<{ id: string 
     concurrency: 2,
     max_turns: 20,
     timeout_seconds: 120,
+    conversation_timeout_seconds: 600,
     stop_conditions: ['max_turns', 'agent_signal'],
     metrics_config: ['efficiency', 'quality', 'tool_usage'],
     edge_case_ratio: 0.2,
@@ -385,6 +386,22 @@ export default function SimulatePage({ params }: { params: Promise<{ id: string 
                 onChange={(e) => setFormData({...formData, timeout_seconds: parseInt(e.target.value) || 30})}
                 className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-strategic-600"
               />
+              <p className="mt-1 text-xs text-parchment-300">Timeout for stop conditions evaluation</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-parchment-200">
+                Conversation Timeout (seconds)
+              </label>
+              <input
+                type="number"
+                min="60"
+                max="1800"
+                value={formData.conversation_timeout_seconds}
+                onChange={(e) => setFormData({...formData, conversation_timeout_seconds: parseInt(e.target.value) || 600})}
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-strategic-600"
+              />
+              <p className="mt-1 text-xs text-parchment-300">Maximum time per conversation before timeout (default: 600s / 10 minutes)</p>
             </div>
           </div>
         </div>

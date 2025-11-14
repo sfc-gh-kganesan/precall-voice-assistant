@@ -86,6 +86,9 @@ class InsightsJudge:
                 simulation, conversations, db
             )
 
+            # Deduplicate similar recommendations
+            recommendations = self._deduplicate_recommendations(recommendations)
+
             # Create and save ImprovementSuggestion records
             suggestions = []
             for rec in recommendations:
@@ -304,3 +307,138 @@ Focus on recommendations that will have the biggest impact on success rate and u
 """
 
         return prompt
+
+    def _deduplicate_recommendations(
+        self, recommendations: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Deduplicate similar recommendations by merging evidence.
+
+        Args:
+            recommendations: List of recommendation dicts from LLM
+
+        Returns:
+            Deduplicated list with merged evidence
+        """
+        if not recommendations:
+            return recommendations
+
+        from difflib import SequenceMatcher
+
+        def similarity(a: str, b: str) -> float:
+            """Calculate similarity ratio between two strings."""
+            return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+        deduplicated = []
+        used_indices = set()
+
+        for i, rec1 in enumerate(recommendations):
+            if i in used_indices:
+                continue
+
+            # Find similar recommendations
+            similar_group = [rec1]
+            for j, rec2 in enumerate(recommendations[i + 1 :], start=i + 1):
+                if j in used_indices:
+                    continue
+
+                # Check if similar: same category + similar title
+                same_category = rec1.get("category") == rec2.get("category")
+                title_similarity = similarity(
+                    rec1.get("title", ""), rec2.get("title", "")
+                )
+
+                # Consider duplicate if >70% title similarity and same category
+                if same_category and title_similarity > 0.7:
+                    similar_group.append(rec2)
+                    used_indices.add(j)
+
+            # Merge the group
+            if len(similar_group) == 1:
+                # No duplicates, keep as-is
+                deduplicated.append(rec1)
+            else:
+                # Merge evidence from all similar recommendations
+                merged = self._merge_recommendations(similar_group)
+                deduplicated.append(merged)
+                logger.info(
+                    f"Merged {len(similar_group)} similar recommendations: '{merged['title']}'"
+                )
+
+        return deduplicated
+
+    def _merge_recommendations(
+        self, recommendations: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Merge multiple similar recommendations into one.
+
+        Args:
+            recommendations: List of similar recommendations to merge
+
+        Returns:
+            Single merged recommendation
+        """
+        # Use the first as base
+        merged = recommendations[0].copy()
+
+        # Take highest priority
+        priority_order = {"high": 3, "medium": 2, "low": 1}
+        merged["priority"] = max(
+            recommendations,
+            key=lambda r: priority_order.get(r.get("priority", "low"), 0),
+        )["priority"]
+
+        # Merge evidence
+        merged_evidence = {
+            "conversation_ids": [],
+            "affected_personas": [],
+            "patterns": [],
+            "metrics": {},
+        }
+
+        for rec in recommendations:
+            evidence = rec.get("evidence", {})
+
+            # Merge conversation IDs (union)
+            conv_ids = evidence.get("conversation_ids", [])
+            if conv_ids:
+                merged_evidence["conversation_ids"].extend(conv_ids)
+
+            # Merge personas (union)
+            personas = evidence.get("affected_personas", [])
+            if personas:
+                merged_evidence["affected_personas"].extend(personas)
+
+            # Collect patterns
+            pattern = evidence.get("pattern")
+            if pattern:
+                merged_evidence["patterns"].append(pattern)
+
+            # Merge metrics
+            metrics = evidence.get("metrics", {})
+            if metrics:
+                merged_evidence["metrics"].update(metrics)
+
+        # Deduplicate lists
+        merged_evidence["conversation_ids"] = list(
+            set(merged_evidence["conversation_ids"])
+        )
+        merged_evidence["affected_personas"] = list(
+            set(merged_evidence["affected_personas"])
+        )
+
+        # Combine patterns into single pattern string
+        if merged_evidence["patterns"]:
+            merged_evidence["pattern"] = "; ".join(set(merged_evidence["patterns"]))
+            del merged_evidence["patterns"]
+
+        # Update counts
+        if merged_evidence["conversation_ids"]:
+            merged_evidence["conversation_count"] = len(
+                merged_evidence["conversation_ids"]
+            )
+        if merged_evidence["affected_personas"]:
+            merged_evidence["persona_count"] = len(merged_evidence["affected_personas"])
+
+        merged["evidence"] = merged_evidence
+
+        return merged

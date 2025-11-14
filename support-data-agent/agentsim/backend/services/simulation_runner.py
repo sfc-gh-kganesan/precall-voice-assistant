@@ -139,6 +139,7 @@ class SimulationRunner:
                 metrics_calculator=metrics_calculator,
                 concurrency=simulation.concurrency,
                 max_turns=simulation.max_turns,
+                conversation_timeout_seconds=simulation.conversation_timeout_seconds,
                 user_simulator=user_simulator,  # Pass user simulator
                 on_conversation_complete=on_conversation_complete,  # Pass callback
                 on_conversation_start=on_conversation_start,  # Pass start callback

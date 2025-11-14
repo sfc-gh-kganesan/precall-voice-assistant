@@ -121,6 +121,9 @@ class Simulation(Base):
     concurrency: Mapped[int] = mapped_column(Integer, default=1)
     max_turns: Mapped[int] = mapped_column(Integer, default=20)
     timeout_seconds: Mapped[int] = mapped_column(Integer, default=300)
+    conversation_timeout_seconds: Mapped[int] = mapped_column(
+        Integer, default=600
+    )  # Max time per conversation
     stop_conditions: Mapped[List[str]] = mapped_column(
         JSON
     )  # List of stop condition names

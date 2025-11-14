@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { simulationsApi } from '@/lib/api'
 import type { SimulationResults, ConversationSummary, ImprovementSuggestion } from '@/lib/types'
 
+type TabType = 'high' | 'medium' | 'low' | 'all'
+
 export default function InsightsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const simulationId = parseInt(id)
@@ -14,6 +16,8 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
   const [loading, setLoading] = useState(true)
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
   const [aiInsightsError, setAiInsightsError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>('high')
+  const [expandedInsights, setExpandedInsights] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadData()
@@ -29,7 +33,7 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
       setConversations(convRes.data)
       setLoading(false)
 
-      // Load AI insights separately (may take a while if generating)
+      // Load AI insights separately
       loadAIInsights()
     } catch (err) {
       console.error(err)
@@ -65,82 +69,138 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  const toggleInsight = (id: number) => {
+    const newExpanded = new Set(expandedInsights)
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id)
+    } else {
+      newExpanded.add(id)
+    }
+    setExpandedInsights(newExpanded)
+  }
+
   if (loading) return <div className="p-8 text-center text-parchment-200">Loading...</div>
   if (!results) return <div className="p-8 text-center text-parchment-200">No results available</div>
 
-  // Analysis
-  const failedConvs = conversations.filter(c => !c.success)
-  const avgTurns = conversations.reduce((sum, c) => sum + c.num_turns, 0) / conversations.length
-  const avgDuration = conversations.reduce((sum, c) => sum + c.total_duration_ms, 0) / conversations.length
-  const timeoutFailures = failedConvs.filter(c => c.stop_reason === 'timeout').length
-  const maxTurnsFailures = failedConvs.filter(c => c.stop_reason === 'max_turns').length
-  const errorFailures = failedConvs.filter(c => c.stop_reason === 'error').length
-  const multiTurnSuccess = conversations.filter(c => c.num_turns > 1 && c.success).length
-  const multiTurnRate = multiTurnSuccess / conversations.filter(c => c.num_turns > 1).length * 100 || 0
-
-  // Generate recommendations
-  const recommendations = []
-  if (results.successful / results.num_simulations < 0.7) {
-    recommendations.push({
-      type: 'critical',
-      title: 'Low Success Rate',
-      description: `Only ${(results.successful / results.num_simulations * 100).toFixed(1)}% of conversations succeeded. This indicates significant issues with your agent.`,
-      actions: ['Review failed conversation logs', 'Check agent error handling', 'Verify business logic']
-    })
+  // Calculate insights by priority and category
+  const insightsByPriority = {
+    high: aiInsights.filter(i => i.priority === 'high'),
+    medium: aiInsights.filter(i => i.priority === 'medium'),
+    low: aiInsights.filter(i => i.priority === 'low')
   }
 
-  if (timeoutFailures > 0) {
-    recommendations.push({
-      type: 'warning',
-      title: 'Timeout Issues',
-      description: `${timeoutFailures} conversations timed out. Your agent may be taking too long to respond.`,
-      actions: ['Increase timeout settings', 'Optimize agent response time', 'Check for blocking operations']
-    })
+  const insightsByCategory: Record<string, ImprovementSuggestion[]> = {}
+  aiInsights.forEach(insight => {
+    const cat = insight.category
+    if (!insightsByCategory[cat]) insightsByCategory[cat] = []
+    insightsByCategory[cat].push(insight)
+  })
+
+  const categoryIcons: Record<string, string> = {
+    tool: '🔧',
+    prompt: '💬',
+    logic: '🧠',
+    error_handling: '⚠️',
+    ux: '✨',
+    performance: '⚡',
+    general: '📌'
   }
 
-  if (maxTurnsFailures > results.num_simulations * 0.3) {
-    recommendations.push({
-      type: 'warning',
-      title: 'Excessive Turn Count',
-      description: `${maxTurnsFailures} conversations hit max turns without completing. Your agent may be going in circles.`,
-      actions: ['Review conversation flow', 'Improve task completion logic', 'Add clearer completion signals']
-    })
+  const categoryLabels: Record<string, string> = {
+    tool: 'Tool Issues',
+    prompt: 'Prompt Issues',
+    logic: 'Logic Issues',
+    error_handling: 'Error Handling',
+    ux: 'UX Issues',
+    performance: 'Performance',
+    general: 'General'
   }
 
-  if (errorFailures > 0) {
-    recommendations.push({
-      type: 'critical',
-      title: 'Agent Errors',
-      description: `${errorFailures} conversations failed with errors. Check your agent logs for exceptions.`,
-      actions: ['Review error logs', 'Add error handling', 'Test edge cases']
+  // Get most affected personas
+  const personaCounts: Record<string, number> = {}
+  aiInsights.forEach(insight => {
+    const personas = insight.evidence?.affected_personas || []
+    personas.forEach(p => {
+      personaCounts[p] = (personaCounts[p] || 0) + 1
     })
-  }
+  })
+  const topPersonas = Object.entries(personaCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
 
-  if (multiTurnRate < 50 && conversations.some(c => c.num_turns > 1)) {
-    recommendations.push({
-      type: 'info',
-      title: 'Multi-Turn Challenges',
-      description: `Only ${multiTurnRate.toFixed(1)}% of multi-turn conversations succeeded. Your agent struggles with follow-up questions.`,
-      actions: ['Improve context retention', 'Test conversation continuity', 'Add conversation state management']
-    })
-  }
+  // Render insight card
+  const renderInsightCard = (insight: ImprovementSuggestion) => {
+    const priorityStyles = {
+      high: 'border-red-600 bg-red-900/30',
+      medium: 'border-amber-600 bg-amber-900/30',
+      low: 'border-blue-600 bg-blue-900/30'
+    }
+    const priorityColors = {
+      high: 'text-red-300',
+      medium: 'text-amber-300',
+      low: 'text-blue-300'
+    }
 
-  if (avgDuration > 30000) {
-    recommendations.push({
-      type: 'info',
-      title: 'Slow Response Times',
-      description: `Average conversation duration is ${(avgDuration / 1000).toFixed(1)}s. Consider optimization.`,
-      actions: ['Profile agent performance', 'Cache common queries', 'Optimize database queries']
-    })
-  }
+    const isExpanded = expandedInsights.has(insight.id)
+    const conversationCount = insight.evidence?.conversation_ids?.length || insight.evidence?.conversation_count || 0
+    const personaCount = insight.evidence?.affected_personas?.length || insight.evidence?.persona_count || 0
 
-  if (recommendations.length === 0) {
-    recommendations.push({
-      type: 'success',
-      title: 'Great Performance!',
-      description: 'Your agent is performing well across all metrics.',
-      actions: ['Continue monitoring', 'Test with more edge cases', 'Expand test scenarios']
-    })
+    return (
+      <div key={insight.id} className={`border-l-4 p-6 rounded ${priorityStyles[insight.priority]}`}>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <h3 className={`font-serif font-semibold text-lg ${priorityColors[insight.priority]}`}>
+            <span className="mr-2">{categoryIcons[insight.category] || '📌'}</span>
+            {insight.title}
+          </h3>
+          <div className="flex gap-2">
+            <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600">
+              {insight.category}
+            </span>
+            <span className={`px-2 py-1 text-xs rounded font-medium ${priorityColors[insight.priority]}`}>
+              {insight.priority.toUpperCase()}
+            </span>
+          </div>
+        </div>
+        <p className="text-sm text-parchment-200 mb-4">{insight.description}</p>
+
+        {/* Compact evidence summary */}
+        <div className="mt-3 flex items-center justify-between p-3 bg-slate-800/50 rounded border border-slate-700">
+          <div className="flex gap-6 text-xs text-parchment-400">
+            {conversationCount > 0 && (
+              <div><span className="text-parchment-300 font-medium">{conversationCount}</span> conversations affected</div>
+            )}
+            {personaCount > 0 && (
+              <div><span className="text-parchment-300 font-medium">{personaCount}</span> personas affected</div>
+            )}
+          </div>
+          <button
+            onClick={() => toggleInsight(insight.id)}
+            className="text-xs text-strategic-500 hover:text-strategic-400 transition-colors flex items-center gap-1"
+          >
+            {isExpanded ? 'Hide' : 'Show'} Details
+            <span className="text-lg">{isExpanded ? '▲' : '▼'}</span>
+          </button>
+        </div>
+
+        {/* Expanded evidence details */}
+        {isExpanded && insight.evidence && (
+          <div className="mt-2 p-3 bg-slate-800/50 rounded border border-slate-700">
+            <div className="text-xs font-medium text-parchment-300 mb-2">Detailed Evidence:</div>
+            <div className="text-xs text-parchment-400 space-y-1">
+              {insight.evidence.pattern && (
+                <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
+              )}
+              {insight.evidence.affected_personas && insight.evidence.affected_personas.length > 0 && (
+                <div><span className="text-parchment-300">Affected Personas:</span> {insight.evidence.affected_personas.join(', ')}</div>
+              )}
+              {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
+                <div><span className="text-parchment-300">Conversation IDs:</span> {insight.evidence.conversation_ids.slice(0, 10).join(', ')}{insight.evidence.conversation_ids.length > 10 ? '...' : ''}</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -157,86 +217,34 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 mb-8">
-        <h2 className="text-lg font-serif font-semibold text-parchment-100 mb-4">Key Metrics</h2>
-        <div className="grid grid-cols-3 gap-6">
-          <div>
-            <div className="text-sm text-parchment-300">Average Turns</div>
-            <div className="text-2xl font-serif font-semibold text-parchment-100 mt-1">{avgTurns.toFixed(1)}</div>
-          </div>
-          <div>
-            <div className="text-sm text-parchment-300">Average Duration</div>
-            <div className="text-2xl font-serif font-semibold text-parchment-100 mt-1">{(avgDuration / 1000).toFixed(1)}s</div>
-          </div>
-          <div>
-            <div className="text-sm text-parchment-300">Multi-Turn Success</div>
-            <div className="text-2xl font-serif font-semibold text-parchment-100 mt-1">{isNaN(multiTurnRate) ? 'N/A' : `${multiTurnRate.toFixed(1)}%`}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Failure Analysis */}
-      {failedConvs.length > 0 && (
-        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 mb-8">
-          <h2 className="text-lg font-serif font-semibold text-parchment-100 mb-4">Failure Analysis</h2>
-          <div className="space-y-3">
-            {timeoutFailures > 0 && (
-              <div className="flex justify-between items-center p-3 bg-red-900/30 border border-red-700 rounded">
-                <span className="text-sm font-medium text-parchment-200">Timeout Failures</span>
-                <span className="text-sm text-red-400">{timeoutFailures} ({(timeoutFailures / failedConvs.length * 100).toFixed(0)}%)</span>
+      {/* Summary Banner */}
+      {aiInsights.length > 0 && !aiInsightsLoading && (
+        <div className="bg-gradient-to-r from-red-900/40 to-amber-900/40 border-2 border-red-600 rounded-lg p-6 mb-8">
+          <div className="flex items-start gap-4">
+            <div className="text-4xl">⚠️</div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-serif font-semibold text-red-200 mb-3">
+                {insightsByPriority.high.length} High Priority Issue{insightsByPriority.high.length !== 1 ? 's' : ''} Detected
+              </h2>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                {Object.entries(insightsByCategory).map(([cat, insights]) => (
+                  <div key={cat} className="flex items-center gap-2 text-sm">
+                    <span className="text-lg">{categoryIcons[cat]}</span>
+                    <span className="text-parchment-200">{insights.length} {categoryLabels[cat]}</span>
+                  </div>
+                ))}
               </div>
-            )}
-            {maxTurnsFailures > 0 && (
-              <div className="flex justify-between items-center p-3 bg-amber-900/30 border border-amber-700 rounded">
-                <span className="text-sm font-medium text-parchment-200">Max Turns Reached</span>
-                <span className="text-sm text-amber-400">{maxTurnsFailures} ({(maxTurnsFailures / failedConvs.length * 100).toFixed(0)}%)</span>
-              </div>
-            )}
-            {errorFailures > 0 && (
-              <div className="flex justify-between items-center p-3 bg-red-900/30 border border-red-700 rounded">
-                <span className="text-sm font-medium text-parchment-200">Agent Errors</span>
-                <span className="text-sm text-red-400">{errorFailures} ({(errorFailures / failedConvs.length * 100).toFixed(0)}%)</span>
-              </div>
-            )}
+              {topPersonas.length > 0 && (
+                <div className="text-sm text-parchment-300">
+                  Most Affected: {topPersonas.map(([p, count]) => `${p} (${count} issues)`).join(', ')}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Recommendations */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-serif font-semibold text-parchment-100">Rule-Based Recommendations</h2>
-        {recommendations.map((rec, i) => {
-          const typeStyles = {
-            critical: 'border-red-600 bg-red-900/30',
-            warning: 'border-amber-600 bg-amber-900/30',
-            info: 'border-strategic-600 bg-strategic-900/30',
-            success: 'border-green-600 bg-green-900/30'
-          }
-          const textColors = {
-            critical: 'text-red-300',
-            warning: 'text-amber-300',
-            info: 'text-strategic-400',
-            success: 'text-green-300'
-          }
-          return (
-            <div key={i} className={`border-l-4 p-6 rounded ${typeStyles[rec.type as keyof typeof typeStyles]}`}>
-              <h3 className={`font-serif font-semibold text-lg mb-2 ${textColors[rec.type as keyof typeof textColors]}`}>{rec.title}</h3>
-              <p className="text-sm text-parchment-200 mb-4">{rec.description}</p>
-              <div>
-                <div className="text-sm font-medium text-parchment-300 mb-2">Recommended Actions:</div>
-                <ul className="list-disc list-inside space-y-1">
-                  {rec.actions.map((action, j) => (
-                    <li key={j} className="text-sm text-parchment-200">{action}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* AI-Powered Insights */}
+      {/* AI-Powered Insights with Tabs */}
       <div className="mt-8 space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-serif font-semibold text-parchment-100">AI-Powered Analysis</h2>
@@ -275,65 +283,86 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
           </div>
         )}
 
-        {!aiInsightsLoading && aiInsights.length > 0 && aiInsights.map((insight) => {
-          const priorityStyles = {
-            high: 'border-red-600 bg-red-900/30',
-            medium: 'border-amber-600 bg-amber-900/30',
-            low: 'border-blue-600 bg-blue-900/30'
-          }
-          const priorityColors = {
-            high: 'text-red-300',
-            medium: 'text-amber-300',
-            low: 'text-blue-300'
-          }
-          const categoryIcons: Record<string, string> = {
-            tool: '🔧',
-            prompt: '💬',
-            logic: '🧠',
-            error_handling: '⚠️',
-            ux: '✨',
-            performance: '⚡',
-            general: '📌'
-          }
+        {!aiInsightsLoading && aiInsights.length > 0 && (
+          <>
+            {/* Priority Tabs */}
+            <div className="flex gap-2 border-b border-slate-700">
+              <button
+                onClick={() => setActiveTab('high')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'high'
+                    ? 'text-red-300 border-b-2 border-red-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                High Priority ({insightsByPriority.high.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('medium')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'medium'
+                    ? 'text-amber-300 border-b-2 border-amber-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                Medium ({insightsByPriority.medium.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('low')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'low'
+                    ? 'text-blue-300 border-b-2 border-blue-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                Low ({insightsByPriority.low.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'all'
+                    ? 'text-strategic-400 border-b-2 border-strategic-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                All by Category
+              </button>
+            </div>
 
-          return (
-            <div key={insight.id} className={`border-l-4 p-6 rounded ${priorityStyles[insight.priority]}`}>
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <h3 className={`font-serif font-semibold text-lg ${priorityColors[insight.priority]}`}>
-                  <span className="mr-2">{categoryIcons[insight.category] || '📌'}</span>
-                  {insight.title}
-                </h3>
-                <div className="flex gap-2">
-                  <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600">
-                    {insight.category}
-                  </span>
-                  <span className={`px-2 py-1 text-xs rounded font-medium ${priorityColors[insight.priority]}`}>
-                    {insight.priority.toUpperCase()}
-                  </span>
-                </div>
-              </div>
-              <p className="text-sm text-parchment-200 mb-4">{insight.description}</p>
+            {/* Tab Content */}
+            <div className="space-y-4 mt-4">
+              {/* Priority-based tabs */}
+              {activeTab !== 'all' && (
+                <>
+                  {insightsByPriority[activeTab].length === 0 ? (
+                    <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 text-center text-parchment-300">
+                      No {activeTab} priority insights found.
+                    </div>
+                  ) : (
+                    insightsByPriority[activeTab].map(renderInsightCard)
+                  )}
+                </>
+              )}
 
-              {/* Evidence */}
-              {insight.evidence && (
-                <div className="mt-4 p-3 bg-slate-800/50 rounded border border-slate-700">
-                  <div className="text-xs font-medium text-parchment-300 mb-2">Evidence:</div>
-                  <div className="text-xs text-parchment-400 space-y-1">
-                    {insight.evidence.pattern && (
-                      <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
-                    )}
-                    {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
-                      <div><span className="text-parchment-300">Affected Conversations:</span> {insight.evidence.conversation_ids.length}</div>
-                    )}
-                    {insight.evidence.affected_personas && insight.evidence.affected_personas.length > 0 && (
-                      <div><span className="text-parchment-300">Affected Personas:</span> {insight.evidence.affected_personas.join(', ')}</div>
-                    )}
-                  </div>
+              {/* Category-based tab */}
+              {activeTab === 'all' && (
+                <div className="space-y-6">
+                  {Object.entries(insightsByCategory).map(([category, insights]) => (
+                    <div key={category}>
+                      <h3 className="text-lg font-serif font-semibold text-parchment-100 mb-3 flex items-center gap-2">
+                        <span className="text-2xl">{categoryIcons[category]}</span>
+                        {categoryLabels[category]} ({insights.length})
+                      </h3>
+                      <div className="space-y-3">
+                        {insights.map(renderInsightCard)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          )
-        })}
+          </>
+        )}
       </div>
     </div>
   )

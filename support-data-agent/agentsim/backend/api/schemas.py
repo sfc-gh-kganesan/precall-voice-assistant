@@ -44,6 +44,7 @@ class SimulationCreate(BaseModel):
     concurrency: int = 1
     max_turns: int = 20
     timeout_seconds: int = 300
+    conversation_timeout_seconds: int = 600  # Max time per conversation (10 minutes)
     stop_conditions: List[str] = ["llm_judge", "max_turns"]
     metrics_config: List[str] = ["efficiency", "quality", "tool_usage"]
     edge_case_ratio: float = 0.2
@@ -59,6 +60,7 @@ class SimulationResponse(BaseModel):
     project_id: int
     num_simulations: int
     status: str
+    conversation_timeout_seconds: int
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     created_at: datetime

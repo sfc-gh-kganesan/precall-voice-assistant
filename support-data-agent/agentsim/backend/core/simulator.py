@@ -33,6 +33,7 @@ class SimulationEngine:
         metrics_calculator: Optional[MetricsCalculatorProtocol] = None,
         concurrency: int = 1,
         max_turns: int = 20,
+        conversation_timeout_seconds: int = 600,
         user_simulator: Optional["UserSimulator"] = None,
         on_conversation_complete: Optional[callable] = None,
         on_conversation_start: Optional[callable] = None,
@@ -46,6 +47,7 @@ class SimulationEngine:
             metrics_calculator: Calculator for metrics
             concurrency: Number of simulations to run in parallel
             max_turns: Maximum number of turns as a hard guardrail (default: 20)
+            conversation_timeout_seconds: Maximum time per conversation in seconds (default: 600)
             user_simulator: Optional user simulator for multi-turn conversations
             on_conversation_complete: Optional callback when a conversation completes
             on_conversation_start: Optional callback when a conversation starts
@@ -53,6 +55,7 @@ class SimulationEngine:
         """
         self.agent_client = agent_client
         self.max_turns = max_turns
+        self.conversation_timeout_seconds = conversation_timeout_seconds
         self.stop_conditions = stop_conditions or []
         self.metrics_calculator = metrics_calculator
         self.concurrency = concurrency
@@ -136,6 +139,17 @@ class SimulationEngine:
                     success = False
                     break
 
+                # Hard guardrail: enforce conversation timeout
+                elapsed_seconds = (datetime.utcnow() - started_at).total_seconds()
+                if elapsed_seconds > self.conversation_timeout_seconds:
+                    logger.warning(
+                        f"Conversation {conversation_id} exceeded timeout "
+                        f"({elapsed_seconds:.1f}s > {self.conversation_timeout_seconds}s)"
+                    )
+                    stop_reason = StopReason.TIMEOUT
+                    success = False
+                    break
+
                 # Check stop conditions before sending
                 # Note: LLM judge only evaluates assistant messages, so it won't trigger here
                 # This check primarily serves MaxTurns, Timeout, and other conditions
@@ -160,56 +174,18 @@ class SimulationEngine:
                         )
                     break
 
-                # Send message to agent with retry logic
-                max_retries = 3
-                retry_delay = 1.0  # Start with 1 second
-                last_error = None
-
-                for attempt in range(max_retries):
-                    try:
-                        response = await self.agent_client.send_message(
-                            message=messages[-1].content,
-                            conversation_id=conversation_id,
-                            context=messages,
-                        )
-                        last_error = None  # Success, clear error
-                        break  # Exit retry loop on success
-                    except Exception as e:
-                        last_error = e
-                        logger.warning(
-                            f"Agent API call failed (attempt {attempt + 1}/{max_retries}): {e}"
-                        )
-
-                        # Check if this is a retryable error
-                        error_str = str(e).lower()
-                        error_type = type(e).__name__.lower()
-                        is_retryable = any(
-                            keyword in error_str or keyword in error_type
-                            for keyword in [
-                                "timeout",
-                                "connection",
-                                "503",
-                                "502",
-                                "500",
-                                "network",
-                            ]
-                        )
-
-                        if not is_retryable or attempt == max_retries - 1:
-                            # Non-retryable error or final attempt failed
-                            logger.error(
-                                f"Agent API call failed permanently: {e}", exc_info=True
-                            )
-                            break
-
-                        # Wait before retrying with exponential backoff
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
-
-                # If all retries failed, end the conversation
-                if last_error:
+                # Send message to agent (agent_api.py handles retries internally)
+                try:
+                    response = await self.agent_client.send_message(
+                        message=messages[-1].content,
+                        conversation_id=conversation_id,
+                        context=messages,
+                    )
+                except Exception as e:
+                    # Agent API failed after all its internal retries
                     logger.error(
-                        f"Conversation failed after {max_retries} attempts: {last_error}"
+                        f"Agent API call failed for conversation {conversation_id}: {e}",
+                        exc_info=True,
                     )
                     stop_reason = StopReason.ERROR
                     success = False

@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     JIRA_MAX_RESULTS: int = 50
     JIRA_CACHE_TTL_SECONDS: int = 300  # 5 minutes
 
+    # Agent Memory Management
+    CONVERSATION_HISTORY_LIMIT: int = 10  # Max messages to keep per conversation
+
+    # Cortex Search Service (Snowflake Documentation)
+    # Uses same SNOWFLAKE_ACCOUNT and SNOWFLAKE_PASSWORD as LLM calls
+    CORTEX_SEARCH_SERVICE: str = "CKE_SNOWFLAKE_DOCS_SERVICE"
+    CORTEX_SEARCH_DATABASE: str = "CORTEX_KNOWLEDGE_EXTENSION_SNOWFLAKE_DOCUMENTATION"
+    CORTEX_SEARCH_SCHEMA: str = "SHARED"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

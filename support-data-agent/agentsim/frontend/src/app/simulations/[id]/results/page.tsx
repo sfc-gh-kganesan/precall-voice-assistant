@@ -110,9 +110,15 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
               ? formatDuration(value as number)
               : typeof value === 'number' ? value.toFixed(2) : value
 
+            // Clean up label: remove _ms suffix for duration/latency metrics since values are auto-formatted
+            let displayLabel = key.replace(/_/g, ' ')
+            if (key.toLowerCase().includes('duration') || key.toLowerCase().includes('latency')) {
+              displayLabel = displayLabel.replace(/\s*ms\s*$/i, '').trim()
+            }
+
             return (
               <div key={key} className="border-l-4 border-strategic-600 pl-4">
-                <div className="text-xs font-medium text-parchment-300 uppercase">{key.replace(/_/g, ' ')}</div>
+                <div className="text-xs font-medium text-parchment-300 uppercase">{displayLabel}</div>
                 <div className="text-xl font-semibold text-parchment-100 mt-1">{displayValue}</div>
               </div>
             )

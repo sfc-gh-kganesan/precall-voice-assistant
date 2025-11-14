@@ -28,6 +28,7 @@ from pydantic_ai import (
 )
 
 from app.agent import create_dda_agent
+from app.core.storage import storage
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -177,9 +178,14 @@ async def list_tools():
     }
 
 
-async def run_agent_with_fallback(message: str, context: Optional[List[str]] = None):
+async def run_agent_with_fallback(
+    message: str, conversation_id: str, context: Optional[List[str]] = None
+):
     """
     Run agent with automatic fallback to openai-o4-mini on timeout.
+
+    Now uses internal storage to manage conversation history instead of
+    relying on caller-provided context.
 
     Retry strategy:
     - Attempts 1-2: claude-4-sonnet (primary)
@@ -187,7 +193,8 @@ async def run_agent_with_fallback(message: str, context: Optional[List[str]] = N
 
     Args:
         message: The user message/query
-        context: Optional conversation context
+        conversation_id: Unique identifier for this conversation
+        context: DEPRECATED - context is now managed internally via storage
 
     Returns:
         Agent result object
@@ -196,6 +203,12 @@ async def run_agent_with_fallback(message: str, context: Optional[List[str]] = N
         Exception: If all 4 attempts fail
     """
     global fallback_agent
+
+    # Load conversation history from storage
+    history = await storage.get_history(conversation_id)
+    logger.info(
+        f"Loaded {len(history)} messages from storage for conversation {conversation_id}"
+    )
 
     for attempt in range(4):  # Total 4 attempts
         try:
@@ -231,13 +244,21 @@ async def run_agent_with_fallback(message: str, context: Optional[List[str]] = N
 
             logger.info(f"Attempt {attempt + 1}/4 with {agent_name}")
 
-            # Attempt the query
-            result = await current_agent.run(message, message_history=context)
+            # Attempt the query with history from storage
+            result = await current_agent.run(message, message_history=history)
 
             if attempt > 0:
                 logger.info(
                     f"✓ Query succeeded on attempt {attempt + 1} with {agent_name}"
                 )
+
+            # Save updated history back to storage (fire-and-forget, don't block response)
+            asyncio.create_task(
+                storage.save_history(conversation_id, result.all_messages())
+            )
+            logger.debug(
+                f"Queued save of {len(result.all_messages())} messages for conversation {conversation_id}"
+            )
 
             return result  # Success!
 
@@ -347,7 +368,9 @@ async def query_agent(request: QueryRequest):
         # Non-streaming response with fallback retry logic
         try:
             result = await run_agent_with_fallback(
-                message_text, context=request.context
+                message_text,
+                conversation_id=request.conversation_id,
+                context=request.context,  # Kept for backwards compat, but ignored
             )
             return {"content": result.output}
         except Exception as e:
@@ -366,11 +389,46 @@ async def query_agent_simple(request: QueryRequest):
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
     try:
-        result = await run_agent_with_fallback(request.message, context=None)
+        result = await run_agent_with_fallback(
+            request.message,
+            conversation_id=request.conversation_id,
+            context=None,  # Ignore context, use internal storage
+        )
         return {"response": result.output}
     except Exception as e:
         logger.error(f"Error processing query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/conversations/{conversation_id}/history")
+async def clear_conversation_history(conversation_id: str):
+    """Clear conversation history for a given conversation.
+
+    Useful for starting fresh or managing memory usage.
+    """
+    await storage.clear_history(conversation_id)
+    return {"status": "cleared", "conversation_id": conversation_id}
+
+
+@app.get("/conversations")
+async def list_conversations():
+    """List all active conversations with stored history."""
+    conversation_ids = await storage.list_conversations()
+    return {"conversation_ids": conversation_ids, "count": len(conversation_ids)}
+
+
+@app.get("/conversations/{conversation_id}/history")
+async def get_conversation_history(conversation_id: str):
+    """Get the current history for a conversation.
+
+    Useful for debugging and understanding conversation state.
+    """
+    history = await storage.get_history(conversation_id)
+    return {
+        "conversation_id": conversation_id,
+        "message_count": len(history),
+        "messages": [str(msg) for msg in history],  # Convert to string for JSON
+    }
 
 
 if __name__ == "__main__":
