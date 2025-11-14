@@ -35,6 +35,12 @@ Experimental platform for building, testing, and deploying agentic workflows.
 
 ### Installation
 
+Setup artifactory auth (needed for accessing internal Snowflake node modules):
+
+```bash
+sf artifact npm setup-auth -r internal-production-npm-snowflake-virtual
+```
+
 Install all dependencies:
 
 ```bash
