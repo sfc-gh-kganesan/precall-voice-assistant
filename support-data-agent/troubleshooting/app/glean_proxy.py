@@ -14,8 +14,6 @@ Usage:
 import asyncio
 import logging
 import os
-from pathlib import Path
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from fastmcp import Client, FastMCP
 from fastmcp.client.auth import OAuth
@@ -29,8 +27,12 @@ logger = logging.getLogger(__name__)
 GLEAN_SERVER_URL = "https://snowflake-be.glean.com/mcp/default"
 
 # OAuth port configuration for Docker + socat setup
-OAUTH_INTERNAL_PORT = int(os.getenv("OAUTH_INTERNAL_PORT", "8091"))  # Where FastMCP binds
-OAUTH_PUBLIC_PORT = int(os.getenv("OAUTH_PUBLIC_PORT", "8090"))      # Where browser connects
+OAUTH_INTERNAL_PORT = int(
+    os.getenv("OAUTH_INTERNAL_PORT", "8091")
+)  # Where FastMCP binds
+OAUTH_PUBLIC_PORT = int(
+    os.getenv("OAUTH_PUBLIC_PORT", "8090")
+)  # Where browser connects
 
 
 class PatchedOAuth(OAuth):
@@ -52,7 +54,7 @@ class PatchedOAuth(OAuth):
         self._public_port = public_port or OAUTH_PUBLIC_PORT
 
         # Pass public port as callback_port so parent uses it for redirect_uri
-        kwargs['callback_port'] = self._public_port
+        kwargs["callback_port"] = self._public_port
 
         # Initialize parent with public port
         super().__init__(*args, **kwargs)
@@ -60,7 +62,10 @@ class PatchedOAuth(OAuth):
         # Now switch redirect_port to internal port for callback server binding
         self.redirect_port = self._internal_port
 
-        logger.info(f"🔧 PatchedOAuth: redirect_uri uses port {self._public_port}, callback server uses port {self._internal_port}")
+        logger.info(
+            f"🔧 PatchedOAuth: redirect_uri uses port {self._public_port}, callback server uses port {self._internal_port}"
+        )
+
 
 # Tools to exclude from the proxy (blacklist)
 # Add tool names here that you don't want to expose
@@ -81,25 +86,25 @@ def create_tool_wrapper(tool_name: str, input_schema: dict, glean_client):
     then executes it to create the actual function.
     """
     # Extract properties and required fields from schema
-    properties = input_schema.get('properties', {})
-    required_fields = set(input_schema.get('required', []))
+    properties = input_schema.get("properties", {})
+    required_fields = set(input_schema.get("required", []))
 
     # Build function parameters and extract parameter names
     param_signatures = []
     param_names = []
 
     for param_name, param_schema in properties.items():
-        param_type = param_schema.get('type', 'string')
+        param_type = param_schema.get("type", "string")
 
         # Map JSON schema types to Python type hints
         type_hint = {
-            'string': 'str',
-            'number': 'float',
-            'integer': 'int',
-            'boolean': 'bool',
-            'array': 'list',
-            'object': 'dict',
-        }.get(param_type, 'str')
+            "string": "str",
+            "number": "float",
+            "integer": "int",
+            "boolean": "bool",
+            "array": "list",
+            "object": "dict",
+        }.get(param_type, "str")
 
         # Add parameter with type hint
         if param_name in required_fields:
@@ -139,9 +144,9 @@ async def tool_wrapper({param_str}):
 '''
 
     # Execute the code to create the function
-    local_vars = {'glean_client': glean_client}
+    local_vars = {"glean_client": glean_client}
     exec(func_code, local_vars)
-    wrapper = local_vars['tool_wrapper']
+    wrapper = local_vars["tool_wrapper"]
 
     return wrapper
 
@@ -162,8 +167,8 @@ async def setup_glean_proxy():
     oauth_config = PatchedOAuth(
         mcp_url=GLEAN_SERVER_URL,
         internal_port=OAUTH_INTERNAL_PORT,  # FastMCP callback server binding
-        public_port=OAUTH_PUBLIC_PORT,       # Browser redirect (for redirect_uri)
-        client_name="DDA Glean Proxy"
+        public_port=OAUTH_PUBLIC_PORT,  # Browser redirect (for redirect_uri)
+        client_name="DDA Glean Proxy",
     )
 
     # Create FastMCP client with patched OAuth
@@ -208,7 +213,7 @@ async def setup_glean_proxy():
             continue
 
         # Get the tool's input schema
-        input_schema = tool.inputSchema if hasattr(tool, 'inputSchema') else {}
+        input_schema = tool.inputSchema if hasattr(tool, "inputSchema") else {}
 
         # Create wrapper function with explicit parameters from schema
         tool_wrapper = create_tool_wrapper(tool_name, input_schema, glean_client)
@@ -232,11 +237,11 @@ async def setup_glean_proxy():
     # Debug: Print all available routes
     logger.info("=" * 70)
     logger.info("DEBUG: Available routes on Glean proxy:")
-    if hasattr(proxy, 'app') and hasattr(proxy.app, 'routes'):
+    if hasattr(proxy, "app") and hasattr(proxy.app, "routes"):
         for route in proxy.app.routes:
-            if hasattr(route, 'path') and hasattr(route, 'methods'):
+            if hasattr(route, "path") and hasattr(route, "methods"):
                 logger.info(f"  Route: {route.path} - Methods: {route.methods}")
-            elif hasattr(route, 'path'):
+            elif hasattr(route, "path"):
                 logger.info(f"  Route: {route.path}")
     logger.info("=" * 70)
 
@@ -262,9 +267,7 @@ def main():
         logger.info("Starting HTTP server...")
 
         # Run the proxy on HTTP transport
-        await proxy.run_async(
-            transport="http", host="0.0.0.0", port=8001, path="/mcp"
-        )
+        await proxy.run_async(transport="http", host="0.0.0.0", port=8001, path="/mcp")
 
     asyncio.run(run_proxy())
 

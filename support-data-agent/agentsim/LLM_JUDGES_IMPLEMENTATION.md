@@ -22,7 +22,7 @@ Intelligently determines when a conversation has reached completion by analyzing
 - Works **alongside** existing conditions (max_turns, timeout, agent_signal)
 - Evaluates after each agent response
 - Considers: goal achievement, conversation flow, user satisfaction signals
-- Returns `StopReason.LLM_EVALUATION` when conversation should stop
+- Returns `StopReason.LLM_JUDGE` when conversation should stop
 - Falls back gracefully if LLM call fails
 - Configurable confidence threshold (default: 0.8)
 
@@ -150,7 +150,7 @@ SNOWFLAKE_CORTEX_MODEL=snowflake-arctic  # optional, defaults to snowflake-arcti
 3. `agentsim/backend/api/routes/insights.py` - Insights API routes (132 lines)
 
 ### Backend - Modified Files
-1. `agentsim/backend/core/interfaces.py` - Added `LLM_EVALUATION` stop reason
+1. `agentsim/backend/core/interfaces.py` - Added `LLM_JUDGE` stop reason
 2. `agentsim/backend/models/models.py` - Added insights tracking fields + relationship
 3. `agentsim/backend/api/schemas.py` - Added insights response schemas
 4. `agentsim/backend/services/simulation_runner.py` - Added insights generation trigger

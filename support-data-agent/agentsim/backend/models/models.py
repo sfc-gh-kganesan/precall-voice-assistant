@@ -162,7 +162,7 @@ class Conversation(Base):
 
     __tablename__ = "conversations"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
     simulation_id: Mapped[int] = mapped_column(ForeignKey("simulations.id"))
 
     # Scenario information
@@ -194,7 +194,9 @@ class Message(Base):
     __tablename__ = "messages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"))
+    conversation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("conversations.id")
+    )  # UUID
 
     role: Mapped[str] = mapped_column(String(50))  # user, assistant, system
     content: Mapped[str] = mapped_column(Text)
@@ -218,7 +220,9 @@ class ConversationMetric(Base):
     __tablename__ = "conversation_metrics"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"))
+    conversation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("conversations.id")
+    )  # UUID
 
     metric_name: Mapped[str] = mapped_column(String(255))
     metric_value: Mapped[float] = mapped_column(Float)
@@ -247,4 +251,6 @@ class ImprovementSuggestion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    simulation: Mapped["Simulation"] = relationship(back_populates="improvement_suggestions")
+    simulation: Mapped["Simulation"] = relationship(
+        back_populates="improvement_suggestions"
+    )

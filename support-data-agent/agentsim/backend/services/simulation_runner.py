@@ -19,7 +19,6 @@ from backend.core.generator import ScenarioGenerator
 from backend.core.stop_conditions import (
     MaxTurnsCondition,
     TimeoutCondition,
-    AgentSignalCondition,
     CombinedStopCondition,
 )
 from backend.core.evaluator import MetricsCalculator
@@ -75,11 +74,23 @@ class SimulationRunner:
                 )
                 logger.info(f"Using {len(base_scenarios)} custom personas...")
 
+                # DEBUG: Log initial queries after parsing
+                for idx, sc in enumerate(base_scenarios[:3]):
+                    logger.info(
+                        f"[PARSE] base_scenarios[{idx}] (id={id(sc)}): persona={sc.persona.name}, initial_query={sc.initial_query[:80]}..."
+                    )
+
                 # Distribute scenarios across num_simulations (round-robin)
                 scenarios = []
                 for i in range(simulation.num_simulations):
                     scenario_index = i % len(base_scenarios)
                     scenarios.append(base_scenarios[scenario_index])
+
+                    # DEBUG: Log what scenario was added
+                    sc = scenarios[-1]
+                    logger.info(
+                        f"[ROUNDROBIN] scenarios[{i}] = base_scenarios[{scenario_index}] (id={id(sc)}): persona={sc.persona.name}, initial_query={sc.initial_query[:80]}..."
+                    )
 
                 logger.info(
                     f"Created {len(scenarios)} scenarios from {len(base_scenarios)} personas (round-robin distribution)"
@@ -170,6 +181,9 @@ class SimulationRunner:
 
     def _create_stop_conditions(self, simulation: Simulation) -> List[Any]:
         """Create stop conditions from simulation configuration."""
+        from backend.core.llm_judge import LLMStopCondition
+        import os
+
         conditions = []
 
         for condition_name in simulation.stop_conditions:
@@ -179,13 +193,36 @@ class SimulationRunner:
                 conditions.append(
                     TimeoutCondition(timeout_seconds=simulation.timeout_seconds)
                 )
-            elif condition_name == "agent_signal":
-                # Look for common completion signals
-                conditions.append(
-                    AgentSignalCondition(
-                        completion_signals=["RESOLVED", "COMPLETED", "DONE"]
+            # elif condition_name == "agent_signal":
+            #     # DISABLED: Text-based signal matching is too error-prone for support conversations
+            #     # Agent responses naturally contain words like "RESOLVED", "COMPLETED", "DONE"
+            #     # when discussing resolved tickets, completed tasks, etc.
+            #     # Use llm_judge for intelligent completion detection instead.
+            #     conditions.append(
+            #         AgentSignalCondition(
+            #             completion_signals=["RESOLVED", "COMPLETED", "DONE"]
+            #         )
+            #     )
+            elif condition_name == "llm_judge":
+                # Add LLM-based intelligent stop condition if Cortex is configured
+                cortex_key = os.getenv("SNOWFLAKE_CORTEX_API_KEY")
+                cortex_url = os.getenv("SNOWFLAKE_CORTEX_BASE_URL")
+
+                if cortex_key and cortex_url:
+                    logger.info("Adding LLM-based stop condition with Snowflake Cortex")
+                    conditions.append(
+                        LLMStopCondition(
+                            api_key=cortex_key,
+                            base_url=cortex_url,
+                            model="claude-4-sonnet",
+                            confidence_threshold=0.75,  # Slightly more lenient than default
+                            max_retries=2,
+                        )
                     )
-                )
+                else:
+                    logger.warning(
+                        "llm_judge requested but Snowflake Cortex not configured, skipping"
+                    )
 
         if len(conditions) > 1:
             return [CombinedStopCondition(conditions)]
@@ -368,11 +405,14 @@ class SimulationRunner:
         self,
         simulation: Simulation,
         scenario: Scenario,
-    ) -> int:
+    ) -> str:
         """Create conversation record at start."""
         from datetime import datetime
+        import uuid
 
+        conversation_id = str(uuid.uuid4())
         conversation = Conversation(
+            id=conversation_id,
             simulation_id=simulation.id,
             persona=scenario.persona.model_dump(),
             scenario={
@@ -391,9 +431,9 @@ class SimulationRunner:
         self.db.add(conversation)
         self.db.commit()
         self.db.refresh(conversation)
-        return conversation.id
+        return conversation_id
 
-    async def _add_message(self, conversation_id: int, message):
+    async def _add_message(self, conversation_id: str, message):
         """Store a single message immediately."""
         from datetime import datetime
 
@@ -414,19 +454,18 @@ class SimulationRunner:
         self.db.add(db_message)
         self.db.commit()
 
-        # Update num_turns if this is a user message
-        if message.role == "user":
-            conversation = (
-                self.db.query(Conversation)
-                .filter(Conversation.id == conversation_id)
-                .first()
-            )
-            if conversation:
-                conversation.num_turns += 1
-                self.db.commit()
+        # Update num_turns for all messages (user + assistant)
+        conversation = (
+            self.db.query(Conversation)
+            .filter(Conversation.id == conversation_id)
+            .first()
+        )
+        if conversation:
+            conversation.num_turns += 1
+            self.db.commit()
 
     async def _complete_conversation(
-        self, conversation_id: int, result: SimulationResult
+        self, conversation_id: str, result: SimulationResult
     ):
         """Update conversation with final results."""
         from datetime import datetime
@@ -478,8 +517,8 @@ class SimulationRunner:
         """Store conversation results in the database."""
         from datetime import datetime
 
-        # Calculate num_turns from messages
-        num_turns = len([m for m in result.messages if m.role == "user"])
+        # Calculate num_turns from messages (count all messages)
+        num_turns = len(result.messages)
 
         # Get timestamps from messages
         started_at = (
@@ -563,22 +602,28 @@ class SimulationRunner:
         from backend.core.insights_judge import InsightsJudge
 
         try:
-            api_key = os.getenv("SNOWFLAKE_CORTEX_API_KEY")
-            base_url = os.getenv("SNOWFLAKE_CORTEX_BASE_URL")
-            model = os.getenv("SNOWFLAKE_CORTEX_MODEL", "snowflake-arctic")
+            api_key = os.getenv("SNOWFLAKE_PASSWORD")
+            account = os.getenv("SNOWFLAKE_ACCOUNT")
+            model = os.getenv("SNOWFLAKE_CORTEX_MODEL", "claude-4-sonnet")
 
-            if not api_key or not base_url:
+            if not api_key or not account:
                 logger.warning(
                     "Snowflake Cortex not configured, skipping AI insights generation. "
-                    "Set SNOWFLAKE_CORTEX_API_KEY and SNOWFLAKE_CORTEX_BASE_URL to enable."
+                    "Set SNOWFLAKE_PASSWORD and SNOWFLAKE_ACCOUNT to enable."
                 )
                 return
 
-            logger.info(f"Generating AI insights for simulation {simulation_id} in background")
+            base_url = f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1"
+
+            logger.info(
+                f"Generating AI insights for simulation {simulation_id} in background"
+            )
             judge = InsightsJudge(api_key=api_key, base_url=base_url, model=model)
             insights = await judge.generate_insights(simulation_id, self.db)
 
-            logger.info(f"Successfully generated {len(insights)} AI insights for simulation {simulation_id}")
+            logger.info(
+                f"Successfully generated {len(insights)} AI insights for simulation {simulation_id}"
+            )
 
         except Exception as e:
             logger.error(
@@ -586,4 +631,3 @@ class SimulationRunner:
                 exc_info=True,
             )
             # Do not raise - this is a background task, should not fail the simulation
-

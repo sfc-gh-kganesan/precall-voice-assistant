@@ -75,7 +75,7 @@ class ScenarioGenerator:
 
     async def _call_llm(self, prompt: str) -> str:
         """Call the LLM provider."""
-        if (self.provider == "openai") or (self.provider=="snowflake"):
+        if (self.provider == "openai") or (self.provider == "snowflake"):
             response = await self.client.chat.completions.create(
                 model="openai-o4-mini",
                 messages=[

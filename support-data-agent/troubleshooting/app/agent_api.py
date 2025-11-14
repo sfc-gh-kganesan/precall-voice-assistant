@@ -9,6 +9,8 @@ This API wraps the PydanticAI agent and provides HTTP endpoints for:
 Intended for integration with agentsim and other services.
 """
 
+import asyncio
+import httpx
 import json
 import logging
 from typing import Any, Dict, List, Optional, Union
@@ -47,8 +49,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global agent instance (initialized on startup)
-agent = None
+# Global agent instances (initialized on startup)
+agent = None  # Primary: claude-4-sonnet
+fallback_agent = None  # Fallback: openai-o4-mini (created lazily on first timeout)
 
 
 # Request/Response Models
@@ -174,6 +177,89 @@ async def list_tools():
     }
 
 
+async def run_agent_with_fallback(message: str, context: Optional[List[str]] = None):
+    """
+    Run agent with automatic fallback to openai-o4-mini on timeout.
+
+    Retry strategy:
+    - Attempts 1-2: claude-4-sonnet (primary)
+    - Attempts 3-4: openai-o4-mini (fallback via Snowflake Cortex)
+
+    Args:
+        message: The user message/query
+        context: Optional conversation context
+
+    Returns:
+        Agent result object
+
+    Raises:
+        Exception: If all 4 attempts fail
+    """
+    global fallback_agent
+
+    for attempt in range(4):  # Total 4 attempts
+        try:
+            # Switch to fallback model after 2 failures
+            if attempt >= 2:
+                # Create fallback agent lazily on first use
+                if fallback_agent is None:
+                    logger.info(
+                        "Primary model timed out after 2 attempts, creating openai-o4-mini fallback agent"
+                    )
+                    try:
+                        fallback_agent = create_dda_agent(
+                            model_name="openai-o4-mini",  # Uses same Snowflake Cortex backend
+                            mcp_server_url="http://fde-dda-service:8000/mcp",
+                            glean_proxy_url="http://glean-proxy:8001/mcp",
+                        )
+                        logger.info("✓ Fallback agent created successfully")
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to create fallback agent: {e}, continuing with primary"
+                        )
+                        fallback_agent = None
+
+                current_agent = fallback_agent if fallback_agent else agent
+                agent_name = (
+                    "openai-o4-mini"
+                    if fallback_agent
+                    else "claude-4-sonnet (fallback failed)"
+                )
+            else:
+                current_agent = agent
+                agent_name = "claude-4-sonnet"
+
+            logger.info(f"Attempt {attempt + 1}/4 with {agent_name}")
+
+            # Attempt the query
+            result = await current_agent.run(message, message_history=context)
+
+            if attempt > 0:
+                logger.info(
+                    f"✓ Query succeeded on attempt {attempt + 1} with {agent_name}"
+                )
+
+            return result  # Success!
+
+        except (TimeoutError, httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+            logger.warning(
+                f"Attempt {attempt + 1}/4 failed with {type(e).__name__}: {str(e)[:100]}"
+            )
+            if attempt == 3:  # Last attempt
+                logger.error("All 4 attempts failed, giving up")
+                raise  # Re-raise on final failure
+            # Exponential backoff: 1s, 2s, 4s
+            backoff = 1.0 * (2**attempt)
+            logger.info(f"Waiting {backoff}s before retry...")
+            await asyncio.sleep(backoff)
+        except Exception as e:
+            # Non-timeout errors: don't retry, just raise immediately
+            logger.error(
+                f"Non-retryable error on attempt {attempt + 1}: {type(e).__name__}: {str(e)[:100]}"
+            )
+            raise
+
+
 @app.post("/query")
 async def query_agent(request: QueryRequest):
     """
@@ -195,11 +281,16 @@ async def query_agent(request: QueryRequest):
     try:
         # Try to parse as JSON in case message contains structured data
         import json as json_lib
+
         parsed = json_lib.loads(request.message)
         if isinstance(parsed, dict) and "description" in parsed and "subject" in parsed:
             # Format as support ticket
-            message_text = f"Subject: {parsed['subject']}\n\nDescription: {parsed['description']}"
-            logger.info(f"Received structured ticket query with subject: {parsed['subject'][:50]}...")
+            message_text = (
+                f"Subject: {parsed['subject']}\n\nDescription: {parsed['description']}"
+            )
+            logger.info(
+                f"Received structured ticket query with subject: {parsed['subject'][:50]}..."
+            )
         else:
             logger.info(f"Received query: {request.message[:100]}...")
     except (json_lib.JSONDecodeError, TypeError):
@@ -253,9 +344,11 @@ async def query_agent(request: QueryRequest):
             },
         )
     else:
-        # Non-streaming response
+        # Non-streaming response with fallback retry logic
         try:
-            result = await agent.run(message_text)
+            result = await run_agent_with_fallback(
+                message_text, context=request.context
+            )
             return {"content": result.output}
         except Exception as e:
             logger.error(f"Error processing query: {e}", exc_info=True)
@@ -273,7 +366,7 @@ async def query_agent_simple(request: QueryRequest):
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
     try:
-        result = await agent.run(request.message)
+        result = await run_agent_with_fallback(request.message, context=None)
         return {"response": result.output}
     except Exception as e:
         logger.error(f"Error processing query: {e}")

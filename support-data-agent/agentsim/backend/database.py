@@ -53,6 +53,7 @@ def init_db():
     if USE_SNOWFLAKE:
         # Use Snowpark-based schema manager for Snowflake
         from backend.services.snowflake_schema import initialize_snowflake_schema
+
         print("Initializing Snowflake schema...")
         result = initialize_snowflake_schema()
         print(f"Snowflake schema initialized: {result}")

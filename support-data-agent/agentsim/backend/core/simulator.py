@@ -1,6 +1,7 @@
 """Simulation engine for orchestrating agent testing."""
 
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
@@ -18,6 +19,8 @@ from backend.core.interfaces import (
 
 if TYPE_CHECKING:
     from backend.core.user_simulator import UserSimulator
+
+logger = logging.getLogger(__name__)
 
 
 class SimulationEngine:
@@ -94,14 +97,25 @@ class SimulationEngine:
 
         try:
             # Send initial query
+            # DEBUG: Log scenario state before creating initial message
+            logger.info(
+                f"[RUN_SIM START] scenario (id={id(scenario)}): persona={scenario.persona.name}, initial_query={scenario.initial_query[:80]}..."
+            )
+
             initial_message = ConversationMessage(
                 role="user",
                 content=scenario.initial_query,
                 timestamp=datetime.utcnow().isoformat(),
             )
+
+            # DEBUG: Log what was actually stored in the message
+            logger.info(
+                f"[INITIAL_MSG] Created message with content={initial_message.content[:80]}..."
+            )
+
             messages.append(initial_message)
             context.messages.append(initial_message)
-            context.turn_count += 1  # Count user messages only
+            context.turn_count += 1  # Count all messages (user + assistant)
 
             # Call message added callback for initial message
             if self.on_message_added:
@@ -123,23 +137,83 @@ class SimulationEngine:
                     break
 
                 # Check stop conditions before sending
+                # Note: LLM judge only evaluates assistant messages, so it won't trigger here
+                # This check primarily serves MaxTurns, Timeout, and other conditions
                 should_stop, reason = self._check_stop_conditions(
                     context, messages[-1] if messages else initial_message
                 )
                 if should_stop:
                     stop_reason = reason
+                    # LLM_JUDGE is also a success reason
                     success = reason in [
                         StopReason.AGENT_SIGNAL,
                         StopReason.CUSTOM_CONDITION,
+                        StopReason.LLM_JUDGE,
                     ]
+                    # Require minimum turns for success (avoid premature success)
+                    # turn_count now counts all messages: user(1) + assistant(2) + user(3) = 3 messages minimum
+                    if success and context.turn_count < 3:
+                        success = False
+                        logger.warning(
+                            f"Conversation stopped after only {context.turn_count} message(s), "
+                            f"marking as unsuccessful despite stop reason: {reason}"
+                        )
                     break
 
-                # Send message to agent
-                response = await self.agent_client.send_message(
-                    message=messages[-1].content,
-                    conversation_id=conversation_id,
-                    context=messages,
-                )
+                # Send message to agent with retry logic
+                max_retries = 3
+                retry_delay = 1.0  # Start with 1 second
+                last_error = None
+
+                for attempt in range(max_retries):
+                    try:
+                        response = await self.agent_client.send_message(
+                            message=messages[-1].content,
+                            conversation_id=conversation_id,
+                            context=messages,
+                        )
+                        last_error = None  # Success, clear error
+                        break  # Exit retry loop on success
+                    except Exception as e:
+                        last_error = e
+                        logger.warning(
+                            f"Agent API call failed (attempt {attempt + 1}/{max_retries}): {e}"
+                        )
+
+                        # Check if this is a retryable error
+                        error_str = str(e).lower()
+                        error_type = type(e).__name__.lower()
+                        is_retryable = any(
+                            keyword in error_str or keyword in error_type
+                            for keyword in [
+                                "timeout",
+                                "connection",
+                                "503",
+                                "502",
+                                "500",
+                                "network",
+                            ]
+                        )
+
+                        if not is_retryable or attempt == max_retries - 1:
+                            # Non-retryable error or final attempt failed
+                            logger.error(
+                                f"Agent API call failed permanently: {e}", exc_info=True
+                            )
+                            break
+
+                        # Wait before retrying with exponential backoff
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+
+                # If all retries failed, end the conversation
+                if last_error:
+                    logger.error(
+                        f"Conversation failed after {max_retries} attempts: {last_error}"
+                    )
+                    stop_reason = StopReason.ERROR
+                    success = False
+                    break
 
                 # Record agent response
                 agent_message = ConversationMessage(
@@ -150,7 +224,7 @@ class SimulationEngine:
                 )
                 messages.append(agent_message)
                 context.messages.append(agent_message)
-                # Don't increment turn_count for agent responses - only count user messages
+                context.turn_count += 1  # Count all messages (user + assistant)
 
                 # Call message added callback for agent response
                 if self.on_message_added:
@@ -170,26 +244,63 @@ class SimulationEngine:
                     break
 
                 # Check stop conditions after agent response
+                # LLM judge evaluates here (after assistant messages)
                 should_stop, reason = self._check_stop_conditions(
                     context, agent_message
                 )
                 if should_stop:
                     stop_reason = reason
+                    # LLM_JUDGE is also a success reason
                     success = reason in [
                         StopReason.AGENT_SIGNAL,
                         StopReason.CUSTOM_CONDITION,
+                        StopReason.LLM_JUDGE,
                     ]
+                    # Require minimum turns for success (avoid premature success)
+                    # turn_count now counts all messages: user(1) + assistant(2) = 2 messages minimum
+                    if success and context.turn_count < 2:
+                        success = False
+                        logger.warning(
+                            f"Conversation stopped after only {context.turn_count} message(s), "
+                            f"marking as unsuccessful despite stop reason: {reason}"
+                        )
                     break
 
                 # Generate next user message if user simulator is available
                 if self.user_simulator:
                     try:
+                        # DEBUG: Log what we're passing to user simulator
+                        logger.info("=== USER SIMULATOR CALL DEBUG ===")
+                        logger.info(f"Conversation ID: {conversation_id}")
+                        logger.info(f"Turn count: {context.turn_count}")
+                        logger.info(f"Persona name: {scenario.persona.name}")
+                        logger.info(f"Persona goal: {scenario.persona.goal}")
+                        logger.info(f"Initial query: {scenario.initial_query[:100]}...")
+                        logger.info(
+                            f"Knowledge base keys: {list(scenario.knowledge_base.keys()) if scenario.knowledge_base else 'None'}"
+                        )
+                        logger.info(f"Conversation history length: {len(messages)}")
+                        logger.info(
+                            f"Last 3 message roles: {[(m.role, m.content[:50] + '...') for m in messages[-3:]]}"
+                        )
+                        logger.info(
+                            f"Agent's last message (first 150 chars): {response.content[:150]}..."
+                        )
+
                         next_user_message = await self.user_simulator.generate_response(
                             persona=scenario.persona,
                             conversation_history=messages,
                             agent_last_message=response.content,
                             knowledge_base=scenario.knowledge_base,  # Pass knowledge_base!
                         )
+
+                        logger.info(
+                            f"Generated user message (first 150 chars): {next_user_message[:150]}..."
+                        )
+                        logger.info(
+                            f"Generated message is JSON?: {next_user_message.strip().startswith('{')}"
+                        )
+                        logger.info("=== END USER SIMULATOR DEBUG ===")
 
                         # Add user's follow-up message
                         user_follow_up = ConversationMessage(
@@ -199,7 +310,7 @@ class SimulationEngine:
                         )
                         messages.append(user_follow_up)
                         context.messages.append(user_follow_up)
-                        context.turn_count += 1  # Count user messages only
+                        context.turn_count += 1  # Count all messages (user + assistant)
 
                         # Call message added callback for user follow-up
                         if self.on_message_added:
@@ -235,6 +346,51 @@ class SimulationEngine:
             stop_reason = StopReason.ERROR
             success = False
 
+        # Semantic evaluation fallback for max_turns conversations
+        # If conversation hit max_turns but wasn't evaluated semantically, check now
+        if stop_reason == StopReason.MAX_TURNS and not success and messages:
+            # Try to evaluate semantically using LLM judge
+            from backend.core.llm_judge import LLMStopCondition
+            import os
+
+            cortex_key = os.getenv("SNOWFLAKE_CORTEX_API_KEY")
+            cortex_url = os.getenv("SNOWFLAKE_CORTEX_BASE_URL")
+
+            if cortex_key and cortex_url:
+                try:
+                    logger.info(
+                        "Conversation reached max_turns, attempting semantic evaluation"
+                    )
+                    llm_judge = LLMStopCondition(
+                        api_key=cortex_key,
+                        base_url=cortex_url,
+                        model="claude-4-sonnet",
+                        confidence_threshold=0.75,
+                        max_retries=2,
+                    )
+
+                    # Evaluate the final conversation state
+                    should_stop, eval_reason = llm_judge.should_stop(
+                        context, messages[-1]
+                    )
+
+                    if should_stop and eval_reason == StopReason.LLM_JUDGE:
+                        # Conversation actually succeeded semantically
+                        success = True
+                        stop_reason = StopReason.LLM_JUDGE
+                        logger.info(
+                            "Semantic evaluation: conversation succeeded despite reaching max_turns"
+                        )
+                    else:
+                        logger.info(
+                            "Semantic evaluation: conversation did not meet success criteria"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to perform semantic evaluation fallback: {e}",
+                        exc_info=True,
+                    )
+
         # Calculate duration
         duration_ms = (datetime.utcnow() - started_at).total_seconds() * 1000
 
@@ -242,6 +398,11 @@ class SimulationEngine:
         metrics = {}
         if self.metrics_calculator:
             metrics = self.metrics_calculator.calculate_metrics(context, messages)
+
+        # DEBUG: Log scenario state at end of run_simulation
+        logger.info(
+            f"[RUN_SIM END] scenario (id={id(scenario)}): persona={scenario.persona.name}, initial_query={scenario.initial_query[:80]}..."
+        )
 
         return SimulationResult(
             conversation_id=conversation_id,

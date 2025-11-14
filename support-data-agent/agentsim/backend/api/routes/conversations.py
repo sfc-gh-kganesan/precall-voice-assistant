@@ -35,7 +35,7 @@ async def get_simulation_conversations(
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
-async def get_conversation(conversation_id: int, db: Session = Depends(get_db)):
+async def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
     """Get full conversation details including all messages."""
     conversation = (
         db.query(Conversation)

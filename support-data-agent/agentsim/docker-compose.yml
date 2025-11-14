@@ -39,9 +39,10 @@ services:
       - CI=false
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=1
+      - TURBO=0
       - TURBOPACK=0
       - NEXT_TELEMETRY_DISABLED=1
-      - NEXT_PUBLIC_API_URL=http://backend:8080
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
     ports:
       - "3000:3000"
     stdin_open: true

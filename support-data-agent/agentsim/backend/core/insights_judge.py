@@ -2,9 +2,14 @@
 
 import json
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from backend.models.models import Conversation, Message, ImprovementSuggestion, Simulation
+from backend.models.models import (
+    Conversation,
+    Message,
+    ImprovementSuggestion,
+    Simulation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +64,9 @@ class InsightsJudge:
         """
         try:
             # Load simulation data
-            simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
+            simulation = (
+                db.query(Simulation).filter(Simulation.id == simulation_id).first()
+            )
             if not simulation:
                 raise ValueError(f"Simulation {simulation_id} not found")
 
@@ -75,7 +82,9 @@ class InsightsJudge:
                 return []
 
             # Analyze with LLM
-            recommendations = await self._analyze_with_llm(simulation, conversations, db)
+            recommendations = await self._analyze_with_llm(
+                simulation, conversations, db
+            )
 
             # Create and save ImprovementSuggestion records
             suggestions = []
@@ -99,7 +108,10 @@ class InsightsJudge:
             return suggestions
 
         except Exception as e:
-            logger.error(f"Failed to generate insights for simulation {simulation_id}: {e}", exc_info=True)
+            logger.error(
+                f"Failed to generate insights for simulation {simulation_id}: {e}",
+                exc_info=True,
+            )
             db.rollback()
             return []
 
@@ -147,7 +159,9 @@ class InsightsJudge:
             return result["recommendations"]
 
         except (json.JSONDecodeError, ValueError, KeyError) as e:
-            logger.error(f"Failed to parse LLM insights response: {e}. Response: {response_text}")
+            logger.error(
+                f"Failed to parse LLM insights response: {e}. Response: {response_text}"
+            )
             return []
 
     def _build_analysis_prompt(
@@ -193,13 +207,15 @@ class InsightsJudge:
                 role = "User" if msg.role == "user" else "Agent"
                 conversation_text += f"{role}: {msg.content[:200]}...\n"
 
-            failed_examples.append({
-                "conversation_id": conv.id,
-                "persona": conv.persona.get("name", "Unknown"),
-                "stop_reason": conv.stop_reason,
-                "turns": conv.num_turns,
-                "excerpt": conversation_text
-            })
+            failed_examples.append(
+                {
+                    "conversation_id": conv.id,
+                    "persona": conv.persona.get("name", "Unknown"),
+                    "stop_reason": conv.stop_reason,
+                    "turns": conv.num_turns,
+                    "excerpt": conversation_text,
+                }
+            )
 
         # Sample successful conversations (up to 3)
         success_convs = [c for c in conversations if c.success][:3]
@@ -218,19 +234,21 @@ class InsightsJudge:
                 role = "User" if msg.role == "user" else "Agent"
                 conversation_text += f"{role}: {msg.content[:200]}...\n"
 
-            success_examples.append({
-                "conversation_id": conv.id,
-                "persona": conv.persona.get("name", "Unknown"),
-                "turns": conv.num_turns,
-                "excerpt": conversation_text
-            })
+            success_examples.append(
+                {
+                    "conversation_id": conv.id,
+                    "persona": conv.persona.get("name", "Unknown"),
+                    "turns": conv.num_turns,
+                    "excerpt": conversation_text,
+                }
+            )
 
         prompt = f"""Analyze this AI agent simulation and provide actionable improvement recommendations.
 
 # SIMULATION OVERVIEW
 - Total Conversations: {total_convs}
-- Successful: {successful} ({successful/total_convs*100:.1f}%)
-- Failed: {failed} ({failed/total_convs*100:.1f}%)
+- Successful: {successful} ({successful / total_convs * 100:.1f}%)
+- Failed: {failed} ({failed / total_convs * 100:.1f}%)
 - Max Turns Setting: {simulation.max_turns}
 - Timeout Setting: {simulation.timeout_seconds}s
 

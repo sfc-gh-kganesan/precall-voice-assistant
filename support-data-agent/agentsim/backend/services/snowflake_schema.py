@@ -32,7 +32,9 @@ def get_snowpark_session() -> Session:
             required = ["account", "user", "password", "warehouse"]
             missing = [k for k in required if not connection_params.get(k)]
             if missing:
-                raise ValueError(f"Missing required Snowflake config: {', '.join(missing)}")
+                raise ValueError(
+                    f"Missing required Snowflake config: {', '.join(missing)}"
+                )
 
             logger.info("Creating Snowflake session for AgentSim")
             _session = Session.builder.configs(connection_params).create()

@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/{simulation_id}/ai-insights", response_model=List[ImprovementSuggestionResponse])
+@router.get(
+    "/{simulation_id}/ai-insights", response_model=List[ImprovementSuggestionResponse]
+)
 async def get_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
     """Get AI-generated insights for a simulation.
 
@@ -27,7 +29,8 @@ async def get_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
 
     if simulation.status != SimulationStatus.COMPLETED:
         raise HTTPException(
-            status_code=400, detail="Simulation must be completed before generating insights"
+            status_code=400,
+            detail="Simulation must be completed before generating insights",
         )
 
     # Check if insights already exist
@@ -38,22 +41,26 @@ async def get_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
     )
 
     if existing_insights and simulation.llm_insights_generated:
-        logger.info(f"Returning {len(existing_insights)} cached AI insights for simulation {simulation_id}")
+        logger.info(
+            f"Returning {len(existing_insights)} cached AI insights for simulation {simulation_id}"
+        )
         return existing_insights
 
     # Generate insights if they don't exist
     logger.info(f"Generating AI insights for simulation {simulation_id}")
 
     # Get Snowflake Cortex configuration from environment
-    api_key = os.getenv("SNOWFLAKE_CORTEX_API_KEY")
-    base_url = os.getenv("SNOWFLAKE_CORTEX_BASE_URL")
-    model = os.getenv("SNOWFLAKE_CORTEX_MODEL", "snowflake-arctic")
+    api_key = os.getenv("SNOWFLAKE_PASSWORD")
+    account = os.getenv("SNOWFLAKE_ACCOUNT")
+    model = os.getenv("SNOWFLAKE_CORTEX_MODEL", "claude-4-sonnet")
 
-    if not api_key or not base_url:
+    if not api_key or not account:
         raise HTTPException(
             status_code=500,
-            detail="Snowflake Cortex configuration missing. Set SNOWFLAKE_CORTEX_API_KEY and SNOWFLAKE_CORTEX_BASE_URL environment variables.",
+            detail="Snowflake configuration missing. Set SNOWFLAKE_PASSWORD and SNOWFLAKE_ACCOUNT environment variables.",
         )
+
+    base_url = f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1"
 
     try:
         judge = InsightsJudge(api_key=api_key, base_url=base_url, model=model)
@@ -64,7 +71,9 @@ async def get_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
         simulation.llm_insights_generated_at = datetime.utcnow()
         db.commit()
 
-        logger.info(f"Successfully generated {len(insights)} AI insights for simulation {simulation_id}")
+        logger.info(
+            f"Successfully generated {len(insights)} AI insights for simulation {simulation_id}"
+        )
         return insights
 
     except Exception as e:
@@ -74,7 +83,10 @@ async def get_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
         )
 
 
-@router.post("/{simulation_id}/ai-insights/regenerate", response_model=List[ImprovementSuggestionResponse])
+@router.post(
+    "/{simulation_id}/ai-insights/regenerate",
+    response_model=List[ImprovementSuggestionResponse],
+)
 async def regenerate_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
     """Regenerate AI insights for a simulation (delete existing and create new ones)."""
     simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
@@ -83,7 +95,8 @@ async def regenerate_ai_insights(simulation_id: int, db: Session = Depends(get_d
 
     if simulation.status != SimulationStatus.COMPLETED:
         raise HTTPException(
-            status_code=400, detail="Simulation must be completed before generating insights"
+            status_code=400,
+            detail="Simulation must be completed before generating insights",
         )
 
     logger.info(f"Regenerating AI insights for simulation {simulation_id}")
@@ -94,16 +107,18 @@ async def regenerate_ai_insights(simulation_id: int, db: Session = Depends(get_d
     ).delete()
     db.commit()
 
-    # Get Snowflake Cortex configuration
-    api_key = os.getenv("SNOWFLAKE_CORTEX_API_KEY")
-    base_url = os.getenv("SNOWFLAKE_CORTEX_BASE_URL")
-    model = os.getenv("SNOWFLAKE_CORTEX_MODEL", "snowflake-arctic")
+    # Get Snowflake Cortex configuration from environment
+    api_key = os.getenv("SNOWFLAKE_PASSWORD")
+    account = os.getenv("SNOWFLAKE_ACCOUNT")
+    model = os.getenv("SNOWFLAKE_CORTEX_MODEL", "claude-4-sonnet")
 
-    if not api_key or not base_url:
+    if not api_key or not account:
         raise HTTPException(
             status_code=500,
-            detail="Snowflake Cortex configuration missing",
+            detail="Snowflake configuration missing. Set SNOWFLAKE_PASSWORD and SNOWFLAKE_ACCOUNT environment variables.",
         )
+
+    base_url = f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1"
 
     try:
         judge = InsightsJudge(api_key=api_key, base_url=base_url, model=model)
@@ -114,7 +129,9 @@ async def regenerate_ai_insights(simulation_id: int, db: Session = Depends(get_d
         simulation.llm_insights_generated_at = datetime.utcnow()
         db.commit()
 
-        logger.info(f"Successfully regenerated {len(insights)} AI insights for simulation {simulation_id}")
+        logger.info(
+            f"Successfully regenerated {len(insights)} AI insights for simulation {simulation_id}"
+        )
         return insights
 
     except Exception as e:

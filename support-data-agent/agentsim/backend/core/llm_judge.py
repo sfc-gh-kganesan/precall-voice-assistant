@@ -71,12 +71,15 @@ class LLMStopCondition(StopCondition):
         try:
             evaluation = self._evaluate_with_llm(context, last_message)
 
-            if evaluation["should_stop"] and evaluation["confidence"] >= self.confidence_threshold:
+            if (
+                evaluation["should_stop"]
+                and evaluation["confidence"] >= self.confidence_threshold
+            ):
                 logger.info(
                     f"LLM Judge recommends stopping conversation {context.conversation_id}: "
                     f"{evaluation['reasoning']} (confidence: {evaluation['confidence']:.2f})"
                 )
-                return True, StopReason.LLM_EVALUATION
+                return True, StopReason.LLM_JUDGE
 
             return False, None
 
@@ -136,7 +139,9 @@ class LLMStopCondition(StopCondition):
             return result
 
         except (json.JSONDecodeError, ValueError, KeyError) as e:
-            logger.error(f"Failed to parse LLM response: {e}. Response: {response_text}")
+            logger.error(
+                f"Failed to parse LLM response: {e}. Response: {response_text}"
+            )
             # Default to not stopping on parse error
             return {
                 "should_stop": False,

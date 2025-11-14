@@ -44,7 +44,7 @@ class SimulationCreate(BaseModel):
     concurrency: int = 1
     max_turns: int = 20
     timeout_seconds: int = 300
-    stop_conditions: List[str] = ["max_turns"]
+    stop_conditions: List[str] = ["llm_judge", "max_turns"]
     metrics_config: List[str] = ["efficiency", "quality", "tool_usage"]
     edge_case_ratio: float = 0.2
     custom_scenarios: Optional[List[Dict[str, Any]]] = (
@@ -99,7 +99,7 @@ class MessageResponse(BaseModel):
 class ConversationSummaryResponse(BaseModel):
     """Schema for conversation summary in list view."""
 
-    id: int
+    id: str  # UUID
     simulation_id: int
     persona: Dict[str, Any]  # Include persona for progress tracking
     success: bool
@@ -116,7 +116,7 @@ class ConversationSummaryResponse(BaseModel):
 class ConversationResponse(BaseModel):
     """Schema for full conversation details."""
 
-    id: int
+    id: str  # UUID
     simulation_id: int
     persona: Dict[str, Any]
     scenario: Dict[str, Any]

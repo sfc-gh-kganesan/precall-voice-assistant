@@ -13,7 +13,7 @@ class StopReason(Enum):
     TIMEOUT = "timeout"
     AGENT_SIGNAL = "agent_signal"
     CUSTOM_CONDITION = "custom_condition"
-    LLM_EVALUATION = "llm_evaluation"
+    LLM_JUDGE = "llm_judge"
     ERROR = "error"
 
 
