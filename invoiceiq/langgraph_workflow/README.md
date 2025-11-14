@@ -160,7 +160,7 @@ You can evaluate the workflow outputs either from a static CSV or by pulling gro
   ```bash
   make eval-csv
   ```
-- **Snowflake table** (replace the sample table name with your own; `--target-table` and `--stage-name` provide defaults if those columns are absent):
+- **Snowflake table** (replace the sample table name with your own; `--eval-target-table` and `--eval-stage-name` provide defaults if those columns are absent):
   ```bash
   make eval-snowflake
   ```
@@ -168,7 +168,7 @@ You can evaluate the workflow outputs either from a static CSV or by pulling gro
 Alternatively, run the script directly and customize all arguments:
 ```bash
 uv run evals/eval.py \
-  --snowflake-table YOUR_DB.YOUR_SCHEMA.YOUR_TABLE \
-  --target-table INVOICEIQ.SERVICE.INVOICES \
-  --stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
+  --eval-snowflake-table YOUR_DB.YOUR_SCHEMA.YOUR_TABLE \
+  --eval-target-table INVOICEIQ.SERVICE.INVOICES_EVALUATION \
+  --eval-stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
 ```

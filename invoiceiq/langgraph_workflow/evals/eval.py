@@ -30,9 +30,9 @@ def parse_args() -> argparse.Namespace:
         help="Fully qualified Snowflake table name providing evaluation data.",
     )
     parser.add_argument(
-        "--evals-table",
+        "--eval-target-table",
         type=str,
-        default=os.getenv("EVALS_TABLE"),
+        default=os.getenv("EVALS_TARGET_TABLE"),
         help="Fallback evaluation table value if dataset rows omit it.",
     )
     parser.add_argument(
@@ -47,8 +47,8 @@ def parse_args() -> argparse.Namespace:
 args = parse_args()
 client = Client()
 
-DEFAULT_TARGET_TABLE = args.target_table
-DEFAULT_STAGE_NAME = args.stage_name
+DEFAULT_TARGET_TABLE = args.eval_target_table
+DEFAULT_STAGE_NAME = args.eval_stage_name
 
 input_keys = [
     'target_table',
@@ -80,8 +80,8 @@ def ensure_value(row: dict, key: str, fallback: str | None = None) -> str | None
 
 cleanup_csv = False
 
-if args.snowflake_table:
-    snowflake_rows = run_query("SELECT * FROM identifier(%(table)s)", {"table": args.snowflake_table})
+if args.eval_snowflake_table:
+    snowflake_rows = run_query("SELECT * FROM identifier(%(table)s)", {"table": args.eval_snowflake_table})
     if isinstance(snowflake_rows, str):
         raise RuntimeError(f"Failed to load evaluation data from Snowflake: {snowflake_rows}")
 
@@ -97,13 +97,13 @@ if args.snowflake_table:
             if not record["target_table"] or not record["stage_name"]:
                 raise ValueError(
                     "Each evaluation row must include target_table and stage_name "
-                    "or provide defaults with --target-table/--stage-name."
+                    "or provide defaults with --eval-target-table/--eval-stage-name."
                 )
             writer.writerow(record)
         csv_file = tmp.name
         cleanup_csv = True
 else:
-    csv_path = args.csv_file or Path("evals/data/test_set.csv")
+    csv_path = args.eval_csv_file or Path("evals/data/test_set.csv")
     if not csv_path.exists():
         raise FileNotFoundError(f"CSV file not found at {csv_path}")
     csv_file = str(csv_path)
@@ -163,7 +163,7 @@ async def wrapped_graph_target(inputs: dict) -> dict:
     if not inputs.get("target_table") or not inputs.get("stage_name"):
         raise ValueError(
             "Inputs must include target_table and stage_name. "
-            "Provide via dataset columns or --target-table/--stage-name."
+            "Provide via dataset columns or --eval-target-table/--eval-stage-name."
         )
     return await run_workflow(**inputs)
 

@@ -44,10 +44,10 @@ langgraph-studio: ## Run LangGraph Studio
 	source .venv/bin/activate && langgraph dev
 
 eval-csv: ## Run LangSmith evals using the bundled CSV test set
-	uv run evals/eval.py --csv-file evals/data/test_set.csv --target-table INVOICEIQ.SERVICE.INVOICES --stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
+	uv run evals/eval.py --eval-csv-file evals/data/test_set.csv --eval-target-table INVOICEIQ.SERVICE.INVOICES --eval-stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
 
 eval-snowflake: ## Run LangSmith evals by pulling rows from a Snowflake table
-	uv run evals/eval.py --snowflake-table AJOSYULA.PUBLIC.INVOICES_EVALUATION --target-table INVOICEIQ.SERVICE.INVOICES --stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
+	uv run evals/eval.py --eval-snowflake-table INVOICEIQ.SERVICE.TESTDATA --eval-target-table INVOICEIQ.SERVICE.INVOICES_EVALUATION --eval-stage-name INVOICEIQ.SERVICE.TICKET_ATTACHMENTS
 
 clean: ## Remove local Docker images
 	docker rmi -f $(LOCAL_IMAGE) 2>/dev/null || true
