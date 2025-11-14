@@ -1,0 +1,27 @@
+{
+  "name": "p67-root",
+  "version": "1.0.0",
+  "description": "P67 with Fastify backend and React frontend",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "dev:api": "pnpm --filter @p67/api dev",
+    "dev:web": "pnpm --filter @p67/web dev",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @p67/api build",
+    "build:web": "pnpm --filter @p67/web build",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "pnpm -r format",
+    "type-check": "pnpm -r type-check"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.22.0",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
