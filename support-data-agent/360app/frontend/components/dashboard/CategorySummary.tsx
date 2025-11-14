@@ -30,7 +30,7 @@ export function CategorySummary() {
 
   if (isLoading) {
     return (
-      <div className="bg-card border border-border rounded-lg p-6">
+      <div className="bg-card p-6">
         <h2 className="text-lg font-semibold mb-4">Category Overview</h2>
         <LoadingSpinner size="md" className="h-48" />
       </div>
@@ -73,7 +73,7 @@ export function CategorySummary() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
+    <div className="bg-card p-6">
       <h2 className="text-lg font-semibold mb-4">Category Overview</h2>
 
       <div className="overflow-x-auto">

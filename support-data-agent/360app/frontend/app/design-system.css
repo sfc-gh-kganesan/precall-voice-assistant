@@ -304,7 +304,7 @@
 }
 
 .badge-muted {
-  background-color: var(--color-bg-muted);
+  background-color: transparent;
   color: var(--color-text-secondary);
 }
 

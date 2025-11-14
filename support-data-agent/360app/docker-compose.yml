@@ -29,7 +29,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        THEME: ${THEME:-gfinance}
+        THEME: ${THEME:-snowflake}
     working_dir: /app
     volumes:
       - ./frontend:/app
@@ -41,13 +41,13 @@ services:
       - CHOKIDAR_USEPOLLING=1
       - TURBOPACK=0
       - NEXT_TELEMETRY_DISABLED=1
-      - THEME=${THEME:-gfinance}
+      - THEME=${THEME:-snowflake}
     ports:
       - "3000:3000"
     stdin_open: true
     tty: true
     command: >-
-      sh -c "npm install --no-audit --no-fund && npm run theme ${THEME:-gfinance} && npm run dev -- --port 3000 --hostname 0.0.0.0"
+      sh -c "npm install --no-audit --no-fund && npm run theme ${THEME:-snowflake} && npm run dev -- --port 3000 --hostname 0.0.0.0"
     depends_on:
       - backend
     restart: unless-stopped

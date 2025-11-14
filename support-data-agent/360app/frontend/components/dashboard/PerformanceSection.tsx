@@ -22,7 +22,7 @@ export function PerformanceSection({
   icon,
 }: PerformanceSectionProps) {
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
+    <div className="bg-card p-6">
       {/* Section Header */}
       <div className="flex items-center gap-3 mb-4">
         {icon && <div className="text-primary">{icon}</div>}

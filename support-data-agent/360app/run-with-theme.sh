@@ -4,7 +4,7 @@
 # Usage: ./run-with-theme.sh [theme]
 # Available themes: gfinance (default), hackernews, snowflake
 
-THEME=${1:-gfinance}
+THEME=${1:-snowflake}
 
 echo "🎨 Building and running with theme: $THEME"
 echo ""
