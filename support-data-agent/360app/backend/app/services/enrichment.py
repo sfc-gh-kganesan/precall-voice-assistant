@@ -225,7 +225,7 @@ class EnrichmentService:
                     F.ai_classify(
                         F.concat_ws(F.lit(" | "), F.col("SUBJECT"), F.col("DESCRIPTION")),
                         F.array_construct(*[F.lit(cat) for cat in category_list]),
-                        task_description="Classify ticket into ONE category, never Unknown or Null. If issue involves security, authentication, RBAC, encryption, data privacy, access policies, compliance, or data governance, choose Governance | Manageability | Privacy | Security. Otherwise select best matching category: AI, Analytics, Engineering, Infrastructure, Billing, Apps, Lakehouse, Metadata, or UI.",
+                        task_description="Classify ticket into ONE category, never Unknown or Null. If issue involves security, authentication, RBAC, encryption, data privacy, access policies, compliance, or data governance, choose Governance | Manageability | Privacy | Security. Otherwise select best matching category: AI, Analytics, Engineering, Infrastructure, Billing, Apps, Lakehouse, Metadata, or UI.", # noqa: E501
                     )["labels"][0]
                     .cast(T.StringType())
                     .alias("GENERATED_PRODUCT_CATEGORY"),

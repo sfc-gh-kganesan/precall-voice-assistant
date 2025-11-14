@@ -29,16 +29,16 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: support-data-agent/frontend/package-lock.json
+          cache-dependency-path: support-data-agent/360app/frontend/package-lock.json
 
       - name: Install frontend dependencies
-        working-directory: support-data-agent/frontend
+        working-directory: support-data-agent/360app/frontend
         run: npm ci
 
       - name: Lint backend
-        working-directory: support-data-agent/backend
+        working-directory: support-data-agent/360app/backend
         run: uv run ruff check
 
       - name: Lint frontend
-        working-directory: support-data-agent/frontend
+        working-directory: support-data-agent/360app/frontend
         run: npm run lint
