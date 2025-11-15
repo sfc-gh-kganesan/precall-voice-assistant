@@ -1,7 +1,0 @@
-.venv
-.claude
-.ruff_cache
-.vscode
-.pytest_cache
-__pycache__
-*.pyc
