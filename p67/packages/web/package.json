@@ -14,13 +14,8 @@
     "type:check": "tsc -b --noEmit"
   },
   "dependencies": {
-    "@snowflake/balto-themes": "^0.20.2",
-    "@snowflake/stellar-charts": "^0.20.2",
-    "@snowflake/stellar-components": "^0.20.2",
-    "@snowflake/stellar-data-table": "^0.20.2",
-    "@snowflake/stellar-data-tools": "^0.20.2",
-    "@snowflake/stellar-icons": "^0.20.2",
-    "@stylexjs/stylex": "^0.16.3",
+    "@mantine/core": "^8.3.7",
+    "@mantine/hooks": "^8.3.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -37,10 +32,12 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.0",
     "globals": "^15.0.0",
+    "postcss": "^8.5.6",
+    "postcss-preset-mantine": "^1.18.0",
+    "postcss-simple-vars": "^7.0.1",
     "prettier": "^3.3.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.0.0",
-    "unplugin-stylex": "^0.5.5",
     "vite": "^7.2.2",
     "vitest": "^4.0.9"
   }

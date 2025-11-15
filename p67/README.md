@@ -24,6 +24,7 @@ Experimental platform for building, testing, and deploying agentic workflows.
   - React 19
   - TypeScript
   - Vite
+  - Mantine UI (Component Library)
   - ESLint
 
 ## Getting Started

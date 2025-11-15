@@ -1,21 +1,55 @@
-import { SingleLine, Heading, Paragraph, Layout } from '@snowflake/stellar-components';
-import { AgentIcon } from '@snowflake/stellar-icons';
+import { AppShell, Container, NavLink, Text, Title } from '@mantine/core';
+import { useState } from 'react';
 
 function App() {
-  return (
-    <Layout.Root style={{ margin: 100 }}>
-      <Layout.Header>
-        <SingleLine bold>
-          <Heading size="pageHeader">
-            <AgentIcon /> p67
-          </Heading>
-        </SingleLine>
-      </Layout.Header>
-      <Layout.Content>
-        <Paragraph>Agent Builder</Paragraph>
-      </Layout.Content>
-    </Layout.Root>
-  );
+    const [activeSection, setActiveSection] = useState('studio');
+
+    return (
+        <AppShell
+            header={{ height: 60 }}
+            navbar={{ width: 200, breakpoint: 'sm' }}
+            padding="md"
+        >
+            <AppShell.Header>
+                <Container
+                    h="100%"
+                    px="md"
+                    style={{ display: 'flex', alignItems: 'center' }}
+                    strategy='grid'
+                >
+                    <Title order={1} fw={700}>
+                        p67
+                    </Title>
+                </Container>
+            </AppShell.Header>
+
+            <AppShell.Navbar p="md">
+                <NavLink
+                    label="Studio"
+                    active={activeSection === 'studio'}
+                    onClick={() => setActiveSection('studio')}
+                />
+                <NavLink
+                    label="Test"
+                    active={activeSection === 'test'}
+                    onClick={() => setActiveSection('test')}
+                />
+                <NavLink
+                    label="Deploy"
+                    active={activeSection === 'deploy'}
+                    onClick={() => setActiveSection('deploy')}
+                />
+            </AppShell.Navbar>
+
+            <AppShell.Main>
+                <Container>
+                    <Text size="lg" mb="md">
+                        Agent Builder - {activeSection.charAt(0).toUpperCase() + activeSection.slice(1)}
+                    </Text>
+                </Container>
+            </AppShell.Main>
+        </AppShell>
+    );
 }
 
 export default App;

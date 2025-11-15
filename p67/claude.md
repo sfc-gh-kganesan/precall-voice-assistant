@@ -22,6 +22,8 @@ P67 is a modern full-stack TypeScript monorepo containing:
 - **Framework**: React 19.2.0 (latest version)
 - **Build Tool**: Vite 7.2.2 (next-generation frontend tooling)
 - **Language**: TypeScript 5.9.3
+- **UI Library**: Mantine UI (component library)
+- **Styling**: PostCSS with postcss-preset-mantine
 - **Dev Server**: Runs on port 5173
 - **Plugins**: @vitejs/plugin-react for Fast Refresh and JSX
 
@@ -62,6 +64,46 @@ p67/
 ├── pnpm-workspace.yaml         # Workspace definition
 └── pnpm-lock.yaml              # Dependency lock file
 ```
+
+## UI Component Library
+
+### Mantine UI
+
+The project uses Mantine v8 as the UI component library. Please refer to the documentation here: https://mantine.dev/llms.txt for full usage information. Mantine provides a comprehensive set of accessible, customizable React components.
+
+#### Setup
+- **Provider**: MantineProvider wraps the app in `main.tsx`
+- **Styles**: `@mantine/core/styles.css` imported at the top of `main.tsx`
+- **PostCSS**: Configured via `postcss.config.cjs` with `postcss-preset-mantine`
+
+#### Available Packages
+- `@mantine/core` - Core components (Button, TextInput, Select, Modal, etc.)
+- `@mantine/hooks` - Utility hooks (useMediaQuery, useClickOutside, etc.)
+
+#### Usage Example
+```typescript
+import { Button, TextInput, Stack, Paper } from '@mantine/core';
+
+function MyComponent() {
+  return (
+    <Paper p="md" shadow="sm">
+      <Stack gap="md">
+        <TextInput label="Name" placeholder="Enter your name" />
+        <Button variant="filled" color="blue">
+          Submit
+        </Button>
+      </Stack>
+    </Paper>
+  );
+}
+```
+
+#### Best Practices
+- Import only the components you need
+- Use Mantine's spacing system (`p`, `m`, `gap` props) for consistency
+- Leverage Mantine hooks for common functionality
+- Use Mantine's color system for theming
+- Refer to [Mantine documentation](https://mantine.dev) for component APIs
 
 ## Code Style Guidelines
 
@@ -121,7 +163,8 @@ start();
 - `pnpm lint` - Lint all packages
 - `pnpm lint:fix` - Auto-fix linting issues across all packages
 - `pnpm format` - Format code across all packages
-- `pnpm type-check` - Type-check all packages
+- `pnpm format:check` - Check if any code is not formatted correctly
+- `pnpm type:check` - Type-check all packages
 
 ### API Package (`packages/api/`)
 - `pnpm dev` - Start dev server with hot reload (tsx watch)
@@ -130,7 +173,8 @@ start();
 - `pnpm lint` - Check code quality
 - `pnpm lint:fix` - Auto-fix issues
 - `pnpm format` - Format code
-- `pnpm type-check` - Validate TypeScript
+- `pnpm format:check` - Check if any code is not formatted correctly
+- `pnpm type:check` - Validate TypeScript
 
 ### Web Package (`packages/web/`)
 - `pnpm dev` - Start Vite dev server
@@ -139,7 +183,8 @@ start();
 - `pnpm lint` - Check code quality
 - `pnpm lint:fix` - Auto-fix issues
 - `pnpm format` - Format code
-- `pnpm type-check` - Validate TypeScript
+- `pnpm format:check` - Check if any code is not formatted correctly
+- `pnpm type:check` - Validate TypeScript
 
 ## Development Workflow
 
@@ -152,7 +197,7 @@ start();
 ### Code Quality Workflow
 1. Before committing, run: `pnpm lint:fix` to auto-fix ESLint issues
 2. Run `pnpm format` to ensure consistent Prettier formatting
-3. Run `pnpm type-check` to validate TypeScript
+3. Run `pnpm type:check` to validate TypeScript
 4. ESLint will check code quality and TypeScript-specific rules
 5. Prettier will format code according to the project style
 
@@ -329,6 +374,7 @@ ESLint and Prettier work well with Git:
 - Fastify Documentation: https://fastify.dev
 - React Documentation: https://react.dev
 - Vite Documentation: https://vite.dev
+- Mantine UI Documentation: https://mantine.dev
 - ESLint Documentation: https://eslint.org
 - TypeScript ESLint: https://typescript-eslint.io
 - Prettier Documentation: https://prettier.io

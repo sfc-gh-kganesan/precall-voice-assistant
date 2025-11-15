@@ -1,15 +1,22 @@
-# React + TypeScript + Vite
+# P67 Web Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 frontend application for the P67 agentic workflow platform.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19.2.0** - Latest React version with modern features
+- **TypeScript 5.9.3** - Type-safe JavaScript
+- **Vite 7.2.2** - Fast build tool with HMR
+- **Mantine UI** - Modern React component library
 
-## React Compiler
+## UI Component Library
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Mantine UI
+Modern, feature-rich component library with excellent TypeScript support and accessibility.
+
+- **Documentation**: https://mantine.dev
+- **Core packages**: `@mantine/core`, `@mantine/hooks`
+- **Styling**: PostCSS with `postcss-preset-mantine`
 
 ## Expanding the ESLint configuration
 
