@@ -1,0 +1,157 @@
+# Load environment variables from .env
+set dotenv-load := true
+
+# Export all variables
+set export := true
+
+# Allow passing positional arguments
+set positional-arguments := true
+
+# Default recipe (run `just` with no args)
+default: help
+
+# Show this help message
+help:
+    @echo "Sanofi Knowledge Builder Service"
+    @echo ""
+    @just --list --unsorted
+    @echo ""
+
+# Setup development environment
+install:
+    uv sync
+
+# Start dev server with auto-reload (optionally specify port, default: 8000)
+kb_builder_svc port="8000": install
+    uv run uvicorn --app-dir=./src kb_builder_svc:app --host 0.0.0.0 --port {{port}} --reload
+
+# Private: Get connection flag for snow CLI
+_connection-flag:
+    #!/usr/bin/env bash
+    if [ "$SNOW_CONNECTION" != "default" ]; then
+        echo "--connection $SNOW_CONNECTION"
+    fi
+
+# Private: Run SQL file with native snow sql variables
+_run-sql sql_file continue_on_error="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+    
+    # Get repository URL for service.sql
+    SPCS_REPO_URL=$(snow spcs image-repository url $SPCS_IMAGE_REPO_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME 2>/dev/null || echo "")
+    
+    # Build variable flags for snow sql
+    VARIABLE_FLAGS="-D ROLE_NAME=$ROLE_NAME"
+    VARIABLE_FLAGS+=" -D KB_DATABASE_NAME=$KB_DATABASE_NAME"
+    VARIABLE_FLAGS+=" -D KB_SCHEMA_NAME=$KB_SCHEMA_NAME"
+    VARIABLE_FLAGS+=" -D KB_TABLE_NAME=$KB_TABLE_NAME"
+    VARIABLE_FLAGS+=" -D SPCS_COMPUTE_POOL_NAME=$SPCS_COMPUTE_POOL_NAME"
+    VARIABLE_FLAGS+=" -D SPCS_IMAGE_REPO_NAME=$SPCS_IMAGE_REPO_NAME"
+    VARIABLE_FLAGS+=" -D SPCS_STAGE_NAME=$SPCS_STAGE_NAME"
+    VARIABLE_FLAGS+=" -D SPCS_DATABASE_NAME=$SPCS_DATABASE_NAME"
+    VARIABLE_FLAGS+=" -D SPCS_SCHEMA_NAME=$SPCS_SCHEMA_NAME"
+    VARIABLE_FLAGS+=" -D SPCS_WAREHOUSE_NAME=$SPCS_WAREHOUSE_NAME"
+    VARIABLE_FLAGS+=" -D SPCS_REPO_URL=$SPCS_REPO_URL"
+    VARIABLE_FLAGS+=" -D SPCS_EAI_NAME=$SPCS_EAI_NAME"
+    VARIABLE_FLAGS+=" -D KB_BUILDER_SVC_NAME=$KB_BUILDER_SVC_NAME"
+    VARIABLE_FLAGS+=" -D KB_BUILDER_IMAGE_NAME=$KB_BUILDER_IMAGE_NAME"
+    VARIABLE_FLAGS+=" -D SNOW_CONNECTION=$SNOW_CONNECTION"
+    
+    # Execute SQL with --silent
+    if [ "{{continue_on_error}}" = "true" ]; then
+        snow sql -f "{{sql_file}}" $CONNECTION_FLAG --role $ROLE_NAME $VARIABLE_FLAGS --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists)"
+    else
+        snow sql -f "{{sql_file}}" $CONNECTION_FLAG --role $ROLE_NAME $VARIABLE_FLAGS --silent
+    fi
+
+deploy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+
+    # Login to registry
+    echo "🔐 Logging into Snowflake image registry..."
+    snow spcs image-registry login --role $ROLE_NAME $CONNECTION_FLAG --silent || echo "⚠️  Registry login failed or already logged in"
+
+    # Setup infrastructure
+    echo "🏗️  Setting up Snowflake infrastructure..."
+    echo "Creating database schema..."
+    just _run-sql release/1_database_schema.sql true
+    echo "Creating network rules..."
+    just _run-sql release/2_network_rules.sql true
+    echo "Creating compute pool..."
+    just _run-sql release/3_compute_pool.sql true
+
+    # Build and push Docker image
+    echo "🐳 Building Docker image..."
+    SPCS_REPO_URL=$(snow spcs image-repository url $SPCS_IMAGE_REPO_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --silent)
+    echo "Building image..."
+    cd release && docker build --rm --platform linux/amd64 -t $SPCS_REPO_URL/$KB_BUILDER_IMAGE_NAME:latest -f Dockerfile.kb_builder_svc ../. --quiet
+    cd ..
+    echo "📤 Pushing to Snowflake image repository..."
+    docker push $SPCS_REPO_URL/kb-builder-svc:latest --quiet
+
+    # Deploy service
+    echo "🚢 Deploying service to Snowflake..."
+    just _run-sql release/4_service.sql false
+
+    echo "Waiting for service to initialize..."
+    sleep 5
+
+    echo ""
+    echo "✅ 🎉 Deployment complete!"
+
+
+# Check service status
+kb_builder_svc_status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📊 Checking service status..."
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service status $KB_BUILDER_SVC_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME
+
+# View service logs (optionally specify instance-id, default: 0)
+kb_builder_svc_logs instance="0":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📋 Fetching service logs (instance {{instance}})..."
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service logs $KB_BUILDER_SVC_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --container-name kb-builder-container --instance-id {{instance}}
+
+# Show public endpoint URL
+kb_builder_svc_url:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service list-endpoints $KB_BUILDER_SVC_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --format JSON_EXT
+
+# Check code quality (used by CI)
+check:
+    @echo "🔍 Checking import sorting..."
+    uv run ruff check --select I
+    @echo "🔍 Checking linting..."
+    uv run ruff check
+    @echo "🔍 Checking formatting..."
+    uv run ruff format --check
+    @echo "✅ All checks passed"
+
+# Format and lint Python code (auto-fix)
+fmt:
+    uv run ruff check --select I --fix .
+    uv run ruff format .
+    uv run ruff check --fix .
+    @echo "✅ Code formatted and linted"
+
+alias format := fmt
+
+# Clean Docker images and cache
+clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🧹 Cleaning up..."
+    docker images | grep kb-builder-svc | awk '{print $3}' | xargs docker rmi -f 2>/dev/null || true
+    find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+    find . -type f -name '*.pyc' -delete 2>/dev/null || true
+    rm -f release/*.tmp 2>/dev/null || true
+    echo "✅ Cleanup complete"
