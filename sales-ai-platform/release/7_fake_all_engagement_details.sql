@@ -1,8 +1,8 @@
 -- Create a fake all_engagement_details table for testing
 
-create or replace table ai_fde.sales_ai_platform.all_engagement_details_synthetic like sales.engagement360_pitch.all_engagement_details;
+create or replace table ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic like sales.engagement360_pitch.all_engagement_details;
 
-insert into ai_fde.sales_ai_platform.all_engagement_details_synthetic select
+insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
 'CompanyA', 
 'MEETING', 
 '9chdhagbdhajj5jlj95584unajgljfdg94u858', 
@@ -104,7 +104,7 @@ ARRAY_CONSTRUCT('sarim@snowflake.com', 'kirk@snowflake.com', 'howard@snowflake.c
 null
 ;
 
-insert into ai_fde.sales_ai_platform.all_engagement_details_synthetic select
+insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
 'CompanyA', 
 'MEETING', 
 '7578ghohjgt8rthljmvotur87947597935', 

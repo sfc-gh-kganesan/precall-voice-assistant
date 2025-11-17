@@ -5,7 +5,7 @@ from langchain_openai import ChatOpenAI
 from utils import get_snowflake_token
 
 
-def get_llm():
+def get_llm(cortex_model_selection: str = "openai-gpt-4.1"):
     """
     Get LLM configured for either Snowflake Cortex or OpenAI.
     Note: For Cortex, token is read fresh each call to handle rotation.
@@ -25,7 +25,7 @@ def get_llm():
         base_url = f"https://{snowflake_host}/api/v2/cortex/openai"
         api_key = get_snowflake_token()  # Fresh token on each call
         llm = ChatOpenAI(
-            model="openai-gpt-4.1",
+            model=cortex_model_selection,
             base_url=base_url,
             api_key=api_key,
             temperature=0,
