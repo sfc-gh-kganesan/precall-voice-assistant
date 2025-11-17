@@ -50,6 +50,11 @@ export const simulationsApi = {
   // AI Insights
   getAIInsights: (id: number) => api.get<ImprovementSuggestion[]>(`/api/simulations/${id}/ai-insights`),
   regenerateAIInsights: (id: number) => api.post<ImprovementSuggestion[]>(`/api/simulations/${id}/ai-insights/regenerate`),
+  createGithubIssue: (simulationId: number, insightId: number, customContent?: { title?: string; body?: string }) =>
+    api.post<{ success: boolean; issue_url: string; insight_id: number }>(
+      `/api/simulations/${simulationId}/insights/${insightId}/create-github-issue`,
+      customContent || {}
+    ),
 }
 
 // Conversations API

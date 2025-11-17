@@ -257,6 +257,11 @@ def create_dda_agent(
         f"✓ Agent configured with {len(toolsets)} MCP toolsets and {len(custom_tools)} custom tools"
     )
 
+    logger.info(f"✓ Agent configured with history limit of {history_limit} messages")
+    logger.info(
+        f"✓ Agent configured with {len(toolsets)} MCP toolsets and {len(custom_tools)} custom tools"
+    )
+
     return agent
 
 

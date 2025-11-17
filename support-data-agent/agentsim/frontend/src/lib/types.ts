@@ -7,6 +7,9 @@ export interface Project {
   business_context: string
   agent_endpoint: string
   auth_type: string
+  github_owner?: string
+  github_repo?: string
+  target_path?: string
   created_at: string
   updated_at: string
 }
@@ -20,6 +23,9 @@ export interface ProjectCreate {
   auth_credentials: Record<string, string>
   custom_headers?: Record<string, string>
   conversation_examples?: any[]
+  github_owner?: string
+  github_repo?: string
+  target_path?: string
 }
 
 export interface Simulation {
@@ -152,6 +158,20 @@ export interface ImprovementSuggestion {
     affected_personas?: string[]
     metrics?: Record<string, any>
     pattern?: string
+  }
+  code_recommendation?: {
+    title: string
+    description: string
+    file_changes: Array<{
+      file: string
+      old_content: string
+      new_content: string
+      diff: string
+    }>
+    priority: string
+    status?: string
+    github_issue_url?: string
+    generated_at?: string
   }
   created_at: string
 }

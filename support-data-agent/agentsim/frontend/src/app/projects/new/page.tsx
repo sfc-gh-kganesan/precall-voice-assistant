@@ -143,6 +143,61 @@ export default function NewProjectPage() {
           </div>
         )}
 
+        {/* GitHub Configuration Section */}
+        <div className="pt-6 border-t border-slate-700">
+          <h3 className="text-lg font-semibold text-parchment-100 mb-4">GitHub Configuration (Optional)</h3>
+          <p className="text-sm text-parchment-300 mb-4">
+            Configure GitHub repository for automated code recommendations and issue creation
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="github_owner" className="block text-sm font-medium text-parchment-200">
+                GitHub Owner/Organization
+              </label>
+              <input
+                type="text"
+                id="github_owner"
+                value={formData.github_owner || ''}
+                onChange={(e) => setFormData({...formData, github_owner: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="snowflakedb"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="github_repo" className="block text-sm font-medium text-parchment-200">
+                Repository Name
+              </label>
+              <input
+                type="text"
+                id="github_repo"
+                value={formData.github_repo || ''}
+                onChange={(e) => setFormData({...formData, github_repo: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="aura"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="target_path" className="block text-sm font-medium text-parchment-200">
+                Target Path (Optional)
+              </label>
+              <input
+                type="text"
+                id="target_path"
+                value={formData.target_path || ''}
+                onChange={(e) => setFormData({...formData, target_path: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="support-data-agent/troubleshooting"
+              />
+              <p className="mt-1 text-xs text-parchment-300">
+                Path within repository to focus code recommendations (e.g., src/agent)
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex justify-end gap-4 pt-4">
           <button
             type="button"

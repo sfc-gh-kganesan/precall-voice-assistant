@@ -22,6 +22,7 @@ services:
       - SEMANTIC_MODEL_FILE=${SEMANTIC_MODEL_FILE}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - TROUBLESHOOTING_AGENT_URL=${TROUBLESHOOTING_AGENT_URL:-http://host.docker.internal:8002}
+      - GITHUB_PROXY_URL=${GITHUB_PROXY_URL:-http://host.docker.internal:8003/mcp}
     command: >-
       sh -c "uv sync --locked && uv run uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload"
     restart: unless-stopped

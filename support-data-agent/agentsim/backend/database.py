@@ -29,7 +29,17 @@ if USE_SNOWFLAKE:
     engine = create_engine(DATABASE_URL, echo=False)
 else:
     # Use SQLite for development
-    DATABASE_URL = "sqlite:///./agentsim.db"
+    # Use DATABASE_PATH env var or default to ./agentsim.db relative to working directory
+    # For Docker: working dir is /app, so it becomes /app/agentsim.db
+    # For local: set DATABASE_PATH in .env to use absolute path or run from project root
+    DATABASE_PATH = os.getenv("DATABASE_PATH", "./agentsim.db")
+
+    # Convert to absolute path to avoid issues with different working directories
+    if not os.path.isabs(DATABASE_PATH):
+        # If relative path, resolve it from current working directory
+        DATABASE_PATH = os.path.abspath(DATABASE_PATH)
+
+    DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
     engine = create_engine(
         DATABASE_URL,

@@ -17,6 +17,9 @@ class ProjectCreate(BaseModel):
     auth_credentials: Dict[str, str] = {}
     custom_headers: Optional[Dict[str, str]] = None
     conversation_examples: Optional[List[Dict[str, Any]]] = None
+    github_owner: Optional[str] = None
+    github_repo: Optional[str] = None
+    target_path: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
@@ -28,6 +31,9 @@ class ProjectResponse(BaseModel):
     business_context: str
     agent_endpoint: str
     auth_type: str
+    github_owner: Optional[str]
+    github_repo: Optional[str]
+    target_path: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -184,6 +190,7 @@ class ImprovementSuggestionResponse(BaseModel):
     description: str
     priority: str
     evidence: Dict[str, Any]
+    code_recommendation: Optional[Dict[str, Any]] = None
     created_at: datetime
 
     class Config:
@@ -195,3 +202,10 @@ class CombinedInsightsResponse(BaseModel):
 
     rule_based: List[Dict[str, Any]]  # From frontend calculations
     ai_generated: List[ImprovementSuggestionResponse]
+
+
+class CreateGithubIssueRequest(BaseModel):
+    """Schema for GitHub issue creation with optional custom content."""
+
+    title: Optional[str] = None
+    body: Optional[str] = None

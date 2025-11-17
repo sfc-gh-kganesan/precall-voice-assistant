@@ -364,6 +364,127 @@ export default function InsightsPage({ params }: { params: Promise<{ id: string 
           </>
         )}
       </div>
+
+      {/* AI-Powered Insights */}
+      <div className="mt-8 space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-serif font-semibold text-parchment-100">AI-Powered Analysis</h2>
+          <button
+            onClick={regenerateInsights}
+            disabled={aiInsightsLoading}
+            className="px-3 py-1 text-sm border border-strategic-600 text-strategic-500 rounded hover:bg-strategic-600/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {aiInsightsLoading ? 'Generating...' : 'Regenerate'}
+          </button>
+        </div>
+
+        {aiInsightsLoading && (
+          <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 text-center">
+            <div className="text-parchment-300">Analyzing conversations with AI...</div>
+            <div className="text-sm text-parchment-400 mt-2">This may take a moment</div>
+          </div>
+        )}
+
+        {aiInsightsError && (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
+            <div className="text-red-300 font-medium">Failed to load AI insights</div>
+            <div className="text-sm text-red-400 mt-1">{aiInsightsError}</div>
+            <button
+              onClick={loadAIInsights}
+              className="mt-3 px-3 py-1 text-sm border border-red-600 text-red-400 rounded hover:bg-red-600/10 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!aiInsightsLoading && !aiInsightsError && aiInsights.length === 0 && (
+          <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 text-center text-parchment-300">
+            No AI insights available yet. They will be generated automatically after simulation completes.
+          </div>
+        )}
+
+        {!aiInsightsLoading && aiInsights.length > 0 && (
+          <>
+            {/* Priority Tabs */}
+            <div className="flex gap-2 border-b border-slate-700">
+              <button
+                onClick={() => setActiveTab('high')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'high'
+                    ? 'text-red-300 border-b-2 border-red-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                High Priority ({insightsByPriority.high.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('medium')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'medium'
+                    ? 'text-amber-300 border-b-2 border-amber-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                Medium ({insightsByPriority.medium.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('low')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'low'
+                    ? 'text-blue-300 border-b-2 border-blue-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                Low ({insightsByPriority.low.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === 'all'
+                    ? 'text-strategic-400 border-b-2 border-strategic-600'
+                    : 'text-parchment-400 hover:text-parchment-200'
+                }`}
+              >
+                All by Category
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="space-y-4 mt-4">
+              {/* Priority-based tabs */}
+              {activeTab !== 'all' && (
+                <>
+                  {insightsByPriority[activeTab].length === 0 ? (
+                    <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 text-center text-parchment-300">
+                      No {activeTab} priority insights found.
+                    </div>
+                  ) : (
+                    insightsByPriority[activeTab].map(renderInsightCard)
+                  )}
+                </>
+              )}
+
+              {/* Category-based tab */}
+              {activeTab === 'all' && (
+                <div className="space-y-6">
+                  {Object.entries(insightsByCategory).map(([category, insights]) => (
+                    <div key={category}>
+                      <h3 className="text-lg font-serif font-semibold text-parchment-100 mb-3 flex items-center gap-2">
+                        <span className="text-2xl">{categoryIcons[category]}</span>
+                        {categoryLabels[category]} ({insights.length})
+                      </h3>
+                      <div className="space-y-3">
+                        {insights.map(renderInsightCard)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
