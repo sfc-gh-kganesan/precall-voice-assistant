@@ -96,6 +96,15 @@ deploy:
     echo "🚢 Deploying service to Snowflake..."
     just _run-sql release/4_service.sql false
 
+    # Deploy example job
+    echo "🦀 Building Rust example job Docker image..."
+    cd release && docker build --rm --platform linux/amd64 -t $SPCS_REPO_URL/example-job:latest -f Dockerfile.example_job ../. --quiet
+    cd ..
+    echo "📤 Pushing example-job to Snowflake..."
+    docker push $SPCS_REPO_URL/example-job:latest --quiet
+    echo "🚢 Deploying example job service..."
+    just _run-sql release/5_example_job.sql false
+
     echo "Waiting for service to initialize..."
     sleep 5
 
@@ -145,12 +154,29 @@ fmt:
 
 alias format := fmt
 
+# Check example job status
+example_job_status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📊 Checking example job status..."
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service status example_job_service $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME
+
+# View example job logs (optionally specify instance-id, default: 0)
+example_job_logs instance="0":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📋 Fetching example job logs (instance {{instance}})..."
+    CONNECTION_FLAG=$(just _connection-flag)
+    snow spcs service logs example_job_service $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --container-name example-job-container --instance-id {{instance}}
+
 # Clean Docker images and cache
 clean:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "🧹 Cleaning up..."
-    docker images | grep kb-builder-svc | awk '{print $3}' | xargs docker rmi -f 2>/dev/null || true
+    cargo clean 2>/dev/null || true
+    docker images | grep -E 'kb-builder-svc|example-job' | awk '{print $3}' | xargs docker rmi -f 2>/dev/null || true
     find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
     find . -type f -name '*.pyc' -delete 2>/dev/null || true
     rm -f release/*.tmp 2>/dev/null || true
