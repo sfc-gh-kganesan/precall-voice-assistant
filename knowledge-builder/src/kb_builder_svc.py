@@ -16,9 +16,9 @@ class ErrorResponse(BaseModel):
 
 # Application metadata
 VERSION = "1.0.0"
-TITLE = "Sanofi Knowledge Builder Service API"
+TITLE = "Knowledge Builder Service API"
 DESCRIPTION = """
-Sanofi SVC functions
+Knowledge Builder Service functions
 """
 
 
@@ -42,7 +42,7 @@ v1_router = APIRouter(prefix="/v1", tags=["v1"])
 async def index():
     """Root endpoint with API information."""
     return {
-        "message": "Sanofi Knowledge Builder Service API",
+        "message": "Knowledge Builder Service API",
         "version": VERSION,
         "api_version": "v1",
         "docs": "/docs",

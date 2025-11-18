@@ -12,7 +12,7 @@ default: help
 
 # Show this help message
 help:
-    @echo "Sanofi Knowledge Builder Service"
+    @echo "Knowledge Builder Service"
     @echo ""
     @just --list --unsorted
     @echo ""

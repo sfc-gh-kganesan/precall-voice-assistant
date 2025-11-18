@@ -1,7 +1,7 @@
 [project]
-name = "sanofi-knowledge"
+name = "knowledge-builder"
 version = "0.1.0"
-description = "Add your description here"
+description = "Knowledge Builder Service"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
