@@ -101,6 +101,10 @@ deploy:
     echo "🚢 Deploying example job service..."
     just _run-sql release/5_example_job.sql "true"
 
+    # Deploy service functions
+    echo "🔧 Deploying service functions..."
+    just _run-sql release/6_service_functions.sql "true"
+
     echo "Waiting for service to initialize..."
     sleep 5
 
