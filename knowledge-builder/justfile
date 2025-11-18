@@ -4,9 +4,6 @@ set dotenv-load := true
 # Export all variables
 set export := true
 
-# Allow passing positional arguments
-set positional-arguments := true
-
 # Default recipe (run `just` with no args)
 default: help
 
@@ -33,13 +30,16 @@ _connection-flag:
     fi
 
 # Private: Run SQL file with native snow sql variables
-_run-sql sql_file continue_on_error="false":
+_run-sql sql_file fetch_repo_url="false":
     #!/usr/bin/env bash
     set -euo pipefail
     CONNECTION_FLAG=$(just _connection-flag)
     
-    # Get repository URL for service.sql
-    SPCS_REPO_URL=$(snow spcs image-repository url $SPCS_IMAGE_REPO_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME 2>/dev/null || echo "")
+    # Conditionally get repository URL (only needed for service deployment SQL files)
+    SPCS_REPO_URL=""
+    if [ "{{fetch_repo_url}}" = "true" ]; then
+        SPCS_REPO_URL=$(snow spcs image-repository url $SPCS_IMAGE_REPO_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --silent 2>/dev/null || echo "")
+    fi
     
     # Build variable flags for snow sql
     VARIABLE_FLAGS="-D ROLE_NAME=$ROLE_NAME"
@@ -59,11 +59,7 @@ _run-sql sql_file continue_on_error="false":
     VARIABLE_FLAGS+=" -D SNOW_CONNECTION=$SNOW_CONNECTION"
     
     # Execute SQL with --silent
-    if [ "{{continue_on_error}}" = "true" ]; then
-        snow sql -f "{{sql_file}}" $CONNECTION_FLAG --role $ROLE_NAME $VARIABLE_FLAGS --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists)"
-    else
-        snow sql -f "{{sql_file}}" $CONNECTION_FLAG --role $ROLE_NAME $VARIABLE_FLAGS --silent
-    fi
+    snow sql -f "{{sql_file}}" $CONNECTION_FLAG --role $ROLE_NAME $VARIABLE_FLAGS --silent
 
 deploy:
     #!/usr/bin/env bash
@@ -77,11 +73,11 @@ deploy:
     # Setup infrastructure
     echo "🏗️  Setting up Snowflake infrastructure..."
     echo "Creating database schema..."
-    just _run-sql release/1_database_schema.sql true
+    just _run-sql release/1_database_schema.sql
     echo "Creating network rules..."
-    just _run-sql release/2_network_rules.sql true
+    just _run-sql release/2_network_rules.sql
     echo "Creating compute pool..."
-    just _run-sql release/3_compute_pool.sql true
+    just _run-sql release/3_compute_pool.sql
 
     # Build and push Docker image
     echo "🐳 Building Docker image..."
@@ -94,7 +90,7 @@ deploy:
 
     # Deploy service
     echo "🚢 Deploying service to Snowflake..."
-    just _run-sql release/4_service.sql false
+    just _run-sql release/4_service.sql "true"
 
     # Deploy example job
     echo "🦀 Building Rust example job Docker image..."
@@ -103,7 +99,7 @@ deploy:
     echo "📤 Pushing example-job to Snowflake..."
     docker push $SPCS_REPO_URL/example-job:latest --quiet
     echo "🚢 Deploying example job service..."
-    just _run-sql release/5_example_job.sql false
+    just _run-sql release/5_example_job.sql "true"
 
     echo "Waiting for service to initialize..."
     sleep 5
