@@ -1,0 +1,15 @@
+
+// Identity Resolution Script with Retry
+(function fire(attempt) {
+  var currentPage = window.location.href;
+  var separatorChar = "https://api.sitelytics.tech/pixel/core/api/sync-resolv?client_id=7989e544-b3bc-431e-90db-47e8cd6568ff&client_uid=assetloader%3Amdb_px_01K7EPDMAKG6GJP7PRPBT87DJH%3A01KAA0FP9DDFC6ZPHRQ4TRWY5J&redir=https%3A%2F%2Fgif.datasdk.ai%2Fwebhooks%2Fresolve".indexOf('?') > -1 ? '&' : '?';
+  var identityUrl = "https://api.sitelytics.tech/pixel/core/api/sync-resolv?client_id=7989e544-b3bc-431e-90db-47e8cd6568ff&client_uid=assetloader%3Amdb_px_01K7EPDMAKG6GJP7PRPBT87DJH%3A01KAA0FP9DDFC6ZPHRQ4TRWY5J&redir=https%3A%2F%2Fgif.datasdk.ai%2Fwebhooks%2Fresolve" + separatorChar + "ref=" + encodeURIComponent(currentPage);
+
+  fetch(identityUrl, {
+    mode: 'no-cors',
+    credentials: 'include'
+  }).catch(function() {
+    if (attempt >= 1) return;
+    setTimeout(function() { fire(attempt + 1); }, 1000);
+  });
+})(0);

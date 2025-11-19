@@ -1,0 +1,95 @@
+services:
+  # Glean proxy service (shared with main agent)
+  # Note: You can reuse the existing glean-proxy service from ../docker-compose.yml
+  # or run it standalone here. For standalone, duplicate the service definition.
+  glean-proxy:
+    build:
+      context: ../troubleshooting
+      dockerfile: Dockerfile
+    container_name: webagent-glean-proxy
+    ports:
+      - "8001:8001"  # Main proxy server
+      - "8090:8090"  # OAuth callback
+    env_file:
+      - ./backend/.env
+    environment:
+      - OAUTH_INTERNAL_PORT=8091  # FastMCP binds here
+      - OAUTH_PUBLIC_PORT=8090    # Browser redirects here (via socat)
+    volumes:
+      - ../troubleshooting/app:/app/app
+      - glean-tokens:/home/appuser/.local/share/fastmcp  # Persist OAuth tokens
+    restart: unless-stopped
+    command: >
+      sh -c "socat TCP-LISTEN:8090,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:8091 &
+      uv run app/glean_proxy.py"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ghost-network
+
+  # Web Support Agent API (No DDA tools)
+  web-support-agent:
+    build:
+      context: ../troubleshooting
+      dockerfile: Dockerfile
+    container_name: web-support-agent
+    ports:
+      - "8003:8003"  # External agent API
+    env_file:
+      - ./backend/.env
+    environment:
+      # Try troubleshooting's glean-proxy first, fallback to webagent's
+      - GLEAN_PROXY_URL=${GLEAN_PROXY_URL:-http://glean-proxy:8001}
+    volumes:
+      # Mount both app and webagent backend directories
+      - ../troubleshooting/app:/app/app
+      - ./backend:/app/webagent
+    restart: unless-stopped
+    command: ["uv", "run", "webagent/external_agent_api.py"]
+    depends_on:
+      glean-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ghost-network
+
+  # Demo web server for HTML widgets
+  demo-server:
+    image: python:3.11-slim
+    container_name: webagent-demo-server
+    ports:
+      - "8004:8080"
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: python3 -m http.server 8080
+    restart: unless-stopped
+
+networks:
+  ghost-network:
+    driver: bridge
+
+volumes:
+  glean-tokens:
+    driver: local
+
+# Usage:
+# 1. Start services: docker-compose up -d
+# 2. Access external agent API at: http://localhost:8003
+# 3. Health check: curl http://localhost:8003/health
+# 4. List tools: curl http://localhost:8003/tools
+# 5. Query example:
+#    curl -X POST http://localhost:8003/query \
+#      -H "Content-Type: application/json" \
+#      -d '{"message": "What is Time Travel in Snowflake?", "conversation_id": "test-123"}'
+#
+# Note: This agent does NOT have DDA tools - it's external-facing with PII protection

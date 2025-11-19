@@ -1,0 +1,53 @@
+/**
+ * Snowflake Chat Widget Styles
+ * Matches Snowflake brand typography
+ */
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+#snowflake-chat-widget-root {
+  /* Match Snowflake brand font with fallbacks */
+  font-family: Texta, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+}
+
+#snowflake-chat-widget-root h1,
+#snowflake-chat-widget-root h2,
+#snowflake-chat-widget-root h3,
+#snowflake-chat-widget-root h4,
+#snowflake-chat-widget-root h5,
+#snowflake-chat-widget-root h6 {
+  font-family: Texta, sans-serif;
+  font-weight: 700;
+  margin: 0;
+  padding: 0;
+}
+
+#snowflake-chat-widget-root button,
+#snowflake-chat-widget-root input,
+#snowflake-chat-widget-root textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+#snowflake-chat-widget-root p {
+  margin: 0 0 0.5em 0;
+  line-height: 1.6;
+}
+

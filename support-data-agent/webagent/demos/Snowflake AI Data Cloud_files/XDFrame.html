@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!-- saved from url=(0054)https://252-rfo-227.mktoweb.com/index.php/form/XDFrame -->
+<html style=""><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Marketo Forms 2 Cross Domain request proxy frame</title>
+    <script src="./forms2.min.js"></script>
+    <script>
+      (function (){
+        var $ = MktoForms2.$;
+        if(!window.parent || window.parent == window){
+          return;
+        }
+        $(window).on("message", function (e){
+          var origin = e.originalEvent.origin;
+          var message = e.originalEvent.data;
+          try{
+            message = $.parseJSON(message);  
+          }catch(ex){
+            return;  //our messages are always JSON
+          }
+          if(message && message.mktoRequest && message.mktoRequest.ajaxParams){
+            var p = message.mktoRequest.ajaxParams;
+            var params = { type:"POST", dataType:"json", url:p.url, data:p.data, crossDomain:false, jsonp:false };
+            params.success = function (data){
+              window.parent.postMessage(JSON.stringify({
+                mktoResponse:{
+                  "for":message.mktoRequest.id,
+                  error:false,
+                  data:data
+                }
+              }), origin);
+            }
+            params.error = function (error, code, errMessage){
+              var e = error.responseJSON || errMessage;
+              window.parent.postMessage(JSON.stringify({
+                mktoResponse:{
+                  "for":message.mktoRequest.id,
+                  error:true,
+                  data:e
+                }
+              }), origin)
+            }
+            $.ajax(params);
+          }
+        });
+        window.parent.postMessage(JSON.stringify({mktoReady:true}), "*");
+      })()
+    </script>
+  </head>
+  <body>
+    <h2>This page is used by Marketo Forms 2 to proxy cross domain AJAX requests.</h2>
+  <script defer="" src="./vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon="{&quot;rayId&quot;:&quot;9a046d57f86017e5&quot;,&quot;serverTiming&quot;:{&quot;name&quot;:{&quot;cfExtPri&quot;:true,&quot;cfEdge&quot;:true,&quot;cfOrigin&quot;:true,&quot;cfL4&quot;:true,&quot;cfSpeedBrain&quot;:true,&quot;cfCacheStatus&quot;:true}},&quot;version&quot;:&quot;2025.9.1&quot;,&quot;token&quot;:&quot;271854501d8743cfb7cc749ee8f2dde0&quot;}" crossorigin="anonymous"></script>
+
+</body></html>
