@@ -78,6 +78,8 @@ deploy:
     just _run-sql release/2_network_rules.sql
     echo "Creating compute pool..."
     just _run-sql release/3_compute_pool.sql
+    echo "🔧 Deploying optional HTML utility functions..."
+    just _run-sql release/7_optional_html_utils.sql
 
     # Build and push Docker image
     echo "🐳 Building Docker image..."
