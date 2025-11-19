@@ -1,0 +1,15 @@
+[project]
+name = "langgraph-trulens"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain-openai>=1.0.3",
+    "langgraph>=1.0.3",
+    "trulens-apps-langgraph>=2.5.0",
+    "trulens>=2.5.0",
+    "snowflake-snowpark-python>=1.42.0",
+    "trulens-connectors-snowflake>=2.5.0",
+    "trulens-providers-cortex>=2.5.0",
+]
