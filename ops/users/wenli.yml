@@ -1,0 +1,9 @@
+---
+login_name: wenli
+display_name: wenli
+first_name: Wenzhao
+last_name: Li
+email: wenzhao.li@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin
