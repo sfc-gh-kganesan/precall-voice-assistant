@@ -24,6 +24,7 @@ from graphs.post_meeting_workflow import graph as post_meeting_graph
 from utils import (
     get_sales_ai_metaorchestrator_api_token,
     get_snowflake_session,
+    is_spcs_environment,
 )
 
 load_dotenv()
@@ -309,6 +310,8 @@ async def meetings_job_status(workflow_id: str):
 
 def _rotate_token_impl():
     """Helper function to perform the actual token rotation logic."""
+    if not is_spcs_environment():
+        return True
     session = get_snowflake_session()
     result = session.sql(f"SELECT SALES.RAVEN_DEV.GET_SALES_AI_AUTH_TOKEN('{os.getenv('METAORCHESTRATOR_AUTH_EMAIL')}'):data:access_token::VARCHAR").collect()
     token = result[0][0] if result else None

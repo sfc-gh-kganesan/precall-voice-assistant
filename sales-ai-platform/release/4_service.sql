@@ -25,7 +25,7 @@ spec:
     port: 8000
     public: true
   platformMonitor:
-    metricConfig:
+    metricConfig: # change this to add more metrics (refer to the snowflake docs)
       groups:
       - system
       - system_limits
