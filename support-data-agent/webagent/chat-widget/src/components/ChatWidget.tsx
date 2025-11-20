@@ -101,15 +101,10 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ apiUrl, conversationId }
                   });
                   setIsLoading(false); // Stop loading dots once streaming starts
                 },
-                // onComplete: Final update and clear all tool indicators
-                (fullText) => {
-                  if (agentMessageId) {
-                    setMessages((prev) =>
-                      prev.map((m) =>
-                        m.id === agentMessageId ? { ...m, content: fullText } : m
-                      )
-                    );
-                  }
+                // onComplete: Clear all tool indicators (content already updated via onChunk)
+                (_fullText) => {
+                  // Note: Don't update message content here to avoid duplication
+                  // The onChunk callback already receives cumulative text and updates the message
                   // Clear any lingering tool indicators
                   setCurrentToolCalls(new Set());
                 },
@@ -151,10 +146,37 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ apiUrl, conversationId }
                   conversationId,
                   conversationHistory: messages, // Pass current conversation for context
                   onTranscript: (text) => {
-                    addMessage(text, 'user', 'You (voice)');
+                    // Insert user message in correct position (before recent agent messages)
+                    // This handles race condition where OpenAI sends response before transcript
+                    setMessages(prev => {
+                      const now = Date.now();
+                      // Find agent messages added within last 2 seconds
+                      let insertIndex = prev.length;
+                      for (let i = prev.length - 1; i >= 0; i--) {
+                        if (prev[i].role === 'agent' &&
+                            prev[i].timestamp.getTime() > now - 2000) {
+                          insertIndex = i;
+                        } else {
+                          break;
+                        }
+                      }
+
+                      const userMessage: Message = {
+                        id: `${Date.now()}-${Math.random()}`,
+                        content: text,
+                        role: 'user',
+                        label: 'You (voice)',
+                        timestamp: new Date(),
+                      };
+
+                      const newMessages = [...prev];
+                      newMessages.splice(insertIndex, 0, userMessage);
+                      return newMessages;
+                    });
                     setVoiceStatus('');
                     setIsLoading(true); // Show loading dots while waiting for response
                     userMessageAddedRef.current = true; // Mark that user message was added
+                    currentStreamingMessageIdRef.current = null; // Reset streaming message for new interaction
                   },
                   onResponse: (text, isStreaming) => {
                     if (isStreaming) {
@@ -179,13 +201,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ apiUrl, conversationId }
                           }
                         }
 
-                        // Check if user message was added before creating agent message
-                        if (!userMessageAddedRef.current) {
-                          // User message hasn't been added yet, wait for next update
-                          return prev;
-                        }
-
-                        // No streaming message yet, create new one
+                        // No streaming message yet - create new one
+                        // This allows multiple agent responses per user question (e.g., acknowledgment + final answer)
                         const newMessageId = `${Date.now()}-${Math.random()}`;
                         currentStreamingMessageIdRef.current = newMessageId; // Sync update!
                         newMessages.push({
@@ -198,16 +215,17 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ apiUrl, conversationId }
                         return newMessages;
                       });
                     } else {
-                      // Response complete
+                      // Response complete - but don't reset userMessageAddedRef
+                      // because there may be multiple responses per user question (e.g., acknowledgment + tool result)
                       setIsAgentSpeaking(false);
                       setVoiceStatus('');
-                      currentStreamingMessageIdRef.current = null; // Clear ref
-                      userMessageAddedRef.current = false; // Reset for next interaction
+                      currentStreamingMessageIdRef.current = null; // Clear ref to allow new message for next response
+                      // Don't set isLoading=true here - let onToolCall handle it for tool execution
                     }
                   },
                   onToolCall: () => {
-                    // Keep tool calls hidden for consistent UX with text input
-                    // (text path shows only loading dots, no tool indicators)
+                    // Show loading dots during tool execution
+                    setIsLoading(true);
                   },
                   onToolResult: () => {
                     // Keep tool calls hidden for consistent UX with text input

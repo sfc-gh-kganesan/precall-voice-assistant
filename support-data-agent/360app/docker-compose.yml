@@ -9,7 +9,7 @@ services:
       - /app/.venv
       - uv-cache:/root/.cache/uv
     ports:
-      - "8000:8000"
+      - "8005:8000"
     environment:
       - UV_LINK_MODE=copy
       - SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
@@ -43,7 +43,7 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       - THEME=${THEME:-snowflake}
     ports:
-      - "3000:3000"
+      - "3001:3000"
     stdin_open: true
     tty: true
     command: >-

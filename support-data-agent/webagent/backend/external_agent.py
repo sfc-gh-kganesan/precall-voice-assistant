@@ -22,17 +22,23 @@ from openai import AsyncOpenAI
 from openai.types import chat
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerStreamableHTTP
+from pydantic_ai.models.instrumented import InstrumentationSettings
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from app.core.history import keep_last_n_messages
-from app.services.cortex_search import CortexSearchClient
+from services.cortex_search import CortexSearchClient
+from services.history import keep_last_n_messages
 
 # Load environment variables
 load_dotenv()
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+# Initialize Phoenix tracing (import triggers registration)
+from opentelemetry import trace
+
+from otel_config import tracer
 
 # Initialize Cortex Search client (global instance)
 cortex_search_client = None
@@ -44,9 +50,7 @@ try:
         cortex_search_client = CortexSearchClient(
             account=snowflake_account,
             password=snowflake_password,
-            service_name=os.getenv(
-                "CORTEX_SEARCH_SERVICE", "cke_snowflake_docs_service"
-            ),
+            service_name=os.getenv("CORTEX_SEARCH_SERVICE", "cke_snowflake_docs_service"),
             database=os.getenv("CORTEX_SEARCH_DATABASE", "snowflake_docs_cke"),
             schema=os.getenv("CORTEX_SEARCH_SCHEMA", "shared"),
         )
@@ -242,16 +246,38 @@ async def search_snowflake_documentation(
         - "Time Travel retention period"
         - "VARIANT data type usage"
     """
-    if cortex_search_client is None:
-        return "Documentation search is not available (Cortex Search not configured)"
+    with tracer.start_as_current_span(
+        "tool.search_snowflake_documentation",
+        attributes={
+            "tool.name": "search_snowflake_documentation",
+            "tool.type": "local_python",
+            "tool.query": query,
+            "tool.limit": limit,
+            "input": query,  # Capture input for observability
+        },
+    ) as span:
+        if cortex_search_client is None:
+            span.set_attribute("tool.status", "unavailable")
+            output = "Documentation search is not available (Cortex Search not configured)"
+            span.set_attribute("output", output)
+            return output
 
-    try:
-        results = await cortex_search_client.search(query, limit=limit)
-        formatted = cortex_search_client.format_results(results)
-        return formatted
-    except Exception as e:
-        logger.error(f"Documentation search failed: {e}", exc_info=True)
-        return f"Documentation search failed: {str(e)}"
+        try:
+            results = await cortex_search_client.search(query, limit=limit)
+            formatted = cortex_search_client.format_results(results)
+            span.set_attribute("tool.status", "success")
+            span.set_attribute(
+                "tool.result_count", len(results) if isinstance(results, list) else 0
+            )
+            span.set_attribute("output", formatted)  # Capture output for observability
+            return formatted
+        except Exception as e:
+            logger.error(f"Documentation search failed: {e}", exc_info=True)
+            span.set_attribute("tool.status", "error")
+            span.record_exception(e)
+            error_msg = f"Documentation search failed: {str(e)}"
+            span.set_attribute("output", error_msg)
+            return error_msg
 
 
 async def create_support_case(
@@ -285,13 +311,27 @@ async def create_support_case(
             category="Performance"
         )
     """
-    # TODO: Integrate with actual case creation system (Jira, Salesforce, etc.)
-    # For now, return a stub response
+    with (
+        tracer.start_as_current_span(
+            "tool.create_support_case",
+            attributes={
+                "tool.name": "create_support_case",
+                "tool.type": "local_python",
+                "tool.subject": subject,
+                "tool.category": category,
+                "input": f"Subject: {subject}\nCategory: {category}\nDescription: {description}",  # Capture input
+            },
+        ) as span
+    ):
+        # TODO: Integrate with actual case creation system (Jira, Salesforce, etc.)
+        # For now, return a stub response
 
-    logger.info(f"[STUB] Support case created: {subject} (Category: {category})")
-    logger.info(f"[STUB] Description: {description}")
+        logger.info(f"[STUB] Support case created: {subject} (Category: {category})")
+        logger.info(f"[STUB] Description: {description}")
 
-    return f"""✅ **Support Case Created**
+        span.set_attribute("tool.status", "success")
+
+        response = f"""✅ **Support Case Created**
 
 **Subject:** {subject}
 **Category:** {category}
@@ -313,6 +353,8 @@ async def create_support_case(
 While you wait for the support engineer, here are some general best practices that might help with similar issues:
 
 """
+        span.set_attribute("output", response)  # Capture output
+        return response
 
 
 def create_external_agent(
@@ -341,9 +383,7 @@ def create_external_agent(
     snowflake_password = os.getenv("SNOWFLAKE_PASSWORD")
 
     if not snowflake_account or not snowflake_password:
-        raise ValueError(
-            "SNOWFLAKE_ACCOUNT and SNOWFLAKE_PASSWORD must be set in environment"
-        )
+        raise ValueError("SNOWFLAKE_ACCOUNT and SNOWFLAKE_PASSWORD must be set in environment")
 
     # Create client pointing to Snowflake Cortex API
     client = AsyncOpenAI(
@@ -383,13 +423,23 @@ def create_external_agent(
     custom_tools.append(create_support_case)
     logger.info("✓ Added support case creation tool")
 
-    # Create agent with toolsets, custom tools, and history processors
+    # Configure OpenTelemetry instrumentation for Pydantic AI
+    # This enables automatic tracing of agent operations, LLM calls, and tool executions
+    # Using version 2 for OpenTelemetry GenAI semantic conventions (gen_ai.input.messages/output.messages)
+    instrumentation_settings = InstrumentationSettings(
+        tracer_provider=trace.get_tracer_provider(),
+        include_content=True,  # Include prompts and responses in traces
+        version=2,  # Use version 2 for Phoenix-compatible gen_ai attributes
+    )
+
+    # Create agent with toolsets, custom tools, history processors, and OTel instrumentation
     agent = Agent(
         model=model,
         toolsets=toolsets if toolsets else None,
         tools=custom_tools if custom_tools else None,
         system_prompt=EXTERNAL_SYSTEM_PROMPT,
         history_processors=[keep_last_n_messages(history_limit)],
+        instrument=instrumentation_settings,
     )
 
     logger.info(f"✓ Agent configured with history limit of {history_limit} messages")

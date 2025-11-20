@@ -1,0 +1,39 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+exporters:
+  # Phoenix for real-time visualization
+  otlphttp/phoenix:
+    endpoint: http://phoenix:6006
+    tls:
+      insecure: true
+
+  # Snowflake writer for persistent storage
+  otlphttp/snowflake:
+    endpoint: http://snowflake-writer:8080
+    compression: none  # Disable compression for local Docker network
+    encoding: json  # Send JSON format instead of protobuf
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/phoenix, otlphttp/snowflake]
+
+  telemetry:
+    logs:
+      level: info

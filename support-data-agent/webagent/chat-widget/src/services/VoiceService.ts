@@ -7,6 +7,8 @@
 import type { VoiceSessionConfig, VoiceStatus, RealtimeSession, RealtimeEvent } from '../types';
 import { AgentService } from './AgentService';
 import { WavStreamPlayer } from 'wavtools';
+import { tracer } from '../instrumentation';
+import { SpanStatusCode } from '@opentelemetry/api';
 
 export class VoiceService {
   private ws: WebSocket | null = null;
@@ -32,53 +34,72 @@ export class VoiceService {
    * Connect to OpenAI Realtime API with tool calling configured
    */
   async connect(): Promise<void> {
-    console.log('[VoiceService] Connecting to OpenAI Realtime API...');
-    this.updateStatus('connecting');
+    return tracer.startActiveSpan('voice.session', async (sessionSpan): Promise<void> => {
+      sessionSpan.setAttribute('voice.model', 'gpt-4o-realtime-preview');
+      sessionSpan.setAttribute('conversation_id', this.config.conversationId || 'unknown');
 
-    // Connect via WebSocket
-    this.ws = new WebSocket(
-      'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
-      ['realtime', `openai-insecure-api-key.${this.token}`]
-    );
+      try {
+        console.log('[VoiceService] Connecting to OpenAI Realtime API...');
+        this.updateStatus('connecting');
 
-    return new Promise((resolve, reject) => {
-      if (!this.ws) {
-        reject(new Error('WebSocket not initialized'));
-        return;
+        // Connect via WebSocket
+        this.ws = new WebSocket(
+          'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
+          ['realtime', `openai-insecure-api-key.${this.token}`]
+        );
+
+        return new Promise((resolve, reject) => {
+          if (!this.ws) {
+            sessionSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'WebSocket not initialized' });
+            sessionSpan.end();
+            reject(new Error('WebSocket not initialized'));
+            return;
+          }
+
+          this.ws.onopen = () => {
+            console.log('[VoiceService] WebSocket connected');
+            this.configureSession();
+            this.isConnected = true;
+            this.updateStatus('connected');
+
+            // Initialize audio player
+            this.initializeAudioPlayer();
+
+            sessionSpan.setStatus({ code: SpanStatusCode.OK });
+            resolve(undefined);
+          };
+
+          this.ws.onmessage = (event) => {
+            try {
+              const data: RealtimeEvent = JSON.parse(event.data);
+              this.handleServerEvent(data);
+            } catch (error) {
+              console.error('[VoiceService] Failed to parse message:', error);
+            }
+          };
+
+          this.ws.onerror = (error) => {
+            console.error('[VoiceService] WebSocket error:', error);
+            this.updateStatus('error');
+            sessionSpan.recordException(new Error('WebSocket error'));
+            sessionSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'WebSocket error' });
+            sessionSpan.end();
+            reject(error);
+          };
+
+          this.ws.onclose = () => {
+            console.log('[VoiceService] WebSocket closed');
+            this.isConnected = false;
+            this.updateStatus('idle');
+            sessionSpan.end();
+          };
+        });
+      } catch (error) {
+        sessionSpan.recordException(error as Error);
+        sessionSpan.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        sessionSpan.end();
+        throw error;
       }
-
-      this.ws.onopen = () => {
-        console.log('[VoiceService] WebSocket connected');
-        this.configureSession();
-        this.isConnected = true;
-        this.updateStatus('connected');
-
-        // Initialize audio player
-        this.initializeAudioPlayer();
-
-        resolve();
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data: RealtimeEvent = JSON.parse(event.data);
-          this.handleServerEvent(data);
-        } catch (error) {
-          console.error('[VoiceService] Failed to parse message:', error);
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error('[VoiceService] WebSocket error:', error);
-        this.updateStatus('error');
-        reject(error);
-      };
-
-      this.ws.onclose = () => {
-        console.log('[VoiceService] WebSocket closed');
-        this.isConnected = false;
-        this.updateStatus('idle');
-      };
     });
   }
 
@@ -258,63 +279,79 @@ CRITICAL REMINDER: ALWAYS respond in the EXACT SAME LANGUAGE as the user's quest
    * Handle tool/function calls from the agent
    */
   private async handleToolCall(event: RealtimeEvent): Promise<void> {
-    const callId = event.call_id;
-    const functionName = event.name;
-    const args = JSON.parse(event.arguments);
+    return tracer.startActiveSpan('voice.tool_call_to_backend', async (span) => {
+      const callId = event.call_id;
+      const functionName = event.name;
+      const args = JSON.parse(event.arguments);
 
-    console.log('[VoiceService] Tool call:', { functionName, args });
-    this.config.onToolCall?.(functionName);
+      span.setAttribute('tool.name', functionName);
+      span.setAttribute('tool.call_id', callId);
+      span.setAttribute('tool.args', JSON.stringify(args));
 
-    try {
-      let result: string;
+      console.log('[VoiceService] Tool call:', { functionName, args });
+      this.config.onToolCall?.(functionName);
 
-      if (functionName === 'query_support_agent') {
-        // Call the backend agent
-        result = await this.agentService.query(args.query, this.config.conversationId);
-      } else {
-        result = JSON.stringify({ error: `Unknown tool: ${functionName}` });
+      try {
+        let result: string;
+
+        if (functionName === 'query_support_agent') {
+          // Call the backend agent (this will propagate trace context)
+          result = await this.agentService.query(args.query, this.config.conversationId);
+          span.setAttribute('tool.status', 'success');
+          span.setAttribute('backend.response_length', result.length);
+        } else {
+          result = JSON.stringify({ error: `Unknown tool: ${functionName}` });
+          span.setAttribute('tool.status', 'unknown_tool');
+        }
+
+        // Send tool result back to OpenAI
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(
+            JSON.stringify({
+              type: 'conversation.item.create',
+              item: {
+                type: 'function_call_output',
+                call_id: callId,
+                output: result,
+              },
+            })
+          );
+
+          // Request agent to continue with the tool result
+          this.ws.send(
+            JSON.stringify({
+              type: 'response.create',
+            })
+          );
+
+          console.log('[VoiceService] Tool result sent back to OpenAI');
+          this.config.onToolResult?.(functionName);
+        }
+
+        span.setStatus({ code: SpanStatusCode.OK });
+        span.end();
+      } catch (error) {
+        console.error('[VoiceService] Tool call failed:', error);
+        span.recordException(error as Error);
+        span.setAttribute('tool.status', 'error');
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        span.end();
+
+        // Send error back to OpenAI
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(
+            JSON.stringify({
+              type: 'conversation.item.create',
+              item: {
+                type: 'function_call_output',
+                call_id: callId,
+                output: JSON.stringify({ error: String(error) }),
+              },
+            })
+          );
+        }
       }
-
-      // Send tool result back to OpenAI
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(
-          JSON.stringify({
-            type: 'conversation.item.create',
-            item: {
-              type: 'function_call_output',
-              call_id: callId,
-              output: result,
-            },
-          })
-        );
-
-        // Request agent to continue with the tool result
-        this.ws.send(
-          JSON.stringify({
-            type: 'response.create',
-          })
-        );
-
-        console.log('[VoiceService] Tool result sent back to OpenAI');
-        this.config.onToolResult?.(functionName);
-      }
-    } catch (error) {
-      console.error('[VoiceService] Tool call failed:', error);
-
-      // Send error back to OpenAI
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(
-          JSON.stringify({
-            type: 'conversation.item.create',
-            item: {
-              type: 'function_call_output',
-              call_id: callId,
-              output: JSON.stringify({ error: String(error) }),
-            },
-          })
-        );
-      }
-    }
+    });
   }
 
   /**

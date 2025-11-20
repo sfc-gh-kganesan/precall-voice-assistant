@@ -1,0 +1,55 @@
+[project]
+name = "webagent-backend"
+version = "0.1.0"
+description = "External-facing web agent backend with voice and text support"
+requires-python = ">=3.11"
+dependencies = [
+    # OpenTelemetry Core (vendor-agnostic)
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20.0",
+    # FastAPI & Web
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.9",
+    # AI & LLM
+    "pydantic-ai>=1.9.1",
+    "openai>=1.0.0",
+    # HTTP & Networking
+    "httpx>=0.28.1",
+    # Snowflake (for trace export)
+    "snowflake-connector-python>=3.0.0",
+    # Utilities
+    "python-dotenv>=1.0.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13.1",
+    "pytest>=8.0.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+     "E",  # pycodestyle errors
+     "W",  # pycodestyle warnings
+     "F",  # pyflakes
+     "I",  # isort
+     "B",  # flake8-bugbear
+     "C4", # flake8-comprehensions
+     "UP", # pyupgrade
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

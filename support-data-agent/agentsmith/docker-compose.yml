@@ -1,0 +1,73 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/.venv
+      - uv-cache:/root/.cache/uv
+    ports:
+      - "8082:8080"  # Backend runs on port 8082 (host) -> 8080 (container)
+    environment:
+      - UV_LINK_MODE=copy
+      - SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
+      - SNOWFLAKE_USER=${SNOWFLAKE_USER}
+      - SNOWFLAKE_PASSWORD=${SNOWFLAKE_PASSWORD}
+      - SNOWFLAKE_DATABASE=${SNOWFLAKE_DATABASE}
+      - SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE:-COMPUTE_WH}
+      - SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA:-PUBLIC}
+      - SNOWFLAKE_ROLE=${SNOWFLAKE_ROLE:-SYSADMIN}
+      - SEMANTIC_MODEL_FILE=${SEMANTIC_MODEL_FILE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TROUBLESHOOTING_AGENT_URL=${TROUBLESHOOTING_AGENT_URL:-http://host.docker.internal:8002}
+      - GITHUB_PROXY_URL=${GITHUB_PROXY_URL:-http://host.docker.internal:8003/mcp}
+    command: >-
+      sh -c "uv sync &&
+      echo '===========================================';
+      echo 'AgentSmith Backend API';
+      echo 'API: http://localhost:8082';
+      echo 'Docs: http://localhost:8082/docs';
+      echo '===========================================';
+      uv run uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - CI=false
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=1
+      - TURBO=0
+      - TURBOPACK=0
+      - NEXT_TELEMETRY_DISABLED=1
+      - NEXT_PUBLIC_API_URL=http://localhost:8082
+    ports:
+      - "3002:3000"
+    stdin_open: true
+    tty: true
+    command: >-
+      sh -c "npm install --no-audit --no-fund &&
+      echo '===========================================';
+      echo 'AgentSmith Frontend';
+      echo 'Access at: http://localhost:3002';
+      echo '===========================================';
+      npm run dev -- --port 3000 --hostname 0.0.0.0"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: agentsmith
+
+volumes:
+  uv-cache:

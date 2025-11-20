@@ -34,7 +34,7 @@ services:
   # Web Support Agent API (No DDA tools)
   web-support-agent:
     build:
-      context: ../troubleshooting
+      context: ./backend
       dockerfile: Dockerfile
     container_name: web-support-agent
     ports:
@@ -42,17 +42,15 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # Try troubleshooting's glean-proxy first, fallback to webagent's
-      - GLEAN_PROXY_URL=${GLEAN_PROXY_URL:-http://glean-proxy:8001}
+      - GLEAN_PROXY_URL=http://glean-proxy:8001/mcp
     volumes:
-      # Mount both app and webagent backend directories
-      - ../troubleshooting/app:/app/app
-      - ./backend:/app/webagent
+      - ./backend:/app
     restart: unless-stopped
-    command: ["uv", "run", "webagent/external_agent_api.py"]
     depends_on:
       glean-proxy:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
       interval: 30s
@@ -74,6 +72,63 @@ services:
     command: python3 -m http.server 8080
     restart: unless-stopped
 
+  # Phoenix observability server (Arize AI)
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: webagent-phoenix
+    ports:
+      - "6006:6006"   # Phoenix UI
+      - "14317:4317"  # gRPC OTLP collector (avoiding conflict with snowtel-collector)
+    environment:
+      - PHOENIX_WORKING_DIR=/phoenix-data
+    volumes:
+      - phoenix-data:/phoenix-data  # Persist traces with SQLite
+    restart: unless-stopped
+    networks:
+      - ghost-network
+
+  # OpenTelemetry Collector (routes traces to Phoenix + Snowflake)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: webagent-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "4321:4317"  # OTLP gRPC (mapped to avoid conflicts)
+      - "4322:4318"  # OTLP HTTP
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    restart: unless-stopped
+    depends_on:
+      - phoenix
+      - snowflake-writer
+    networks:
+      - ghost-network
+
+  # Snowflake Trace Writer (receives traces from collector, writes to Snowflake)
+  snowflake-writer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.snowflake-writer
+    container_name: webagent-snowflake-writer
+    ports:
+      - "8081:8080"
+    env_file:
+      - ./backend/.env
+    environment:
+      - TRACES_DATABASE=AI_FDE
+      - TRACES_SCHEMA=CX360_DEMO
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ghost-network
+
 networks:
   ghost-network:
     driver: bridge
@@ -81,15 +136,23 @@ networks:
 volumes:
   glean-tokens:
     driver: local
+  phoenix-data:
+    driver: local
 
 # Usage:
 # 1. Start services: docker-compose up -d
 # 2. Access external agent API at: http://localhost:8003
-# 3. Health check: curl http://localhost:8003/health
-# 4. List tools: curl http://localhost:8003/tools
-# 5. Query example:
+# 3. View Phoenix traces at: http://localhost:6006
+# 4. Health check: curl http://localhost:8003/health
+# 5. List tools: curl http://localhost:8003/tools
+# 6. Query example:
 #    curl -X POST http://localhost:8003/query \
 #      -H "Content-Type: application/json" \
 #      -d '{"message": "What is Time Travel in Snowflake?", "conversation_id": "test-123"}'
+#
+# Phoenix Observability:
+# - UI: http://localhost:6006
+# - gRPC endpoint: localhost:4317
+# - Traces are persisted in phoenix-data volume
 #
 # Note: This agent does NOT have DDA tools - it's external-facing with PII protection

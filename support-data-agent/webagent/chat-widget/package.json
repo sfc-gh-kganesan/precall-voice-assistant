@@ -9,6 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-trace-web": "^1.9.0",
+    "@opentelemetry/sdk-trace-base": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.50.0",
+    "@opentelemetry/instrumentation": "^0.50.0",
+    "@opentelemetry/instrumentation-fetch": "^0.50.0",
+    "@opentelemetry/resources": "^1.9.0",
+    "@opentelemetry/semantic-conventions": "^1.9.0",
     "@openai/agents": "^0.1.0",
     "@types/react-syntax-highlighter": "^15.5.13",
     "marked": "^11.0.0",

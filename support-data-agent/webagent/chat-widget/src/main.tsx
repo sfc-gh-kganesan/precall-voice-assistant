@@ -4,6 +4,9 @@
  * Main entry point - renders React widget
  */
 
+// IMPORTANT: Import instrumentation FIRST before any other imports
+import './instrumentation';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ChatWidget } from './components/ChatWidget';
