@@ -194,11 +194,25 @@ INSTRUCTIONS:
 3. **duplicate_use_case_id**: (type: str) - The ID of the existing use case that is a duplicate of the proposed new use case.
 4. **duplicate_use_case_name**: (type: str) - The name of the existing use case that is a duplicate of the proposed new use case.
 
+DUPLICATE CRITERIA - ALL must be true for a duplicate:
+1. **Same Business Domain**: Both use cases must address the same business area (e.g., marketing, supply chain, finance)
+2. **Same Business Function**: Both must solve the same specific business problem or serve the same purpose
+3. **Same Data Type/Source**: Both must work with the same type of data or data sources
+4. **Same Technical Approach**: Both must use similar technical methods or tools
+
+DO NOT CONSIDER DUPLICATES if:
+- Different business domains (marketing analytics vs. supply chain analytics)
+- Different technical implementations (even if using same tools like Snowpark)
+- Different end users or stakeholders
+- Different business outcomes or KPIs
+
 RULES:
-- The wording between the proposed new use case and the existing use cases may be slightly different, but if the intent and details are essentially the same, then it is a duplicate.
-- If the wording of the existing use case is short and generic, it might not be possible to determine if it is a duplicate of the proposed new use case. In this case, return 0 for is_duplicate and empty strings for duplicate_use_case_id and duplicate_use_case_name.
-- If you are not sure if the proposed new use case is a duplicate of any existing use case, return 0 for is_duplicate and empty strings for duplicate_use_case_id and duplicate_use_case_name.
-- If the proposed new use case is not a duplicate of any existing use case, return 0 for is_duplicate and empty strings for duplicate_use_case_id and duplicate_use_case_name.
+- Be VERY CONSERVATIVE - when in doubt, mark as NOT duplicate (is_duplicate = 0, duplicate_use_case_id="", duplicate_use_case_name="")
+- Only mark as duplicate if the use cases are addressing the EXACT SAME business need
+- Similar keywords alone do not make duplicates
+- If the wording of the existing use case is short and generic, it might not be possible to determine if it is a duplicate of the proposed new use case. In this case, mark as NOT duplicate .
+- If you are not sure if the proposed new use case is a duplicate of any existing use case, mark as NOT duplicate .
+- If the proposed new use case is not a duplicate of any existing use case, mark as NOT duplicate .
 - Only mark is_duplicate as 1 if the proposed new use case is a duplicate of an existing use case.
 - If there are multiple existing use cases that are possible duplicates of the proposed new use case, only return information for the single use case that is the most similar to the proposed new use case.
 - Return the response in JSON format.
