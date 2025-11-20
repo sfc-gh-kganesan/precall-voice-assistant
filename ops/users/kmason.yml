@@ -1,0 +1,9 @@
+---
+login_name: kmason
+display_name: kmason
+first_name: Kirk
+last_name: Mason
+email: kirk.mason@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

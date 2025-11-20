@@ -1,0 +1,9 @@
+---
+login_name: jsummer
+display_name: jsummer
+first_name: Jason
+last_name: Summer
+email: jason.summer@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

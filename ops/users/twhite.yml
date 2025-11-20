@@ -1,0 +1,9 @@
+---
+login_name: twhite
+display_name: twhite
+first_name: Tyler
+last_name: White
+email: tyler.white@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

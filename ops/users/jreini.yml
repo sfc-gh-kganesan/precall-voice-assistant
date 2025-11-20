@@ -1,0 +1,9 @@
+---
+login_name: jreini
+display_name: jreini
+first_name: Josh
+last_name: Reini
+email: josh.reini@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

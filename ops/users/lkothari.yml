@@ -1,0 +1,9 @@
+---
+login_name: lkothari
+display_name: lkothari
+first_name: Luv
+last_name: Kothari
+email: luv.kothari@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

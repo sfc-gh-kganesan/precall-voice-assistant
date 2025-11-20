@@ -1,0 +1,9 @@
+---
+login_name: sabbas
+display_name: sabbas
+first_name: Sarim
+last_name: Abbas
+email: sarim.abbas@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

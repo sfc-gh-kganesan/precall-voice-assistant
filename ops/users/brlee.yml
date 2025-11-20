@@ -1,0 +1,9 @@
+---
+login_name: brlee
+display_name: brlee
+first_name: Brian
+last_name: Lee
+email: b.lee@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

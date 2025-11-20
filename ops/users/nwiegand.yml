@@ -1,0 +1,9 @@
+---
+login_name: nwiegand
+display_name: nwiegand
+first_name: Nathan
+last_name: Wiegand
+email: nathan.wiegand@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

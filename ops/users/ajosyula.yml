@@ -1,0 +1,9 @@
+---
+login_name: ajosyula
+display_name: ajosyula
+first_name: Akhila
+last_name: Josyula
+email: akhila.josyula@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

@@ -1,0 +1,9 @@
+---
+login_name: rho
+display_name: rho
+first_name: Ricky
+last_name: Ho
+email: ricky.ho@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

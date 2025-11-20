@@ -1,0 +1,9 @@
+---
+login_name: vsrinivas
+display_name: vsrinivas
+first_name: Vinny
+last_name: Srinivas
+email: vinny.srinivas@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

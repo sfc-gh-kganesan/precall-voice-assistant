@@ -1,0 +1,9 @@
+---
+login_name: htian
+display_name: htian
+first_name: Howard
+last_name: Tian
+email: howard.tian@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

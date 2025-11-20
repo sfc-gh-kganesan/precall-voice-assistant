@@ -1,0 +1,9 @@
+---
+login_name: setli
+display_name: setli
+first_name: Seth
+last_name: Li
+email: seth.li@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin
