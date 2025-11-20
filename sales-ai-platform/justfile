@@ -157,6 +157,9 @@ deploy: check-env
     echo "Creating synthetic call transcript table..."
     just _run-sql release/7_fake_all_engagement_details.sql true
 
+    echo "Creating new use cases table to contain new use cases found in call transcripts..."
+    just _run-sql release/8_potential_use_case_table.sql true
+
     # Build and push Docker image
     echo "🐳 Building Docker image..."
     REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent)

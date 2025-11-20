@@ -17,18 +17,23 @@ load_dotenv()
 
 
 # Input records from synthetic table
-inputs_records = [{"activity_id": "7578ghohjgt8rthljmvotur87947597936", "owner_id": "004G0005867qtHRAN", "salesforce_account_id": "00184759847rG98TAU78"}, {"activity_id": "9chdhagbdhajj5jlj95584unajgljfdg94u859", "owner_id": "004G0005867qtHRAN", "salesforce_account_id": "00184759847rG98TAU78"}]
+inputs_records = [
+    {"activity_id": "7578ghohjgt8rthljmvotur87947597935", "owner_id": "004G0005867qtHRAN", "salesforce_account_id": "00184759847rG98TAU78"},
+    {"activity_id": "9chdhagbdhajj5jlj95584unajgljfdg94u858", "owner_id": "004G0005867qtHRAN", "salesforce_account_id": "00184759847rG98TAU78"},
+    {"activity_id": "890uhjdklg9898t890fjkdjalgjjh88r88t8882223", "owner_id": "004G0005867qtHRAN", "salesforce_account_id": "00184759847rG98TAU78"},
+    {"activity_id": "12345969808jhgqpeuruzvn58t8ty7r8invat887", "owner_id": "00789BNV8ouWWH", "salesforce_account_id": "002YTN87708FJbrdsd342"},
+]
 
 
 async def run_workflow_async(test_inputs: list[dict]):
     """Run the workflow asynchronously."""
 
-    print("🚀 Starting Post-Meeting Workflow Test")
+    print("Starting Post-Meeting Workflow Test")
     print(f"DEMO_MODE = {os.getenv('DEMO_MODE', 'false')}")
     print("-" * 50)
 
     for i, test_input in enumerate(test_inputs, 1):
-        print(f"\n📋 Test Case {i}:")
+        print(f"\nTest Case {i}:")
         print(f"   Activity ID: {test_input['activity_id']}")
         print(f"   Account ID: {test_input['salesforce_account_id']}")
         print(f"   Owner ID: {test_input['owner_id']}")
@@ -37,11 +42,12 @@ async def run_workflow_async(test_inputs: list[dict]):
             # Invoke the workflow graph
             result = await graph.ainvoke(test_input)
 
-            print("✅ Workflow completed successfully!")
-            print(f"🔍 Full result: {result}")
+            print("Workflow completed successfully! \n")
+            print("Full result:")
+            print(result)
 
         except Exception as e:
-            print(f"❌ Workflow failed: {str(e)}")
+            print(f"Workflow failed: {str(e)}")
             print(f"   Error type: {type(e).__name__}")
 
         print("-" * 50)
@@ -53,11 +59,11 @@ def run_workflow_sync(test_inputs: list[dict]):
     # Test input data - these should exist in your synthetic table
     test_input = test_inputs[0]
 
-    print("🚀 Starting Post-Meeting Workflow Test (Sync)")
+    print("Starting Post-Meeting Workflow Test (Sync)")
     print(f"DEMO_MODE = {os.getenv('DEMO_MODE', 'false')}")
     print("-" * 50)
 
-    print("📋 Test Input:")
+    print("Test Input:")
     print(f"   Activity ID: {test_input['activity_id']}")
     print(f"   Account ID: {test_input['salesforce_account_id']}")
     print(f"   Owner ID: {test_input['owner_id']}")
@@ -66,11 +72,12 @@ def run_workflow_sync(test_inputs: list[dict]):
         # Invoke the workflow graph synchronously
         result = graph.invoke(test_input)
 
-        print("✅ Workflow completed successfully!")
-        print(f"🔍 Full result: {result}")
+        print("Workflow completed successfully! \n")
+        print("Full result:")
+        print(result)
 
     except Exception as e:
-        print(f"❌ Workflow failed: {str(e)}")
+        print(f"Workflow failed: {str(e)}")
         print(f"   Error type: {type(e).__name__}")
         import traceback
 
@@ -82,17 +89,17 @@ if __name__ == "__main__":
     print("=" * 50)
 
     if os.getenv("DEMO_MODE", "false").lower() != "true":
-        print("⚠️  WARNING: DEMO_MODE is not enabled!")
+        print("WARNING: DEMO_MODE is not enabled!")
         print("   Set DEMO_MODE=true in your .env file to use synthetic data")
     else:
         # Allow user to choose sync or async
         mode = input("\nChoose execution mode:\n1. Sync (s)\n2. Async (a)\nEnter choice [s/a]: ").lower().strip()
 
         if mode in ["a", "async", "2"]:
-            print("\n🔄 Running in async mode...")
+            print("\nRunning in async mode...")
             asyncio.run(run_workflow_async(inputs_records))
         else:
-            print("\n🔄 Running in sync mode...")
+            print("\nRunning in sync mode...")
             run_workflow_sync(inputs_records)
 
-        print("\n✨ Test completed!")
+        print("\nTest completed!")

@@ -167,3 +167,72 @@ $$,
 ARRAY_CONSTRUCT('sarim@snowflake.com', 'kirk@snowflake.com', 'howard@snowflake.com', 'seth@snowflake.com', 'john@companya.com'),
 null
 ;
+
+
+insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
+'CompanyA', 
+'MEETING', 
+'890uhjdklg9898t890fjkdjalgjjh88r88t8882223', 
+'00184759847rG98TAU78', 
+'Sarim from Snowflake, Kirk from Snowflake, Howard from Snowflake, Seth from Snowflake, John from CompanyA', 
+'Predictive Inventory',
+$$
+1212111: Hey! Good to talk again. How are things going this week?
+788778888: Pretty good—still chaotic, but that’s just normal for us at this point.
+3444433: Totally understand. Did you get a chance to look at the example architecture we sent over?
+788778888: Yeah, Priya and I went through it. The Snowpark piece caught her attention.
+1212111: Nice. We wanted to check in specifically on the predictive inventory project you mentioned last time. Any updates on what your data science team is running today?
+788778888: They’re still doing everything manually—pulling CSVs, cleaning them locally. It works for prototypes, but it’s not scalable.
+5556655: That’s exactly where Snowpark helps. You can run all the Python transformations and XGBoost models directly in Snowflake, on the same compute your analytics team already uses. No exporting, no drift.
+788778888: Yeah, that would simplify a lot. Priya’s biggest complaint is managing environment consistency across people’s laptops.
+3444433: With Snowpark, the environment's standardized. And you can schedule the whole workflow with Tasks, so your forecasting jobs just run automatically.
+788778888: That’s appealing. Leadership keeps asking why the out-of-stock predictions vary depending on who ran the script.
+1212111: Makes sense. For next steps, we can help you create a small Snowpark prototype—maybe start with one product line or one region.
+788778888: I like that. If we can prove it out with a narrow scope, getting budget for the full rollout will be way easier.
+5556655: Perfect. We’ll bring an example during our next session so you can see the whole workflow end-to-end: ingest → feature engineering → training → inference → dashboard refresh.
+788778888: Great. That’ll help us socialize the idea internally.
+1212111: Anything else on your radar that we should plan for?
+788778888: Actually, yeah—our marketing team has been asking about something pretty different. They want an Agentic-style setup where they can ask natural-language questions about all the unstructured content we store in Snowflake. Things like campaign briefs, customer notes, call summaries.
+3444433: Got it—natural language insights on unstructured data.
+788778888: Exactly. They want to ask questions like “Why did engagement dip in Q3?” or “What themes are showing up in customer support notes?” and get answers without a ton of prep work.
+1212111: That’s doable. What are they currently using to do that work?
+788778888: Manual hours. There really isn't a good system in place right now.
+1212111: We can talk through some options using Cortex functions or retrieval-augmented workflows in Snowflake.
+788778888: Perfect. Let’s add that to the agenda for next week.
+$$,
+'004G0005867qtHRAN',
+'{"key_takeaway": "important takeaways here"}',
+'2025-11-01'::DATE,
+ARRAY_CONSTRUCT('sarim@snowflake.com', 'kirk@snowflake.com', 'howard@snowflake.com', 'seth@snowflake.com', 'john@companya.com'),
+null
+;
+
+insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
+'CompanyB', 
+'MEETING', 
+'12345969808jhgqpeuruzvn58t8ty7r8invat887', 
+'002YTN87708FJbrdsd342', 
+'Alex from Snowflake, Jordan from Snowflake, Priya from CompanyB', 
+'Contract Status',
+$$
+1212222: Hi, this is Alex from Snowflake. How are you today?
+3333333: Doing well, thanks. Excited to touch base.
+9999999: Hey Alex, hey Jordan—this is Priya, CTO at CompanyB.
+1212222: Great to hear! Anything specific you wanted to cover today?
+9999999: Actually, yes. I just wanted to confirm that our legal team has reviewed and approved the contract. Everything is cleared on our side.
+3333333: That’s fantastic news. So signing will happen later this week?
+9999999: Yep, we plan to get it signed by Friday.
+1212222: Perfect. Once that’s done, we can kick off onboarding and get your account fully set up.
+9999999: Sounds good. Looking forward to it.
+3333333: Excellent. We’ll make sure all the paperwork and welcome materials are ready for you.
+9999999: Thanks, appreciate it.
+1212222: Alright, we’ll let you go. Enjoy the rest of your day, Priya.
+9999999: You too. Bye.
+3333333: Bye!
+$$,
+'00789BNV8ouWWH',
+'{"key_takeaway": "important takeaways here"}',
+'2025-11-05'::DATE,
+ARRAY_CONSTRUCT('alex@snowflake.com', 'jordan@snowflake.com', 'priya@companyb.com'),
+null
+;

@@ -181,3 +181,98 @@ Please extract information about any potential new use cases mentioned in the at
 CALL TRANSCRIPT:
 {transcript}
 """
+
+SYSTEM_PROMPT_USE_CASE_DEDUP = """
+You are an sales analyst specializing in Salesforce CRM data extraction. Your task is to review proposed new use cases and determine if it is a duplicate of an existing use case.
+You will be provided with a list of existing use cases and the proposed new use case.
+Compare the description and name of the proposed new use case to the descriptions and names of the existing use cases.
+If the proposed new use case is a duplicate of an existing use case, return the ID and name of the existing use case.
+
+INSTRUCTIONS:
+1. **proposed_new_use_case_name**: (type: str) - The name of the proposed new use case.
+2. **is_duplicate**: (type: int) - 1 if the proposed new use case is a duplicate of an existing use case, 0 otherwise.
+3. **duplicate_use_case_id**: (type: str) - The ID of the existing use case that is a duplicate of the proposed new use case.
+4. **duplicate_use_case_name**: (type: str) - The name of the existing use case that is a duplicate of the proposed new use case.
+
+RULES:
+- The wording between the proposed new use case and the existing use cases may be slightly different, but if the intent and details are essentially the same, then it is a duplicate.
+- If the wording of the existing use case is short and generic, it might not be possible to determine if it is a duplicate of the proposed new use case. In this case, return 0 for is_duplicate and empty strings for duplicate_use_case_id and duplicate_use_case_name.
+- If you are not sure if the proposed new use case is a duplicate of any existing use case, return 0 for is_duplicate and empty strings for duplicate_use_case_id and duplicate_use_case_name.
+- If the proposed new use case is not a duplicate of any existing use case, return 0 for is_duplicate and empty strings for duplicate_use_case_id and duplicate_use_case_name.
+- Only mark is_duplicate as 1 if the proposed new use case is a duplicate of an existing use case.
+- If there are multiple existing use cases that are possible duplicates of the proposed new use case, only return information for the single use case that is the most similar to the proposed new use case.
+- Return the response in JSON format.
+
+EXAMPLE 1:
+  PROPOSED NEW USE CASE:
+  {
+    "use_case_description": "The marketing analytics team wants to deploy Cortex Search and Cortex Analyst so business users can ask natural-language questions about campaign performance, customer segmentation, attribution trends, and audience engagement directly against Snowflake data. Eliminates manual SQL work.",
+    "use_case_name": "Marketing NLQ with Cortex Search and Analyst"
+  }
+
+  EXISTING USE CASES:
+  [
+    {
+      "use_case_id": "c4b882cd-2a58-41e3-9d7f-0bf9ad5009e8",
+      "use_case_description": "The customer support team is exploring Cortex Search and Cortex Analyst to allow support agents to query historical case notes, ticket trends, and resolution patterns using natural language. This would reduce reliance on BI dashboards and custom reports.",
+      "use_case_name": "Cortex-Powered Insights for Customer Support"
+    },
+    {
+      "use_case_id": "5d31d8b6-dad4-4946-8ff0-0b49c18ba712",
+      "use_case_description": "Marketing leadership wants to enable natural-language analytics across Snowflake by implementing Cortex Search and Cortex Analyst. They want marketers to query campaign metrics, segmentation insights, and funnel performance using plain English.",
+      "use_case_name": "Cortex for Marketing Analytics"
+    },
+    {
+      "use_case_id": "3d13db0c-7a44-47b4-b71d-68989f89f0df",
+      "use_case_description": "The sales operations team wants to improve quarterly forecasting accuracy by centralizing CRM, pipeline, and historical bookings data in Snowflake. They plan to use machine learning to predict revenue and identify deal-slipping risk.",
+      "use_case_name": "Sales Forecasting and Pipeline Analytics"
+    }
+  ]
+
+  EXPECTED RESPONSE:
+ {
+    "proposed_new_use_case_name": "Marketing NLQ with Cortex Search and Analyst",
+    "is_duplicate": 1,
+    "duplicate_use_case_id": "5d31d8b6-dad4-4946-8ff0-0b49c18ba712"
+    "duplicate_use_case_name": "Cortex for Marketing Analytics"
+  }
+
+EXAMPLE 2:
+  PROPOSED NEW USE CASE:
+  {
+    "use_case_description": "The marketing analytics team wants to deploy Cortex Search and Cortex Analyst so business users can ask natural-language questions about campaign performance, customer segmentation, attribution trends, and audience engagement directly against Snowflake data. Eliminates manual SQL work..",
+    "use_case_name": "Marketing NLQ with Cortex Search and Analyst"
+  }
+
+  EXISTING USE CASES:
+  [
+    {
+      "use_case_id": "c4b882cd-2a58-41e3-9d7f-0bf9ad5009e8",
+      "use_case_description": "The customer support team is exploring Cortex Search and Cortex Analyst to allow support agents to query historical case notes, ticket trends, and resolution patterns using natural language. This would reduce reliance on BI dashboards and custom reports.",
+      "use_case_name": "Cortex-Powered Insights for Customer Support"
+    },
+    {
+      "use_case_id": "5d31d8b6-dad4-4946-8ff0-0b49c18ba712",
+      "use_case_description": "The Marketing team wants to leverage Cortex AI_EXTRACT to extract data from unstructured contract documents. This will save hundreds of man-hours per month.",
+      "use_case_name": "Cortex for Marketing "
+    }
+  ]
+
+  EXPECTED RESPONSE:
+ {
+    "proposed_new_use_case_name": "Marketing NLQ with Cortex Search and Analyst",
+    "is_duplicate": 0,
+    "duplicate_use_case_id": ""
+    "duplicate_use_case_name": ""
+  }
+"""
+
+HUMAN_MESSAGE_USE_CASE_DEDUP = """
+Please review the following proposed new use case and determine if it is a duplicate of an existing use case.
+
+PROPOSED NEW USE CASE:
+{proposed_new_use_case}
+
+EXISTING USE CASES:
+{existing_use_cases}
+"""
