@@ -32,10 +32,8 @@ from services.history import keep_last_n_messages
 # Load environment variables
 load_dotenv()
 
-# Setup logging
+# Setup logging + tracing
 logger = logging.getLogger(__name__)
-
-# Initialize Phoenix tracing (import triggers registration)
 from opentelemetry import trace
 
 from otel_config import tracer
@@ -178,6 +176,32 @@ Use the `create_support_case` tool to escalate to internal support engineers who
 - Issues that need access to customer logs or data
 - Any troubleshooting requiring diagnostic tools or account access
 
+**CRITICAL: Support Case Validation Workflow**
+When creating a support case, you MUST follow this workflow:
+1. **Review conversation history** - Use all context from the conversation to understand the complete issue
+2. **Draft comprehensive details** - Create a subject and description that includes:
+   - The specific issue or problem
+   - Any error messages, symptoms, or technical details mentioned
+   - Steps already discussed or attempted
+   - Relevant context from the conversation
+3. **Validate with user** - Present the draft to the user:
+   "I've drafted a support case with the following details:
+   - **Subject:** [your drafted subject]
+   - **Description:** [summary of your drafted description]
+
+   Does this accurately capture your issue? Should I submit this support case?"
+4. **ONLY submit after confirmation** - Wait for explicit user approval (e.g., "yes", "submit it", "looks good")
+5. **NEVER submit without validation** - Do NOT call create_support_case until the user confirms the details are correct
+
+**Example:**
+User: "My queries are timing out after 5 minutes and I'm getting connection errors"
+You: "I can help create a support case for this. Based on our conversation, I'll draft:
+- **Subject:** Query Timeout and Connection Errors
+- **Description:** User experiencing query timeouts after approximately 5 minutes, accompanied by connection errors. Issue requires investigation of account configuration and query performance.
+
+Does this accurately capture your issue? Should I submit this support case?"
+[Wait for user confirmation before calling create_support_case]
+
 **Investigation Approach:**
 
 1. **Classify the Question**:
@@ -280,13 +304,109 @@ async def search_snowflake_documentation(
             return error_msg
 
 
+async def _create_github_issue_via_mcp(subject: str, description: str, category: str) -> str:
+    """Create a GitHub issue using the GitHub MCP proxy.
+
+    Args:
+        subject: Issue title
+        description: Issue body (markdown)
+        category: Issue category for labeling
+
+    Returns:
+        URL of the created issue
+
+    Raises:
+        Exception: If GitHub issue creation fails
+    """
+    # Get GitHub configuration from environment
+    github_proxy_url = os.getenv("GITHUB_PROXY_URL", "http://localhost:8003/mcp")
+    github_owner = os.getenv("GITHUB_OWNER")
+    github_repo = os.getenv("GITHUB_REPO")
+
+    if not github_owner or not github_repo:
+        raise ValueError(
+            "GitHub configuration missing. Set GITHUB_OWNER and GITHUB_REPO environment variables."
+        )
+
+    logger.info(
+        f"Creating GitHub issue via MCP: {github_proxy_url} -> {github_owner}/{github_repo}"
+    )
+
+    try:
+        # Use FastMCP client to call the GitHub MCP proxy
+        from fastmcp import Client
+
+        config = {
+            "mcpServers": {
+                "github": {
+                    "url": github_proxy_url,
+                }
+            }
+        }
+
+        async with Client(config) as client:
+            # Prepare issue data
+            issue_data = {
+                "method": "create",  # Required by GitHub MCP
+                "owner": github_owner,
+                "repo": github_repo,
+                "title": subject,
+                "body": description,
+                "labels": ["support", category.lower().replace(" ", "-")],
+            }
+
+            logger.info(f"Calling issue_write tool with data: {issue_data}")
+
+            # Call the issue_write tool
+            result = await client.call_tool("issue_write", issue_data)
+
+            # Extract issue URL from result
+            if result and hasattr(result, "content"):
+                for content_block in result.content:
+                    if hasattr(content_block, "text"):
+                        text = content_block.text
+                        logger.info(f"GitHub MCP response: {text}")
+
+                        # Parse the response to extract issue URL
+                        # Expected format: "Created issue #123: <url>"
+                        if "http" in text:
+                            import re
+
+                            urls = re.findall(r"https://github\.com/[^\s]+", text)
+                            if urls:
+                                logger.info(f"Successfully created GitHub issue: {urls[0]}")
+                                return urls[0]
+
+            # Fallback: construct URL from owner/repo
+            logger.warning("Could not parse issue URL from response, constructing fallback URL")
+            return f"https://github.com/{github_owner}/{github_repo}/issues"
+
+    except Exception as e:
+        logger.error(f"Failed to create GitHub issue via MCP: {e}", exc_info=True)
+        raise Exception(f"GitHub MCP error: {str(e)}")
+
+
 async def create_support_case(
     ctx: RunContext[None],
     subject: str,
-    description: str,
+    description: str,  # Now required, no default value
     category: str = "General Inquiry",
 ) -> str:
-    """Create a Snowflake support case for issues requiring account-specific assistance.
+    """Create a GitHub issue for support cases requiring assistance.
+
+    ⚠️ **CRITICAL: You MUST validate with user BEFORE calling this tool!**
+
+    **Required workflow before calling this function:**
+    1. Review conversation history to draft comprehensive subject + description
+    2. Present draft to user: "I've drafted a support case with:
+       - Subject: [your drafted subject]
+       - Description: [summary of description]
+
+       Should I submit this support case?"
+    3. Wait for explicit user confirmation (e.g., "yes", "submit it", "looks good", "confirm")
+    4. ONLY call this function AFTER user confirms
+
+    **DO NOT call this tool without user validation!**
 
     Use this tool when the user needs help that requires:
     - Access to their specific account, queries, or configurations
@@ -296,76 +416,96 @@ async def create_support_case(
 
     Args:
         subject: Brief summary of the issue (e.g., "Query Performance Issue")
-        description: Detailed description of what the user needs help with
+        description: Detailed description of what the user needs help with (REQUIRED)
         category: Type of issue - options: "Performance", "Configuration", "Error", "General Inquiry"
 
     Returns:
-        Confirmation message with case details and next steps
+        Confirmation message with GitHub issue URL
 
     Example usage:
-        When user says "My query abc123 is slow", respond with:
-        "I can help you create a support case for account-specific query analysis."
-        Then call: create_support_case(
+        User: "My query abc123 is slow"
+        You: "I can create a support case. Should I submit:
+        - Subject: Query Performance Analysis Needed
+        - Description: User reporting slow query performance for query abc123"
+        User: "Yes, submit it"
+        [NOW call the tool]: create_support_case(
             subject="Query Performance Analysis Needed",
             description="User reporting slow query performance and needs specific query analysis",
             category="Performance"
         )
     """
-    with (
-        tracer.start_as_current_span(
-            "tool.create_support_case",
-            attributes={
-                "tool.name": "create_support_case",
-                "tool.type": "local_python",
-                "tool.subject": subject,
-                "tool.category": category,
-                "input": f"Subject: {subject}\nCategory: {category}\nDescription: {description}",  # Capture input
-            },
-        ) as span
-    ):
-        # TODO: Integrate with actual case creation system (Jira, Salesforce, etc.)
-        # For now, return a stub response
+    with tracer.start_as_current_span(
+        "tool.create_support_case",
+        attributes={
+            "tool.name": "create_support_case",
+            "tool.type": "local_python",
+            "tool.subject": subject,
+            "tool.category": category,
+            "input": f"Subject: {subject}\nCategory: {category}\nDescription: {description}",
+        },
+    ) as span:
+        try:
+            # Create GitHub issue via MCP
+            issue_url = await _create_github_issue_via_mcp(
+                subject=subject,
+                description=description,
+                category=category,
+            )
 
-        logger.info(f"[STUB] Support case created: {subject} (Category: {category})")
-        logger.info(f"[STUB] Description: {description}")
+            span.set_attribute("tool.status", "success")
+            span.set_attribute("github.issue_url", issue_url)
 
-        span.set_attribute("tool.status", "success")
-
-        response = f"""✅ **Support Case Created**
+            response = f"""✅ **Support Case Created**
 
 **Subject:** {subject}
 **Category:** {category}
-**Status:** Submitted
+**GitHub Issue:** {issue_url}
 
 **Next Steps:**
-1. A Snowflake support engineer will reach out within 24 hours
-2. They have access to your account data and diagnostic tools
-3. You'll receive a case number and tracking link via email shortly
+1. A support engineer will review your issue
+2. You can track progress at the GitHub issue link above
+3. You'll receive updates via GitHub notifications
 
-**What to prepare for the engineer:**
-- Query IDs or specific examples of the issue
-- Your account name and region
-- Any error messages or screenshots
-- Timeframe when the issue occurred
-- Steps to reproduce (if applicable)
+**Issue Details:**
+The support case has been logged with the following information:
+- Category: {category}
+- Description: {description[:100]}{"..." if len(description) > 100 else ""}
 
-**In the meantime:**
-While you wait for the support engineer, here are some general best practices that might help with similar issues:
-
+You can view the full details and any updates at: {issue_url}
 """
-        span.set_attribute("output", response)  # Capture output
-        return response
+            span.set_attribute("output", response)
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to create GitHub issue: {e}", exc_info=True)
+            span.set_attribute("tool.status", "error")
+            span.record_exception(e)
+
+            error_response = f"""❌ **Failed to Create Support Case**
+
+Error: {str(e)}
+
+The system encountered an error while creating the GitHub issue. This may be due to:
+- GitHub configuration not set up properly
+- GitHub proxy server not running
+- Network connectivity issues
+
+Please contact your administrator or try again later.
+"""
+            span.set_attribute("output", error_response)
+            return error_response
 
 
 def create_external_agent(
     model_name: str = "claude-4-sonnet",
     glean_proxy_url: str = "http://localhost:8001/mcp",
+    enable_glean: bool = True,
 ) -> Agent:
     """
     Create a PydanticAI agent configured WITHOUT DDA tools (external-facing).
 
     This agent has access to:
-    - Glean search for internal knowledge (with PII protection)
+    - Glean search for internal knowledge (with PII protection) - optional via enable_glean
     - Snowflake documentation search via Cortex
     - NO access to customer-specific diagnostic data (DDA tools disabled)
 
@@ -373,10 +513,11 @@ def create_external_agent(
 
     Args:
         model_name: The Cortex model to use (e.g., 'claude-4-sonnet', 'mistral-large')
-        glean_proxy_url: URL of the Glean proxy server (set to None to disable Glean)
+        glean_proxy_url: URL of the Glean proxy server (used only if enable_glean=True)
+        enable_glean: Whether to enable Glean search tools (default: True)
 
     Returns:
-        Configured PydanticAI Agent with Glean + documentation tools only
+        Configured PydanticAI Agent with optional Glean + documentation tools only
     """
     # Setup OpenAI-compatible client for Snowflake Cortex
     snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
@@ -384,6 +525,18 @@ def create_external_agent(
 
     if not snowflake_account or not snowflake_password:
         raise ValueError("SNOWFLAKE_ACCOUNT and SNOWFLAKE_PASSWORD must be set in environment")
+
+    # Validate GitHub configuration for support case creation
+    github_owner = os.getenv("GITHUB_OWNER")
+    github_repo = os.getenv("GITHUB_REPO")
+    github_proxy_url = os.getenv("GITHUB_PROXY_URL", "http://localhost:8003/mcp")
+
+    if github_owner and github_repo:
+        logger.info(f"✓ GitHub integration enabled: {github_owner}/{github_repo}")
+        logger.info(f"  GitHub proxy URL: {github_proxy_url}")
+    else:
+        logger.warning("⚠️  GitHub integration disabled: GITHUB_OWNER and GITHUB_REPO not set")
+        logger.warning("  The create_support_case tool will return error messages if used")
 
     # Create client pointing to Snowflake Cortex API
     client = AsyncOpenAI(
@@ -402,13 +555,13 @@ def create_external_agent(
     toolsets = []
 
     # Optionally connect to Glean proxy
-    if glean_proxy_url:
+    if enable_glean and glean_proxy_url:
         logger.info(f"Connecting to Glean proxy at {glean_proxy_url}")
         glean_server = MCPServerStreamableHTTP(glean_proxy_url)
         toolsets.append(glean_server)
         logger.info("✓ External agent configured with Glean toolset")
     else:
-        logger.info("✓ External agent configured without Glean")
+        logger.info("✓ External agent configured WITHOUT Glean (Glean disabled)")
 
     # Get history limit from environment (default: 10)
     history_limit = int(os.getenv("CONVERSATION_HISTORY_LIMIT", "10"))
@@ -447,6 +600,7 @@ def create_external_agent(
         f"✓ External agent configured with {len(toolsets)} MCP toolsets and {len(custom_tools)} custom tools"
     )
     logger.info("⚠️  DDA tools are DISABLED for this external-facing agent")
+    logger.info(f"⚠️  Glean tools are {'ENABLED' if enable_glean else 'DISABLED'}")
 
     return agent
 

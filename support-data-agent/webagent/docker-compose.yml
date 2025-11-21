@@ -1,12 +1,10 @@
 services:
-  # Glean proxy service (shared with main agent)
-  # Note: You can reuse the existing glean-proxy service from ../docker-compose.yml
-  # or run it standalone here. For standalone, duplicate the service definition.
+  # Glean proxy service (shared across webagent and agentsmith)
   glean-proxy:
     build:
       context: ../troubleshooting
       dockerfile: Dockerfile
-    container_name: webagent-glean-proxy
+    container_name: aura-glean-proxy  # Shared container name
     ports:
       - "8001:8001"  # Main proxy server
       - "8090:8090"  # OAuth callback
@@ -17,7 +15,7 @@ services:
       - OAUTH_PUBLIC_PORT=8090    # Browser redirects here (via socat)
     volumes:
       - ../troubleshooting/app:/app/app
-      - glean-tokens:/home/appuser/.local/share/fastmcp  # Persist OAuth tokens
+      - aura-glean-tokens:/home/appuser/.local/share/fastmcp  # Shared volume
     restart: unless-stopped
     command: >
       sh -c "socat TCP-LISTEN:8090,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:8091 &
@@ -29,7 +27,31 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - ghost-network
+      - aura-shared
+
+  # GitHub proxy service (shared across webagent and agentsmith)
+  github-proxy:
+    build:
+      context: ../agentsmith
+      dockerfile: backend/Dockerfile
+    container_name: aura-github-proxy  # Shared container name
+    working_dir: /app/backend/code_agent
+    volumes:
+      - ../agentsmith:/app
+      - /app/.venv
+      - uv-cache:/root/.cache/uv
+    ports:
+      - "8005:8005"  # Different port to avoid conflict with web-support-agent on 8003
+    env_file:
+      - ./backend/.env
+    environment:
+      - UV_LINK_MODE=copy
+      - GITHUB_TOOLSETS=context,repos,issues,pull_requests
+      - SERVER_PORT=8005  # Run on port 8005
+    command: uv run github_proxy.py
+    restart: unless-stopped
+    networks:
+      - aura-shared
 
   # Web Support Agent API (No DDA tools)
   web-support-agent:
@@ -42,14 +64,17 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - GLEAN_PROXY_URL=http://glean-proxy:8001/mcp
+      - GLEAN_PROXY_URL=http://aura-glean-proxy:8001/mcp  # Use shared container name
+      - GITHUB_PROXY_URL=http://aura-github-proxy:8005/mcp  # Use shared GitHub proxy on port 8005
     volumes:
       - ./backend:/app
     restart: unless-stopped
     depends_on:
-      glean-proxy:
-        condition: service_healthy
       otel-collector:
+        condition: service_started
+      glean-proxy:
+        condition: service_started
+      github-proxy:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
@@ -58,6 +83,7 @@ services:
       retries: 3
       start_period: 40s
     networks:
+      - aura-shared
       - ghost-network
 
   # Demo web server for HTML widgets
@@ -130,13 +156,19 @@ services:
       - ghost-network
 
 networks:
+  aura-shared:
+    external: true
+    name: aura-shared-network
   ghost-network:
     driver: bridge
 
 volumes:
-  glean-tokens:
-    driver: local
+  aura-glean-tokens:
+    external: true
+    name: aura-glean-tokens
   phoenix-data:
+    driver: local
+  uv-cache:
     driver: local
 
 # Usage:

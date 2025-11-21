@@ -79,7 +79,18 @@ async def create_simulation(
     # Start simulation in background using asyncio.create_task
     asyncio.create_task(run_simulation_in_background(db_simulation.id))
 
-    return db_simulation
+    # Return properly formatted response with conversation_count (0 for new simulation)
+    return {
+        "id": db_simulation.id,
+        "project_id": db_simulation.project_id,
+        "num_simulations": db_simulation.num_simulations,
+        "conversation_count": 0,  # No conversations yet for newly created simulation
+        "status": db_simulation.status.value,
+        "conversation_timeout_seconds": db_simulation.conversation_timeout_seconds,
+        "started_at": db_simulation.started_at,
+        "completed_at": db_simulation.completed_at,
+        "created_at": db_simulation.created_at,
+    }
 
 
 @router.get("/{simulation_id}", response_model=SimulationResponse)
@@ -88,7 +99,25 @@ async def get_simulation(simulation_id: int, db: Session = Depends(get_db)):
     simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
     if not simulation:
         raise HTTPException(status_code=404, detail="Simulation not found")
-    return simulation
+
+    # Count actual conversations for this simulation
+    conversation_count = (
+        db.query(Conversation)
+        .filter(Conversation.simulation_id == simulation_id)
+        .count()
+    )
+
+    return {
+        "id": simulation.id,
+        "project_id": simulation.project_id,
+        "num_simulations": simulation.num_simulations,
+        "conversation_count": conversation_count,
+        "status": simulation.status.value,
+        "conversation_timeout_seconds": simulation.conversation_timeout_seconds,
+        "started_at": simulation.started_at,
+        "completed_at": simulation.completed_at,
+        "created_at": simulation.created_at,
+    }
 
 
 @router.get("/{simulation_id}/results", response_model=SimulationResultsResponse)
@@ -112,16 +141,10 @@ async def get_simulation_results(simulation_id: int, db: Session = Depends(get_d
 
     aggregate_metrics = {}
     if conversations:
-        # Calculate averages
-        aggregate_metrics["avg_turns"] = sum(c.num_turns for c in conversations) / len(
-            conversations
-        )
-        aggregate_metrics["avg_duration_ms"] = sum(
-            c.total_duration_ms for c in conversations
-        ) / len(conversations)
+        # Calculate success rate (not stored in per-conversation metrics)
         aggregate_metrics["success_rate"] = successful / len(conversations)
 
-        # Aggregate conversation metrics
+        # Aggregate conversation metrics from database
         all_metrics = (
             db.query(ConversationMetric)
             .join(Conversation)

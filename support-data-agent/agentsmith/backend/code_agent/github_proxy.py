@@ -265,7 +265,7 @@ def main():
     print("Authentication: Personal Access Token (PAT)")
     print(f"\nEnabled toolsets: {', '.join(GITHUB_TOOLSETS)}")
     print("\nStarting proxy server...")
-    print("  Local URL: http://localhost:8003/mcp")
+    print(f"  Local URL: http://localhost:{os.getenv('SERVER_PORT', '8003')}/mcp")
     print("\nNote: Ensure GITHUB_TOKEN is set in your .env file.")
     print("=" * 70)
     print()
@@ -276,7 +276,11 @@ def main():
         logger.info("Starting HTTP server...")
 
         # Run the proxy on HTTP transport
-        await proxy.run_async(transport="http", host="0.0.0.0", port=8003, path="/mcp")
+        # Port can be configured via SERVER_PORT environment variable (default: 8003)
+        server_port = int(os.getenv("SERVER_PORT", "8003"))
+        await proxy.run_async(
+            transport="http", host="0.0.0.0", port=server_port, path="/mcp"
+        )
 
     asyncio.run(run_proxy())
 

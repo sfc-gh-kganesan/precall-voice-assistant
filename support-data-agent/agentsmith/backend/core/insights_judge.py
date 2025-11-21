@@ -167,6 +167,55 @@ class InsightsJudge:
             )
             return []
 
+    def _analyze_gaps(self, conversations: List[Conversation]) -> dict:
+        """Analyze knowledge and capability gaps across conversations.
+
+        Args:
+            conversations: List of conversation records
+
+        Returns:
+            Dict with gap analysis and ending quality stats
+        """
+        from collections import defaultdict
+
+        knowledge_gaps = defaultdict(list)
+        capability_gaps = defaultdict(list)
+        ending_stats = {"appropriate": 0, "premature": 0, "excessive": 0, "unknown": 0}
+
+        for conv in conversations:
+            # Extract evaluation data from scenario JSON
+            evaluation = conv.scenario.get("evaluation", {}) if conv.scenario else {}
+
+            # Track ending assessment
+            ending = evaluation.get("ending_assessment", "unknown")
+            ending_stats[ending] = ending_stats.get(ending, 0) + 1
+
+            # Track knowledge gaps
+            if kg := evaluation.get("knowledge_gap"):
+                description = kg.get("description", "Unknown knowledge gap")
+                gap_type = kg.get("type", "unknown")
+                knowledge_gaps[f"[{gap_type}] {description}"].append(conv.id)
+
+            # Track capability gaps
+            if cg := evaluation.get("capability_gap"):
+                description = cg.get("description", "Unknown capability gap")
+                gap_type = cg.get("type", "unknown")
+                capability_gaps[f"[{gap_type}] {description}"].append(conv.id)
+
+        # Sort by frequency
+        knowledge_gaps = dict(
+            sorted(knowledge_gaps.items(), key=lambda x: len(x[1]), reverse=True)
+        )
+        capability_gaps = dict(
+            sorted(capability_gaps.items(), key=lambda x: len(x[1]), reverse=True)
+        )
+
+        return {
+            "knowledge_gaps": knowledge_gaps,
+            "capability_gaps": capability_gaps,
+            "ending_stats": ending_stats,
+        }
+
     def _build_analysis_prompt(
         self, simulation: Simulation, conversations: List[Conversation], db: Session
     ) -> str:
@@ -246,6 +295,42 @@ class InsightsJudge:
                 }
             )
 
+        # Analyze gaps
+        gap_analysis = self._analyze_gaps(conversations)
+
+        # Format gap sections for prompt
+        knowledge_gap_section = ""
+        if gap_analysis["knowledge_gaps"]:
+            knowledge_gap_section = "# KNOWLEDGE GAP ANALYSIS\n"
+            for gap_desc, conv_ids in list(gap_analysis["knowledge_gaps"].items())[
+                :10
+            ]:  # Top 10
+                knowledge_gap_section += f"- {gap_desc}: {len(conv_ids)} conversations (IDs: {conv_ids[:5]})\n"
+        else:
+            knowledge_gap_section = (
+                "# KNOWLEDGE GAP ANALYSIS\nNo knowledge gaps detected.\n"
+            )
+
+        capability_gap_section = ""
+        if gap_analysis["capability_gaps"]:
+            capability_gap_section = "# CAPABILITY GAP ANALYSIS\n"
+            for gap_desc, conv_ids in list(gap_analysis["capability_gaps"].items())[
+                :10
+            ]:  # Top 10
+                capability_gap_section += f"- {gap_desc}: {len(conv_ids)} conversations (IDs: {conv_ids[:5]})\n"
+        else:
+            capability_gap_section = (
+                "# CAPABILITY GAP ANALYSIS\nNo capability gaps detected.\n"
+            )
+
+        ending_stats = gap_analysis["ending_stats"]
+        ending_section = f"""# CONVERSATION ENDING QUALITY
+- Appropriate endings: {ending_stats.get("appropriate", 0)} ({ending_stats.get("appropriate", 0) / total_convs * 100:.1f}%)
+- Premature endings (stopped too early): {ending_stats.get("premature", 0)} ({ending_stats.get("premature", 0) / total_convs * 100:.1f}%)
+- Excessive conversations (went too long): {ending_stats.get("excessive", 0)} ({ending_stats.get("excessive", 0) / total_convs * 100:.1f}%)
+- Unknown/Not evaluated: {ending_stats.get("unknown", 0)}
+"""
+
         prompt = f"""Analyze this AI agent simulation and provide actionable improvement recommendations.
 
 # SIMULATION OVERVIEW
@@ -261,6 +346,12 @@ class InsightsJudge:
 # PERSONA PERFORMANCE
 {json.dumps(persona_performance, indent=2)}
 
+{knowledge_gap_section}
+
+{capability_gap_section}
+
+{ending_section}
+
 # FAILED CONVERSATION EXAMPLES
 {json.dumps(failed_examples, indent=2)}
 
@@ -270,19 +361,32 @@ class InsightsJudge:
 # YOUR TASK
 Analyze the above data and identify 5-10 specific, actionable improvements for this AI agent. Consider:
 
+**IMPORTANT NOTE**: Conversations with stop_reason='historical_data' are pre-completed conversations
+loaded from production logs for retrospective analysis. They did not go through AgentSmith's stop
+condition logic. Do NOT recommend fixing "historical_data" stop reasons - this is an artifact of the
+analysis methodology, not an agent behavior issue.
+
 1. **Common Failure Patterns**: What's causing conversations to fail?
 2. **Performance Issues**: Are there timeout or efficiency problems?
-3. **Logic Gaps**: Does the agent struggle with certain types of queries?
-4. **UX Issues**: Is the agent's communication style effective?
-5. **Tool Usage**: Are there missing capabilities or tools?
-6. **Error Handling**: How well does the agent handle edge cases?
-7. **Persona-Specific Issues**: Does performance vary by user type?
+3. **Knowledge Gaps**: What information is missing from docs/KB? (See KNOWLEDGE GAP ANALYSIS above)
+4. **Capability Gaps**: What tools/integrations are missing? (See CAPABILITY GAP ANALYSIS above)
+5. **Conversation Ending**: Are conversations ending at appropriate times? (See ENDING QUALITY above)
+6. **Logic Gaps**: Does the agent struggle with certain types of queries?
+7. **UX Issues**: Is the agent's communication style effective?
+8. **Error Handling**: How well does the agent handle edge cases?
+9. **Persona-Specific Issues**: Does performance vary by user type?
+
+PRIORITIZE recommendations based on:
+- High-frequency capability gaps → Engineering team (new tools/integrations needed)
+- High-frequency knowledge gaps → Documentation team (missing/incomplete docs)
+- Premature endings → Prompt/logic improvements (agent giving up too early)
+- Excessive conversations → Better completion detection (agent not recognizing resolution)
 
 For each recommendation:
-- **Category**: tool, prompt, logic, error_handling, ux, or performance
+- **Category**: tool, knowledge, prompt, logic, error_handling, ux, or performance
 - **Title**: Short, descriptive title (max 50 chars)
 - **Description**: Detailed explanation of the issue and how to fix it (2-4 sentences)
-- **Priority**: high, medium, or low
+- **Priority**: high (affects many conversations), medium, or low
 - **Evidence**: Include conversation IDs, specific metrics, or patterns that support this recommendation
 
 Respond ONLY with valid JSON in this format:
@@ -341,16 +445,27 @@ Focus on recommendations that will have the biggest impact on success rate and u
                 if j in used_indices:
                     continue
 
-                # Check if similar: same category + similar title
+                # Check if similar: same category + (exact title OR high similarity)
                 same_category = rec1.get("category") == rec2.get("category")
-                title_similarity = similarity(
-                    rec1.get("title", ""), rec2.get("title", "")
+                title1 = rec1.get("title", "").strip().lower()
+                title2 = rec2.get("title", "").strip().lower()
+                exact_match = title1 == title2
+                title_similarity = similarity(title1, title2)
+
+                # Log comparison for debugging
+                logger.debug(
+                    f"Comparing insights: '{rec1.get('title')}' vs '{rec2.get('title')}' - "
+                    f"Category match: {same_category}, Title similarity: {title_similarity:.2f}, Exact: {exact_match}"
                 )
 
-                # Consider duplicate if >70% title similarity and same category
-                if same_category and title_similarity > 0.7:
+                # Consider duplicate if exact match OR >60% title similarity (lowered from 70%)
+                if same_category and (exact_match or title_similarity > 0.6):
                     similar_group.append(rec2)
                     used_indices.add(j)
+                    logger.info(
+                        f"Found duplicate insight: '{rec2.get('title')}' matches '{rec1.get('title')}' "
+                        f"(similarity: {title_similarity:.2f}, exact: {exact_match})"
+                    )
 
             # Merge the group
             if len(similar_group) == 1:

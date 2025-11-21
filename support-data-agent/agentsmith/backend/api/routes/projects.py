@@ -11,7 +11,13 @@ from backend.api.schemas import (
     PersonaTemplateCreate,
     PersonaTemplateResponse,
 )
-from backend.models.models import Project, AuthType, Simulation, PersonaTemplate
+from backend.models.models import (
+    Project,
+    AuthType,
+    Simulation,
+    PersonaTemplate,
+    Conversation,
+)
 
 router = APIRouter()
 
@@ -28,6 +34,12 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
         auth_credentials=project.auth_credentials,
         custom_headers=project.custom_headers,
         conversation_examples=project.conversation_examples,
+        source_database=project.source_database,
+        source_schema=project.source_schema,
+        source_table=project.source_table,
+        github_owner=project.github_owner,
+        github_repo=project.github_repo,
+        target_path=project.target_path,
     )
     db.add(db_project)
     db.commit()
@@ -64,7 +76,28 @@ async def get_project_simulations(project_id: int, db: Session = Depends(get_db)
         .order_by(Simulation.created_at.desc())
         .all()
     )
-    return simulations
+
+    # Add conversation count to each simulation
+    result = []
+    for sim in simulations:
+        conversation_count = (
+            db.query(Conversation).filter(Conversation.simulation_id == sim.id).count()
+        )
+        result.append(
+            {
+                "id": sim.id,
+                "project_id": sim.project_id,
+                "num_simulations": sim.num_simulations,
+                "conversation_count": conversation_count,
+                "status": sim.status.value,
+                "conversation_timeout_seconds": sim.conversation_timeout_seconds,
+                "started_at": sim.started_at,
+                "completed_at": sim.completed_at,
+                "created_at": sim.created_at,
+            }
+        )
+
+    return result
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
@@ -85,6 +118,12 @@ async def update_project(
     project.auth_credentials = project_update.auth_credentials
     project.custom_headers = project_update.custom_headers
     project.conversation_examples = project_update.conversation_examples
+    project.source_database = project_update.source_database
+    project.source_schema = project_update.source_schema
+    project.source_table = project_update.source_table
+    project.github_owner = project_update.github_owner
+    project.github_repo = project_update.github_repo
+    project.target_path = project_update.target_path
 
     db.commit()
     db.refresh(project)

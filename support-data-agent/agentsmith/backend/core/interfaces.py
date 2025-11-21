@@ -15,6 +15,7 @@ class StopReason(Enum):
     CUSTOM_CONDITION = "custom_condition"
     LLM_JUDGE = "llm_judge"
     ERROR = "error"
+    HISTORICAL_DATA = "historical_data"  # Pre-completed conversations from data sources
 
 
 class ConversationMessage(BaseModel):

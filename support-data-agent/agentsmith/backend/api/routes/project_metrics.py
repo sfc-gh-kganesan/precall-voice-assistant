@@ -25,8 +25,8 @@ class ProjectMetrics(BaseModel):
     avg_duration_ms: Optional[float]
     avg_turns: Optional[float]
     error_rate: Optional[float]
-    voice_count: int
-    text_count: int
+    total_voice_interactions: int
+    total_text_interactions: int
 
 
 @router.get("/{project_id}/metrics", response_model=ProjectMetrics)
@@ -52,8 +52,8 @@ async def get_project_metrics(
             avg_duration_ms=None,
             avg_turns=None,
             error_rate=None,
-            voice_count=0,
-            text_count=0,
+            total_voice_interactions=0,
+            total_text_interactions=0,
         )
 
     # Determine table name
@@ -70,6 +70,7 @@ async def get_project_metrics(
 
     try:
         # Query for metrics using Snowflake session
+        # Note: Count interactions (turns) not conversations for voice/text
         query = text(f"""
             WITH conversation_stats AS (
                 SELECT
@@ -77,11 +78,17 @@ async def get_project_metrics(
                     MIN(start_time) as conv_start,
                     MAX(end_time) as conv_end,
                     COUNT(*) as turn_count,
-                    MAX(CASE WHEN status_code != '200' THEN 1 ELSE 0 END) as has_error,
-                    MAX(triggered_by) as triggered_by
+                    MAX(CASE WHEN status_code != '200' THEN 1 ELSE 0 END) as has_error
                 FROM {table_name}
                 WHERE conversation_id IS NOT NULL
                 GROUP BY conversation_id
+            ),
+            interaction_counts AS (
+                SELECT
+                    COUNT(CASE WHEN triggered_by = 'voice' THEN 1 END) as voice_interactions,
+                    COUNT(CASE WHEN triggered_by IN ('text', 'direct_text') THEN 1 END) as text_interactions
+                FROM {table_name}
+                WHERE conversation_id IS NOT NULL
             )
             SELECT
                 COUNT(*) as total_conversations,
@@ -90,13 +97,12 @@ async def get_project_metrics(
                 AVG(DATEDIFF('millisecond', conv_start, conv_end)) as avg_duration_ms,
                 AVG(turn_count) as avg_turns,
                 SUM(has_error)::FLOAT / COUNT(*)::FLOAT as error_rate,
-                SUM(CASE WHEN triggered_by = 'voice' THEN 1 ELSE 0 END) as voice_count,
-                SUM(CASE WHEN triggered_by = 'text' THEN 1 ELSE 0 END) as text_count
+                (SELECT voice_interactions FROM interaction_counts) as voice_interactions,
+                (SELECT text_interactions FROM interaction_counts) as text_interactions
             FROM conversation_stats
         """)
 
         result = snowflake_db.execute(query).fetchone()
-
         if not result or result[0] == 0:
             # No conversations found
             return ProjectMetrics(
@@ -106,8 +112,8 @@ async def get_project_metrics(
                 avg_duration_ms=None,
                 avg_turns=None,
                 error_rate=None,
-                voice_count=0,
-                text_count=0,
+                total_voice_interactions=0,
+                total_text_interactions=0,
             )
 
         return ProjectMetrics(
@@ -117,8 +123,8 @@ async def get_project_metrics(
             avg_duration_ms=float(result[3]) if result[3] else None,
             avg_turns=float(result[4]) if result[4] else None,
             error_rate=float(result[5]) if result[5] else None,
-            voice_count=result[6] or 0,
-            text_count=result[7] or 0,
+            total_voice_interactions=result[6] or 0,
+            total_text_interactions=result[7] or 0,
         )
 
     except Exception as e:

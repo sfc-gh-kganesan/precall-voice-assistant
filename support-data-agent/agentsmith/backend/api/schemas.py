@@ -84,6 +84,7 @@ class SimulationResponse(BaseModel):
     id: int
     project_id: int
     num_simulations: int
+    conversation_count: int  # Actual number of conversations analyzed
     status: str
     conversation_timeout_seconds: int
     started_at: Optional[datetime]
@@ -210,6 +211,7 @@ class ImprovementSuggestionResponse(BaseModel):
     priority: str
     evidence: Dict[str, Any]
     code_recommendation: Optional[Dict[str, Any]] = None
+    knowledge_recommendation: Optional[Dict[str, Any]] = None
     created_at: datetime
 
     class Config:

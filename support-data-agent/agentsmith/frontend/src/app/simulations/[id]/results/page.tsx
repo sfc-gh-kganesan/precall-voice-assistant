@@ -2,9 +2,11 @@
 
 import { use, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { simulationsApi, conversationsApi } from '@/lib/api'
+import { simulationsApi, conversationsApi, projectsApi } from '@/lib/api'
 import type { SimulationResults, ConversationSummary, Conversation, ImprovementSuggestion } from '@/lib/types'
 import CodeRecommendationModal from '@/components/CodeRecommendationModal'
+import KnowledgeRecommendationModal from '@/components/KnowledgeRecommendationModal'
+import { QualityScoreBadge, EndingAssessmentBadge, KnowledgeGapBadge, CapabilityGapBadge, GapCard } from '@/components/GapIndicators'
 
 // Helper function to format milliseconds into human-readable format
 function formatDuration(ms: number): string {
@@ -29,8 +31,14 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [aiInsightsError, setAiInsightsError] = useState<string | null>(null)
   const [insightsExpanded, setInsightsExpanded] = useState(true)
   const [expandedInsightIds, setExpandedInsightIds] = useState<Set<number>>(new Set())
-  const [activeInsightsTab, setActiveInsightsTab] = useState<'high' | 'medium' | 'low'>('high')
+  const [selectedPriorities, setSelectedPriorities] = useState<Set<string>>(new Set(['high', 'medium', 'low']))
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set())
   const [selectedInsightForModal, setSelectedInsightForModal] = useState<ImprovementSuggestion | null>(null)
+  const [selectedKnowledgeForModal, setSelectedKnowledgeForModal] = useState<ImprovementSuggestion | null>(null)
+  const [conversationsExpanded, setConversationsExpanded] = useState(false)
+  const [selectedSnowflakeConvId, setSelectedSnowflakeConvId] = useState<string | null>(null)
+  const [snowflakeConvDetails, setSnowflakeConvDetails] = useState<any>(null)
+  const [snowflakeConvLoading, setSnowflakeConvLoading] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -101,6 +109,25 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     }
   }
 
+  const loadSnowflakeConversation = async (conversationId: string) => {
+    if (!results?.project_id) {
+      alert('Project ID not available')
+      return
+    }
+    try {
+      setSnowflakeConvLoading(true)
+      setSelectedSnowflakeConvId(conversationId)
+      const response = await projectsApi.getConversationDetails(results.project_id, conversationId)
+      setSnowflakeConvDetails(response.data)
+    } catch (err) {
+      console.error('Failed to load conversation details:', err)
+      alert('Failed to load conversation')
+      setSelectedSnowflakeConvId(null)
+    } finally {
+      setSnowflakeConvLoading(false)
+    }
+  }
+
   const handleIssueCreated = (insightId: number, issueUrl: string) => {
     // Update the insight in the state with the new issue URL
     setAiInsights(prevInsights =>
@@ -131,8 +158,44 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     low: aiInsights.filter(i => i.priority === 'low')
   }
 
+  // Get all unique categories
+  const allCategories = Array.from(new Set(aiInsights.map(i => i.category)))
+
+  // Filter insights based on selected priorities and categories
+  const filteredInsights = aiInsights.filter(insight => {
+    const matchesPriority = selectedPriorities.has(insight.priority)
+    const matchesCategory = selectedCategories.size === 0 || selectedCategories.has(insight.category)
+    return matchesPriority && matchesCategory
+  }).sort((a, b) => {
+    // Sort by priority: high (0) -> medium (1) -> low (2)
+    const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
+    return priorityOrder[a.priority] - priorityOrder[b.priority]
+  })
+
+  // Toggle functions for filters
+  const togglePriority = (priority: string) => {
+    const newSelected = new Set(selectedPriorities)
+    if (newSelected.has(priority)) {
+      newSelected.delete(priority)
+    } else {
+      newSelected.add(priority)
+    }
+    setSelectedPriorities(newSelected)
+  }
+
+  const toggleCategory = (category: string) => {
+    const newSelected = new Set(selectedCategories)
+    if (newSelected.has(category)) {
+      newSelected.delete(category)
+    } else {
+      newSelected.add(category)
+    }
+    setSelectedCategories(newSelected)
+  }
+
   const categoryIcons: Record<string, string> = {
     tool: '🔧',
+    knowledge: '📚',
     prompt: '💬',
     logic: '🧠',
     error_handling: '⚠️',
@@ -147,20 +210,20 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
       <div className="mb-4">
         <nav className="flex items-center gap-2 text-sm text-parchment-400">
           <Link href="/projects" className="hover:text-parchment-200 transition-colors">
-            Projects
+            Deployments
           </Link>
           <span>›</span>
           <Link href={`/projects/${results.project_id}`} className="hover:text-parchment-200 transition-colors">
-            Project
+            Deployment
           </Link>
           <span>›</span>
-          <span className="text-parchment-200">Simulation Results</span>
+          <span className="text-parchment-200">Analysis Results</span>
         </nav>
       </div>
 
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-3xl font-serif font-semibold text-parchment-100">Simulation Results</h1>
+          <h1 className="text-3xl font-serif font-semibold text-parchment-100">Analysis Results</h1>
           <p className="text-sm text-parchment-300 mt-2">ID: {results.id}</p>
         </div>
         <button onClick={() => {
@@ -176,93 +239,115 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-          <div className="text-sm font-medium text-parchment-300">Total</div>
-          <div className="text-3xl font-serif font-semibold text-parchment-100 mt-2">{results.num_simulations}</div>
-        </div>
-        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-          <div className="text-sm font-medium text-parchment-300">Success Rate</div>
-          <div className="text-3xl font-serif font-semibold text-green-400 mt-2">{successRate.toFixed(1)}%</div>
-        </div>
-        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-          <div className="text-sm font-medium text-parchment-300">Successful</div>
-          <div className="text-3xl font-serif font-semibold text-green-400 mt-2">{results.successful}</div>
-        </div>
-        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-          <div className="text-sm font-medium text-parchment-300">Failed</div>
-          <div className="text-3xl font-serif font-semibold text-red-400 mt-2">{results.failed}</div>
+      <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 mb-4">
+        <h2 className="text-base font-serif font-semibold text-parchment-100 mb-3">Performance Overview</h2>
+
+        <div className="grid grid-cols-4 gap-3">
+          {/* Total */}
+          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+            <div className="text-xs font-medium text-parchment-300">Total</div>
+            <div className="text-2xl font-serif font-semibold text-parchment-100 mt-1">{conversations.length}</div>
+          </div>
+
+          {/* Success Rate */}
+          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+            <div className="text-xs font-medium text-parchment-300">Success Rate</div>
+            <div className="text-2xl font-serif font-semibold text-green-400 mt-1">{successRate.toFixed(1)}%</div>
+          </div>
+
+          {/* Successful */}
+          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+            <div className="text-xs font-medium text-parchment-300">Successful</div>
+            <div className="text-2xl font-serif font-semibold text-green-400 mt-1">{results.successful}</div>
+          </div>
+
+          {/* Failed */}
+          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+            <div className="text-xs font-medium text-parchment-300">Failed</div>
+            <div className="text-2xl font-serif font-semibold text-red-400 mt-1">{results.failed}</div>
+          </div>
         </div>
       </div>
 
-      <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 mb-8">
-        <h2 className="text-lg font-serif font-semibold text-parchment-100 mb-4">Aggregate Metrics</h2>
-        <div className="grid grid-cols-4 gap-4">
-          {Object.entries(results.aggregate_metrics).map(([key, value]) => {
-            // Format duration metrics
-            const displayValue = key.toLowerCase().includes('duration') || key.toLowerCase().includes('latency')
-              ? formatDuration(value as number)
-              : typeof value === 'number' ? value.toFixed(2) : value
+      {/* Gap Analysis Summary */}
+      {(() => {
+        // Calculate gap statistics
+        const appropriateCount = conversations.filter(c => c.scenario?.evaluation?.ending_assessment === 'appropriate').length
+        const prematureCount = conversations.filter(c => c.scenario?.evaluation?.ending_assessment === 'premature').length
+        const excessiveCount = conversations.filter(c => c.scenario?.evaluation?.ending_assessment === 'excessive').length
+        const knowledgeGapCount = conversations.filter(c => c.scenario?.evaluation?.knowledge_gap).length
+        const capabilityGapCount = conversations.filter(c => c.scenario?.evaluation?.capability_gap).length
+        const avgQuality = conversations
+          .filter(c => c.scenario?.evaluation?.quality_score !== undefined)
+          .reduce((sum, c) => sum + (c.scenario?.evaluation?.quality_score || 0), 0) /
+          Math.max(conversations.filter(c => c.scenario?.evaluation?.quality_score !== undefined).length, 1)
 
-            // Clean up label: remove _ms suffix for duration/latency metrics since values are auto-formatted
-            let displayLabel = key.replace(/_/g, ' ')
-            if (key.toLowerCase().includes('duration') || key.toLowerCase().includes('latency')) {
-              displayLabel = displayLabel.replace(/\s*ms\s*$/i, '').trim()
-            }
+        // Only show dashboard if we have evaluation data
+        const hasEvaluationData = appropriateCount + prematureCount + excessiveCount + knowledgeGapCount + capabilityGapCount > 0
 
-            return (
-              <div key={key} className="border-l-4 border-strategic-600 pl-4">
-                <div className="text-xs font-medium text-parchment-300 uppercase">{displayLabel}</div>
-                <div className="text-xl font-semibold text-parchment-100 mt-1">{displayValue}</div>
+        if (!hasEvaluationData) return null
+
+        return (
+          <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 mb-4">
+            <h2 className="text-base font-serif font-semibold text-parchment-100 mb-3">Gap Analysis Summary</h2>
+
+            <div className="grid grid-cols-4 gap-3">
+              {/* Average Quality */}
+              <div className="border-l-4 border-strategic-600 pl-4">
+                <div className="text-xs font-medium text-parchment-300 uppercase">Avg Quality</div>
+                <div className="text-2xl font-semibold text-parchment-100 mt-2">{(avgQuality * 100).toFixed(0)}%</div>
+                <div className="text-xs text-parchment-400 mt-1">across evaluated conversations</div>
               </div>
-            )
-          })}
-        </div>
-      </div>
 
-      {/* All Conversations Table */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-slate-700 bg-slate-800/50">
-          <h2 className="text-lg font-serif font-semibold text-parchment-100">All Conversations</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-700">
-            <thead className="bg-slate-800/30">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Persona</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Turns</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Duration</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-slate-900 divide-y divide-slate-800">
-              {conversations.map(conv => (
-                <tr key={conv.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.id}</td>
-                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.persona?.name || 'Unknown'}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${conv.success ? 'bg-green-900/40 text-green-400 border-green-700' : 'bg-red-900/40 text-red-400 border-red-700'}`}>
-                      {conv.success ? 'Success' : 'Failed'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.num_turns}</td>
-                  <td className="px-6 py-4 text-sm text-parchment-200">{formatDuration(conv.total_duration_ms)}</td>
-                  <td className="px-6 py-4">
-                    <button onClick={() => loadConversation(conv.id)} className="text-strategic-500 hover:text-strategic-400 text-sm font-medium">
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              {/* Ending Quality */}
+              <div className="border-l-4 border-green-600 pl-4">
+                <div className="text-xs font-medium text-parchment-300 uppercase">Ending Quality</div>
+                <div className="mt-2 space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-green-400">✓ Appropriate</span>
+                    <span className="font-semibold text-parchment-100">{appropriateCount}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-yellow-400">⚠ Premature</span>
+                    <span className="font-semibold text-parchment-100">{prematureCount}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-400">⏳ Excessive</span>
+                    <span className="font-semibold text-parchment-100">{excessiveCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Knowledge Gaps */}
+              <div className="border-l-4 border-blue-600 pl-4">
+                <div className="text-xs font-medium text-parchment-300 uppercase">Knowledge Gaps</div>
+                <div className="text-2xl font-semibold text-blue-300 mt-2">{knowledgeGapCount}</div>
+                <div className="text-xs text-parchment-400 mt-1">
+                  {knowledgeGapCount > 0 ?
+                    `${(knowledgeGapCount / conversations.length * 100).toFixed(0)}% of conversations` :
+                    'No gaps detected'
+                  }
+                </div>
+              </div>
+
+              {/* Capability Gaps */}
+              <div className="border-l-4 border-purple-600 pl-4">
+                <div className="text-xs font-medium text-parchment-300 uppercase">Capability Gaps</div>
+                <div className="text-2xl font-semibold text-purple-300 mt-2">{capabilityGapCount}</div>
+                <div className="text-xs text-parchment-400 mt-1">
+                  {capabilityGapCount > 0 ?
+                    `${(capabilityGapCount / conversations.length * 100).toFixed(0)}% of conversations` :
+                    'No gaps detected'
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Quality Insights Section */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-8">
+      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-4">
         <div
           className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center cursor-pointer hover:bg-slate-800/70 transition-colors"
           onClick={() => setInsightsExpanded(!insightsExpanded)}
@@ -328,13 +413,16 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
 
             {!aiInsightsLoading && aiInsights.length > 0 && (
               <>
-                {/* Executive Summary & Insights Summary - Side by Side */}
-                <div className="grid grid-cols-[1.5fr,1fr] gap-6 mb-6">
+                {/* Executive Summary - Full Width */}
+                <div className="mb-6">
                   {/* Executive Summary */}
                   <div className="bg-gradient-to-r from-strategic-900/40 to-slate-900/40 rounded-lg p-5 border-2 border-strategic-600">
                     <div className="flex items-center gap-2 mb-4">
                       <span className="text-2xl">🎯</span>
                       <h3 className="text-lg font-serif font-semibold text-strategic-400">Executive Summary</h3>
+                      <span className="px-2 py-1 text-xs rounded bg-strategic-900/50 border border-strategic-600 text-strategic-300">
+                        {aiInsights.length} issue{aiInsights.length !== 1 ? 's' : ''} found
+                      </span>
                     </div>
 
                     <div className="space-y-4 text-parchment-200">
@@ -395,19 +483,6 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                               actions.push(`Review ${topCategory[0]} issues (${topCategory[1]} instances found) for systemic improvements`)
                             }
 
-                            // Add persona-specific recommendation
-                            const personaCounts: Record<string, number> = {}
-                            aiInsights.forEach(insight => {
-                              const personas = insight.evidence?.affected_personas || []
-                              personas.forEach(p => {
-                                personaCounts[p] = (personaCounts[p] || 0) + 1
-                              })
-                            })
-                            const topPersona = Object.entries(personaCounts).sort((a, b) => b[1] - a[1])[0]
-                            if (topPersona && topPersona[1] > 1) {
-                              actions.push(`Focus testing on "${topPersona[0]}" persona (${topPersona[1]} issues detected)`)
-                            }
-
                             // Add general recommendation based on success rate
                             const successRate = (results.successful / results.num_simulations) * 100
                             if (successRate < 90) {
@@ -422,371 +497,307 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Insights Summary */}
-                  <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-lg">📊</span>
-                      <h3 className="text-sm font-semibold text-parchment-200 uppercase tracking-wide">Summary</h3>
+                {/* Compact Filter Bar */}
+                <div className="bg-slate-800/30 border-b border-slate-700 py-2 px-4 -mx-6 mb-0 flex items-center gap-4 text-sm">
+                  {/* Priority Filters */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-parchment-400 uppercase">Priority:</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => togglePriority('high')}
+                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                          selectedPriorities.has('high')
+                            ? 'bg-red-900/50 border-red-600 text-red-300'
+                            : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-red-600/50'
+                        }`}
+                      >
+                        {selectedPriorities.has('high') ? '✓ ' : ''}High ({insightsByPriority.high.length})
+                      </button>
+                      <button
+                        onClick={() => togglePriority('medium')}
+                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                          selectedPriorities.has('medium')
+                            ? 'bg-amber-900/50 border-amber-600 text-amber-300'
+                            : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-amber-600/50'
+                        }`}
+                      >
+                        {selectedPriorities.has('medium') ? '✓ ' : ''}Medium ({insightsByPriority.medium.length})
+                      </button>
+                      <button
+                        onClick={() => togglePriority('low')}
+                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                          selectedPriorities.has('low')
+                            ? 'bg-blue-900/50 border-blue-600 text-blue-300'
+                            : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-blue-600/50'
+                        }`}
+                      >
+                        {selectedPriorities.has('low') ? '✓ ' : ''}Low ({insightsByPriority.low.length})
+                      </button>
                     </div>
+                  </div>
 
-                    <div className="space-y-6">
-                      {/* Total & Priority Breakdown */}
-                      <div>
-                        <div className="text-xs text-parchment-400 mb-2">Issues Found</div>
-                        <div className="text-2xl font-semibold text-parchment-100 mb-3">{aiInsights.length}</div>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                            <span className="text-parchment-300">{insightsByPriority.high.length} High Priority</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                            <span className="text-parchment-300">{insightsByPriority.medium.length} Medium</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                            <span className="text-parchment-300">{insightsByPriority.low.length} Low</span>
-                          </div>
-                        </div>
-                      </div>
+                  {/* Separator */}
+                  {allCategories.length > 0 && (
+                    <div className="h-4 w-px bg-slate-600"></div>
+                  )}
 
-                      {/* Top Categories */}
-                      <div>
-                        <div className="text-xs text-parchment-400 mb-2">Top Categories</div>
-                        <div className="space-y-1 text-sm">
-                          {(() => {
-                            const categoryCounts: Record<string, number> = {}
-                            aiInsights.forEach(insight => {
-                              categoryCounts[insight.category] = (categoryCounts[insight.category] || 0) + 1
-                            })
-                            return Object.entries(categoryCounts)
-                              .sort((a, b) => b[1] - a[1])
-                              .slice(0, 4)
-                              .map(([category, count]) => (
-                                <div key={category} className="flex items-center gap-2">
-                                  <span>{categoryIcons[category] || '📌'}</span>
-                                  <span className="text-parchment-300">{category} ({count})</span>
-                                </div>
-                              ))
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Most Affected Personas */}
-                      <div>
-                        <div className="text-xs text-parchment-400 mb-2">Most Affected</div>
-                        <div className="space-y-1 text-sm">
-                          {(() => {
-                            const personaCounts: Record<string, number> = {}
-                            aiInsights.forEach(insight => {
-                              const personas = insight.evidence?.affected_personas || []
-                              personas.forEach(p => {
-                                personaCounts[p] = (personaCounts[p] || 0) + 1
-                              })
-                            })
-                            const topPersonas = Object.entries(personaCounts)
-                              .sort((a, b) => b[1] - a[1])
-                              .slice(0, 3)
-
-                            return topPersonas.length > 0 ? (
-                              topPersonas.map(([persona, count]) => (
-                                <div key={persona} className="flex items-center gap-2">
-                                  <span className="text-parchment-300">{persona}</span>
-                                  <span className="text-xs text-parchment-500">({count} issues)</span>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="text-parchment-500 text-xs">No persona data</div>
-                            )
-                          })()}
-                        </div>
+                  {/* Category Filters */}
+                  {allCategories.length > 0 && (
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-xs font-medium text-parchment-400 uppercase">Category:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {allCategories.map(category => {
+                          const count = aiInsights.filter(i => i.category === category).length
+                          return (
+                            <button
+                              key={category}
+                              onClick={() => toggleCategory(category)}
+                              className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                                selectedCategories.has(category)
+                                  ? 'bg-strategic-900/50 border-strategic-600 text-strategic-300'
+                                  : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-strategic-600/50'
+                              }`}
+                            >
+                              {categoryIcons[category] || '📌'} {selectedCategories.has(category) ? '✓ ' : ''}{category} ({count})
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
+                  )}
+
+                  {/* Result Count */}
+                  <div className="text-xs text-parchment-400 whitespace-nowrap">
+                    {filteredInsights.length} results
                   </div>
                 </div>
 
-                {/* Priority Tabs */}
-                <div className="flex gap-2 border-b border-slate-700 -mx-6 px-6 mb-4">
-                  <button
-                    onClick={() => setActiveInsightsTab('high')}
-                    className={`px-4 py-2 font-medium transition-colors ${
-                      activeInsightsTab === 'high'
-                        ? 'text-red-300 border-b-2 border-red-600'
-                        : 'text-parchment-400 hover:text-parchment-200'
-                    }`}
-                  >
-                    High Priority ({insightsByPriority.high.length})
-                  </button>
-                  <button
-                    onClick={() => setActiveInsightsTab('medium')}
-                    className={`px-4 py-2 font-medium transition-colors ${
-                      activeInsightsTab === 'medium'
-                        ? 'text-amber-300 border-b-2 border-amber-600'
-                        : 'text-parchment-400 hover:text-parchment-200'
-                    }`}
-                  >
-                    Medium ({insightsByPriority.medium.length})
-                  </button>
-                  <button
-                    onClick={() => setActiveInsightsTab('low')}
-                    className={`px-4 py-2 font-medium transition-colors ${
-                      activeInsightsTab === 'low'
-                        ? 'text-blue-300 border-b-2 border-blue-600'
-                        : 'text-parchment-400 hover:text-parchment-200'
-                    }`}
-                  >
-                    Low ({insightsByPriority.low.length})
-                  </button>
-                </div>
+                {/* Insights Cards */}
+                <div className="space-y-2 mt-4">
+                  {filteredInsights.length === 0 ? (
+                    <div className="text-center py-8 text-parchment-300">
+                      No insights match the selected filters.
+                    </div>
+                  ) : (
+                    filteredInsights.map(insight => {
+                      const isExpanded = expandedInsightIds.has(insight.id)
+                      const conversationCount = insight.evidence?.conversation_ids?.length || insight.evidence?.conversation_count || 0
 
-                {/* Tab Content */}
-                <div className="space-y-3">
-                  {/* High Priority Tab */}
-                  {activeInsightsTab === 'high' && (
-                    <>
-                      {insightsByPriority.high.length === 0 ? (
-                        <div className="text-center py-8 text-parchment-300">
-                          No high priority issues found.
-                        </div>
-                      ) : (
-                        insightsByPriority.high.map(insight => {
-                          const isExpanded = expandedInsightIds.has(insight.id)
-                          const conversationCount = insight.evidence?.conversation_ids?.length || insight.evidence?.conversation_count || 0
-                          const personaCount = insight.evidence?.affected_personas?.length || insight.evidence?.persona_count || 0
+                      // Determine card styling based on priority
+                      const priorityStyles = {
+                        high: {
+                          border: 'border-red-600',
+                          bg: 'bg-red-900/30',
+                          text: 'text-red-300'
+                        },
+                        medium: {
+                          border: 'border-amber-600',
+                          bg: 'bg-amber-900/30',
+                          text: 'text-amber-300'
+                        },
+                        low: {
+                          border: 'border-blue-600',
+                          bg: 'bg-blue-900/30',
+                          text: 'text-blue-300'
+                        }
+                      }
 
-                          return (
-                            <div key={insight.id} className="border-l-4 border-red-600 p-4 rounded bg-red-900/30">
-                              <div className="flex items-start justify-between gap-4 mb-2">
-                                <h4 className="font-semibold text-red-300 flex items-center gap-2">
-                                  <span>{categoryIcons[insight.category] || '📌'}</span>
-                                  {insight.title}
-                                </h4>
-                                <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600 shrink-0">
-                                  {insight.category}
-                                </span>
-                              </div>
-                              <p className="text-sm text-parchment-200 mb-3">{insight.description}</p>
+                      const style = priorityStyles[insight.priority as keyof typeof priorityStyles]
 
-                              {/* Code Recommendation Button */}
-                              {insight.code_recommendation && (
-                                <div className="mb-3">
-                                  <button
-                                    onClick={() => setSelectedInsightForModal(insight)}
-                                    className="px-3 py-1.5 text-xs bg-strategic-600/20 text-strategic-400 border border-strategic-600 rounded hover:bg-strategic-600/30 transition-colors flex items-center gap-2"
-                                  >
-                                    <span>💡</span>
-                                    View Code Recommendation
-                                    {insight.code_recommendation.github_issue_url && (
-                                      <span className="text-green-400">✓</span>
-                                    )}
-                                  </button>
-                                </div>
-                              )}
+                      return (
+                        <div key={insight.id} className={`border-l-4 ${style.border} p-4 rounded ${style.bg}`}>
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <h4 className={`font-semibold ${style.text} flex items-center gap-2`}>
+                              <span>{categoryIcons[insight.category] || '📌'}</span>
+                              {insight.title}
+                            </h4>
+                            <div className="flex gap-2 shrink-0">
+                              <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600">
+                                {insight.category}
+                              </span>
+                              <span className={`px-2 py-1 text-xs rounded border ${
+                                insight.priority === 'high' ? 'bg-red-900/50 border-red-700 text-red-300' :
+                                insight.priority === 'medium' ? 'bg-amber-900/50 border-amber-700 text-amber-300' :
+                                'bg-blue-900/50 border-blue-700 text-blue-300'
+                              }`}>
+                                {insight.priority}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-parchment-200 mb-3">{insight.description}</p>
 
-                              <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded border border-slate-700">
-                                <div className="flex gap-4 text-xs text-parchment-400">
-                                  {conversationCount > 0 && (
-                                    <div><span className="text-parchment-300 font-medium">{conversationCount}</span> conversations</div>
-                                  )}
-                                  {personaCount > 0 && (
-                                    <div><span className="text-parchment-300 font-medium">{personaCount}</span> personas</div>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => toggleInsightDetail(insight.id)}
-                                  className="text-xs text-strategic-500 hover:text-strategic-400 transition-colors"
-                                >
-                                  {isExpanded ? 'Hide' : 'Show'} Details
-                                </button>
-                              </div>
+                          {/* Recommendation Buttons */}
+                          <div className="flex gap-2 mb-3">
+                            {/* Code Recommendation Button */}
+                            {insight.code_recommendation && (
+                              <button
+                                onClick={() => setSelectedInsightForModal(insight)}
+                                className="px-3 py-1.5 text-xs bg-strategic-600/20 text-strategic-400 border border-strategic-600 rounded hover:bg-strategic-600/30 transition-colors flex items-center gap-2"
+                              >
+                                <span>💡</span>
+                                View Code Recommendation
+                                {insight.code_recommendation.github_issue_url && (
+                                  <span className="text-green-400">✓</span>
+                                )}
+                              </button>
+                            )}
 
-                              {isExpanded && insight.evidence && (
-                                <div className="mt-2 p-2 bg-slate-800/50 rounded border border-slate-700">
-                                  <div className="text-xs text-parchment-400 space-y-1">
-                                    {insight.evidence.pattern && (
-                                      <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
-                                    )}
-                                    {insight.evidence.affected_personas && insight.evidence.affected_personas.length > 0 && (
-                                      <div><span className="text-parchment-300">Affected Personas:</span> {insight.evidence.affected_personas.join(', ')}</div>
-                                    )}
-                                    {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
-                                      <div><span className="text-parchment-300">Conversation IDs:</span> {insight.evidence.conversation_ids.slice(0, 10).join(', ')}{insight.evidence.conversation_ids.length > 10 ? '...' : ''}</div>
-                                    )}
-                                  </div>
-                                </div>
+                            {/* Knowledge Recommendation Button */}
+                            {insight.knowledge_recommendation && (
+                              <button
+                                onClick={() => setSelectedKnowledgeForModal(insight)}
+                                className="px-3 py-1.5 text-xs bg-blue-600/20 text-blue-400 border border-blue-600 rounded hover:bg-blue-600/30 transition-colors flex items-center gap-2"
+                              >
+                                <span>📚</span>
+                                View Documentation Recommendation
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded border border-slate-700">
+                            <div className="flex gap-4 text-xs text-parchment-400">
+                              {conversationCount > 0 && (
+                                <div><span className="text-parchment-300 font-medium">{conversationCount}</span> conversations</div>
                               )}
                             </div>
-                          )
-                        })
-                      )}
-                    </>
-                  )}
+                            <button
+                              onClick={() => toggleInsightDetail(insight.id)}
+                              className="text-xs text-strategic-500 hover:text-strategic-400 transition-colors"
+                            >
+                              {isExpanded ? 'Hide' : 'Show'} Details
+                            </button>
+                          </div>
 
-                  {/* Medium Priority Tab */}
-                  {activeInsightsTab === 'medium' && (
-                    <>
-                      {insightsByPriority.medium.length === 0 ? (
-                        <div className="text-center py-8 text-parchment-300">
-                          No medium priority issues found.
-                        </div>
-                      ) : (
-                        insightsByPriority.medium.map(insight => {
-                          const isExpanded = expandedInsightIds.has(insight.id)
-                          const conversationCount = insight.evidence?.conversation_ids?.length || insight.evidence?.conversation_count || 0
-                          const personaCount = insight.evidence?.affected_personas?.length || insight.evidence?.persona_count || 0
-
-                          return (
-                            <div key={insight.id} className="border-l-4 border-amber-600 p-4 rounded bg-amber-900/30">
-                              <div className="flex items-start justify-between gap-4 mb-2">
-                                <h4 className="font-semibold text-amber-300 flex items-center gap-2">
-                                  <span>{categoryIcons[insight.category] || '📌'}</span>
-                                  {insight.title}
-                                </h4>
-                                <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600 shrink-0">
-                                  {insight.category}
-                                </span>
-                              </div>
-                              <p className="text-sm text-parchment-200 mb-3">{insight.description}</p>
-
-                              {/* Code Recommendation Button */}
-                              {insight.code_recommendation && (
-                                <div className="mb-3">
-                                  <button
-                                    onClick={() => setSelectedInsightForModal(insight)}
-                                    className="px-3 py-1.5 text-xs bg-strategic-600/20 text-strategic-400 border border-strategic-600 rounded hover:bg-strategic-600/30 transition-colors flex items-center gap-2"
-                                  >
-                                    <span>💡</span>
-                                    View Code Recommendation
-                                    {insight.code_recommendation.github_issue_url && (
-                                      <span className="text-green-400">✓</span>
-                                    )}
-                                  </button>
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded border border-slate-700">
-                                <div className="flex gap-4 text-xs text-parchment-400">
-                                  {conversationCount > 0 && (
-                                    <div><span className="text-parchment-300 font-medium">{conversationCount}</span> conversations</div>
-                                  )}
-                                  {personaCount > 0 && (
-                                    <div><span className="text-parchment-300 font-medium">{personaCount}</span> personas</div>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => toggleInsightDetail(insight.id)}
-                                  className="text-xs text-strategic-500 hover:text-strategic-400 transition-colors"
-                                >
-                                  {isExpanded ? 'Hide' : 'Show'} Details
-                                </button>
-                              </div>
-
-                              {isExpanded && insight.evidence && (
-                                <div className="mt-2 p-2 bg-slate-800/50 rounded border border-slate-700">
-                                  <div className="text-xs text-parchment-400 space-y-1">
-                                    {insight.evidence.pattern && (
-                                      <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
-                                    )}
-                                    {insight.evidence.affected_personas && insight.evidence.affected_personas.length > 0 && (
-                                      <div><span className="text-parchment-300">Affected Personas:</span> {insight.evidence.affected_personas.join(', ')}</div>
-                                    )}
-                                    {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
-                                      <div><span className="text-parchment-300">Conversation IDs:</span> {insight.evidence.conversation_ids.slice(0, 10).join(', ')}{insight.evidence.conversation_ids.length > 10 ? '...' : ''}</div>
-                                    )}
+                          {isExpanded && insight.evidence && (
+                            <div className="mt-2 p-2 bg-slate-800/50 rounded border border-slate-700">
+                              <div className="text-xs text-parchment-400 space-y-1">
+                                {insight.evidence.pattern && (
+                                  <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
+                                )}
+                                {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
+                                  <div>
+                                    <span className="text-parchment-300">Conversation IDs:</span>{' '}
+                                    {insight.evidence.conversation_ids.slice(0, 10).map((convId, idx) => (
+                                      <span key={convId}>
+                                        {idx > 0 && ', '}
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            loadSnowflakeConversation(String(convId))
+                                          }}
+                                          className="text-strategic-500 hover:text-strategic-400 hover:underline transition-colors"
+                                        >
+                                          {convId}
+                                        </button>
+                                      </span>
+                                    ))}
+                                    {insight.evidence.conversation_ids.length > 10 && <span>...</span>}
                                   </div>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
-                          )
-                        })
-                      )}
-                    </>
-                  )}
-
-                  {/* Low Priority Tab */}
-                  {activeInsightsTab === 'low' && (
-                    <>
-                      {insightsByPriority.low.length === 0 ? (
-                        <div className="text-center py-8 text-parchment-300">
-                          No low priority issues found.
+                          )}
                         </div>
-                      ) : (
-                        insightsByPriority.low.map(insight => {
-                          const isExpanded = expandedInsightIds.has(insight.id)
-                          const conversationCount = insight.evidence?.conversation_ids?.length || insight.evidence?.conversation_count || 0
-                          const personaCount = insight.evidence?.affected_personas?.length || insight.evidence?.persona_count || 0
-
-                          return (
-                            <div key={insight.id} className="border-l-4 border-blue-600 p-4 rounded bg-blue-900/30">
-                              <div className="flex items-start justify-between gap-4 mb-2">
-                                <h4 className="font-semibold text-blue-300 flex items-center gap-2">
-                                  <span>{categoryIcons[insight.category] || '📌'}</span>
-                                  {insight.title}
-                                </h4>
-                                <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600 shrink-0">
-                                  {insight.category}
-                                </span>
-                              </div>
-                              <p className="text-sm text-parchment-200 mb-3">{insight.description}</p>
-
-                              {/* Code Recommendation Button */}
-                              {insight.code_recommendation && (
-                                <div className="mb-3">
-                                  <button
-                                    onClick={() => setSelectedInsightForModal(insight)}
-                                    className="px-3 py-1.5 text-xs bg-strategic-600/20 text-strategic-400 border border-strategic-600 rounded hover:bg-strategic-600/30 transition-colors flex items-center gap-2"
-                                  >
-                                    <span>💡</span>
-                                    View Code Recommendation
-                                    {insight.code_recommendation.github_issue_url && (
-                                      <span className="text-green-400">✓</span>
-                                    )}
-                                  </button>
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded border border-slate-700">
-                                <div className="flex gap-4 text-xs text-parchment-400">
-                                  {conversationCount > 0 && (
-                                    <div><span className="text-parchment-300 font-medium">{conversationCount}</span> conversations</div>
-                                  )}
-                                  {personaCount > 0 && (
-                                    <div><span className="text-parchment-300 font-medium">{personaCount}</span> personas</div>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => toggleInsightDetail(insight.id)}
-                                  className="text-xs text-strategic-500 hover:text-strategic-400 transition-colors"
-                                >
-                                  {isExpanded ? 'Hide' : 'Show'} Details
-                                </button>
-                              </div>
-
-                              {isExpanded && insight.evidence && (
-                                <div className="mt-2 p-2 bg-slate-800/50 rounded border border-slate-700">
-                                  <div className="text-xs text-parchment-400 space-y-1">
-                                    {insight.evidence.pattern && (
-                                      <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
-                                    )}
-                                    {insight.evidence.affected_personas && insight.evidence.affected_personas.length > 0 && (
-                                      <div><span className="text-parchment-300">Affected Personas:</span> {insight.evidence.affected_personas.join(', ')}</div>
-                                    )}
-                                    {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
-                                      <div><span className="text-parchment-300">Conversation IDs:</span> {insight.evidence.conversation_ids.slice(0, 10).join(', ')}{insight.evidence.conversation_ids.length > 10 ? '...' : ''}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })
-                      )}
-                    </>
+                      )
+                    })
                   )}
                 </div>
               </>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* All Conversations Table */}
+      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-8">
+        <div
+          className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 cursor-pointer hover:bg-slate-800/70 transition-colors"
+          onClick={() => setConversationsExpanded(!conversationsExpanded)}
+        >
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{conversationsExpanded ? '▼' : '►'}</span>
+              <div>
+                <h2 className="text-lg font-serif font-semibold text-parchment-100">All Conversations</h2>
+                <p className="text-sm text-parchment-200 mt-1">{conversations.length} total conversation(s)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {conversationsExpanded && (
+          <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-700">
+            <thead className="bg-slate-800/30">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Persona</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Quality</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Ending</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Gaps</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Turns</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Duration</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-slate-900 divide-y divide-slate-800">
+              {conversations.map(conv => (
+                <tr key={conv.id} className="hover:bg-slate-800/50 transition-colors">
+                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.id}</td>
+                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.persona?.name || 'Unknown'}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${conv.success ? 'bg-green-900/40 text-green-400 border-green-700' : 'bg-red-900/40 text-red-400 border-red-700'}`}>
+                      {conv.success ? 'Success' : 'Failed'}
+                    </span>
+                  </td>
+
+                  {/* Quality Score */}
+                  <td className="px-6 py-4">
+                    {conv.scenario?.evaluation?.quality_score !== undefined ? (
+                      <QualityScoreBadge score={conv.scenario.evaluation.quality_score} compact />
+                    ) : (
+                      <span className="text-xs text-parchment-400">—</span>
+                    )}
+                  </td>
+
+                  {/* Ending Assessment */}
+                  <td className="px-6 py-4">
+                    {conv.scenario?.evaluation?.ending_assessment ? (
+                      <EndingAssessmentBadge assessment={conv.scenario.evaluation.ending_assessment} compact />
+                    ) : (
+                      <span className="text-xs text-parchment-400">—</span>
+                    )}
+                  </td>
+
+                  {/* Gaps */}
+                  <td className="px-6 py-4">
+                    <div className="flex gap-1">
+                      {conv.scenario?.evaluation?.knowledge_gap && (
+                        <KnowledgeGapBadge gap={conv.scenario.evaluation.knowledge_gap} compact />
+                      )}
+                      {conv.scenario?.evaluation?.capability_gap && (
+                        <CapabilityGapBadge gap={conv.scenario.evaluation.capability_gap} compact />
+                      )}
+                      {!conv.scenario?.evaluation?.knowledge_gap && !conv.scenario?.evaluation?.capability_gap && (
+                        <span className="text-xs text-parchment-400">—</span>
+                      )}
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.num_turns}</td>
+                  <td className="px-6 py-4 text-sm text-parchment-200">{formatDuration(conv.total_duration_ms)}</td>
+                  <td className="px-6 py-4">
+                    <button onClick={() => loadConversation(conv.id)} className="text-strategic-500 hover:text-strategic-400 text-sm font-medium">
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           </div>
         )}
       </div>
@@ -837,6 +848,72 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
+      {/* Snowflake Conversation Details Modal */}
+      {selectedSnowflakeConvId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedSnowflakeConvId(null)}>
+          <div className="bg-slate-900 rounded-lg border border-slate-700 max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-6 border-b border-slate-700">
+              <div>
+                <h2 className="text-xl font-serif font-semibold text-parchment-100">Conversation Details</h2>
+                <p className="text-sm text-parchment-400 mt-1 font-mono">{selectedSnowflakeConvId}</p>
+              </div>
+              <button onClick={() => setSelectedSnowflakeConvId(null)} className="text-parchment-300 hover:text-parchment-100 text-2xl">×</button>
+            </div>
+
+            {snowflakeConvLoading ? (
+              <div className="p-8 text-center text-parchment-200">Loading conversation...</div>
+            ) : snowflakeConvDetails ? (
+              <>
+                {/* Conversation Metadata */}
+                <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-700 flex gap-6 text-sm">
+                  <div>
+                    <span className="text-parchment-400">Turns:</span>
+                    <span className="text-parchment-100 ml-2 font-semibold">{snowflakeConvDetails.turn_count}</span>
+                  </div>
+                  <div>
+                    <span className="text-parchment-400">Duration:</span>
+                    <span className="text-parchment-100 ml-2 font-semibold">
+                      {snowflakeConvDetails.duration_ms ? formatDuration(snowflakeConvDetails.duration_ms) : '-'}
+                    </span>
+                  </div>
+                  {snowflakeConvDetails.triggered_by && (
+                    <div>
+                      <span className="text-parchment-400">Channel:</span>
+                      <span className="text-parchment-100 ml-2 font-semibold">{snowflakeConvDetails.triggered_by}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Messages */}
+                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                  {snowflakeConvDetails.messages && snowflakeConvDetails.messages.length > 0 ? (
+                    snowflakeConvDetails.messages.map((msg: any, i: number) => (
+                      <div
+                        key={i}
+                        className={`p-4 rounded-lg ${
+                          msg.role === 'user'
+                            ? 'bg-strategic-900/40 border border-strategic-700'
+                            : 'bg-slate-800 border border-slate-700'
+                        }`}
+                      >
+                        <div className="text-xs font-medium text-parchment-300 mb-1">
+                          {msg.role === 'user' ? '👤 User' : '🤖 Assistant'}
+                        </div>
+                        <div className="text-sm text-parchment-200 whitespace-pre-wrap">{msg.content}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-parchment-400 py-8">No messages found</div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="p-8 text-center text-parchment-400">Failed to load conversation</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Code Recommendation Modal */}
       {selectedInsightForModal && (
         <CodeRecommendationModal
@@ -847,6 +924,15 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
           onIssueCreated={(issueUrl) => {
             handleIssueCreated(selectedInsightForModal.id, issueUrl)
           }}
+        />
+      )}
+
+      {/* Knowledge Recommendation Modal */}
+      {selectedKnowledgeForModal && (
+        <KnowledgeRecommendationModal
+          insight={selectedKnowledgeForModal}
+          isOpen={true}
+          onClose={() => setSelectedKnowledgeForModal(null)}
         />
       )}
     </div>

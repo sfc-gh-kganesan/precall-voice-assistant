@@ -43,6 +43,7 @@ def get_snowflake_connection() -> SnowflakeConnection:
         logger.info("✓ Connected to Snowflake for trace storage")
         logger.info(f"  Database: {os.getenv('TRACES_DATABASE', 'AI_FDE')}")
         logger.info(f"  Schema: {os.getenv('TRACES_SCHEMA', 'CX360_DEMO')}")
+        logger.info(f"  Table: {os.getenv('TRACES_TABLE', 'AGENT_TRACES')}")
 
     return snowflake_conn
 
@@ -172,8 +173,11 @@ def write_span_to_snowflake(span_data: dict[str, Any], resource_attrs: dict[str,
         span_attrs_json = json.dumps(span_attrs)
         resource_attrs_json = json.dumps(resource_attrs)
 
-        insert_sql = """
-            INSERT INTO AGENT_TRACES (
+        # Get table name from environment (default: AGENT_TRACES)
+        table_name = os.getenv("TRACES_TABLE", "AGENT_TRACES")
+
+        insert_sql = f"""
+            INSERT INTO {table_name} (
                 trace_id, span_id, parent_span_id, name, span_kind,
                 start_time, end_time, latency_ms,
                 status_code, status_message,
@@ -282,6 +286,7 @@ async def health_check():
             "snowflake_connected": not conn.is_closed(),
             "database": os.getenv("TRACES_DATABASE", "AI_FDE"),
             "schema": os.getenv("TRACES_SCHEMA", "CX360_DEMO"),
+            "table": os.getenv("TRACES_TABLE", "AGENT_TRACES"),
         }
     except Exception as e:
         return {

@@ -39,15 +39,26 @@ logger = logging.getLogger(__name__)
 CODE_AGENT_SYSTEM_PROMPT = """You are a code review AI that generates specific code improvements from simulation insights.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ CRITICAL: You are analyzing a REMOTE GitHub repository
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**TOOL USAGE RULES:**
+1. ALWAYS use mcp__github__search_code to search for code in the remote repository
+2. ALWAYS use mcp__github__get_file_contents to read files from the remote repository
+3. NEVER use local file tools (Read, Glob, etc) - they access the wrong repository
+4. Include "path:{target_path}" in ALL search_code queries to narrow scope
+5. Example: mcp__github__search_code(q="error handling path:support-data-agent/webagent")
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WORKFLOW (5-10 turns total)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. get_simulation_insights(simulation_id) → Get the insight
-2. search_code (1-2 targeted queries) OR get_file_contents → Find code
-3. Read relevant files → Understand the issue
-4. output_code_recommendation → Generate fix ✅ REQUIRED
+1. mcp__agentsim__get_simulation_insights(simulation_id) → Get the insight
+2. mcp__github__search_code (1-2 targeted queries) → Find code in remote repo
+3. mcp__github__get_file_contents → Read relevant files from remote repo
+4. mcp__agentsim__output_code_recommendation → Generate fix ✅ REQUIRED
 
-⚠️ You MUST call output_code_recommendation or the task FAILS.
+⚠️ You MUST call output_code_recommendation by turn 10 or the task FAILS.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EXAMPLE
@@ -55,16 +66,20 @@ EXAMPLE
 
 Insight: "Add Timeout to HTTP Requests - agent hangs on slow connections"
 
-Turn 1: get_simulation_insights(simulation_id=1)
-Turn 2: search_code(q="http client path:support-data-agent/troubleshooting")
-        → Found: http_client.py
-Turn 3: get_file_contents(path="...http_client.py")
+Turn 1: mcp__agentsim__get_simulation_insights(simulation_id=1)
+Turn 2: mcp__github__search_code(q="http client path:support-data-agent/webagent")
+        → Found: backend/http_client.py
+Turn 3: mcp__github__get_file_contents(
+            owner="snowflakedb",
+            repo="aura",
+            path="support-data-agent/webagent/backend/http_client.py"
+        )
         → Line 45: response = await client.post(url, json=data)  # NO TIMEOUT
-Turn 4: output_code_recommendation(
+Turn 4: mcp__agentsim__output_code_recommendation(
     title="Add timeout to HTTP requests",
     description="HTTP client lacks timeout causing hangs. Adding 30s timeout prevents indefinite waits.",
     file_changes=[{
-        "file": "support-data-agent/troubleshooting/app/http_client.py",
+        "file": "support-data-agent/webagent/backend/http_client.py",
         "old_content": "    response = await client.post(url, json=data)",
         "new_content": "    response = await client.post(url, json=data, timeout=30.0)",
         "diff": "--- a/http_client.py\n+++ b/http_client.py\n@@ -45 +45 @@\n-    response = await client.post(url, json=data)\n+    response = await client.post(url, json=data, timeout=30.0)"
@@ -78,7 +93,7 @@ Turn 4: output_code_recommendation(
 CONSTRAINTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**Read-only**: Can use search_code, get_file_contents, list_commits. Cannot modify files.
+**Read-only**: Can use GitHub search/read tools. Cannot modify files.
 
 **Search scope**: ALWAYS include "path:{target_path}" in search_code queries.
 
@@ -337,18 +352,27 @@ async def block_github_write_operations(
 
 async def create_code_agent(
     target_repo: str = "snowflakedb/aura",
-    github_proxy_url: str = "http://localhost:8003/mcp",
+    github_proxy_url: str = None,
 ) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client configured for code recommendations.
 
     Args:
         target_repo: Target repository (e.g., 'snowflakedb/aura')
-        github_proxy_url: URL of the GitHub MCP proxy server
+        github_proxy_url: URL of the GitHub MCP proxy server (reads from GITHUB_PROXY_URL env var if not provided)
 
     Returns:
         Configured ClaudeSDKClient
     """
+    # Read GitHub proxy URL from environment if not provided
+    if github_proxy_url is None:
+        github_proxy_url = os.getenv(
+            "GITHUB_PROXY_URL",
+            "http://localhost:8005/mcp",  # Fallback for local development
+        )
+
+    logger.info(f"Connecting to GitHub proxy at: {github_proxy_url}")
+
     # Get Snowflake Cortex credentials from environment
     snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
     snowflake_password = os.getenv("SNOWFLAKE_PASSWORD")
@@ -469,7 +493,11 @@ async def generate_recommendation_for_insight(
     from backend.database import get_db
     from backend.models.models import ImprovementSuggestion
 
+    logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     logger.info(f"Generating code recommendation for insight {insight_id}")
+    logger.info(f"  Target repo: {target_repo}")
+    logger.info(f"  Target path: {target_path}")
+    logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     try:
         # Get database session
@@ -485,12 +513,18 @@ async def generate_recommendation_for_insight(
         if not insight:
             raise ValueError(f"Insight {insight_id} not found")
 
+        logger.info(f"  Insight category: {insight.category}")
+        logger.info(f"  Insight title: {insight.title}")
+
         # Skip if already has a recommendation
         if insight.code_recommendation:
-            logger.info(f"Insight {insight_id} already has a code recommendation")
+            logger.info(
+                f"Insight {insight_id} already has a code recommendation (skipping)"
+            )
             return insight.code_recommendation
 
         # Create the agent
+        logger.info("Creating code agent...")
         async with await create_code_agent(target_repo=target_repo) as client:
             # Build focused prompt for this single insight
             prompt = f"""Generate ONE concise code recommendation for this insight:

@@ -90,6 +90,89 @@ npm run dev
 
 Frontend will be available at http://localhost:3000
 
+## Docker Deployment
+
+### Prerequisites (One-Time Setup)
+
+Before running AgentSmith with Docker, create the shared network and volume:
+
+```bash
+# Create shared Docker network for service communication
+docker network create aura-shared-network
+
+# Create shared volume for Glean OAuth tokens
+docker volume create aura-glean-tokens
+```
+
+### Deployment Scenarios
+
+#### Scenario A: AgentSmith + Webagent (with Glean enabled)
+
+When running both AgentSmith and Webagent with Glean enabled, they share the glean-proxy service via the shared Docker network. You can start them in any order - Docker will reuse existing containers.
+
+```bash
+# Terminal 1: Start AgentSmith
+cd agentsmith
+docker compose up
+
+# Terminal 2: Start Webagent (with GLEAN_ENABLED=true in .env)
+cd ../webagent
+docker compose up
+```
+
+**Services:**
+- AgentSmith API: http://localhost:8082
+- AgentSmith Frontend: http://localhost:3002
+- Webagent API: http://localhost:8000
+- Shared Glean Proxy: http://localhost:8001
+- GitHub Proxy: http://localhost:8003
+
+#### Scenario B: AgentSmith + Webagent (without Glean)
+
+If Webagent doesn't need Glean access (GLEAN_ENABLED=false), AgentSmith will still bring up glean-proxy for its knowledge recommendation agent.
+
+```bash
+# Terminal 1: Start AgentSmith
+cd agentsmith
+docker compose up
+
+# Terminal 2: Start Webagent (with GLEAN_ENABLED=false in .env)
+cd ../webagent
+docker compose up
+```
+
+Webagent will route traces to a different table (configured via TRACES_TABLE env var).
+
+#### Scenario C: AgentSmith Only
+
+AgentSmith can run independently and will spin up its own glean-proxy and github-proxy services:
+
+```bash
+cd agentsmith
+docker compose up
+```
+
+**Services:**
+- AgentSmith API: http://localhost:8082
+- AgentSmith Frontend: http://localhost:3002
+- Glean Proxy: http://localhost:8001
+- GitHub Proxy: http://localhost:8003
+
+### Shared Services Architecture
+
+AgentSmith uses two MCP (Model Context Protocol) proxy servers:
+
+1. **glean-proxy** (aura-glean-proxy): Provides search access to internal knowledge (Glean)
+   - Used by: knowledge_agent for documentation recommendations
+   - Optional for: webagent (via GLEAN_ENABLED env var)
+   - Port: 8001
+
+2. **github-proxy** (aura-github-proxy): Provides read-only access to GitHub repositories
+   - Used by: code_agent for code recommendations
+   - Port: 8003
+
+Both services use consistent container names and an external Docker network (`aura-shared-network`), allowing multiple applications to share the same proxy instances without port conflicts.
+
 ## API Documentation
 
 Once the backend is running, visit:

@@ -23,8 +23,8 @@ interface ProjectMetrics {
   avg_duration_ms?: number
   avg_turns?: number
   error_rate?: number
-  voice_count: number
-  text_count: number
+  total_voice_interactions: number
+  total_text_interactions: number
 }
 
 interface ConversationSummary {
@@ -47,7 +47,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [conversationsTotal, setConversationsTotal] = useState(0)
   const [conversationsOffset, setConversationsOffset] = useState(0)
-  const [conversationsLimit] = useState(20)
+  const [conversationsLimit] = useState(5)
   const [conversationsFilter, setConversationsFilter] = useState<string | null>(null)
   const [errorsOnly, setErrorsOnly] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -55,6 +55,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [conversationsLoading, setConversationsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
+  const [conversationDetails, setConversationDetails] = useState<any>(null)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [latestAnalysis, setLatestAnalysis] = useState<Simulation | null>(null)
+  const [latestInsights, setLatestInsights] = useState<any[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [conversationsExpanded, setConversationsExpanded] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -66,6 +73,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     loadConversations()
   }, [conversationsOffset, conversationsFilter, errorsOnly])
 
+  useEffect(() => {
+    // Load latest insights when simulations change
+    if (simulations.length > 0) {
+      loadLatestInsights()
+    }
+  }, [simulations])
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -76,6 +90,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       setProject(projectRes.data)
       setSimulations(simulationsRes.data)
       setError(null)
+
+      // Load latest insights after simulations are loaded
+      // We'll call it separately since it depends on simulations state
     } catch (err) {
       setError('Failed to load deployment data')
       console.error(err)
@@ -111,6 +128,44 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       console.error('Failed to load conversations:', err)
     } finally {
       setConversationsLoading(false)
+    }
+  }
+
+  const loadLatestInsights = async () => {
+    try {
+      setInsightsLoading(true)
+      // Find the most recent completed analysis
+      const completedAnalyses = simulations.filter(s => s.status === 'completed').sort((a, b) => {
+        return new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime()
+      })
+
+      if (completedAnalyses.length > 0) {
+        const latest = completedAnalyses[0]
+        setLatestAnalysis(latest)
+
+        // Load insights for this analysis
+        const response = await simulationsApi.getAIInsights(latest.id)
+        setLatestInsights(response.data)
+      }
+    } catch (err) {
+      console.error('Failed to load latest insights:', err)
+    } finally {
+      setInsightsLoading(false)
+    }
+  }
+
+  const loadConversationDetails = async (conversationId: string) => {
+    try {
+      setDetailsLoading(true)
+      setSelectedConversationId(conversationId)
+      const response = await projectsApi.getConversationDetails(projectId, conversationId)
+      setConversationDetails(response.data)
+    } catch (err) {
+      console.error('Failed to load conversation details:', err)
+      alert('Failed to load conversation details')
+      setSelectedConversationId(null)
+    } finally {
+      setDetailsLoading(false)
     }
   }
 
@@ -220,7 +275,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div className="text-center py-8 text-parchment-300">Loading metrics...</div>
         ) : metrics && metrics.total_conversations > 0 ? (
           <>
-            <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-5 gap-4 mb-4">
               <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
                 <div className="text-sm font-medium text-parchment-300">Total Conversations</div>
                 <div className="text-3xl font-serif font-semibold text-parchment-100 mt-2">{metrics.total_conversations}</div>
@@ -243,24 +298,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   {metrics.error_rate ? `${(metrics.error_rate * 100).toFixed(1)}%` : '0%'}
                 </div>
               </div>
-            </div>
-            <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-              <h3 className="text-sm font-medium text-parchment-300 mb-3">Channel Breakdown</h3>
-              <div className="flex gap-6">
-                <div className="flex items-center gap-2">
-                  <span className="text-parchment-200">🎤 Voice:</span>
-                  <span className="text-parchment-100 font-medium">{metrics.voice_count}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-parchment-200">💬 Text:</span>
-                  <span className="text-parchment-100 font-medium">{metrics.text_count}</span>
+              <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+                <div className="text-sm font-medium text-parchment-300">Interactions</div>
+                <div className="text-2xl font-serif font-semibold text-parchment-100 mt-2">
+                  🎤 {metrics.total_voice_interactions} | 💬 {metrics.total_text_interactions}
                 </div>
               </div>
-              {metrics.date_range_start && metrics.date_range_end && (
-                <div className="mt-3 text-xs text-parchment-400">
-                  Data range: {formatDate(metrics.date_range_start)} - {formatDate(metrics.date_range_end)}
-                </div>
-              )}
             </div>
           </>
         ) : (
@@ -271,24 +314,128 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
+      {/* Latest Insights from Most Recent Analysis */}
+      {latestAnalysis && (
+        <div className="mb-8">
+          <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎯</span>
+                <h2 className="text-xl font-serif font-semibold text-parchment-100">Latest Insights</h2>
+                {latestAnalysis && (
+                  <span className="px-2 py-1 text-xs rounded bg-slate-700 text-parchment-300">
+                    Analysis #{latestAnalysis.id} · {formatDate(latestAnalysis.completed_at || latestAnalysis.created_at)}
+                  </span>
+                )}
+              </div>
+              {latestAnalysis && (
+                <Link
+                  href={`/simulations/${latestAnalysis.id}/results`}
+                  className="px-4 py-2 bg-strategic-600 text-parchment-50 rounded hover:bg-strategic-500 transition-colors text-sm font-medium"
+                >
+                  View Full Analysis
+                </Link>
+              )}
+            </div>
+
+            {insightsLoading ? (
+              <div className="p-8 text-center text-parchment-300">Loading insights...</div>
+            ) : latestInsights.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="text-4xl mb-2">✨</div>
+                <div className="text-parchment-300">No issues detected in latest analysis. Great job!</div>
+              </div>
+            ) : (
+              <div className="p-6">
+                {/* Insights Summary Grid */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  {/* High Priority Issues */}
+                  <div className="bg-red-900/20 border border-red-700 rounded-lg p-4">
+                    <div className="text-xs font-medium text-red-300 uppercase mb-1">High Priority</div>
+                    <div className="text-3xl font-semibold text-red-400">
+                      {latestInsights.filter(i => i.priority === 'high').length}
+                    </div>
+                    <div className="text-xs text-parchment-400 mt-1">issues require attention</div>
+                  </div>
+
+                  {/* Medium Priority Issues */}
+                  <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-4">
+                    <div className="text-xs font-medium text-amber-300 uppercase mb-1">Medium Priority</div>
+                    <div className="text-3xl font-semibold text-amber-400">
+                      {latestInsights.filter(i => i.priority === 'medium').length}
+                    </div>
+                    <div className="text-xs text-parchment-400 mt-1">optimization opportunities</div>
+                  </div>
+
+                  {/* Low Priority Issues */}
+                  <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+                    <div className="text-xs font-medium text-blue-300 uppercase mb-1">Low Priority</div>
+                    <div className="text-3xl font-semibold text-blue-400">
+                      {latestInsights.filter(i => i.priority === 'low').length}
+                    </div>
+                    <div className="text-xs text-parchment-400 mt-1">minor improvements</div>
+                  </div>
+                </div>
+
+                {/* Top High Priority Insights */}
+                {latestInsights.filter(i => i.priority === 'high').length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-red-300 uppercase tracking-wide">Top Concerns</h3>
+                    {latestInsights
+                      .filter(i => i.priority === 'high')
+                      .slice(0, 3)
+                      .map((insight) => (
+                        <div key={insight.id} className="border-l-4 border-red-600 bg-red-900/30 p-4 rounded">
+                          <h4 className="font-semibold text-red-300 mb-1">{insight.title}</h4>
+                          <p className="text-sm text-parchment-200">{insight.description}</p>
+                          {insight.evidence && (
+                            <div className="mt-2 text-xs text-parchment-400">
+                              {insight.evidence.conversation_ids && (
+                                <span>Affects {insight.evidence.conversation_ids.length} conversation(s)</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Conversations Browser */}
       <div className="bg-slate-900 rounded border border-slate-700 overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-slate-700 bg-slate-800/50">
+        <div
+          className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 cursor-pointer hover:bg-slate-800/70 transition-colors"
+          onClick={() => setConversationsExpanded(!conversationsExpanded)}
+        >
           <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-serif font-semibold text-parchment-100">Conversation Browser</h2>
-              <p className="text-sm text-parchment-200 mt-1">{conversationsTotal} total conversation(s)</p>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{conversationsExpanded ? '▼' : '►'}</span>
+              <div>
+                <h2 className="text-lg font-serif font-semibold text-parchment-100">Conversation Browser</h2>
+                <p className="text-sm text-parchment-200 mt-1">{conversationsTotal} total conversation(s)</p>
+              </div>
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setErrorsOnly(!errorsOnly)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setErrorsOnly(!errorsOnly)
+                }}
                 className={`px-3 py-1.5 text-sm rounded transition-colors ${errorsOnly ? 'bg-red-600 text-white' : 'bg-slate-700 text-parchment-200 hover:bg-slate-600'}`}
               >
                 {errorsOnly ? 'Show All' : 'Errors Only'}
               </button>
               <select
                 value={conversationsFilter || ''}
-                onChange={(e) => setConversationsFilter(e.target.value || null)}
+                onChange={(e) => {
+                  e.stopPropagation()
+                  setConversationsFilter(e.target.value || null)
+                }}
+                onClick={(e) => e.stopPropagation()}
                 className="px-3 py-1.5 text-sm bg-slate-700 text-parchment-200 rounded border-0 focus:ring-2 focus:ring-strategic-500"
               >
                 <option value="">All Channels</option>
@@ -299,71 +446,79 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
-        {conversationsLoading ? (
-          <div className="text-center py-12 text-parchment-300">Loading conversations...</div>
-        ) : conversations.length === 0 ? (
-          <div className="text-center py-12 px-4 text-parchment-300">
-            No conversations found
-          </div>
-        ) : (
+        {conversationsExpanded && (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-700">
-                <thead className="bg-slate-800/30">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Start Time</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Duration</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Turns</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Channel</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-slate-900 divide-y divide-slate-800">
-                  {conversations.map((conv) => (
-                    <tr key={conv.conversation_id} className="hover:bg-slate-800/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-mono text-parchment-200">{conv.conversation_id.substring(0, 8)}...</td>
-                      <td className="px-6 py-4 text-sm text-parchment-200">{formatDate(conv.start_time)}</td>
-                      <td className="px-6 py-4 text-sm text-parchment-200">
-                        {conv.duration_ms ? formatDuration(conv.duration_ms) : '-'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-parchment-200">{conv.turn_count}</td>
-                      <td className="px-6 py-4 text-sm text-parchment-200">
-                        {conv.triggered_by || '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${conv.has_error ? 'bg-red-900/40 text-red-400 border-red-700' : 'bg-green-900/40 text-green-400 border-green-700'}`}>
-                          {conv.has_error ? `Error (${conv.status_code})` : 'Success'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Pagination */}
-            {conversationsTotal > conversationsLimit && (
-              <div className="px-6 py-4 border-t border-slate-700 flex justify-between items-center">
-                <div className="text-sm text-parchment-300">
-                  Showing {conversationsOffset + 1} to {Math.min(conversationsOffset + conversationsLimit, conversationsTotal)} of {conversationsTotal}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setConversationsOffset(Math.max(0, conversationsOffset - conversationsLimit))}
-                    disabled={conversationsOffset === 0}
-                    className="px-3 py-1 text-sm bg-slate-700 text-parchment-200 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setConversationsOffset(conversationsOffset + conversationsLimit)}
-                    disabled={conversationsOffset + conversationsLimit >= conversationsTotal}
-                    className="px-3 py-1 text-sm bg-slate-700 text-parchment-200 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
+            {conversationsLoading ? (
+              <div className="text-center py-12 text-parchment-300">Loading conversations...</div>
+            ) : conversations.length === 0 ? (
+              <div className="text-center py-12 px-4 text-parchment-300">
+                No conversations found
               </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-700">
+                    <thead className="bg-slate-800/30">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Start Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Duration</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Turns</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Channel</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-slate-900 divide-y divide-slate-800">
+                      {conversations.map((conv) => (
+                        <tr
+                          key={conv.conversation_id}
+                          onClick={() => loadConversationDetails(conv.conversation_id)}
+                          className="hover:bg-slate-800/50 transition-colors cursor-pointer"
+                        >
+                          <td className="px-6 py-4 text-sm font-mono text-parchment-200">{conv.conversation_id.substring(0, 8)}...</td>
+                          <td className="px-6 py-4 text-sm text-parchment-200">{formatDate(conv.start_time)}</td>
+                          <td className="px-6 py-4 text-sm text-parchment-200">
+                            {conv.duration_ms ? formatDuration(conv.duration_ms) : '-'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-parchment-200">{conv.turn_count}</td>
+                          <td className="px-6 py-4 text-sm text-parchment-200">
+                            {conv.triggered_by || '-'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${conv.has_error ? 'bg-red-900/40 text-red-400 border-red-700' : 'bg-green-900/40 text-green-400 border-green-700'}`}>
+                              {conv.has_error ? `Error (${conv.status_code})` : 'Success'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Pagination */}
+                {conversationsTotal > conversationsLimit && (
+                  <div className="px-6 py-4 border-t border-slate-700 flex justify-between items-center">
+                    <div className="text-sm text-parchment-300">
+                      Showing {conversationsOffset + 1} to {Math.min(conversationsOffset + conversationsLimit, conversationsTotal)} of {conversationsTotal}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setConversationsOffset(Math.max(0, conversationsOffset - conversationsLimit))}
+                        disabled={conversationsOffset === 0}
+                        className="px-3 py-1 text-sm bg-slate-700 text-parchment-200 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setConversationsOffset(conversationsOffset + conversationsLimit)}
+                        disabled={conversationsOffset + conversationsLimit >= conversationsTotal}
+                        className="px-3 py-1 text-sm bg-slate-700 text-parchment-200 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -406,7 +561,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Tests</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Conversations</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Created</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Completed</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Actions</th>
@@ -417,7 +572,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       <tr key={sim.id} className="hover:bg-slate-800/50 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-parchment-100">{sim.id}</td>
                         <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(sim.status)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-parchment-200">{sim.num_simulations}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-parchment-200">{sim.conversation_count}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-parchment-200">{formatDate(sim.created_at)}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-parchment-200">
                           {sim.completed_at ? formatDate(sim.completed_at) : '-'}
@@ -481,6 +636,72 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </>
         )}
       </div>
+
+      {/* Conversation Details Modal */}
+      {selectedConversationId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedConversationId(null)}>
+          <div className="bg-slate-900 rounded-lg border border-slate-700 max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-6 border-b border-slate-700">
+              <div>
+                <h2 className="text-xl font-serif font-semibold text-parchment-100">Conversation Details</h2>
+                <p className="text-sm text-parchment-400 mt-1 font-mono">{selectedConversationId}</p>
+              </div>
+              <button onClick={() => setSelectedConversationId(null)} className="text-parchment-300 hover:text-parchment-100 text-2xl">×</button>
+            </div>
+
+            {detailsLoading ? (
+              <div className="p-8 text-center text-parchment-200">Loading conversation...</div>
+            ) : conversationDetails ? (
+              <>
+                {/* Conversation Metadata */}
+                <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-700 flex gap-6 text-sm">
+                  <div>
+                    <span className="text-parchment-400">Turns:</span>
+                    <span className="text-parchment-100 ml-2 font-semibold">{conversationDetails.turn_count}</span>
+                  </div>
+                  <div>
+                    <span className="text-parchment-400">Duration:</span>
+                    <span className="text-parchment-100 ml-2 font-semibold">
+                      {conversationDetails.duration_ms ? formatDuration(conversationDetails.duration_ms) : '-'}
+                    </span>
+                  </div>
+                  {conversationDetails.triggered_by && (
+                    <div>
+                      <span className="text-parchment-400">Channel:</span>
+                      <span className="text-parchment-100 ml-2 font-semibold">{conversationDetails.triggered_by}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Messages */}
+                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                  {conversationDetails.messages && conversationDetails.messages.length > 0 ? (
+                    conversationDetails.messages.map((msg: any, i: number) => (
+                      <div
+                        key={i}
+                        className={`p-4 rounded-lg ${
+                          msg.role === 'user'
+                            ? 'bg-strategic-900/40 border border-strategic-700'
+                            : 'bg-slate-800 border border-slate-700'
+                        }`}
+                      >
+                        <div className="text-xs font-medium text-parchment-300 mb-1">
+                          {msg.role === 'user' ? '👤 User' : '🤖 Assistant'}
+                        </div>
+                        <div className="text-sm text-parchment-200 whitespace-pre-wrap">{msg.content}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-parchment-400 py-8">No messages found</div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="p-8 text-center text-parchment-400">Failed to load conversation</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

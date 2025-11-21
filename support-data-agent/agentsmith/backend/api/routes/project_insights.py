@@ -49,11 +49,6 @@ async def generate_project_insights(
 
     logger.info(f"Generating insights for project {project_id}")
 
-    # TODO: Implement actual insights generation using:
-    # 1. Query Snowflake for conversations
-    # 2. Analyze patterns, errors, trends
-    # 3. Use LLM to generate actionable insights
-
     # For now, return placeholder
     return InsightsResponse(
         insights=[

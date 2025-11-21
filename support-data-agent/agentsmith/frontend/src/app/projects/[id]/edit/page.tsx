@@ -19,6 +19,12 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     auth_type: 'none',
     auth_credentials: {},
     custom_headers: {},
+    source_database: '',
+    source_schema: '',
+    source_table: '',
+    github_owner: '',
+    github_repo: '',
+    target_path: '',
   })
 
   useEffect(() => {
@@ -37,6 +43,12 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         auth_type: project.auth_type,
         auth_credentials: {},  // Don't pre-fill credentials for security
         custom_headers: {},
+        source_database: project.source_database || '',
+        source_schema: project.source_schema || '',
+        source_table: project.source_table || '',
+        github_owner: project.github_owner || '',
+        github_repo: project.github_repo || '',
+        target_path: project.target_path || '',
       })
     } catch (error) {
       alert('Failed to load project')
@@ -136,6 +148,116 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
             className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
             placeholder="https://your-agent.com/api/chat"
           />
+        </div>
+
+        {/* Data Source Section */}
+        <div className="pt-6 border-t border-slate-700">
+          <h3 className="text-lg font-semibold text-parchment-100 mb-4">Data Source</h3>
+          <p className="text-sm text-parchment-300 mb-4">
+            Snowflake table containing conversation traces for analysis
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="source_database" className="block text-sm font-medium text-parchment-200">
+                Database Name
+              </label>
+              <input
+                type="text"
+                id="source_database"
+                value={formData.source_database || ''}
+                onChange={(e) => setFormData({...formData, source_database: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="AI_FDE"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="source_schema" className="block text-sm font-medium text-parchment-200">
+                Schema Name
+              </label>
+              <input
+                type="text"
+                id="source_schema"
+                value={formData.source_schema || ''}
+                onChange={(e) => setFormData({...formData, source_schema: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="CX360_DEMO"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="source_table" className="block text-sm font-medium text-parchment-200">
+                Table Name
+              </label>
+              <input
+                type="text"
+                id="source_table"
+                value={formData.source_table || ''}
+                onChange={(e) => setFormData({...formData, source_table: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="AGENT_TRACES"
+              />
+              <p className="mt-1 text-xs text-parchment-300">
+                Leave blank to use environment defaults (AI_FDE.CX360_DEMO.AGENT_TRACES)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* GitHub Configuration Section */}
+        <div className="pt-6 border-t border-slate-700">
+          <h3 className="text-lg font-semibold text-parchment-100 mb-4">GitHub Configuration</h3>
+          <p className="text-sm text-parchment-300 mb-4">
+            Configure GitHub repository for code recommendations and issue creation
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="github_owner" className="block text-sm font-medium text-parchment-200">
+                GitHub Owner/Organization
+              </label>
+              <input
+                type="text"
+                id="github_owner"
+                value={formData.github_owner || ''}
+                onChange={(e) => setFormData({...formData, github_owner: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="snowflakedb"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="github_repo" className="block text-sm font-medium text-parchment-200">
+                GitHub Repository Name
+              </label>
+              <input
+                type="text"
+                id="github_repo"
+                value={formData.github_repo || ''}
+                onChange={(e) => setFormData({...formData, github_repo: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="aura"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="target_path" className="block text-sm font-medium text-parchment-200">
+                Target Code Path (Optional)
+              </label>
+              <input
+                type="text"
+                id="target_path"
+                value={formData.target_path || ''}
+                onChange={(e) => setFormData({...formData, target_path: e.target.value})}
+                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                placeholder="src/agent"
+              />
+              <p className="mt-1 text-xs text-parchment-300">
+                Specific path in repository where agent code lives (optional)
+              </p>
+            </div>
+          </div>
         </div>
 
         <div>

@@ -38,6 +38,7 @@ export interface Simulation {
   id: number
   project_id: number
   num_simulations: number
+  conversation_count: number
   conversation_timeout_seconds: number
   status: 'pending' | 'running' | 'completed' | 'failed'
   started_at?: string
@@ -54,6 +55,15 @@ export interface SimulationCreate {
   conversation_timeout_seconds?: number
   stop_conditions?: string[]
   metrics_config?: string[]
+
+  // Analysis-specific filters (for analyzing existing conversations from Snowflake)
+  date_from?: Date | null
+  date_to?: Date | null
+  conversation_ids?: string[] | null
+  triggered_by?: string | null
+  include_errors_only?: boolean
+
+  // Legacy fields (for simulation mode with personas)
   edge_case_ratio?: number
   custom_scenarios?: CustomScenario[]
 }
@@ -127,6 +137,26 @@ export interface ConversationSummary {
   started_at?: string
   completed_at?: string
   error_message?: string
+
+  // Evaluation data from ConversationAnalyzer
+  scenario?: {
+    evaluation?: {
+      quality_score?: number           // 0-1
+      confidence?: number              // 0-1
+      ending_assessment?: string       // appropriate/premature/excessive
+      reasoning?: string
+      knowledge_gap?: {
+        type: string                   // missing_documentation | incomplete_knowledge_base
+        description: string
+        evidence: string
+      }
+      capability_gap?: {
+        type: string                   // missing_tool | missing_integration | unsupported_action
+        description: string
+        evidence: string
+      }
+    }
+  }
 }
 
 export interface Message {
@@ -178,6 +208,18 @@ export interface ImprovementSuggestion {
     status?: string
     github_issue_url?: string
     generated_at?: string
+  }
+  knowledge_recommendation?: {
+    title: string
+    doc_type: 'new_page' | 'update_existing' | 'add_example'
+    target_doc: string
+    existing_doc_coverage: string
+    glean_sources: string[]
+    recommended_content: string
+    rationale: string
+    priority: 'high' | 'medium' | 'low'
+    generated_at?: string
+    status?: string
   }
   created_at: string
 }

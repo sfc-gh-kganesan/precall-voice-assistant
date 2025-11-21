@@ -7,7 +7,6 @@ services:
     volumes:
       - .:/app
       - /app/.venv
-      - uv-cache:/root/.cache/uv
     ports:
       - "8082:8080"  # Backend runs on port 8082 (host) -> 8080 (container)
     environment:
@@ -22,7 +21,8 @@ services:
       - SEMANTIC_MODEL_FILE=${SEMANTIC_MODEL_FILE}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - TROUBLESHOOTING_AGENT_URL=${TROUBLESHOOTING_AGENT_URL:-http://host.docker.internal:8002}
-      - GITHUB_PROXY_URL=${GITHUB_PROXY_URL:-http://host.docker.internal:8003/mcp}
+      - GLEAN_PROXY_URL=http://aura-glean-proxy:8001/mcp
+      - GITHUB_PROXY_URL=http://aura-github-proxy:8005/mcp
     command: >-
       sh -c "uv sync &&
       echo '===========================================';
@@ -32,6 +32,8 @@ services:
       echo '===========================================';
       uv run uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload"
     restart: unless-stopped
+    networks:
+      - aura-shared
 
   frontend:
     build:
@@ -64,10 +66,15 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - aura-shared
 
 networks:
-  default:
-    name: agentsmith
+  aura-shared:
+    external: true
+    name: aura-shared-network
 
 volumes:
-  uv-cache:
+  aura-glean-tokens:
+    external: true
+    name: aura-glean-tokens

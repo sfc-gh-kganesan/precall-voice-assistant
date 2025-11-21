@@ -29,9 +29,12 @@ from pydantic import BaseModel, field_validator
 from pydantic_ai import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
+    ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
+    UserPromptPart,
 )
 from pydantic_ai.messages import TextPart
 
@@ -67,6 +70,7 @@ app.add_middleware(
 # Global agent instances (initialized on startup)
 agent = None  # Primary: claude-4-sonnet
 fallback_agent = None  # Fallback: openai-o4-mini (created lazily on first timeout)
+glean_enabled = None  # Track whether Glean is enabled
 
 
 # Request/Response Models
@@ -129,6 +133,7 @@ class HealthResponse(BaseModel):
 
     status: str
     glean_proxy: str
+    glean_enabled: bool
     dda_tools_enabled: bool
 
 
@@ -136,15 +141,22 @@ class HealthResponse(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize the external agent on startup"""
-    global agent
+    global agent, glean_enabled
     logger.info("Initializing External Agent (No DDA)...")
     logger.info("✓ Phoenix tracing initialized")
     logger.info("   View traces at: http://localhost:6006 (or your PHOENIX_COLLECTOR_ENDPOINT)")
+
+    # Read Glean configuration from environment
+    glean_enabled_str = os.getenv("GLEAN_ENABLED", "true").lower()
+    glean_enabled = glean_enabled_str in ("true", "1", "yes")
+
+    logger.info(f"⚙️  GLEAN_ENABLED={glean_enabled}")
 
     try:
         agent = create_external_agent(
             model_name="claude-4-sonnet",
             glean_proxy_url="http://glean-proxy:8001/mcp",
+            enable_glean=glean_enabled,
         )
         logger.info("✓ External agent initialized successfully")
         logger.info("⚠️  DDA tools are DISABLED for this agent")
@@ -161,7 +173,8 @@ async def health_check():
 
     return HealthResponse(
         status="healthy",
-        glean_proxy="http://glean-proxy:8001/mcp",
+        glean_proxy="http://glean-proxy:8001/mcp" if glean_enabled else "disabled",
+        glean_enabled=glean_enabled,
         dda_tools_enabled=False,  # Always false for external agent
     )
 
@@ -169,25 +182,34 @@ async def health_check():
 @app.get("/tools")
 async def list_tools():
     """
-    List all available tools (Glean + Documentation only).
+    List all available tools based on current configuration.
 
     Note: DDA tools are NOT available in this external-facing agent.
     """
     if agent is None:
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
-    return {
-        "glean_tools": [
+    tools_response = {
+        "documentation_tools": [
+            "search_snowflake_documentation - Search official Snowflake docs",
+        ],
+        "support_tools": [
+            "create_support_case - Create a support case for account-specific issues",
+        ],
+        "dda_tools": "DISABLED - This is an external-facing agent with no access to customer diagnostic data",
+    }
+
+    if glean_enabled:
+        tools_response["glean_tools"] = [
             "search - Search documents and files",
             "code_search - Search internal code repositories",
             "employee_search - Find company employees",
             "read_document - Get full document content by URL",
-        ],
-        "documentation_tools": [
-            "search_snowflake_documentation - Search official Snowflake docs",
-        ],
-        "dda_tools": "DISABLED - This is an external-facing agent with no access to customer diagnostic data",
-    }
+        ]
+    else:
+        tools_response["glean_tools"] = "DISABLED - Glean is not enabled for this agent instance"
+
+    return tools_response
 
 
 async def run_agent_with_fallback(
@@ -239,6 +261,7 @@ async def run_agent_with_fallback(
                             fallback_agent = create_external_agent(
                                 model_name="openai-o4-mini",  # Uses same Snowflake Cortex backend
                                 glean_proxy_url="http://glean-proxy:8001/mcp",
+                                enable_glean=glean_enabled,  # Use same Glean configuration
                             )
                             logger.info("✓ Fallback agent created successfully")
                         except Exception as e:
@@ -388,9 +411,30 @@ async def query_agent(
             # Capture span reference to use inside generator
             async def event_stream():
                 full_response = ""
+                collected_messages = []  # Collect messages to save after streaming
                 try:
-                    # Note: We already set gen_ai.input.messages on api_span at line 353
-                    # No need to set it again here
+                    # Load conversation history from storage
+                    history = await storage.get_history(request.conversation_id)
+                    logger.info(
+                        f"Loaded {len(history)} messages from storage for conversation {request.conversation_id}"
+                    )
+
+                    # Get current span to add GenAI semantic conventions for Phoenix
+                    # This is crucial for text queries where agent.run becomes the root span
+                    current_span = trace.get_current_span()
+                    if current_span:
+                        # Add input message in GenAI format for Phoenix UI
+                        current_span.set_attribute(
+                            "gen_ai.input.messages",
+                            json.dumps(
+                                [
+                                    {
+                                        "role": "user",
+                                        "parts": [{"type": "text", "content": message_text}],
+                                    }
+                                ]
+                            ),
+                        )
 
                     async for event in agent.run_stream_events(message_text):
                         # Handle tool call events
@@ -417,6 +461,26 @@ async def query_agent(
                                     yield f"event: text_delta\ndata: {json.dumps({'content': text_content})}\n\n"
 
                     logger.info("Query completed successfully")
+
+                    # Save updated conversation history
+                    # We need to manually construct the messages since streaming doesn't return all_messages()
+                    if full_response:
+                        # Append user message and assistant response to history
+                        # User message
+                        user_msg = ModelRequest(parts=[UserPromptPart(content=message_text)])
+                        # Assistant response
+                        assistant_msg = ModelResponse(parts=[TextPart(content=full_response)])
+
+                        # Update history with new messages
+                        updated_history = history + [user_msg, assistant_msg]
+
+                        # Save back to storage
+                        asyncio.create_task(
+                            storage.save_history(request.conversation_id, updated_history)
+                        )
+                        logger.info(
+                            f"Saved {len(updated_history)} messages for conversation {request.conversation_id}"
+                        )
 
                 except Exception as e:
                     logger.error(f"Error processing query: {e}", exc_info=True)

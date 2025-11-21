@@ -201,6 +201,21 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ apiUrl, conversationId }
                           }
                         }
 
+                        // Check if this is a cumulative response (starts with previous agent message)
+                        // This handles OpenAI sending: "Sure!" then "Sure! Here's the answer"
+                        if (newMessages.length > 0) {
+                          const lastMsg = newMessages[newMessages.length - 1];
+                          if (lastMsg.role === 'agent' && text.startsWith(lastMsg.content)) {
+                            // Cumulative response - update the existing message
+                            currentStreamingMessageIdRef.current = lastMsg.id;
+                            newMessages[newMessages.length - 1] = {
+                              ...lastMsg,
+                              content: text,
+                            };
+                            return newMessages;
+                          }
+                        }
+
                         // No streaming message yet - create new one
                         // This allows multiple agent responses per user question (e.g., acknowledgment + final answer)
                         const newMessageId = `${Date.now()}-${Math.random()}`;

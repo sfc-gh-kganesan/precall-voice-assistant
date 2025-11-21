@@ -17,9 +17,8 @@ from backend.core.simulator import SimulationEngine
 from backend.core.agent_client import AgentClient
 from backend.core.conversation_loader import (
     ConversationLoader,
-)  # NEW: Use conversation loader
+)
 
-# from backend.core.generator import ScenarioGenerator  # DEPRECATED: No longer needed
 from backend.core.stop_conditions import (
     MaxTurnsCondition,
     TimeoutCondition,
@@ -71,26 +70,48 @@ class SimulationRunner:
                 cost_per_1k_tokens=0.001
             )  # Default cost
 
-            # NEW: Use conversation loader instead of scenario generator
-            conversation_loader = ConversationLoader(self.db, project=project)
+            # NEW: Create conversation analyzer for quality evaluation
+            conversation_analyzer = self._create_conversation_analyzer(simulation)
 
-            # Load real conversations from Snowflake AGENT_TRACES table
-            logger.info(
-                f"Loading up to {simulation.num_simulations} conversations from Snowflake..."
-            )
-            logger.info(
-                f"Using table from project config: {project.source_database}.{project.source_schema}.{project.source_table if project.source_database else 'env vars'}"
-            )
+            # Create Snowflake session for loading conversations from AGENT_TRACES
+            # Note: We use a separate Snowflake connection for querying conversation data,
+            # while self.db (SQLite) is used for storing simulation metadata
+            snowflake_session = next(get_snowflake_db())
+            if snowflake_session is None:
+                raise ValueError(
+                    "Snowflake is not configured. Cannot load conversations from AGENT_TRACES. "
+                    "Set SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, SNOWFLAKE_ACCOUNT, "
+                    "SNOWFLAKE_WAREHOUSE, and SNOWFLAKE_ROLE environment variables."
+                )
 
-            # Use date range and filters from simulation config
-            scenarios = await conversation_loader.load_conversations(
-                date_from=simulation.date_from,
-                date_to=simulation.date_to,
-                conversation_ids=simulation.conversation_ids,
-                triggered_by=simulation.triggered_by,
-                include_errors_only=simulation.include_errors_only,
-                limit=simulation.num_simulations,
-            )
+            try:
+                # NEW: Use conversation loader with Snowflake session
+                conversation_loader = ConversationLoader(
+                    snowflake_session, project=project
+                )
+
+                # Load real conversations from Snowflake AGENT_TRACES table
+                logger.info(
+                    f"Loading up to {simulation.num_simulations} conversations from Snowflake..."
+                )
+                logger.info(
+                    f"Using table from project config: {project.source_database}.{project.source_schema}.{project.source_table if project.source_database else 'env vars'}"
+                )
+
+                # Use date range and filters from simulation config
+                scenarios = await conversation_loader.load_conversations(
+                    date_from=simulation.date_from,
+                    date_to=simulation.date_to,
+                    conversation_ids=simulation.conversation_ids,
+                    triggered_by=simulation.triggered_by,
+                    include_errors_only=simulation.include_errors_only,
+                    limit=simulation.num_simulations,
+                )
+            finally:
+                # Clean up Snowflake session after loading conversations
+                if snowflake_session:
+                    snowflake_session.close()
+                    logger.info("Snowflake session closed after loading conversations")
 
             if not scenarios:
                 raise ValueError(
@@ -134,6 +155,7 @@ class SimulationRunner:
                 agent_client=agent_client,  # None for analysis mode
                 stop_conditions=stop_conditions,
                 metrics_calculator=metrics_calculator,
+                conversation_analyzer=conversation_analyzer,  # NEW: For evaluating completed conversations
                 concurrency=simulation.concurrency,
                 max_turns=simulation.max_turns,
                 conversation_timeout_seconds=simulation.conversation_timeout_seconds,
@@ -202,16 +224,19 @@ class SimulationRunner:
             #         )
             #     )
             elif condition_name == "llm_judge":
-                # Add LLM-based intelligent stop condition if Cortex is configured
-                cortex_key = os.getenv("SNOWFLAKE_CORTEX_API_KEY")
-                cortex_url = os.getenv("SNOWFLAKE_CORTEX_BASE_URL")
+                # Use same env var pattern as analyzer and insights
+                api_key = os.getenv("SNOWFLAKE_PASSWORD")
+                account = os.getenv("SNOWFLAKE_ACCOUNT")
 
-                if cortex_key and cortex_url:
+                if api_key and account:
+                    base_url = (
+                        f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1"
+                    )
                     logger.info("Adding LLM-based stop condition with Snowflake Cortex")
                     conditions.append(
                         LLMStopCondition(
-                            api_key=cortex_key,
-                            base_url=cortex_url,
+                            api_key=api_key,
+                            base_url=base_url,
                             model="claude-4-sonnet",
                             confidence_threshold=0.75,  # Slightly more lenient than default
                             max_retries=2,
@@ -219,32 +244,13 @@ class SimulationRunner:
                     )
                 else:
                     logger.warning(
-                        "llm_judge requested but Snowflake Cortex not configured, skipping"
+                        "llm_judge requested but Snowflake Cortex not configured. "
+                        "Set SNOWFLAKE_PASSWORD and SNOWFLAKE_ACCOUNT."
                     )
 
         if len(conditions) > 1:
             return [CombinedStopCondition(conditions)]
         return conditions
-
-    # DEPRECATED: No longer needed - we load real conversations from Snowflake
-    # def _create_scenario_generator(
-    #     self, project: Project
-    # ) -> Optional[ScenarioGenerator]:
-    #     """Create a scenario generator if LLM config is available."""
-    #     # For now, we'll use OpenAI if API key is in environment
-    #     # In production, this should be configurable per project
-    #     import os
-    #
-    #     api_key = os.environ.get("OPENAI_API_KEY")
-    #     if not api_key:
-    #         logger.warning("No OPENAI_API_KEY found, will use fallback scenarios")
-    #         return None
-    #
-    #     return ScenarioGenerator(
-    #         provider="openai",
-    #         api_key=api_key,
-    #         model="gpt-4o-mini",
-    #     )
 
     def _create_user_simulator(self) -> Optional:
         """Create a user simulator if LLM config is available."""
@@ -271,29 +277,6 @@ class SimulationRunner:
             model="claude-4-sonnet",
             base_url=base_url,
         )
-
-    # DEPRECATED: No longer needed - we load real conversations from Snowflake
-    # async def _generate_scenarios(
-    #     self,
-    #     generator: Optional[ScenarioGenerator],
-    #     num_scenarios: int,
-    #     business_context: str,
-    # ) -> List[Scenario]:
-    #     """Generate test scenarios."""
-    #     if generator:
-    #         try:
-    #             scenarios = await generator.generate_scenarios(
-    #                 business_context=business_context,
-    #                 num_scenarios=num_scenarios,
-    #             )
-    #             return scenarios
-    #         except Exception as e:
-    #             logger.warning(
-    #                 f"Failed to generate scenarios with LLM: {e}, using fallback"
-    #             )
-    #
-    #     # Fallback: create simple test scenarios
-    #     return self._create_fallback_scenarios(num_scenarios)
 
     def _parse_custom_scenarios(self, custom_scenarios: List[Dict]) -> List[Scenario]:
         """Parse custom scenarios from API request."""
@@ -488,8 +471,36 @@ class SimulationRunner:
         )
         conversation.completed_at = datetime.utcnow()
 
+        # Store evaluation results in scenario JSON if available
+        # TODO: Once DB migration is done, store in dedicated columns
+        if "evaluation" in result.metrics:
+            eval_data = result.metrics["evaluation"]
+
+            # Store evaluation in scenario metadata for now
+            if not conversation.scenario:
+                conversation.scenario = {}
+
+            conversation.scenario["evaluation"] = {
+                "quality_score": eval_data.get("quality_score"),
+                "confidence": eval_data.get("confidence"),
+                "ending_assessment": eval_data.get("ending_assessment"),
+                "reasoning": eval_data.get("reasoning"),
+                "knowledge_gap": eval_data.get("knowledge_gap"),
+                "capability_gap": eval_data.get("capability_gap"),
+            }
+
+            logger.info(
+                f"Stored evaluation for conversation {conversation_id}: "
+                f"quality={eval_data.get('quality_score'):.2f}, "
+                f"ending={eval_data.get('ending_assessment')}"
+            )
+
         # Store metrics
         for metric_name, metric_value in result.metrics.items():
+            # Skip 'evaluation' dict - already stored in scenario JSON
+            if metric_name == "evaluation":
+                continue
+
             if isinstance(metric_value, dict):
                 for sub_name, sub_value in metric_value.items():
                     metric = ConversationMetric(
@@ -621,9 +632,36 @@ class SimulationRunner:
             judge = InsightsJudge(api_key=api_key, base_url=base_url, model=model)
             insights = await judge.generate_insights(simulation_id, self.db)
 
-            logger.info(
-                f"Successfully generated {len(insights)} AI insights for simulation {simulation_id}"
+            # Mark insights as generated on the simulation record
+            simulation = (
+                self.db.query(Simulation).filter(Simulation.id == simulation_id).first()
             )
+            if simulation:
+                simulation.llm_insights_generated = True
+                simulation.llm_insights_generated_at = datetime.utcnow()
+                self.db.commit()
+                logger.info(
+                    f"Successfully generated {len(insights)} AI insights for simulation {simulation_id}, flag set"
+                )
+
+                # Generate code/knowledge recommendations for each insight
+                logger.info(
+                    f"Generating recommendations for {len(insights)} insights..."
+                )
+                from backend.api.routes.insights import (
+                    _generate_recommendations_for_insights,
+                )
+
+                await _generate_recommendations_for_insights(
+                    simulation, insights, self.db
+                )
+                logger.info(
+                    f"Recommendation generation complete for simulation {simulation_id}"
+                )
+            else:
+                logger.warning(
+                    f"Simulation {simulation_id} not found when setting insights flag"
+                )
 
         except Exception as e:
             logger.error(

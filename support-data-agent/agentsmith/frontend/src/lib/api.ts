@@ -41,6 +41,8 @@ export const projectsApi = {
   getMetrics: (id: number) => api.get(`/api/projects/${id}/metrics`),
   getConversations: (id: number, params?: { limit?: number; offset?: number; triggered_by?: string; errors_only?: boolean }) =>
     api.get(`/api/projects/${id}/conversations`, { params }),
+  getConversationDetails: (projectId: number, conversationId: string) =>
+    api.get(`/api/projects/${projectId}/conversations/${conversationId}`),
   generateInsights: (id: number, data?: { date_from?: string; date_to?: string }) =>
     api.post(`/api/projects/${id}/insights`, data || {}),
 }

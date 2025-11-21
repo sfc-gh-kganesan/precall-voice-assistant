@@ -35,6 +35,7 @@ class SimulationEngine:
         max_turns: int = 20,
         conversation_timeout_seconds: int = 600,
         user_simulator: Optional["UserSimulator"] = None,
+        conversation_analyzer: Optional = None,
         on_conversation_complete: Optional[callable] = None,
         on_conversation_start: Optional[callable] = None,
         on_message_added: Optional[callable] = None,
@@ -49,6 +50,7 @@ class SimulationEngine:
             max_turns: Maximum number of turns as a hard guardrail (default: 20)
             conversation_timeout_seconds: Maximum time per conversation in seconds (default: 600)
             user_simulator: Optional user simulator for multi-turn conversations
+            conversation_analyzer: Optional analyzer for evaluating completed conversations
             on_conversation_complete: Optional callback when a conversation completes
             on_conversation_start: Optional callback when a conversation starts
             on_message_added: Optional callback when a message is added
@@ -60,6 +62,7 @@ class SimulationEngine:
         self.metrics_calculator = metrics_calculator
         self.concurrency = concurrency
         self.user_simulator = user_simulator
+        self.conversation_analyzer = conversation_analyzer
         self.on_conversation_complete = on_conversation_complete
         self.on_conversation_start = on_conversation_start
         self.on_message_added = on_message_added
@@ -181,21 +184,63 @@ class SimulationEngine:
                 turn_count=len(messages),
             )
             try:
-                metrics = self.metrics_calculator.calculate_metrics(
-                    context=context,
-                    success=success,
-                    duration_ms=duration_ms,
-                )
+                metrics = self.metrics_calculator.calculate_metrics(context, messages)
             except Exception as e:
                 logger.warning(f"Failed to calculate metrics: {e}")
                 metrics = {}
 
+        # Use ConversationAnalyzer if available to evaluate the conversation
+        if self.conversation_analyzer:
+            context = ConversationContext(
+                conversation_id=conversation_id,
+                messages=messages,
+                started_at=started_at_str or datetime.utcnow().isoformat(),
+                turn_count=len(messages),
+            )
+            try:
+                logger.info(
+                    f"Evaluating conversation {conversation_id} with ConversationAnalyzer"
+                )
+                evaluation = await self.conversation_analyzer.evaluate_conversation(
+                    context, messages
+                )
+
+                # Override success based on analyzer evaluation
+                success = evaluation.conversation_successful
+
+                # Store evaluation results in metrics
+                metrics["evaluation"] = {
+                    "quality_score": evaluation.quality_score,
+                    "confidence": evaluation.confidence,
+                    "ending_assessment": evaluation.ending_assessment,
+                    "reasoning": evaluation.reasoning,
+                    "knowledge_gap": evaluation.knowledge_gap.to_dict()
+                    if evaluation.knowledge_gap
+                    else None,
+                    "capability_gap": evaluation.capability_gap.to_dict()
+                    if evaluation.capability_gap
+                    else None,
+                }
+
+                logger.info(
+                    f"Conversation {conversation_id} evaluation: "
+                    f"successful={success}, quality={evaluation.quality_score:.2f}, "
+                    f"ending={evaluation.ending_assessment}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to evaluate conversation {conversation_id}: {e}",
+                    exc_info=True,
+                )
+                # Don't fail the entire analysis if evaluation fails
+
         # Create result
         result = SimulationResult(
             conversation_id=conversation_id,
+            scenario=scenario,  # Required field for Pydantic validation
             success=success,
             messages=messages,
-            stop_reason=StopReason.CUSTOM_CONDITION,  # Already completed
+            stop_reason=StopReason.HISTORICAL_DATA,  # Pre-completed conversation from Snowflake
             duration_ms=duration_ms,
             metrics=metrics,
         )

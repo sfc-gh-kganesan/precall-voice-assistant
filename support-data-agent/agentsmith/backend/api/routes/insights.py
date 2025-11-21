@@ -46,11 +46,22 @@ async def get_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
         .all()
     )
 
-    if existing_insights and simulation.llm_insights_generated:
-        logger.info(
-            f"Returning {len(existing_insights)} cached AI insights for simulation {simulation_id}"
-        )
-        return existing_insights
+    if existing_insights:
+        if simulation.llm_insights_generated:
+            # Valid complete insights exist, return them
+            logger.info(
+                f"Returning {len(existing_insights)} cached AI insights for simulation {simulation_id}"
+            )
+            return existing_insights
+        else:
+            # Orphaned insights exist without flag set - clean them up before regenerating
+            logger.warning(
+                f"Found {len(existing_insights)} orphaned insights without flag set for simulation {simulation_id}, cleaning up before regenerating"
+            )
+            db.query(ImprovementSuggestion).filter(
+                ImprovementSuggestion.simulation_id == simulation_id
+            ).delete()
+            db.commit()
 
     # Generate insights if they don't exist
     logger.info(f"Generating AI insights for simulation {simulation_id}")
@@ -82,7 +93,7 @@ async def get_ai_insights(simulation_id: int, db: Session = Depends(get_db)):
         )
 
         # Automatically generate code recommendations for all insights
-        await _generate_code_recommendations_for_insights(simulation, insights, db)
+        await _generate_recommendations_for_insights(simulation, insights, db)
 
         return insights
 
@@ -144,7 +155,7 @@ async def regenerate_ai_insights(simulation_id: int, db: Session = Depends(get_d
         )
 
         # Automatically generate code recommendations for all insights
-        await _generate_code_recommendations_for_insights(simulation, insights, db)
+        await _generate_recommendations_for_insights(simulation, insights, db)
 
         return insights
 
@@ -155,10 +166,14 @@ async def regenerate_ai_insights(simulation_id: int, db: Session = Depends(get_d
         )
 
 
-async def _generate_code_recommendations_for_insights(
+async def _generate_recommendations_for_insights(
     simulation: Simulation, insights: List[ImprovementSuggestion], db: Session
 ):
-    """Generate code recommendations for all insights using the code agent.
+    """Generate code and knowledge recommendations for insights using appropriate agents.
+
+    Routes insights to:
+    - knowledge_agent.py for knowledge category (doc recommendations)
+    - code_agent.py for other categories (code recommendations)
 
     Args:
         simulation: The simulation object
@@ -169,42 +184,75 @@ async def _generate_code_recommendations_for_insights(
     project = db.query(Project).filter(Project.id == simulation.project_id).first()
     if not project:
         logger.warning(
-            f"Project {simulation.project_id} not found, skipping code recommendations"
+            f"Project {simulation.project_id} not found, skipping recommendations"
         )
         return
 
-    # Check if GitHub configuration exists
-    if not project.github_owner or not project.github_repo:
-        logger.info(
-            f"No GitHub configuration for project {project.id}, skipping code recommendations"
-        )
-        return
+    # Check if GitHub configuration exists (needed for code agent)
+    has_github_config = bool(project.github_owner and project.github_repo)
+
+    # Get Glean proxy URL for knowledge agent
+    glean_proxy_url = os.getenv("GLEAN_PROXY_URL", "http://aura-glean-proxy:8001/mcp")
 
     try:
-        # Import code agent module
-        from backend.code_agent.code_agent import generate_recommendation_for_insight
-
-        target_repo = f"{project.github_owner}/{project.github_repo}"
-        target_path = project.target_path or ""
-
-        logger.info(f"Generating code recommendations for {len(insights)} insights")
-        logger.info(f"Target: {target_repo}/{target_path}")
+        logger.info(f"Generating recommendations for {len(insights)} insights")
 
         # Generate recommendations for each insight (with rate limiting)
         for i, insight in enumerate(insights):
             try:
-                recommendation = await generate_recommendation_for_insight(
-                    insight.id, target_repo=target_repo, target_path=target_path
-                )
-
-                if recommendation:
+                # Route based on category
+                if insight.category == "knowledge":
+                    # Use knowledge agent for documentation recommendations
                     logger.info(
-                        f"Generated code recommendation for insight {insight.id}"
+                        f"Routing insight {insight.id} to knowledge_agent (category: knowledge)"
                     )
+                    from backend.code_agent.knowledge_agent import (
+                        generate_knowledge_recommendation,
+                    )
+
+                    recommendation = await generate_knowledge_recommendation(
+                        insight.id, glean_proxy_url=glean_proxy_url
+                    )
+
+                    if recommendation:
+                        logger.info(
+                            f"Generated knowledge recommendation for insight {insight.id}"
+                        )
+                    else:
+                        logger.warning(
+                            f"No knowledge recommendation generated for insight {insight.id}"
+                        )
+
                 else:
-                    logger.warning(
-                        f"No code recommendation generated for insight {insight.id}"
+                    # Use code agent for code recommendations
+                    if not has_github_config:
+                        logger.info(
+                            f"Skipping insight {insight.id}: no GitHub configuration"
+                        )
+                        continue
+
+                    logger.info(
+                        f"Routing insight {insight.id} to code_agent (category: {insight.category})"
                     )
+                    from backend.code_agent.code_agent import (
+                        generate_recommendation_for_insight,
+                    )
+
+                    target_repo = f"{project.github_owner}/{project.github_repo}"
+                    target_path = project.target_path or ""
+
+                    recommendation = await generate_recommendation_for_insight(
+                        insight.id, target_repo=target_repo, target_path=target_path
+                    )
+
+                    if recommendation:
+                        logger.info(
+                            f"Generated code recommendation for insight {insight.id}"
+                        )
+                    else:
+                        logger.warning(
+                            f"No code recommendation generated for insight {insight.id}"
+                        )
 
                 # Rate limiting: wait between insights to avoid API limits
                 if i < len(insights) - 1:
@@ -212,7 +260,7 @@ async def _generate_code_recommendations_for_insights(
 
             except Exception as e:
                 logger.error(
-                    f"Failed to generate code recommendation for insight {insight.id}: {e}"
+                    f"Failed to generate recommendation for insight {insight.id}: {e}"
                 )
                 continue
 
@@ -417,7 +465,7 @@ async def _create_github_issue_via_mcp(
         URL of the created issue
     """
     # Check if GitHub proxy is available
-    github_proxy_url = os.getenv("GITHUB_PROXY_URL", "http://localhost:8003/mcp")
+    github_proxy_url = os.getenv("GITHUB_PROXY_URL", "http://localhost:8005/mcp")
 
     try:
         # Use FastMCP client to call the GitHub MCP proxy

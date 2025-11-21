@@ -121,14 +121,70 @@ class ConversationLoader:
 
         logger.info(f"Found {len(conversations_meta)} conversations to load")
 
-        # Load full conversation details for each
+        if not conversations_meta:
+            return []
+
+        # OPTIMIZATION: Batch load all messages for all conversations in a single query
+        # This replaces N individual queries with 1 batch query
+        conversation_ids = [conv.conversation_id for conv in conversations_meta]
+
+        # Build batch query to get all messages for all conversations
+        messages_query = f"""
+            SELECT
+                conversation_id,
+                trace_id,
+                start_time,
+                end_time,
+                input_text,
+                output_text,
+                latency_ms,
+                token_count_input,
+                token_count_output,
+                model_name,
+                status_code,
+                status_message
+            FROM {self.table_name}
+            WHERE conversation_id IN ({",".join([f":conv_id_{i}" for i in range(len(conversation_ids))])})
+                AND name = 'api.query'
+                AND (input_text IS NOT NULL OR output_text IS NOT NULL)
+            ORDER BY conversation_id, start_time ASC
+        """
+
+        messages_params = {
+            f"conv_id_{i}": conv_id for i, conv_id in enumerate(conversation_ids)
+        }
+
+        logger.info(
+            f"Batch loading messages for {len(conversation_ids)} conversations..."
+        )
+        messages_result = self.db.execute(text(messages_query), messages_params)
+        all_messages = messages_result.fetchall()
+
+        logger.info(f"Loaded {len(all_messages)} total messages in batch")
+
+        # Group messages by conversation_id
+        messages_by_conversation = {}
+        for msg in all_messages:
+            if msg.conversation_id not in messages_by_conversation:
+                messages_by_conversation[msg.conversation_id] = []
+            messages_by_conversation[msg.conversation_id].append(msg)
+
+        # Transform each conversation into a Scenario
         scenarios = []
         for conv_meta in conversations_meta:
             try:
-                scenario = await self._load_conversation_details(
+                messages = messages_by_conversation.get(conv_meta.conversation_id, [])
+                if not messages:
+                    logger.warning(
+                        f"No messages found for conversation {conv_meta.conversation_id}"
+                    )
+                    continue
+
+                scenario = await self._build_scenario_from_messages(
                     conv_meta.conversation_id,
                     conv_meta.interaction_type,
                     conv_meta.error_count > 0,
+                    messages,
                 )
                 if scenario:
                     scenarios.append(scenario)
@@ -142,45 +198,26 @@ class ConversationLoader:
         logger.info(f"Successfully loaded {len(scenarios)} conversations")
         return scenarios
 
-    async def _load_conversation_details(
-        self, conversation_id: str, interaction_type: str, has_errors: bool
+    async def _build_scenario_from_messages(
+        self,
+        conversation_id: str,
+        interaction_type: str,
+        has_errors: bool,
+        messages: List[Any],
     ) -> Optional[Scenario]:
-        """Load full conversation details including all messages.
+        """Build a Scenario from pre-loaded conversation messages.
 
         Args:
             conversation_id: Unique conversation ID from Snowflake
             interaction_type: 'voice', 'text', or 'unknown'
             has_errors: Whether conversation had any errors
+            messages: List of pre-loaded message records
 
         Returns:
             Scenario object with persona, goal, and initial query
         """
-        # Query to get all messages in conversation order
-        query = f"""
-            SELECT
-                trace_id,
-                start_time,
-                end_time,
-                input_text,
-                output_text,
-                latency_ms,
-                token_count_input,
-                token_count_output,
-                model_name,
-                status_code,
-                status_message
-            FROM {self.table_name}
-            WHERE conversation_id = :conversation_id
-                AND name = 'api.query'
-                AND (input_text IS NOT NULL OR output_text IS NOT NULL)
-            ORDER BY start_time ASC
-        """
-
-        result = self.db.execute(text(query), {"conversation_id": conversation_id})
-        messages = result.fetchall()
-
         if not messages:
-            logger.warning(f"No messages found for conversation {conversation_id}")
+            logger.warning(f"No messages provided for conversation {conversation_id}")
             return None
 
         # Extract first user message as initial query
@@ -381,8 +418,39 @@ class ConversationLoader:
             logger.warning(f"Conversation {conversation_id} not found")
             return None
 
-        return await self._load_conversation_details(
+        # Load messages for this conversation
+        messages_query = f"""
+            SELECT
+                trace_id,
+                start_time,
+                end_time,
+                input_text,
+                output_text,
+                latency_ms,
+                token_count_input,
+                token_count_output,
+                model_name,
+                status_code,
+                status_message
+            FROM {self.table_name}
+            WHERE conversation_id = :conversation_id
+                AND name = 'api.query'
+                AND (input_text IS NOT NULL OR output_text IS NOT NULL)
+            ORDER BY start_time ASC
+        """
+
+        messages_result = self.db.execute(
+            text(messages_query), {"conversation_id": conversation_id}
+        )
+        messages = messages_result.fetchall()
+
+        if not messages:
+            logger.warning(f"No messages found for conversation {conversation_id}")
+            return None
+
+        return await self._build_scenario_from_messages(
             conv_meta.conversation_id,
             conv_meta.interaction_type,
             conv_meta.error_count > 0,
+            messages,
         )

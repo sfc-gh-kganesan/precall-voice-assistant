@@ -15,8 +15,10 @@ from fastapi import FastAPI
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+
+# Import shared Snowflake Cortex model
+from backend.code_agent.snowflake_cortex_model import SnowflakeCortexModel
 
 # Load environment variables
 load_dotenv()
@@ -64,31 +66,6 @@ def reset_snowpark_session():
             pass
     _snowpark_session = None
     logger.info("Snowpark session reset")
-
-
-class SnowflakeCortexModel(OpenAIChatModel):
-    """Custom model that handles Snowflake Cortex API response quirks."""
-
-    def _process_response(self, response):
-        """Patch Snowflake's empty fields before validation."""
-        response_dict = response.model_dump()
-
-        # Fix empty finish_reason
-        if "choices" in response_dict:
-            for choice in response_dict["choices"]:
-                if choice.get("finish_reason") == "":
-                    choice["finish_reason"] = "stop"
-
-        # Fix empty service_tier
-        if response_dict.get("service_tier") == "":
-            response_dict["service_tier"] = "default"
-
-        # Re-create response with fixed data
-        from openai.types import chat
-
-        fixed_response = chat.ChatCompletion.model_validate(response_dict)
-
-        return super()._process_response(fixed_response)
 
 
 # Setup OpenAI client for Snowflake Cortex

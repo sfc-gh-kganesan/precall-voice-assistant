@@ -4,6 +4,7 @@ import { use, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { simulationsApi, conversationsApi } from '@/lib/api'
 import type { Simulation, ConversationSummary, Conversation } from '@/lib/types'
+import { QualityScoreBadge, EndingAssessmentBadge, KnowledgeGapBadge, CapabilityGapBadge, GapCard } from '@/components/GapIndicators'
 
 export default function MonitorSimulationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -83,13 +84,14 @@ export default function MonitorSimulationPage({ params }: { params: Promise<{ id
   const completed = conversations.filter(c => c.completed_at)
   const inProgress = conversations.filter(c => !c.completed_at)
   const successful = completed.filter(c => c.success)
-  const progress = simulation.num_simulations > 0 ? (completed.length / simulation.num_simulations) * 100 : 0
+  const totalConversations = conversations.length
+  const progress = totalConversations > 0 ? (completed.length / totalConversations) * 100 : 0
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8 flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-parchment-100">Simulation Monitor</h1>
+          <h1 className="text-3xl font-serif font-bold text-parchment-100">Analysis Monitor</h1>
           <p className="text-sm text-parchment-200 mt-2">ID: {simulation.id} • Status: {simulation.status}</p>
         </div>
         {simulation.status === 'completed' && (
@@ -102,7 +104,7 @@ export default function MonitorSimulationPage({ params }: { params: Promise<{ id
       <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 mb-6">
         <div className="flex justify-between mb-2">
           <span className="text-sm font-medium text-parchment-100">Overall Progress</span>
-          <span className="text-sm text-parchment-200">{completed.length} of {simulation.num_simulations}</span>
+          <span className="text-sm text-parchment-200">{completed.length} of {totalConversations}</span>
         </div>
         <div className="w-full bg-slate-700 rounded-full h-4">
           <div className="bg-strategic-600 h-4 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
@@ -193,13 +195,25 @@ function ConversationCard({ conversation, onClick }: { conversation: Conversatio
 
         <div className="text-xs font-medium ml-2">
           {isComplete ? (
-            <span className={`px-2 py-1 rounded-full ${
-              conversation.success
-                ? 'bg-green-900/50 text-green-300 border border-green-700'
-                : 'bg-red-900/50 text-red-300 border border-red-700'
-            }`}>
-              {conversation.success ? '✓ Success' : '✗ Failed'}
-            </span>
+            <div className="flex flex-col gap-2 items-end">
+              <span className={`px-2 py-1 rounded-full ${
+                conversation.success
+                  ? 'bg-green-900/50 text-green-300 border border-green-700'
+                  : 'bg-red-900/50 text-red-300 border border-red-700'
+              }`}>
+                {conversation.success ? '✓ Success' : '✗ Failed'}
+              </span>
+
+              {/* Quality Score */}
+              {conversation.scenario?.evaluation?.quality_score !== undefined && (
+                <QualityScoreBadge score={conversation.scenario.evaluation.quality_score} compact />
+              )}
+
+              {/* Ending Assessment */}
+              {conversation.scenario?.evaluation?.ending_assessment && (
+                <EndingAssessmentBadge assessment={conversation.scenario.evaluation.ending_assessment} compact />
+              )}
+            </div>
           ) : (
             <span className="px-2 py-1 rounded-full bg-strategic-900/50 text-strategic-300 border border-strategic-600">
               Running
@@ -212,6 +226,18 @@ function ConversationCard({ conversation, onClick }: { conversation: Conversatio
       {isComplete && !conversation.success && conversation.stop_reason && (
         <div className="mt-2 text-xs text-parchment-200">
           <span className="font-medium">Reason:</span> {conversation.stop_reason}
+        </div>
+      )}
+
+      {/* Gap Indicators */}
+      {isComplete && (conversation.scenario?.evaluation?.knowledge_gap || conversation.scenario?.evaluation?.capability_gap) && (
+        <div className="flex gap-1 mt-2">
+          {conversation.scenario.evaluation.knowledge_gap && (
+            <KnowledgeGapBadge gap={conversation.scenario.evaluation.knowledge_gap} />
+          )}
+          {conversation.scenario.evaluation.capability_gap && (
+            <CapabilityGapBadge gap={conversation.scenario.evaluation.capability_gap} />
+          )}
         </div>
       )}
     </div>
@@ -288,6 +314,66 @@ function ConversationModal({ conversation, onClose, isLoading }: {
             ×
           </button>
         </div>
+
+        {/* Evaluation Section */}
+        {isComplete && conversation.scenario?.evaluation && (
+          <div className="px-6 py-4 bg-slate-800/30 border-b border-slate-700">
+            <h4 className="text-sm font-semibold text-parchment-200 mb-3">AI Evaluation</h4>
+
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              {/* Quality Score */}
+              {conversation.scenario.evaluation.quality_score !== undefined && (
+                <div>
+                  <div className="text-xs text-parchment-300 mb-1">Quality Score</div>
+                  <QualityScoreBadge
+                    score={conversation.scenario.evaluation.quality_score}
+                    showLabel
+                  />
+                </div>
+              )}
+
+              {/* Ending Assessment */}
+              {conversation.scenario.evaluation.ending_assessment && (
+                <div>
+                  <div className="text-xs text-parchment-300 mb-1">Ending Assessment</div>
+                  <EndingAssessmentBadge
+                    assessment={conversation.scenario.evaluation.ending_assessment}
+                    showLabel
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Reasoning */}
+            {conversation.scenario.evaluation.reasoning && (
+              <div className="mb-3">
+                <div className="text-xs text-parchment-300 mb-1">Reasoning</div>
+                <p className="text-sm text-parchment-200">{conversation.scenario.evaluation.reasoning}</p>
+              </div>
+            )}
+
+            {/* Gaps */}
+            {(conversation.scenario.evaluation.knowledge_gap || conversation.scenario.evaluation.capability_gap) && (
+              <div>
+                <div className="text-xs text-parchment-300 mb-2">Detected Gaps</div>
+                <div className="space-y-2">
+                  {conversation.scenario.evaluation.knowledge_gap && (
+                    <GapCard
+                      type="knowledge"
+                      gap={conversation.scenario.evaluation.knowledge_gap}
+                    />
+                  )}
+                  {conversation.scenario.evaluation.capability_gap && (
+                    <GapCard
+                      type="capability"
+                      gap={conversation.scenario.evaluation.capability_gap}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Failure details */}
         {isComplete && !conversation.success && (conversation.stop_reason || conversation.error_message) && (
