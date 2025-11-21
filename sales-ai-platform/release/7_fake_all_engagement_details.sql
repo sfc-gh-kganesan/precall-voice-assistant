@@ -1,22 +1,17 @@
 -- Create a fake all_engagement_details table for testing
-CREATE OR REPLACE TABLE ${DATABASE}.${SCHEMA}.potential_new_use_cases(
-    new_use_case_id VARCHAR DEFAULT UUID_STRING(),
-    record_creation_dttm DATETIME DEFAULT CURRENT_TIMESTAMP(),
-    activity_date DATE,
-    activity_id VARCHAR,
-    owner_id VARCHAR,
-    salesforce_account_id VARCHAR,
-    use_case_description VARCHAR,
-    use_case_name VARCHAR,
-    workloads ARRAY,
-    technical_use_cases ARRAY,
-    incumbent_vendor VARCHAR,
-    status VARCHAR DEFAULT 'REVIEW',
-    status_review_dttm DATETIME DEFAULT NULL
-    
-    sfdc_use_case_id VARCHAR DEFAULT NULL
-    last_updated_dttm DATETIME DEFAULT NULL
-    last_update_by VARCHAR DEFAULT NULL
+create or replace table ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic (
+CRM_ACCOUNT_NAME VARCHAR,
+TYPE VARCHAR(11),
+ACTIVITY_ID VARCHAR,
+SALESFORCE_ACCOUNT_ID VARCHAR,
+PARTICIPANT_NAMES VARCHAR,
+SUBJECT VARCHAR,
+RAW_CONTENT VARCHAR,
+OWNER_ID VARCHAR,
+TAKEAWAYS VARCHAR,
+ACTIVITY_DATE DATE,
+USER_COLUMN ARRAY,
+DS DATE
 );
 insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
 'CompanyA', 
