@@ -103,14 +103,21 @@ async def run_cli(
         server_url: URL of the DDA MCP server
         glean_proxy_url: URL of the Glean proxy server (or None to disable)
     """
-    print("=" * 70)
-    print("DDA Support Agent - Interactive CLI")
-    print("=" * 70)
-    print(f"\nModel: {model_name} (via Snowflake Cortex)")
-    print(f"DDA MCP Server: {server_url}")
-    if glean_proxy_url:
-        print(f"Glean Proxy: {glean_proxy_url}")
-    print("\nConnecting to MCP servers...")
+    print("\n")
+    print("    ╔═══════════════════════════════════════════════════╗")
+    print("    ║                                                   ║")
+    print("    ║            _____ __   __   _____                  ║")
+    print("    ║           / ____|\ \ / /  / ____|                 ║")
+    print("    ║          | |      \ V /  | |                      ║")
+    print("    ║          | |       > <   | |                      ║")
+    print("    ║          | |____  / . \  | |____                  ║")
+    print("    ║           \_____\/_/ \_\  \_____|                 ║")
+    print("    ║                                                   ║")
+    print("    ║                  CX Copilot                       ║")
+    print("    ║       Your Snowflake troubleshooting AI          ║")
+    print("    ║                                                   ║")
+    print("    ╚═══════════════════════════════════════════════════╝")
+    print("\n  Initializing...")
 
     try:
         # Create the agent with both DDA and Glean toolsets
@@ -120,16 +127,16 @@ async def run_cli(
             glean_proxy_url=glean_proxy_url,
         )
 
-        print("\nAgent ready! Type your questions or commands:")
-        print("  - Ask about cases: 'Get details for case 01172497'")
-        print("  - Analyze locks: 'Analyze transaction locks for query 01c00d3d...'")
-        print("  - Search cases: 'Find open performance cases'")
-        if glean_proxy_url:
-            print("  - Search docs: 'Search for documents about authentication'")
-            print("  - Find people: 'Who works on query optimization?'")
-        print("  - Type 'help' for more examples")
-        print("  - Type 'exit' or 'quit' to end")
-        print("=" * 70)
+        print("\n✓ Ready! I have access to:")
+        print("  • DDA diagnostic tools for deep case analysis")
+        print("  • Enterprise knowledge base and documentation")
+        print("  • Best practices and troubleshooting workflows")
+        print("\nWhat can I help you with?")
+        print("  • Investigate a case or query")
+        print("  • Analyze performance or errors")
+        print("  • Search documentation and past solutions")
+        print("\nType 'help' for examples or 'exit' to quit")
+        print("=" * 60)
 
         # Start the REPL loop
         while True:
