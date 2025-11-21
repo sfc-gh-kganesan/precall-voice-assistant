@@ -41,6 +41,9 @@ class DedupeStructuredOutputState(BaseModel):
     duplicate_use_case_name: str = Field(default="", description="Name of the existing use case that is a duplicate of the proposed new use case.")
 
 
+# TODO: Maybe add duplicate_use_case_description as well above
+
+
 # Overall State
 class OverallState(BaseModel):
     activity_id: str = Field(default="", description="Activity ID")
@@ -71,8 +74,10 @@ def extract_transcript(state: OverallState) -> OverallState:
 
     session = get_snowflake_session()
 
+    DATABASE = os.getenv("DATABASE")
+    SCHEMA = os.getenv("SCHEMA")
     # Use synthetic data table for demo mode, otherwise use production table
-    table_name = "ai_fde.sales_ai_platform.all_engagement_details_synthetic" if os.getenv("DEMO_MODE", "false").lower() == "true" else "sales.engagement360_pitch.all_engagement_details"
+    table_name = f"{DATABASE}.{SCHEMA}.all_engagement_details_synthetic" if os.getenv("DEMO_MODE", "false").lower() == "true" else "sales.engagement360_pitch.all_engagement_details"
 
     query = f"""
     SELECT RAW_CONTENT, TAKEAWAYS, ACTIVITY_DATE
@@ -132,8 +137,8 @@ def new_use_case_insert(state: OverallState) -> OverallState:
     new_use_cases_list = state_dict["new_use_cases"]
 
     # TODO: Make DB and Schema dynamic using environment variables. Need to also add them to 4_service.sql if we do that.
-    DATABASE = "AI_FDE"
-    SCHEMA = "SALES_AI_PLATFORM"
+    DATABASE = os.getenv("DATABASE")
+    SCHEMA = os.getenv("SCHEMA")
     POTENTIAL_NEW_USE_CASES_TBL_NM = "POTENTIAL_NEW_USE_CASES"
 
     new_use_case_records_inserted = 0

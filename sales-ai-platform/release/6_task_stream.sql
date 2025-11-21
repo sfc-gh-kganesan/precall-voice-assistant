@@ -1,11 +1,11 @@
 -- NOTE: Change to CREATE IF NOT EXISTS once we are confident in the workflow
-CREATE OR REPLACE STREAM ai_fde.sales_ai_platform.all_engagement_details_stream
+CREATE OR REPLACE STREAM ${DATABASE}.${SCHEMA}.all_engagement_details_stream
 ON TABLE sales.engagement360_pitch.all_engagement_details
 APPEND_ONLY = TRUE          
 SHOW_INITIAL_ROWS = FALSE;
 
 -- Create stored procedure to process stream data
-CREATE OR REPLACE PROCEDURE ai_fde.sales_ai_platform.process_engagement_details_stream()
+CREATE OR REPLACE PROCEDURE ${DATABASE}.${SCHEMA}.process_engagement_details_stream()
 RETURNS VARCHAR
 LANGUAGE SQL
 AS
@@ -16,7 +16,7 @@ DECLARE
   insert_timestamp TIMESTAMP_NTZ;
 BEGIN
   -- Create tracking table to advance stream offset
-  CREATE TABLE IF NOT EXISTS ai_fde.sales_ai_platform.processed_engagement_details (
+  CREATE TABLE IF NOT EXISTS ${DATABASE}.${SCHEMA}.processed_engagement_details (
     activity_id VARCHAR,
     owner_id VARCHAR,
     salesforce_account_id VARCHAR,
@@ -28,10 +28,10 @@ BEGIN
   insert_timestamp := CURRENT_TIMESTAMP();
   
   -- INSERT from stream to advance it (and persist the batch)
-  INSERT INTO ai_fde.sales_ai_platform.processed_engagement_details 
+  INSERT INTO ${DATABASE}.${SCHEMA}.processed_engagement_details 
     (activity_id, owner_id, salesforce_account_id, activity_date)
   SELECT activity_id, owner_id, salesforce_account_id, activity_date
-  FROM ai_fde.sales_ai_platform.all_engagement_details_stream
+  FROM ${DATABASE}.${SCHEMA}.all_engagement_details_stream
   WHERE type='MEETING' 
   AND raw_content IS NOT NULL
   LIMIT :batch_size;
@@ -41,7 +41,7 @@ BEGIN
   -- Process the rows we just captured 
   IF (rows_processed > 0) THEN
     SELECT sales_ai_meetings_jobs(activity_id, owner_id, salesforce_account_id)
-    FROM ai_fde.sales_ai_platform.processed_engagement_details
+    FROM ${DATABASE}.${SCHEMA}.processed_engagement_details
     WHERE processed_at >= :insert_timestamp
     ORDER BY activity_date DESC
     LIMIT :rows_processed;
@@ -56,12 +56,12 @@ END
 $$;
 
 -- Create task that calls the stored procedure
-CREATE OR REPLACE TASK ai_fde.sales_ai_platform.all_engagement_details_task
+CREATE OR REPLACE TASK ${DATABASE}.${SCHEMA}.all_engagement_details_task
 TARGET_COMPLETION_INTERVAL='10 MINUTE'
 SUSPEND_TASK_AFTER_NUM_FAILURES = 3
-WHEN SYSTEM$STREAM_HAS_DATA('ai_fde.sales_ai_platform.all_engagement_details_stream')
+WHEN SYSTEM$STREAM_HAS_DATA('${DATABASE}.${SCHEMA}.all_engagement_details_stream')
 AS
-CALL ai_fde.sales_ai_platform.process_engagement_details_stream();
+CALL ${DATABASE}.${SCHEMA}.process_engagement_details_stream();
 
-ALTER TASK ai_fde.sales_ai_platform.all_engagement_details_task RESUME;
+ALTER TASK ${DATABASE}.${SCHEMA}.all_engagement_details_task RESUME;
 

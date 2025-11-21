@@ -1,11 +1,27 @@
 -- Create a fake all_engagement_details table for testing
-
-create or replace table ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic like sales.engagement360_pitch.all_engagement_details;
-
+CREATE OR REPLACE TABLE ${DATABASE}.${SCHEMA}.potential_new_use_cases(
+    new_use_case_id VARCHAR DEFAULT UUID_STRING(),
+    record_creation_dttm DATETIME DEFAULT CURRENT_TIMESTAMP(),
+    activity_date DATE,
+    activity_id VARCHAR,
+    owner_id VARCHAR,
+    salesforce_account_id VARCHAR,
+    use_case_description VARCHAR,
+    use_case_name VARCHAR,
+    workloads ARRAY,
+    technical_use_cases ARRAY,
+    incumbent_vendor VARCHAR,
+    status VARCHAR DEFAULT 'REVIEW',
+    status_review_dttm DATETIME DEFAULT NULL
+    
+    sfdc_use_case_id VARCHAR DEFAULT NULL
+    last_updated_dttm DATETIME DEFAULT NULL
+    last_update_by VARCHAR DEFAULT NULL
+);
 insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
 'CompanyA', 
 'MEETING', 
-'9chdhagbdhajj5jlj95584unajgljfdg94u858', 
+'9chdhagbdhajj5jlj95584unajgljfdg94u8585', 
 '00184759847rG98TAU78', 
 'Sarim from Snowflake, Kirk from Snowflake, Howard from Snowflake, Seth from Snowflake, John from CompanyA', 
 'Future Sys Status Meeting',
@@ -168,7 +184,6 @@ ARRAY_CONSTRUCT('sarim@snowflake.com', 'kirk@snowflake.com', 'howard@snowflake.c
 null
 ;
 
-
 insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
 'CompanyA', 
 'MEETING', 
@@ -178,27 +193,27 @@ insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic select
 'Predictive Inventory',
 $$
 1212111: Hey! Good to talk again. How are things going this week?
-788778888: Pretty good—still chaotic, but that’s just normal for us at this point.
+788778888: Pretty good—still chaotic, but that's just normal for us at this point.
 3444433: Totally understand. Did you get a chance to look at the example architecture we sent over?
 788778888: Yeah, Priya and I went through it. The Snowpark piece caught her attention.
 1212111: Nice. We wanted to check in specifically on the predictive inventory project you mentioned last time. Any updates on what your data science team is running today?
-788778888: They’re still doing everything manually—pulling CSVs, cleaning them locally. It works for prototypes, but it’s not scalable.
-5556655: That’s exactly where Snowpark helps. You can run all the Python transformations and XGBoost models directly in Snowflake, on the same compute your analytics team already uses. No exporting, no drift.
-788778888: Yeah, that would simplify a lot. Priya’s biggest complaint is managing environment consistency across people’s laptops.
+788778888: They're still doing everything manually—pulling CSVs, cleaning them locally. It works for prototypes, but it's not scalable.
+5556655: That's exactly where Snowpark helps. You can run all the Python transformations and XGBoost models directly in Snowflake, on the same compute your analytics team already uses. No exporting, no drift.
+788778888: Yeah, that would simplify a lot. Priya's biggest complaint is managing environment consistency across people's laptops.
 3444433: With Snowpark, the environment's standardized. And you can schedule the whole workflow with Tasks, so your forecasting jobs just run automatically.
-788778888: That’s appealing. Leadership keeps asking why the out-of-stock predictions vary depending on who ran the script.
+788778888: That's appealing. Leadership keeps asking why the out-of-stock predictions vary depending on who ran the script.
 1212111: Makes sense. For next steps, we can help you create a small Snowpark prototype—maybe start with one product line or one region.
 788778888: I like that. If we can prove it out with a narrow scope, getting budget for the full rollout will be way easier.
-5556655: Perfect. We’ll bring an example during our next session so you can see the whole workflow end-to-end: ingest → feature engineering → training → inference → dashboard refresh.
-788778888: Great. That’ll help us socialize the idea internally.
+5556655: Perfect. We'll bring an example during our next session so you can see the whole workflow end-to-end: ingest → feature engineering → training → inference → dashboard refresh.
+788778888: Great. That'll help us socialize the idea internally.
 1212111: Anything else on your radar that we should plan for?
 788778888: Actually, yeah—our marketing team has been asking about something pretty different. They want an Agentic-style setup where they can ask natural-language questions about all the unstructured content we store in Snowflake. Things like campaign briefs, customer notes, call summaries.
 3444433: Got it—natural language insights on unstructured data.
 788778888: Exactly. They want to ask questions like “Why did engagement dip in Q3?” or “What themes are showing up in customer support notes?” and get answers without a ton of prep work.
-1212111: That’s doable. What are they currently using to do that work?
+1212111: That's doable. What are they currently using to do that work?
 788778888: Manual hours. There really isn't a good system in place right now.
 1212111: We can talk through some options using Cortex functions or retrieval-augmented workflows in Snowflake.
-788778888: Perfect. Let’s add that to the agenda for next week.
+788778888: Perfect. Let's add that to the agenda for next week.
 $$,
 '004G0005867qtHRAN',
 '{"key_takeaway": "important takeaways here"}',
@@ -220,13 +235,13 @@ $$
 9999999: Hey Alex, hey Jordan—this is Priya, CTO at CompanyB.
 1212222: Great to hear! Anything specific you wanted to cover today?
 9999999: Actually, yes. I just wanted to confirm that our legal team has reviewed and approved the contract. Everything is cleared on our side.
-3333333: That’s fantastic news. So signing will happen later this week?
+3333333: That's fantastic news. So signing will happen later this week?
 9999999: Yep, we plan to get it signed by Friday.
-1212222: Perfect. Once that’s done, we can kick off onboarding and get your account fully set up.
+1212222: Perfect. Once that's done, we can kick off onboarding and get your account fully set up.
 9999999: Sounds good. Looking forward to it.
-3333333: Excellent. We’ll make sure all the paperwork and welcome materials are ready for you.
+3333333: Excellent. We'll make sure all the paperwork and welcome materials are ready for you.
 9999999: Thanks, appreciate it.
-1212222: Alright, we’ll let you go. Enjoy the rest of your day, Priya.
+1212222: Alright, we'll let you go. Enjoy the rest of your day, Priya.
 9999999: You too. Bye.
 3333333: Bye!
 $$,
@@ -234,5 +249,60 @@ $$,
 '{"key_takeaway": "important takeaways here"}',
 '2025-11-05'::DATE,
 ARRAY_CONSTRUCT('alex@snowflake.com', 'jordan@snowflake.com', 'priya@companyb.com'),
+null
+;
+
+insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic 
+select 'BrightWaveTech', 
+'MEETING', 
+'FJ38HJG92LKSJH38KJHDKJ23JH45KJH23', 
+'003BRW2024-05-17-001', 
+'Alice from Snowflake, Marcus from Snowflake, Elena from Snowflake, Victor from BrightWaveTech, Sara from BrightWaveTech', 
+'Unified Data Governance and Real-Time Analytics',
+$$
+1001: Hi Victor and Sara, thanks for joining us today. How's everything at BrightWaveTech since we last spoke? 
+1002: We've been busy, Alice. The security team finalized the audit results but flagged several inconsistencies across our data zones. 
+1003: Understood. We've designed a governance framework that enforces policies at ingestion time and automatically tracks lineage. Would that address your main concerns? 
+1004: That's exactly what we need. Right now we spend hours manually reconciling data and ensuring compliance for each source system. 
+1005: With Snowflake's Object Tagging and Dynamic Data Masking, you can classify sensitive fields and hide them automatically for unauthorized roles. 
+1002: That sounds promising. Can you walk us through a typical workflow? 
+1003: Sure. When you load data into a staging table, you apply classification tags based on content patterns. Then, a masking policy triggers before any SELECT. Finally, automatically generated lineage dashboards show you upstream and downstream dependencies. 
+1004: That real-time lineage view will save us a lot of headaches. How much overhead does it introduce? 
+1001: Negligible. All enforcement happens at query compile time, and lineage metadata is captured asynchronously in system tables without impacting performance. 
+1005: Great. Another topic: we want to enable real-time analytics on streaming IoT data from our sensor network. We're currently dumping raw files into S3 and using batch loads every four hours. 
+1002: You can use Snowpipe Continuous Data Ingestion to stream JSON events directly into a table in seconds. Then, you can build materialized views for aggregated metrics and serve dashboards with sub-second refresh. 
+1003: And if you want anomaly detection on those streams, you can integrate with Snowpark to run Python UDFs on incoming records. 
+1004: That's exactly the capability we need. Especially if we can generate alerts when temperature or vibration thresholds exceed limits. 
+1001: We can set up Task chains that evaluate each batch or micro-batch and push alerts via Notification Services to your Slack or PagerDuty channels. 
+1005: Perfect. Finally, Sara has been investigating a way to manage cost allocation across teams and chargebacks. 
+1002: We recommend using Resource Monitors combined with Usage Shares. You tag each warehouse or role by department, and Snowflake automatically allocates credits based on consumption. 
+1004: Does that integrate with your Cost Governance Dashboard? 
+1003: Absolutely. You get an out-of-the-box cost breakdown by project, user, or workload. You can even forecast next quarter's spend using historical patterns. 
+1001: For next steps, we'll prepare a two-week proof of concept environment: governance policies, streaming ingestion, anomaly detection prototype, and cost dashboards. 
+1005: That covers all our priorities. Thank you, everyone. Let's reconvene after the POC is live and review metrics and performance benchmarks. 
+1002: Thanks, Alice and Marcus. Looking forward to it! 
+$$,
+'009BRW-OPP-0045678',
+'{"key_takeaway": "important takeaways here"}',
+'2025-11-05'::DATE,
+ARRAY_CONSTRUCT('alice@snowflake.com', 'marcus@snowflake.com', 'elena@snowflake.com', 'victor@brightwavetech.com', 'sara@brightwavetech.com'),
+null
+;
+
+insert into ${DATABASE}.${SCHEMA}.all_engagement_details_synthetic 
+select
+'FinNova',
+'MEETING',
+'XZ12MKL9OPQ34RST56UV78WX90YZAB12CD34EF56',
+'004FNCV-2025-078',
+'Alice from Snowflake, Raj from Snowflake, Emily from FinNova, Dave from FinNova',
+'Snowflake Data Governance and ML Use Case Discussion',
+$$
+1001001001001: Hi everyone, thanks for joining today.; Let's start with a quick round of intros.; I'll pass to Raj first.;\\n2002002002002: Hello, I'm Raj on the Snowflake solutions engineering team, focused on data governance.;\\n1001001001001: Thanks, Raj. I'm Alice, Snowflake product manager for Data Science workloads.;\\n3003003003003: I'm Emily, head of analytics at FinNova, leading our fraud detection initiative.;\\n4004004004004: And I'm Dave, data architect at FinNova, working on our compliance pipelines.;\\n1001001001001: Great. The goal today is to map out how Snowflake can support your data privacy rules and also power the ML models you mentioned.;\\n2002002002002: Precisely. We can use dynamic data masking and row-access policies to enforce GDPR and CCPA. Then share curated datasets with your ML team through secure data sharing.;\\n3003003003003: That sounds promising. We need to ensure personally identifiable information is masked before any model training.;\\n4004004004004: Also, can we schedule automatic policy audits? We must generate compliance reports monthly for our regulators.;\\n2002002002002: Yes, with Snowflake's Access History and Tag-Based masking, you can track usage and produce reports via INFORMATION_SCHEMA views.;\\n1001001001001: On the ML side, you can leverage Snowpark for Python to build feature pipelines directly inside Snowflake. No data egress needed.;\\n3003003003003: Excellent. That would simplify our architecture and cut costs. Can you share a sample Python notebook?;\\n2002002002002: Absolutely. I'll drop a link to our GitHub repo after the call.;\\n4004004004004: One more thing: we have budget constraints. Do you have any best practices for cost control?;\\n1001001001001: Yes, you can set Resource Monitors on your warehouses and use auto-suspend and scaling policies. We'll share a guide.\\n3003003003003: Perfect. Let's recap next steps.;\\n1001001001001: Raj will send over the masking examples and Python notebook link.;\\n2002002002002: I'll also include our compliance reporting SQL templates.;\\n1001001001001: Emily and Dave, please provide sample PII schemas you'd like to mask by Friday.;\\n3003003003003: Will do.;\\n4004004004004: Thanks everyone.;\\n1001001001001: Thanks, talk soon.;\\n2002002002002: Goodbye!.
+$$,
+'007FNOVA00012345',
+'{"key_takeaway": "important takeaways here"}',
+'2025-11-10'::DATE,
+ARRAY_CONSTRUCT('alice@snowflake.com','raj@snowflake.com','emily@finnova.com','dave@finnova.com'),
 null
 ;

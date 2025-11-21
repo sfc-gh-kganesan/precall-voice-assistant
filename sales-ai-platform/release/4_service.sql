@@ -16,6 +16,8 @@ spec:
       LLM_PROVIDER: ${LLM_PROVIDER}
       METAORCHESTRATOR_AUTH_EMAIL: ${METAORCHESTRATOR_AUTH_EMAIL}
       DEMO_MODE: ${DEMO_MODE}
+      DATABASE: ${DATABASE}
+      SCHEMA: ${SCHEMA}
       DBOS_SYSTEM_DATABASE_URL: "sqlite:////sfmnt/dbos.db"
     volumeMounts:
     - name: shared-data
