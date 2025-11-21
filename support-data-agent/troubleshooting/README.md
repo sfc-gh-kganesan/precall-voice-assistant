@@ -1,332 +1,193 @@
-# FDE DDA Service
+# Troubleshooting Agent (DDA)
 
-Frontend-Decoupled Diagnostic Data Application (DDA) API Service & Agent
+AI-powered diagnostic troubleshooting agent with integrated Snowflake diagnostic data and Glean search capabilities.
 
 ## Overview
 
-This project provides two ways to interact with Snowflake diagnostic data:
-
-1. **FastAPI REST API Service** - Backend service for programmatic access to diagnostic data
-2. **DDA Agent with MCP Servers** - AI-powered agent with integrated Glean search capabilities
-
-Both services share the same core business logic and can be used independently or together.
-
-### Key Features
-
-**REST API Service:**
-- Frontend-Agnostic REST API (Streamlit, React, CLI tools, etc.)
-- Query-First Architecture with 18+ endpoints
-- Environment-Based Data Masking for dev/local environments
-- In-Memory Caching with 15-minute TTL
-- Simple API Key Authentication (OAuth2 + JWT in Phase 2)
-- Snowflake Connection Pooling
-- Auto-Generated API Documentation at `/api/docs`
-
-**DDA Agent:**
-- AI-powered diagnostic troubleshooting
-- Integrated Glean search for internal knowledge
-- Natural language query interface
-- MCP server architecture for tool composition
-- Support for cases, queries, warehouses, and TSW diagnostics
+The Troubleshooting Agent helps diagnose Snowflake customer issues by combining:
+- **DDA Tools**: Direct access to Snowflake diagnostic data (cases, queries, warehouses, TSW diagnostics)
+- **Glean Search**: Internal knowledge base search for documentation and code
+- **AI Reasoning**: Natural language interface powered by Claude
 
 ## Architecture
 
-### REST API Architecture
-
 ```
-fde_dda_service/
-├── app/
-│   ├── main.py                 # FastAPI application entry point
-│   ├── config.py               # Pydantic settings
-│   ├── dependencies.py         # Dependency injection (auth, etc.)
-│   ├── api/v1/endpoints/       # REST API endpoints
-│   ├── core/                   # Core modules (database, cache, etc.)
-│   ├── services/               # Business logic layer
-│   ├── queries/                # SQL query definitions
-│   ├── models/                 # Pydantic request/response models
-│   └── utils/                  # Utilities (table_mappings, etc.)
-├── tests/                      # Test suite
-├── requirements.txt            # Python dependencies
-└── .env.example                # Environment configuration template
-```
-
-### Agent Architecture
-
-```
-User Query → agent.py (DDA Agent)
-                ↓
-    ┌───────────┴───────────┐
-    ↓                       ↓
-DDA MCP Server          Glean Proxy
-(localhost:8000)        (localhost:8001)
-    ↓                       ↓
-Snowflake DB          Glean API (OAuth)
+┌─────────────────────────────────────────────────────────────┐
+│                          User Query                         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+                    ┌──────────────────┐
+                    │   Agent API      │
+                    │  (Port 8002)     │
+                    └─────────┬────────┘
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+                 ▼                         ▼
+    ┌─────────────────────┐   ┌─────────────────────┐
+    │  DDA MCP Server     │   │   Glean Proxy       │
+    │   (Port 8000)       │   │   (Port 8006)       │
+    │                     │   │   OAuth: 8092       │
+    └──────────┬──────────┘   └──────────┬──────────┘
+               │                         │
+               ▼                         ▼
+    ┌─────────────────────┐   ┌─────────────────────┐
+    │   Snowflake DB      │   │   Glean API         │
+    │   (SUPPORT.CXE)     │   │   (OAuth)           │
+    └─────────────────────┘   └─────────────────────┘
 ```
 
-The agent requires two MCP servers:
-- **DDA MCP Server** (`app/mcp_server.py`) - Snowflake diagnostic tools
-- **Glean Proxy** (`app/glean_proxy.py`) - Glean search and knowledge tools
+### Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| **fde-dda-service** | 8000 | MCP server providing Snowflake diagnostic tools |
+| **glean-proxy** | 8006 | MCP proxy for Glean search and knowledge tools |
+| **glean-proxy (OAuth)** | 8092 | OAuth callback for Glean authentication |
+| **agent-api** | 8002 | Main agent API endpoint |
+
+## Available DDA Tools
+
+### Case Operations
+- **get_case** - Retrieve case details, queries, and metadata
+- **search_cases** - Search cases by account, status, or date range
+- **get_case_queries** - List all queries associated with a case
+
+### Query Analysis
+- **get_query** - Comprehensive query metadata and performance metrics
+- **get_query_historical_runs** - Historical execution data
+- **get_concurrent_queries** - Find queries running concurrently
+- **get_query_logs** - GS and XP logs for debugging
+- **get_query_parameters** - Non-default parameter settings
+- **compare_queries** - Side-by-side comparison of two queries
+
+### Warehouse Operations
+- **get_warehouse** - Warehouse configuration and status
+- **get_warehouse_queries** - Queries executed on a warehouse
+- **get_warehouse_utilization** - Resource usage metrics
+
+### TSW Diagnostics
+- **check_locks** - Detect lock conflicts and blocking queries
+- **check_incidents** - Find related incidents and outages
+- **check_compilation** - Analyze compilation failures
+- **check_udf** - UDF execution issues
+- **check_rbac** - Role-based access control problems
+- **check_auth** - Authentication failures
+- **check_iceberg** - Iceberg table issues
+
+### Account Operations
+- **get_account** - Account metadata and configuration
+- **search_accounts** - Find accounts by name or region
 
 ## Quick Start
 
-Choose your path:
-- **Path A**: Run the FastAPI REST API service (for programmatic access)
-- **Path B**: Run the DDA Agent with MCP servers (for AI-powered troubleshooting)
-
 ### Prerequisites
 
-- **uv must be installed** - Fast Python package installer and resolver ([installation guide](https://github.com/astral-sh/uv))
+- Docker and Docker Compose installed
 - Snowflake account credentials
-- API key for authentication
-- (Path B only) Glean access for OAuth authentication
+- Glean access for OAuth authentication
 
-### Installation
+### Setup
 
-1. **Clone the repository** (if not already in the repo):
+1. **Configure environment**:
 ```bash
-cd /path/to/cxe-dda-streamlit/dda_service
-```
-
-2. **Install dependencies**:
-```bash
-uv sync
-```
-
-This will automatically create a virtual environment and install all dependencies.
-
-3. **Configure environment**:
-```bash
+cd troubleshooting
 cp .env.example .env
-# Edit .env with your Snowflake credentials and API key
+# Edit .env with your credentials
 ```
 
 Required environment variables:
-- `SNOWFLAKE_ACCOUNT`: Your Snowflake account (e.g., "snowhouse")
-- `SNOWFLAKE_USER`: Service account username
-- `SNOWFLAKE_PASSWORD`: Service account password
-- `API_KEY`: Secret key for API authentication
-- `ENV`: Environment (local/dev/canary/prod)
+```bash
+SNOWFLAKE_ACCOUNT=your_account
+SNOWFLAKE_USER=your_username
+SNOWFLAKE_PASSWORD=your_password
+SNOWFLAKE_DATABASE=SUPPORT
+SNOWFLAKE_SCHEMA=CXE
+SNOWFLAKE_WAREHOUSE=DDA_WH
+SNOWFLAKE_ROLE=DDA_ROLE
+```
 
----
+2. **Start services**:
+```bash
+docker compose up
+```
 
-## Path A: Running the FastAPI REST API Service
+This will start all three services:
+- DDA MCP Server (port 8000)
+- Glean Proxy (port 8006, OAuth on 8092)
+- Agent API (port 8002)
 
-### Start the Service
+3. **Authenticate with Glean**:
+   - A browser window will open automatically for OAuth
+   - Complete the authentication flow
+   - OAuth tokens are persisted in the `glean-tokens` volume
+
+### Usage
+
+#### Using the Agent CLI
 
 ```bash
-# Development mode with auto-reload
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Production mode
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+# In a new terminal
+docker exec -it dda-agent-api uv run app/agent_cli.py
 ```
 
-The API will be available at:
-- API Base: `http://localhost:8000`
-- Swagger Documentation: `http://localhost:8000/api/docs`
-- ReDoc Documentation: `http://localhost:8000/api/redoc`
-- OpenAPI Spec: `http://localhost:8000/api/openapi.json`
+#### Example Queries
 
-### Testing the API
-
-```bash
-# Health check (no auth required)
-curl http://localhost:8000/health
-
-# Get query metadata (requires API key)
-curl -H "X-API-Key: your_api_key_here" \
-     http://localhost:8000/api/v1/queries/01abc-123
-```
-
-### API Usage
-
-#### Authentication
-
-All API endpoints require an API key in the request header:
-
-```bash
-X-API-Key: your_api_key_here
-```
-
-Example with curl:
-```bash
-curl -H "X-API-Key: your_api_key_here" \
-     http://localhost:8000/api/v1/queries/{query_id}
-```
-
-Example with Python:
-```python
-import requests
-
-headers = {"X-API-Key": "your_api_key_here"}
-response = requests.get(
-    "http://localhost:8000/api/v1/queries/01abc-123",
-    headers=headers
-)
-data = response.json()
-```
-
-#### Available Endpoints
-
-**Query Endpoints (Primary - Fully Implemented)**
-
-- `GET /api/v1/queries/{query_id}` - Get comprehensive query metadata
-- `GET /api/v1/queries/{query_id}/historical-runs` - Historical runs
-- `GET /api/v1/queries/{query_id}/concurrent` - Concurrent queries
-- `GET /api/v1/queries/{query_id}/logs/gs` - Global Services logs
-- `GET /api/v1/queries/{query_id}/logs/xp` - Execution Platform logs
-- `GET /api/v1/queries/{query_id}/parameters` - Non-default parameters
-- `GET /api/v1/queries/{query_id}/incidents` - Related incidents
-- `GET /api/v1/queries/{query_id}/parent-child` - Query execution tree
-- `GET /api/v1/queries/{query_id}/processing-status` - DDA pipeline status
-- `POST /api/v1/queries/adhoc-process` - Trigger adhoc processing
-- `POST /api/v1/queries/compare` - Compare two queries
-- Additional query operations...
-
-**Other Endpoints (Basic GET operations)**
-
-- `GET /api/v1/accounts/{id}` - Get account metadata
-- `GET /api/v1/cases/{id}` - Get case information
-- `GET /api/v1/warehouses/{id}` - Get warehouse details
-- `GET /api/v1/snowpipes/{id}` - Get snowpipe information
-- `GET /api/v1/parameters/{name}` - Get parameter details
-- `GET /api/v1/tsw/*` - Troubleshooting workflow endpoints
-- `POST /api/v1/search` - Universal search
-- `GET /api/v1/landing-page` - Landing page data
-
-Full API documentation available at `/api/docs` when the server is running.
-
----
-
-## Path B: Running the DDA Agent with MCP Servers
-
-### Option 1: Automated Startup (Python Script - Recommended)
-
-```bash
-cd troubleshooting
-python start_services.py
-```
-
-This script will:
-- Start both MCP servers in background processes
-- Open browser for Glean OAuth authentication
-- Monitor services and handle graceful shutdown
-- Works on macOS, Linux, and Windows
-
-Press `Ctrl+C` to stop all services.
-
-### Option 2: Automated Startup (Bash Script - macOS/Linux)
-
-```bash
-cd troubleshooting
-./start_services.sh
-```
-
-This will open separate terminal windows for each service.
-
-### Option 3: Manual Startup (Full Control)
-
-#### Terminal 1: Start DDA MCP Server
-
-```bash
-cd troubleshooting
-uv run app/mcp_server.py
-```
-
-**Expected output:**
-```
-Starting DDA MCP Server...
-Server will be available at http://localhost:8000/mcp
-
-Available tools will include:
-  - Case operations (get_case, search_cases, get_case_queries)
-  - TSW diagnostics (locks, incidents, compilation, UDF, RBAC, auth, iceberg)
-  - Query analysis
-  - Warehouse operations
-  - Account operations
-```
-
-**Keep this terminal running.**
-
-#### Terminal 2: Start Glean Proxy
-
-```bash
-cd troubleshooting
-uv run app/glean_proxy.py
-```
-
-**Expected output:**
-```
-======================================================================
-Glean MCP Proxy Server
-======================================================================
-
-Connecting to: https://snowflake-be.glean.com/mcp/default
-Authentication: OAuth (browser-based)
-
-Starting proxy server...
-  Local URL: http://localhost:8001/mcp
-
-Note: A browser window will open for OAuth authentication.
-======================================================================
-```
-
-**What happens next:**
-1. A browser window will open automatically
-2. You'll be prompted to authenticate with Glean
-3. Complete the OAuth flow in the browser
-4. The proxy will confirm connection and list available tools
-5. Keep this terminal running
-
-#### Terminal 3: Run the Agent
-
-Once both services are running and Glean OAuth is complete:
-
-```bash
-cd troubleshooting
-uv run app/agent_cli.py
-```
-
-**Example queries:**
 ```
 > Get details for case 01172497
-> Search for documents about authentication issues
-> Find employees working on query optimization
-> What tools do you have available?
+
+> What queries are running on warehouse COMPUTE_WH?
+
+> Check for lock conflicts in query 01abc-123-456
+
+> Search Glean for documentation about query optimization
+
+> Compare query 01abc-123 with 01def-456
 ```
 
-### Service URLs
+#### Using the API
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| DDA MCP Server | `http://localhost:8000/mcp` | Snowflake diagnostic tools |
-| Glean Proxy | `http://localhost:8001/mcp` | Glean search & knowledge tools |
+```bash
+# Health check
+curl http://localhost:8002/health
+
+# Query the agent
+curl -X POST http://localhost:8002/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Get details for case 01172497",
+    "conversation_id": "test-123"
+  }'
+```
 
 ### Stopping Services
 
-**Python Script Method:**
-Press `Ctrl+C` in the terminal where you ran `start_services.py`
-
-**Bash Script Method:**
-Close the terminal windows or press `Ctrl+C` in each
-
-**Manual Method:**
-Press `Ctrl+C` in each terminal (Terminal 1 and Terminal 2)
-
-### Configuration
-
-#### Disable Glean Integration
-
-If you only want DDA diagnostic tools (no Glean):
-
-```python
-# In app/agent.py
-agent = create_dda_agent(glean_proxy_url=None)
+```bash
+docker compose down
 ```
 
-Or only start the DDA MCP Server (skip Terminal 2).
+To also remove volumes (OAuth tokens):
+```bash
+docker compose down -v
+```
 
-#### Exclude Specific Glean Tools
+## Configuration
+
+### Disable Glean Integration
+
+If you only want DDA diagnostic tools (no Glean search):
+
+```yaml
+# In docker-compose.yml, remove or comment out:
+services:
+  glean-proxy:
+    # ...entire service
+```
+
+And update the agent-api depends_on to remove glean-proxy dependency.
+
+### Exclude Specific Glean Tools
 
 Edit `app/glean_proxy.py` and update the `EXCLUDED_TOOLS` set:
 
@@ -344,209 +205,105 @@ Available Glean tools:
 - `employee_search` - Find company employees
 - `read_document` - Get full document content by URL
 
----
-
 ## Environment Configuration
-
-### Environment Variables
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `ENV` | Environment (local/dev/canary/prod) | local | No |
-| `SNOWFLAKE_ACCOUNT` | Snowflake account name | - | Yes |
-| `SNOWFLAKE_USER` | Service account username | - | Yes |
-| `SNOWFLAKE_PASSWORD` | Service account password | - | Yes |
-| `SNOWFLAKE_WAREHOUSE` | Warehouse name | DDA_WH | No |
-| `SNOWFLAKE_DATABASE` | Database name | SUPPORT | No |
-| `SNOWFLAKE_SCHEMA` | Schema name | CXE | No |
-| `SNOWFLAKE_ROLE` | Role name | DDA_ROLE | No |
-| `API_KEY` | API authentication key | - | Yes |
-| `CACHE_ENABLED` | Enable in-memory caching | true | No |
-| `CACHE_TTL_SECONDS` | Cache TTL in seconds | 900 | No |
-| `CACHE_MAX_SIZE` | Max cache entries | 1000 | No |
-| `QUERY_TIMEOUT_SECONDS` | Query timeout | 300 | No |
-| `MAX_QUERY_RESULTS` | Max result rows | 10000 | No |
 
 ### Table/View Mappings
 
-**CRITICAL**: The service automatically routes queries to masked views in dev/local environments to protect customer data.
+The service automatically routes queries to masked views in dev/local environments to protect customer data:
 
 - **dev/local**: Uses `*_MASKED_V` views for all customer data tables
 - **canary/prod**: Uses production tables directly
 
 This is handled automatically by `app/utils/table_mappings.py`.
 
-## Development
+### Cache Configuration
 
-### Running Tests
-
-```bash
-# Run all tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=app --cov-report=html
-
-# Run specific test file
-uv run pytest tests/test_api/test_queries.py
-```
-
-### Code Formatting
-
-```bash
-# Format code
-uv run black app/
-
-# Lint
-uv run flake8 app/
-
-# Type checking
-uv run mypy app/
-```
-
-### Adding More Tools
-
-To add new diagnostic tools, edit the FastAPI endpoints in `app/api/v1/endpoints/`. They'll automatically be exposed as MCP tools via `mcp_server.py`.
-
-## Deployment
-
-### Docker
-
-```bash
-# Build image
-docker build -t fde-dda-service:latest .
-
-# Run container
-docker run -p 8000:8000 --env-file .env fde-dda-service:latest
-```
-
-### Docker Compose (Local Development)
-
-```bash
-docker-compose up -d
-```
-
-### Kubernetes
-
-See `k8s/` directory for Kubernetes manifests (coming in Phase 4).
-
-## Monitoring
-
-### Health Checks
-
-- `/health` - Basic health check (always returns 200 if service is running)
-- `/ready` - Readiness check (checks dependencies)
-
-### Logging
-
-Logs are output to stdout in structured format:
-```
-2024-01-15 10:30:45 - app.main - INFO - Starting fde-dda-service in local environment
-```
-
-### Cache Statistics
-
-Get cache performance metrics:
-```bash
-# Future endpoint (Phase 2)
-curl -H "X-API-Key: your_key" http://localhost:8000/api/v1/admin/cache/stats
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CACHE_ENABLED` | Enable in-memory caching | true |
+| `CACHE_TTL_SECONDS` | Cache TTL in seconds | 900 (15 min) |
+| `CACHE_MAX_SIZE` | Max cache entries | 1000 |
 
 ## Troubleshooting
 
-### REST API Service Issues
+### "Connection refused" error
+- **Cause**: Services aren't running
+- **Solution**: Run `docker compose up` and wait for all services to be healthy
 
-**Connection refused**:
-- Ensure Snowflake credentials are correct in `.env`
-- Check network connectivity to Snowflake
-- Verify warehouse/database/schema names
-
-**Authentication failed**:
-- Verify `API_KEY` in `.env` matches request header
-- Check `X-API-Key` header is properly set
-
-**Query returns empty results**:
-- In dev/local, ensure masked views exist for the table
-- Check `ENV` variable is set correctly
-- Verify query parameters are correct
-
-### Agent Service Issues
-
-**"Connection refused" error**:
-- **Cause**: One or both MCP servers aren't running
-- **Solution**: Make sure both DDA MCP Server and Glean Proxy are running
-
-**Glean OAuth fails**:
+### Glean OAuth fails
 - **Cause**: Browser didn't open or OAuth callback failed
 - **Solution**:
-  1. Stop the Glean proxy (`Ctrl+C`)
-  2. Restart it: `uv run app/glean_proxy.py`
-  3. Complete OAuth in the browser when it opens
+  ```bash
+  docker compose restart glean-proxy
+  # Complete OAuth in the browser when it opens
+  ```
 
-**"SNOWFLAKE_ACCOUNT not set" error**:
+### "SNOWFLAKE_ACCOUNT not set" error
 - **Cause**: Missing environment variables
-- **Solution**: Create a `.env` file with required variables
+- **Solution**: Create a `.env` file with required variables (see Setup section)
 
-**Port already in use**:
-- **Cause**: Services are already running or ports are occupied
+### Port already in use
+- **Cause**: Another docker-compose is using the same ports
 - **Solution**:
   ```bash
   # Check what's using the ports
   lsof -i :8000
-  lsof -i :8001
+  lsof -i :8002
+  lsof -i :8006
 
-  # Kill existing processes if needed
-  kill <PID>
+  # Stop conflicting services
+  docker ps
+  docker stop <container_name>
   ```
 
-**Agent can't find tools**:
+### Agent can't find tools
 - **Cause**: Services started but not fully initialized
-- **Solution**: Wait 5-10 seconds after starting services before running the agent
+- **Solution**: Wait 10-15 seconds after starting services, check health:
+  ```bash
+  curl http://localhost:8000/health
+  curl http://localhost:8006/health
+  curl http://localhost:8002/health
+  ```
 
-### Logs
-
-View application logs:
+### View logs
 ```bash
-# If running locally
-# Logs output to stdout
+# All services
+docker compose logs -f
 
-# If running in Docker
-docker logs <container_id>
-
-# If running in Kubernetes
-kubectl logs -f deployment/fde-dda-service -n dda
+# Specific service
+docker compose logs -f fde-dda-service
+docker compose logs -f glean-proxy
+docker compose logs -f agent-api
 ```
 
-## Roadmap
+## Development
 
-### MVP (Current - Week 1-4)
-- ✅ FastAPI foundation
-- ✅ Simple API key authentication
-- ✅ In-memory caching
-- ✅ Snowflake connection pooling
-- ✅ Table/view mappings (dev/prod)
-- ✅ Query view (full implementation)
-- ⏳ Basic endpoints for other views
-- ⏳ Docker deployment
+### Running without Docker
 
-### Phase 2 (Post-MVP)
-- ⏳ OAuth2 + JWT authentication
-- ⏳ Redis distributed caching
-- ⏳ Full CRUD operations for all views
-- ⏳ JIRA integration
-- ⏳ Comprehensive test coverage
-- ⏳ Prometheus metrics
-- ⏳ Advanced monitoring
+```bash
+# Terminal 1: Start DDA MCP Server
+uv run app/dda_mcp_server.py
+
+# Terminal 2: Start Glean Proxy
+uv run app/glean_proxy.py
+
+# Terminal 3: Start Agent API
+uv run app/agent_api.py
+
+# Terminal 4: Run CLI
+uv run app/agent_cli.py
+```
+
+### Running Tests
+
+```bash
+uv run pytest
+```
 
 ## Support
 
 For issues or questions:
-1. Check `/api/docs` for API documentation
-2. Review logs for error messages
-3. Consult `REFACTOR_BACKEND_ONLY.txt` for architecture details
-4. Try example workflows in `docs/demo_flows.md` (for agent)
-5. Contact the Customer Experience Engineering team
-
-## License
-
-Internal Snowflake project - not for external distribution.
+1. Check service logs: `docker compose logs -f`
+2. Verify environment variables in `.env`
+3. Ensure Snowflake credentials have correct permissions
+4. Contact the Customer Experience Engineering team

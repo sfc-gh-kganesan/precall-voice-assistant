@@ -30,22 +30,22 @@ services:
       dockerfile: Dockerfile
     container_name: glean-proxy
     ports:
-      - "8001:8001"  # Main proxy server
-      - "8090:8090"  # OAuth callback (socat forwards to 127.0.0.1:8091)
+      - "8006:8006"  # Main proxy server
+      - "8092:8092"  # OAuth callback (socat forwards to 127.0.0.1:8091)
     env_file:
       - .env
     environment:
       - OAUTH_INTERNAL_PORT=8091  # FastMCP binds here
-      - OAUTH_PUBLIC_PORT=8090    # Browser redirects here (via socat)
+      - OAUTH_PUBLIC_PORT=8092    # Browser redirects here (via socat)
     volumes:
       - ./app:/app/app
       - glean-tokens:/home/appuser/.local/share/fastmcp  # Persist OAuth tokens
     restart: unless-stopped
     command: >
-      sh -c "socat TCP-LISTEN:8090,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:8091 &
+      sh -c "socat TCP-LISTEN:8092,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:8091 &
       uv run app/glean_proxy.py"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
       interval: 30s
       timeout: 10s
       retries: 3
