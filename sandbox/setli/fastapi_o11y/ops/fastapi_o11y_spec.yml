@@ -1,0 +1,8 @@
+spec:
+  containers:
+    - name: fastapi-o11y
+      image: sfengineering-aifde.registry.snowflakecomputing.com/setli/sandbox/image_repository/fastapi-o11y:latest
+  endpoints:
+    - name: web
+      port: 8080
+      public: true

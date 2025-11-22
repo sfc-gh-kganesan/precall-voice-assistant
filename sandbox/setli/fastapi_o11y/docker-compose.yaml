@@ -1,0 +1,21 @@
+services:
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      ["fastapi", "dev", "./app/main.py", "--host", "0.0.0.0", "--reload"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+volumes:
+  grafana-storage: {}

@@ -1,0 +1,28 @@
+definition_version: 2
+env:
+  COMPUTE_POOL: sandbox_compute_pool_cpu
+  DATABASE: setli
+  IMAGE_REPOSITORY: image_repository
+  SCHEMA: sandbox
+  SERVICE_NAME: fastapi_o11y
+  STAGE: data
+
+entities:
+  service:
+    # for details on service properties, please see:
+    # <https://docs.snowflake.com/en/developer-guide/snowflake-cli/services/manage-services#create-and-deploy-a-service-from-a-project-definition>
+    type: service
+    identifier:
+      name: <% ctx.env.SERVICE_NAME %>
+      database: <% ctx.env.DATABASE %>
+      schema: <% ctx.env.SCHEMA %>
+    stage: <% ctx.env.STAGE %>
+    compute_pool: <% ctx.env.COMPUTE_POOL %>
+    spec_file: /services/<% ctx.env.SERVICE_SPEC %>
+    min_instances: 1
+    max_instances: 1
+    auto_resume: true
+    artifacts:
+      - src: <% ctx.env.SERVICE_SPEC %>
+        dest: services/<% ctx.env.SERVICE_SPEC %>
+    comment: "Example FastAPI service which demonstrates observability patterns"
