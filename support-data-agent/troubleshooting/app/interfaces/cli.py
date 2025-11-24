@@ -21,7 +21,7 @@ from pydantic_ai import (
     TextPartDelta,
 )
 
-from app.agent import create_dda_agent
+from app.agents.dda_agent import create_dda_agent
 
 
 # ANSI color codes for terminal output
@@ -54,6 +54,15 @@ async def stream_cli_response(agent, prompt: str):
         if isinstance(event, FunctionToolCallEvent):
             tools_pending += 1
             tool_name = event.part.tool_name
+
+            # DEBUG: Log to understand what's happening
+            import sys
+
+            print(
+                f"\n[DEBUG] FunctionToolCallEvent #{tools_pending}: tool_name='{tool_name}', pending_count={len(pending_tool_names)}",
+                file=sys.stderr,
+            )
+
             pending_tool_names.append(tool_name)
 
             # Print tool call - simple inline approach
@@ -64,6 +73,7 @@ async def stream_cli_response(agent, prompt: str):
                     end="",
                     flush=True,
                 )
+                print("", file=sys.stderr, flush=True)  # DEBUG: Force flush
             else:
                 # Additional tools - just print comma and name inline
                 print(
@@ -71,6 +81,7 @@ async def stream_cli_response(agent, prompt: str):
                     end="",
                     flush=True,
                 )
+                print("", file=sys.stderr, flush=True)  # DEBUG: Force flush
             continue
 
         # Track tool call completion
@@ -228,7 +239,18 @@ async def run_cli(
                     traceback.print_exc()
                     print("\nPlease try again or type 'exit' to quit.")
             except Exception as e:
-                print(f"\nError: {e}")
+                # Check for 500 errors (internal server errors)
+                if "500" in str(e) or "internal error" in str(e).lower():
+                    print(
+                        f"\n{Colors.YELLOW}⚠️  Snowflake API temporarily unavailable. "
+                        "The request has been automatically retried.{Colors.RESET}"
+                    )
+                    print(
+                        "If the issue persists, try rephrasing your question or try again in a moment.\n"
+                    )
+                else:
+                    print(f"\nError: {e}")
+
                 print("\nFull traceback:")
                 traceback.print_exc()
                 print("\nPlease try again or type 'exit' to quit.")

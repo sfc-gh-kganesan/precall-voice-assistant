@@ -27,7 +27,7 @@ from pydantic_ai import (
     TextPartDelta,
 )
 
-from app.agent import create_dda_agent
+from app.agents.dda_agent import create_dda_agent
 from app.core.storage import storage
 
 # Setup logging
@@ -438,7 +438,7 @@ if __name__ == "__main__":
 
     # Run the API server
     uvicorn.run(
-        "app.agent_api:app",
+        "app.interfaces.api:app",
         host="0.0.0.0",
         port=8002,
         reload=True,

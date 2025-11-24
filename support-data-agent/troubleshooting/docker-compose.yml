@@ -14,7 +14,7 @@ services:
       # Mount app directory for hot reload during development
       - ./app:/app/app
     restart: unless-stopped
-    command: ["uv", "run", "app/dda_mcp_native.py"]
+    command: ["uv", "run", "app/mcp/dda_server.py"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -43,7 +43,7 @@ services:
     restart: unless-stopped
     command: >
       sh -c "socat TCP-LISTEN:8092,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:8091 &
-      uv run app/glean_proxy.py"
+      uv run app/mcp/glean_proxy.py"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
       interval: 30s
@@ -66,7 +66,7 @@ services:
       # Mount app directory for hot reload during development
       - ./app:/app/app
     restart: unless-stopped
-    command: ["uv", "run", "app/agent_api.py"]
+    command: ["uv", "run", "app/interfaces/api.py"]
     depends_on:
       fde-dda-service:
         condition: service_healthy

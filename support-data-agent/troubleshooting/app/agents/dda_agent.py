@@ -5,6 +5,7 @@ An AI agent that uses the DDA Native MCP server tools to help support engineers
 diagnose Snowflake customer issues. Uses Snowflake Cortex as the LLM provider.
 """
 
+import asyncio
 import logging
 import os
 from typing import List
@@ -13,11 +14,12 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from openai.types import chat
 from pydantic_ai import Agent, AgentRunResultEvent, ModelMessage, RunContext
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from app.core.history import keep_last_n_messages
+from app.agents.history import keep_last_n_tokens
 from app.services.cortex_search import CortexSearchClient
 
 # Load environment variables
@@ -53,7 +55,21 @@ except Exception as e:
 
 
 class SnowflakeCortexModel(OpenAIChatModel):
-    """Custom model that handles Snowflake Cortex API response quirks"""
+    """Custom model that handles Snowflake Cortex API response quirks.
+
+    Fixes two key issues:
+    1. Empty fields in non-streaming responses (finish_reason, service_tier)
+    2. Missing 'index' field in streaming tool call chunks (causes name concatenation)
+    """
+
+    def __init__(self, model_name: str, *, provider: OpenAIProvider):
+        super().__init__(model_name, provider=provider)
+        self._tool_call_index_map: dict[
+            str, int
+        ] = {}  # Maps tool_call_id -> synthetic index
+        logger.info(
+            "Initialized SnowflakeCortexModel with streaming fix for missing 'index' fields"
+        )
 
     def _process_response(self, response):
         # Patch Snowflake's empty fields before validation
@@ -74,6 +90,69 @@ class SnowflakeCortexModel(OpenAIChatModel):
 
         # Let parent process the fixed response
         return super()._process_response(fixed_response)
+
+    def _normalize_tool_call_chunk(self, chunk):
+        """Inject synthetic index when missing from Cortex streaming chunks.
+
+        Snowflake Cortex omits the 'index' field in streaming tool call chunks,
+        causing pydantic-ai to store all parallel tool calls under dict key None,
+        which concatenates their names. We inject a synthetic index based on
+        tool_call_id to keep them separate.
+
+        Args:
+            chunk: Tool call chunk from streaming response
+
+        Returns:
+            Normalized chunk with synthetic index if needed
+        """
+        if chunk.index is None and hasattr(chunk, "id") and chunk.id:
+            # Use cached mapping for stability across chunks of same tool call
+            if chunk.id not in self._tool_call_index_map:
+                self._tool_call_index_map[chunk.id] = len(self._tool_call_index_map)
+                logger.debug(
+                    f"Injected synthetic index {self._tool_call_index_map[chunk.id]} "
+                    f"for tool_call_id={chunk.id} (missing from Cortex response)"
+                )
+            chunk.index = self._tool_call_index_map[chunk.id]
+        return chunk
+
+    async def _process_streamed_response(self, response, model_request_parameters):
+        """Process streamed response and normalize chunks before pydantic-ai processes them."""
+        self._tool_call_index_map.clear()  # Reset for each new request
+
+        # Wrap the response to normalize chunks on-the-fly
+        class NormalizedStream:
+            def __init__(self, stream, normalizer):
+                self._stream = stream
+                self._normalizer = normalizer
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                chunk = await self._stream.__anext__()
+                # Normalize tool call chunks if present
+                if hasattr(chunk, "choices"):
+                    for choice in chunk.choices:
+                        if (
+                            hasattr(choice, "delta")
+                            and hasattr(choice.delta, "tool_calls")
+                            and choice.delta.tool_calls
+                        ):
+                            choice.delta.tool_calls = [
+                                self._normalizer(tc) for tc in choice.delta.tool_calls
+                            ]
+                return chunk
+
+        # Wrap the response stream
+        normalized_response = NormalizedStream(
+            response, self._normalize_tool_call_chunk
+        )
+
+        # Call parent with normalized stream
+        return await super()._process_streamed_response(
+            normalized_response, model_request_parameters
+        )
 
 
 # System prompt for the agent
@@ -202,27 +281,53 @@ class StatefulAgent:
         Yields:
             Event objects from the underlying agent
         """
-        # Capture the AgentRunResultEvent to update history
-        streamed_result = None
-        async for event in self._agent.run_stream_events(
-            prompt, message_history=self._history
-        ):
-            # Check if this is the agent run result event
-            if isinstance(event, AgentRunResultEvent):
-                streamed_result = event.result
-            yield event
+        max_500_retries = 2
 
-        # Update history from the streamed result
-        # The AgentRunResultEvent contains the result with all_messages()
-        if streamed_result is not None:
-            self._history = streamed_result.all_messages()
-            logger.debug(
-                f"Updated conversation history to {len(self._history)} messages"
-            )
-        else:
-            logger.warning(
-                "No AgentRunResultEvent received from stream, history not updated"
-            )
+        for attempt in range(max_500_retries + 1):
+            try:
+                # Capture the AgentRunResultEvent to update history
+                streamed_result = None
+                async for event in self._agent.run_stream_events(
+                    prompt, message_history=self._history
+                ):
+                    # Check if this is the agent run result event
+                    if isinstance(event, AgentRunResultEvent):
+                        streamed_result = event.result
+                    yield event
+
+                # Update history from the streamed result
+                # The AgentRunResultEvent contains the result with all_messages()
+                if streamed_result is not None:
+                    self._history = streamed_result.all_messages()
+                    logger.debug(
+                        f"Updated conversation history to {len(self._history)} messages"
+                    )
+                else:
+                    logger.warning(
+                        "No AgentRunResultEvent received from stream, history not updated"
+                    )
+
+                # If we got here successfully, break out of retry loop
+                break
+
+            except ModelHTTPError as e:
+                # Handle 500 errors with retry logic
+                if e.status_code == 500 and attempt < max_500_retries:
+                    wait_time = 2**attempt  # exponential backoff: 1s, 2s
+                    logger.warning(
+                        f"Received 500 error from Snowflake Cortex API on attempt {attempt + 1}/{max_500_retries + 1}. "
+                        f"Retrying in {wait_time}s..."
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    # Either not a 500 error, or we've exhausted retries
+                    if e.status_code == 500:
+                        logger.error(
+                            f"500 error persisted after {max_500_retries + 1} attempts. "
+                            f"Request ID: {e.body.get('request_id', 'unknown') if hasattr(e, 'body') and e.body else 'unknown'}"
+                        )
+                    raise
 
     async def run(self, prompt: str):
         """Run agent with history management.
@@ -274,7 +379,8 @@ def create_dda_agent(
 
     # Create client pointing to Snowflake Cortex API
     client = AsyncOpenAI(
-        max_retries=10,
+        max_retries=5,
+        timeout=90.0,
         api_key=snowflake_password,
         base_url=f"https://{snowflake_account}.snowflakecomputing.com/api/v2/cortex/v1",
     )
@@ -301,9 +407,6 @@ def create_dda_agent(
     else:
         logger.info("✓ Agent configured with DDA toolset only")
 
-    # Get history limit from environment (default: 10)
-    history_limit = int(os.getenv("CONVERSATION_HISTORY_LIMIT", "10"))
-
     # Build custom tools list
     custom_tools = []
     if cortex_search_client is not None:
@@ -316,10 +419,10 @@ def create_dda_agent(
         toolsets=toolsets,
         tools=custom_tools if custom_tools else None,
         system_prompt=SYSTEM_PROMPT,
-        history_processors=[keep_last_n_messages(history_limit)],
+        history_processors=[keep_last_n_tokens(25000)],
     )
 
-    logger.info(f"✓ Agent configured with history limit of {history_limit} messages")
+    logger.info("✓ Agent configured with history limit of 25000 tokens")
     logger.info(
         f"✓ Agent configured with {len(toolsets)} MCP toolsets and {len(custom_tools)} custom tools"
     )

@@ -33,8 +33,8 @@ def check_prerequisites():
     """Check if required files and tools exist"""
     # Check if we're in the right directory
     if (
-        not Path("app/mcp_server.py").exists()
-        or not Path("app/glean_proxy.py").exists()
+        not Path("app/mcp/dda_server.py").exists()
+        or not Path("app/mcp/glean_proxy.py").exists()
     ):
         print(f"{RED}Error: Must be run from the troubleshooting directory{NC}")
         print(f"Current directory: {Path.cwd()}")
@@ -97,11 +97,11 @@ def main():
     print()
 
     # Start DDA MCP Server
-    dda_proc = start_service("DDA MCP Server", "app/mcp_server.py", 8000)
+    dda_proc = start_service("DDA MCP Server", "app/mcp/dda_server.py", 8000)
     time.sleep(2)
 
     # Start Glean Proxy
-    glean_proc = start_service("Glean Proxy", "app/glean_proxy.py", 8001)
+    glean_proc = start_service("Glean Proxy", "app/mcp/glean_proxy.py", 8001)
     print(
         f"  {YELLOW}Note: OAuth browser window will open for Glean authentication{NC}"
     )
