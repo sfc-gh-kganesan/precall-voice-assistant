@@ -26,15 +26,30 @@ install:
 
 # Start dev server with auto-reload (optionally specify port, default: 8000)
 dev port="8000": install
-    uv run uvicorn app:app --host 0.0.0.0 --port {{port}} --reload
+    echo "Starting development server on port {{port}}..."
+
+    # Local tracing directory
+    if [ $ENABLE_LOCAL_TRACING = true ]; then \
+        echo "Initializing local tracing directory: $LANGGRAPH_TRACING_DIR"; \
+        mkdir -p $LANGGRAPH_TRACING_DIR; \
+    fi
+
+    # Start LangGraph Studio in background
+    if [ $ENABLE_GRAPH_UI = true ]; then \
+        echo "Starting LangGraph Studio..."; \
+        cd local_langsmith && docker compose up -d --remove-orphans && cd ..; \
+    fi
+
+    echo "Starting FastAPI server..."
+    uv run uvicorn app:app --host 0.0.0.0 --port {{port}} --reload --env-file .env
 
 # Start production server (optionally specify port, default: 8000)
 api port="8000":
     uv run uvicorn app:app --host 0.0.0.0 --port {{port}}
 
-# Open LangGraph Studio
+# Open LangGraph Studio, be cautious with this command and ensure no sensitive data is exposed
 studio:
-    langgraph dev
+    langgraph dev --studio-url https://smith.langchain.com
 
 # Validate .env and show config
 check-env:
@@ -111,7 +126,10 @@ _run-sql sql_file continue_on_error="false" substitute_vars="true" run_for_loadt
     # Process SQL file
     SQL_BASENAME=$(basename "{{sql_file}}")
     if [ "{{substitute_vars}}" = "true" ]; then
-        envsubst < "{{sql_file}}" > "tmp/${SQL_BASENAME}.tmp"
+        sed 's/SYSTEM\$/__SYSTEM_DOLLAR__/g' "{{sql_file}}" \
+        | envsubst \
+        | sed 's/__SYSTEM_DOLLAR__/SYSTEM\$/g' \
+        > "tmp/${SQL_BASENAME}.tmp"
     else
         cp "{{sql_file}}" "tmp/${SQL_BASENAME}.tmp"
     fi
@@ -178,7 +196,7 @@ deploy: check-env
     just _run-sql release/5_functions.sql false
     
     echo "📝 Deploying task and stream..."
-    just _run-sql release/6_task_stream.sql false false
+    just _run-sql release/6_task_stream.sql false
 
     echo "Waiting for service to initialize..."
     sleep 5

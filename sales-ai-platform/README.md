@@ -142,6 +142,87 @@ CREATE OR REPLACE FUNCTION my_workflow_func(input VARCHAR)
 ```
 
 Done! Now: `make dev` → test → `make deploy`
+## Local Development & Testing
+
+We provide two workflows for local development and testing:
+
+**Workflow 1: LangGraph Architecture Visualization**
+
+You will be able to run the following command to check the GUI of the LangGraph architecture in the LangSmith Studio: 
+
+```
+make studio
+```
+
+The generated GUI intends to provide a high level overview of the current LangGraph architecture and it is NOT interactive. Since LangSmith Studio is a feature only supported by the cloud-based deployment, we currently only support local self-hosted LangSmith to ensure security compliance. 
+
+***Required Environment Vars***
+
+For the above command to be executed correctly, you need to be in the right python virtual environment by running the following command (make sure you are on the root path):
+
+```
+source .venv/vin/activate.sh
+```
+
+These are the required environment variables:
+
+- OPENAI_API_KEY: you can create one by logging into your OpenAI account and create an API key.
+- LANGSMITH_API_KEY: You must have this set up so that langsmith will trace your execution.
+
+**Workflow 2: LangGraph Execution Local Tracing**
+
+we provide an entry point to turn on the self-hosted local LangSmith UI to support LangGraph local tracing and observibility.
+
+You will be able to check the detailed steps run in your developed LangGraph including lantency and step-level inputs/outputs in a LangSmith UI. Run the following command to start the server locally:
+
+```
+make dev
+```
+
+Then for executing any LangGraph test locally, make sure you have the DEMO_MODE set to false, if you intend to run on real data or true if you wish to run on the synthetic data.
+
+You can trigger the langgraph developed locally by running the command:
+
+```
+# make sure you are in the python virtual environment
+source .venv/bin/activate.sh
+
+# run the workflow locally
+python3 test_run_workflow.py
+```
+
+You can modify the SQL query block in the code starting at line 32:
+```
+query = """
+    select *
+    from sales.engagement360_pitch.all_engagement_details
+    where TYPE = 'MEETING'
+        and RAW_CONTENT is not null
+        and OWNER_ID = '005VI00000QLxXZYA1'
+        and lower(PARTICIPANT_NAMES) like '%tara%'
+        and RAW_CONTENT not like '%## Quick recap%'
+    """
+``` 
+
+and set the where conditions to filter for your specific example you wish to run by the LangGraph. Please make sure DEMO_MODE=false, such that you will be able to check the LangSmith GUI with LangGraph execution tracing records on a specific real example (make sure you request for insider role and permissions on Lift).
+
+**LangGraph Load Test**
+
+Since there is a backend job running periodically to parse newly generated sales meeting transcripts, we have a dedicated workflow developed for load test the system.
+
+To trigger the load test, simply run:
+```
+make load-test
+```
+
+***Warning: the current default load test volume is set to 200, DO NOT increase the volume as we have a tight dependency on Sales AI MetaOrchesrator***
+
+After you finished the load test, run the following command to clear up the testing environment:
+
+```
+make load-test-reset
+```
+
 ## Troubleshooting
 
 **Environment issues:**

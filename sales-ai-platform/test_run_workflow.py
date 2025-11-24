@@ -34,7 +34,7 @@ else:
     from sales.engagement360_pitch.all_engagement_details
     where TYPE = 'MEETING'
         and RAW_CONTENT is not null
-        and OWNER_ID = '005VI00000R9VxuYAF'
+        and OWNER_ID = '005VI00000QLxXZYA1'
         and lower(PARTICIPANT_NAMES) like '%tara%'
         and RAW_CONTENT not like '%## Quick recap%'
     """
