@@ -14,7 +14,7 @@ services:
       # Mount app directory for hot reload during development
       - ./app:/app/app
     restart: unless-stopped
-    command: ["uv", "run", "app/dda_mcp_server.py"]
+    command: ["uv", "run", "app/dda_mcp_native.py"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

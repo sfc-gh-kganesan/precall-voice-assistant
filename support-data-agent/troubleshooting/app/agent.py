@@ -1,17 +1,18 @@
 """
 PydanticAI Agent for DDA Service
 
-An AI agent that uses the DDA MCP server tools to help support engineers
+An AI agent that uses the DDA Native MCP server tools to help support engineers
 diagnose Snowflake customer issues. Uses Snowflake Cortex as the LLM provider.
 """
 
 import logging
 import os
+from typing import List
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from openai.types import chat
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, AgentRunResultEvent, ModelMessage, RunContext
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -179,22 +180,88 @@ async def search_snowflake_documentation(
         return f"Documentation search failed: {str(e)}"
 
 
+class StatefulAgent:
+    """Agent wrapper that maintains conversation history automatically.
+
+    Wraps a PydanticAI agent and manages conversation state internally,
+    so callers don't need to manually pass message_history.
+    """
+
+    def __init__(self, agent: Agent):
+        """Initialize with a PydanticAI agent."""
+        self._agent = agent
+        self._history: List[ModelMessage] = []
+        logger.info("StatefulAgent initialized with empty conversation history")
+
+    async def run_stream_events(self, prompt: str):
+        """Stream events while maintaining conversation history.
+
+        Args:
+            prompt: User message/query
+
+        Yields:
+            Event objects from the underlying agent
+        """
+        # Capture the AgentRunResultEvent to update history
+        streamed_result = None
+        async for event in self._agent.run_stream_events(
+            prompt, message_history=self._history
+        ):
+            # Check if this is the agent run result event
+            if isinstance(event, AgentRunResultEvent):
+                streamed_result = event.result
+            yield event
+
+        # Update history from the streamed result
+        # The AgentRunResultEvent contains the result with all_messages()
+        if streamed_result is not None:
+            self._history = streamed_result.all_messages()
+            logger.debug(
+                f"Updated conversation history to {len(self._history)} messages"
+            )
+        else:
+            logger.warning(
+                "No AgentRunResultEvent received from stream, history not updated"
+            )
+
+    async def run(self, prompt: str):
+        """Run agent with history management.
+
+        Args:
+            prompt: User message/query
+
+        Returns:
+            Agent result object
+        """
+        result = await self._agent.run(prompt, message_history=self._history)
+        self._history = result.all_messages()
+        logger.debug(f"Updated conversation history to {len(self._history)} messages")
+        return result
+
+    def clear_history(self):
+        """Clear conversation history."""
+        self._history = []
+        logger.info("Cleared conversation history")
+
+
 def create_dda_agent(
     model_name: str = "claude-4-sonnet",
     mcp_server_url: str = "http://localhost:8000/mcp",
     glean_proxy_url: str = "http://localhost:8001/mcp",
+    stateful: bool = True,
 ) -> Agent:
     """
-    Create a PydanticAI agent configured with DDA MCP tools and Glean search.
+    Create a PydanticAI agent configured with DDA Native MCP tools and Glean search.
     Uses Snowflake Cortex as the LLM provider instead of OpenAI.
 
     Args:
         model_name: The Cortex model to use (e.g., 'claude-4-sonnet', 'mistral-large')
-        mcp_server_url: URL of the DDA MCP server
+        mcp_server_url: URL of the DDA Native MCP server
         glean_proxy_url: URL of the Glean proxy server (set to None to disable Glean)
+        stateful: If True, wrap agent in StatefulAgent for automatic conversation memory
 
     Returns:
-        Configured PydanticAI Agent with both DDA and Gelan toolsets
+        Configured PydanticAI Agent (wrapped in StatefulAgent if stateful=True)
     """
     # Setup OpenAI-compatible client for Snowflake Cortex
     snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
@@ -218,8 +285,8 @@ def create_dda_agent(
     # Use custom model that handles Snowflake response quirks
     model = SnowflakeCortexModel(model_name, provider=provider)
 
-    # Connect to the DDA MCP server
-    logger.info(f"Connecting to DDA MCP server at {mcp_server_url}")
+    # Connect to the DDA Native MCP server
+    logger.info(f"Connecting to DDA Native MCP server at {mcp_server_url}")
     dda_server = MCPServerStreamableHTTP(mcp_server_url)
 
     # Build toolsets list
@@ -257,10 +324,12 @@ def create_dda_agent(
         f"✓ Agent configured with {len(toolsets)} MCP toolsets and {len(custom_tools)} custom tools"
     )
 
-    logger.info(f"✓ Agent configured with history limit of {history_limit} messages")
-    logger.info(
-        f"✓ Agent configured with {len(toolsets)} MCP toolsets and {len(custom_tools)} custom tools"
-    )
+    # Wrap in StatefulAgent if requested (default for CLI use)
+    if stateful:
+        agent = StatefulAgent(agent)
+        logger.info(
+            "✓ Agent wrapped in StatefulAgent for automatic conversation memory"
+        )
 
     return agent
 

@@ -14,9 +14,11 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "python-multipart>=0.0.9",
     "fastmcp>=2.11.0",
-    "pydantic-ai>=1.9.1",
+    "pydantic-ai>=1.22.0",
     "openai>=1.0.0",
     "jira>=3.5.0",
+    "typer>=0.20.0",
+    "prompt-toolkit>=3.0.0",
 ]
 
 [project.optional-dependencies]

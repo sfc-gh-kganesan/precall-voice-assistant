@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-from app.config import settings
 from app.services.account_service import AccountService
 from app.services.case_service import CaseService
 from app.services.jira_service import JiraService
@@ -25,10 +24,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Create FastMCP server instance
-mcp = FastMCP(
-    name="DDA Diagnostic Service (Native)",
-    description="Snowflake Diagnostic Data Application - Native MCP implementation with comprehensive diagnostic tools",
-)
+mcp = FastMCP(name="DDA Diagnostic Service (Native)")
 
 
 # ============================================================================
@@ -82,11 +78,7 @@ def get_case_queries(case_number: str) -> Dict[str, Any]:
         queries = case_service.get_case_queries(case_number)
         count = case_service.get_case_query_count(case_number)
 
-        return {
-            "case_number": case_number,
-            "query_count": count,
-            "queries": queries
-        }
+        return {"case_number": case_number, "query_count": count, "queries": queries}
     except Exception as e:
         logger.error(f"Error fetching queries for case {case_number}: {e}")
         return {"error": str(e)}
@@ -992,9 +984,7 @@ def get_account_metadata(
         metadata = service.get_account_metadata(deployment, locator)
 
         if metadata is None:
-            return {
-                "error": f"Account not found: {locator} in deployment {deployment}"
-            }
+            return {"error": f"Account not found: {locator} in deployment {deployment}"}
 
         return metadata
     except Exception as e:
@@ -1024,9 +1014,7 @@ def get_release_history(
     """
     try:
         service = AccountService()
-        releases = service.get_release_history(
-            deployment, account_id, min(limit, 500)
-        )
+        releases = service.get_release_history(deployment, account_id, min(limit, 500))
 
         return releases
     except Exception as e:
@@ -1237,7 +1225,9 @@ def search_jira_by_case(
     """
     try:
         jira_service = JiraService()
-        result = jira_service.search_by_case_number(case_number, max_results=max_results)
+        result = jira_service.search_by_case_number(
+            case_number, max_results=max_results
+        )
 
         return result.model_dump() if hasattr(result, "model_dump") else result
     except ValueError as e:

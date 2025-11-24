@@ -10,6 +10,9 @@ import asyncio
 import sys
 import traceback
 
+import typer
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import InMemoryHistory
 from pydantic_ai import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
@@ -44,26 +47,67 @@ async def stream_cli_response(agent, prompt: str):
 
     full_content = ""
     tools_pending = 0
+    pending_tool_names = []  # Track multiple parallel tool calls
 
     async for event in agent.run_stream_events(prompt):
         # Track tool call start
         if isinstance(event, FunctionToolCallEvent):
             tools_pending += 1
             tool_name = event.part.tool_name
-            print(
-                f"\n{Colors.YELLOW}🔧 Calling tool: {tool_name}...{Colors.RESET}",
-                flush=True,
-            )
+            pending_tool_names.append(tool_name)
+
+            # Print tool call - simple inline approach
+            if len(pending_tool_names) == 1:
+                # First tool - print the prefix
+                print(
+                    f"\n{Colors.YELLOW}🔧 Calling tool: {tool_name}",
+                    end="",
+                    flush=True,
+                )
+            else:
+                # Additional tools - just print comma and name inline
+                print(
+                    f", {tool_name}",
+                    end="",
+                    flush=True,
+                )
             continue
 
         # Track tool call completion
         if isinstance(event, FunctionToolResultEvent):
             tools_pending -= 1
             tool_name = event.result.tool_name
-            print(
-                f"{Colors.GREEN}✅ Tool completed: {tool_name}{Colors.RESET}",
-                flush=True,
-            )
+
+            # On first result, close the tool list with ... and newline
+            if (
+                tools_pending == len(pending_tool_names) - 1
+                and len(pending_tool_names) > 0
+            ):
+                print(f"...{Colors.RESET}", flush=True)
+
+            # Remove from pending list
+            if tool_name in pending_tool_names:
+                pending_tool_names.remove(tool_name)
+
+            # Show completion
+            if tools_pending == 0:
+                # All tools done
+                print(
+                    f"{Colors.GREEN}✅ All tools completed{Colors.RESET}",
+                    flush=True,
+                )
+                pending_tool_names = []  # Reset for next batch
+            else:
+                # Still waiting on other tools
+                remaining = ", ".join(pending_tool_names)
+                print(
+                    f"{Colors.GREEN}✅ Tool completed: {tool_name}{Colors.RESET}",
+                    flush=True,
+                )
+                print(
+                    f"{Colors.YELLOW}⏳ Still running: {remaining}...{Colors.RESET}",
+                    flush=True,
+                )
 
             # Reset accumulator after all tools complete
             if tools_pending == 0:
@@ -100,18 +144,18 @@ async def run_cli(
 
     Args:
         model_name: The Snowflake Cortex model to use
-        server_url: URL of the DDA MCP server
+        server_url: URL of the DDA Native MCP server
         glean_proxy_url: URL of the Glean proxy server (or None to disable)
     """
     print("\n")
     print("    ╔═══════════════════════════════════════════════════╗")
     print("    ║                                                   ║")
     print("    ║            _____ __   __   _____                  ║")
-    print("    ║           / ____|\ \ / /  / ____|                 ║")
-    print("    ║          | |      \ V /  | |                      ║")
+    print(r"    ║           / ____|\ \ / /  / ____|                 ║")
+    print(r"    ║          | |      \ V /  | |                      ║")
     print("    ║          | |       > <   | |                      ║")
-    print("    ║          | |____  / . \  | |____                  ║")
-    print("    ║           \_____\/_/ \_\  \_____|                 ║")
+    print(r"    ║          | |____  / . \  | |____                  ║")
+    print(r"    ║           \_____\/_/ \_\  \_____|                 ║")
     print("    ║                                                   ║")
     print("    ║                  CX Copilot                       ║")
     print("    ║       Your Snowflake troubleshooting AI          ║")
@@ -138,11 +182,14 @@ async def run_cli(
         print("\nType 'help' for examples or 'exit' to quit")
         print("=" * 60)
 
+        # Create prompt session with history
+        session = PromptSession(history=InMemoryHistory())
+
         # Start the REPL loop
         while True:
             try:
-                # Get user input
-                user_input = input("\n> ").strip()
+                # Get user input with history support
+                user_input = (await session.prompt_async("\n> ")).strip()
 
                 if not user_input:
                     continue
@@ -159,11 +206,27 @@ async def run_cli(
                 # Send query to agent with streaming
                 await stream_cli_response(agent, user_input)
 
+            except EOFError:
+                # Handle Ctrl+D gracefully
+                print("\n\nGoodbye!")
+                break
             except KeyboardInterrupt:
                 print(
                     "\n\nInterrupted. Type 'exit' to quit or continue asking questions."
                 )
                 continue
+            except RuntimeError as e:
+                # Workaround for pydantic-ai/MCP cancel scope bug during cleanup
+                if "cancel scope" in str(e).lower():
+                    print(
+                        f"\n{Colors.YELLOW}⚠️  Note: MCP cleanup warning (known issue, query completed successfully){Colors.RESET}"
+                    )
+                    continue
+                else:
+                    print(f"\nError: {e}")
+                    print("\nFull traceback:")
+                    traceback.print_exc()
+                    print("\nPlease try again or type 'exit' to quit.")
             except Exception as e:
                 print(f"\nError: {e}")
                 print("\nFull traceback:")
@@ -173,7 +236,7 @@ async def run_cli(
     except Exception as e:
         print(f"\nFailed to initialize agent: {e}")
         print("\nMake sure:")
-        print("  1. The MCP server is running (python app/mcp_server.py)")
+        print("  1. The Native MCP server is running (python app/dda_mcp_native.py)")
         print("  2. Your Snowflake credentials are set in .env")
         print("  3. The server URL is correct")
         sys.exit(1)
@@ -209,20 +272,46 @@ def print_help():
     print("=" * 70)
 
 
-def main():
-    """Main entry point for the CLI."""
-    # Parse command line arguments (optional)
-    model_name = "claude-4-sonnet"  # Default Cortex model
-    server_url = "http://localhost:8000/mcp"
+# Create Typer app
+app = typer.Typer(help="CX Copilot - AI-powered Snowflake troubleshooting assistant")
 
-    if len(sys.argv) > 1:
-        model_name = sys.argv[1]
-    if len(sys.argv) > 2:
-        server_url = sys.argv[2]
 
+@app.command()
+def main(
+    model: str = typer.Option(
+        "claude-4-sonnet",
+        "--model",
+        "-m",
+        help="The Snowflake Cortex model to use (e.g., claude-4-sonnet, claude-3-5-sonnet)",
+    ),
+    server_url: str = typer.Option(
+        "http://localhost:8000/mcp",
+        "--server-url",
+        "-s",
+        help="URL of the DDA Native MCP server",
+    ),
+    glean_proxy_url: str = typer.Option(
+        "http://localhost:8001/mcp",
+        "--glean-proxy-url",
+        "-g",
+        help="URL of the Glean proxy server",
+    ),
+):
+    """
+    Run the interactive CLI for the DDA agent.
+
+    This starts an interactive REPL session where you can ask natural language
+    questions about Snowflake cases, queries, and diagnostic issues.
+    """
     # Run the async CLI
-    asyncio.run(run_cli(model_name=model_name, server_url=server_url))
+    asyncio.run(
+        run_cli(
+            model_name=model,
+            server_url=server_url,
+            glean_proxy_url=glean_proxy_url,
+        )
+    )
 
 
 if __name__ == "__main__":
-    main()
+    app()

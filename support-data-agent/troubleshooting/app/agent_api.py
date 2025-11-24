@@ -130,6 +130,7 @@ async def startup_event():
             model_name="claude-4-sonnet",
             mcp_server_url="http://fde-dda-service:8000/mcp",
             glean_proxy_url="http://glean-proxy:8001/mcp",
+            stateful=False,  # API manages history explicitly via storage
         )
         logger.info("✓ Agent initialized successfully")
     except Exception as e:
@@ -224,6 +225,7 @@ async def run_agent_with_fallback(
                             model_name="openai-o4-mini",  # Uses same Snowflake Cortex backend
                             mcp_server_url="http://fde-dda-service:8000/mcp",
                             glean_proxy_url="http://glean-proxy:8001/mcp",
+                            stateful=False,  # API manages history explicitly
                         )
                         logger.info("✓ Fallback agent created successfully")
                     except Exception as e:
