@@ -19,7 +19,7 @@ t = session.table("KB_KNOWLEDGE")
 clean_html = (
     F.trim(
         F.regexp_replace(
-            F.regexp_replace(F.col("TEXT"), r"<[^>]+>|&nbsp;", " "), 
+            F.regexp_replace(F.col("TEXT"), r"<[^>]+>|&nbsp;", " "),
             r"\s+", " "
         )
     )
@@ -58,8 +58,8 @@ AS (
 filter_expr = F.lit(1) == 1
 
 cols = [
-    F.col("TEXT"), 
-    F.col("VERSION"), 
+    F.col("TEXT"),
+    F.col("VERSION"),
     F.col("SHORT_DESCRIPTION")
 ]
 (

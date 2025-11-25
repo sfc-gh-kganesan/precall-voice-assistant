@@ -34,13 +34,13 @@ _run-sql sql_file fetch_repo_url="false":
     #!/usr/bin/env bash
     set -euo pipefail
     CONNECTION_FLAG=$(just _connection-flag)
-    
+
     # Conditionally get repository URL (only needed for service deployment SQL files)
     SPCS_REPO_URL=""
     if [ "{{fetch_repo_url}}" = "true" ]; then
         SPCS_REPO_URL=$(snow spcs image-repository url $SPCS_IMAGE_REPO_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --silent 2>/dev/null || echo "")
     fi
-    
+
     # Build variable flags for snow sql
     VARIABLE_FLAGS="-D ROLE_NAME=$ROLE_NAME"
     VARIABLE_FLAGS+=" -D KB_DATABASE_NAME=$KB_DATABASE_NAME"
@@ -57,7 +57,7 @@ _run-sql sql_file fetch_repo_url="false":
     VARIABLE_FLAGS+=" -D KB_BUILDER_SVC_NAME=$KB_BUILDER_SVC_NAME"
     VARIABLE_FLAGS+=" -D KB_BUILDER_IMAGE_NAME=$KB_BUILDER_IMAGE_NAME"
     VARIABLE_FLAGS+=" -D SNOW_CONNECTION=$SNOW_CONNECTION"
-    
+
     # Execute SQL with --silent
     snow sql -f "{{sql_file}}" $CONNECTION_FLAG --role $ROLE_NAME $VARIABLE_FLAGS --silent
 

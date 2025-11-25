@@ -43,4 +43,3 @@ RUN chmod +x /app/example-job
 
 # Set the entrypoint
 ENTRYPOINT ["/app/example-job"]
-

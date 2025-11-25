@@ -55,11 +55,11 @@ $$;
 
 
 -- SELECT KNOWLEDGE_BUILDER.CORE.KNOWLEDGE_SEARCH_UDF(
---     'How do I set up Azure Virtual Desktop?',  
---     'john.doe@example.com',                    
---     'IT_AGENT',                                
---     'US',                                      
---     'en-US',                                   
---     5,                                         
---     'SELF_HELP'                                
+--     'How do I set up Azure Virtual Desktop?',
+--     'john.doe@example.com',
+--     'IT_AGENT',
+--     'US',
+--     'en-US',
+--     5,
+--     'SELF_HELP'
 -- );

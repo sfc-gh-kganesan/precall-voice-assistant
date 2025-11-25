@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
     // Read configuration from environment variables
     let api_key = env::var("API_KEY")
         .context("API_KEY environment variable not found")?;
-    
+
     let api_endpoint = env::var("API_ENDPOINT")
         .unwrap_or_else(|_| "https://api.publicapis.org/entries".to_string());
 
@@ -82,12 +82,12 @@ async fn main() -> Result<()> {
         requests_per_second: rate_limit,
         burst_size: rate_limit.max(1),
     };
-    
+
     let rate_nz = std::num::NonZeroU32::new(rate_limit)
         .context("Rate limit must be greater than 0")?;
     let burst_nz = std::num::NonZeroU32::new(rate_limit_config.burst_size)
         .context("Burst size must be greater than 0")?;
-    
+
     let quota = Quota::per_second(rate_nz).allow_burst(burst_nz);
     let limiter = Arc::new(RateLimiter::direct(quota));
 
@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
     let run_id = Uuid::new_v4().to_string();
     let start_time = Utc::now();
     let overall_start = Instant::now();
-    
+
     let mut records = Vec::new();
     let mut successful = 0;
     let mut failed = 0;
@@ -112,19 +112,19 @@ async fn main() -> Result<()> {
         // Rate limiting: Block until we're allowed to make the next request
         // This demonstrates throttling by spacing requests according to our quota
         limiter.until_ready().await;
-        
+
         let request_start = Instant::now();
         let request_id = Uuid::new_v4();
-        
+
         print!("Request {}/{}: ", i, num_requests);
-        
+
         let (status_str, response_size) = match make_api_request(&api_endpoint, &api_key).await {
             Ok(response) => {
                 let duration = request_start.elapsed();
                 let response_str = serde_json::to_string(&response)
                     .unwrap_or_else(|_| String::from("{}"));
                 let size = response_str.len();
-                
+
                 println!("✅ SUCCESS ({}ms, {} bytes)", duration.as_millis(), size);
                 successful += 1;
                 ("success".to_string(), size)
@@ -136,7 +136,7 @@ async fn main() -> Result<()> {
                 (format!("error: {}", e), 0)
             }
         };
-        
+
         records.push(RequestRecord {
             request_id: request_id.to_string(),
             timestamp: Utc::now().to_rfc3339(),
@@ -153,7 +153,7 @@ async fn main() -> Result<()> {
     println!("{}", "-".repeat(80));
     println!("\n📊 Execution Summary:");
     println!("  Total Requests: {}", num_requests);
-    
+
     let success_pct = if num_requests > 0 {
         (successful * 100) / num_requests
     } else {
@@ -164,11 +164,11 @@ async fn main() -> Result<()> {
     } else {
         0
     };
-    
+
     println!("  Successful: {} ({}%)", successful, success_pct);
     println!("  Failed: {} ({}%)", failed, failed_pct);
     println!("  Total Duration: {:.2}s", total_duration.as_secs_f64());
-    
+
     let effective_rate = if total_duration.as_secs_f64() > 0.0 {
         num_requests as f64 / total_duration.as_secs_f64()
     } else {
@@ -194,10 +194,10 @@ async fn main() -> Result<()> {
     let output_dir = "/tmp/spcs_output";
     fs::create_dir_all(output_dir)
         .context("Failed to create output directory")?;
-    
+
     let summary_filename = format!("api_results_{}.json", run_id);
     let summary_path = format!("{}/{}", output_dir, summary_filename);
-    
+
     println!("💾 Saving results to local file...");
     let summary_json = serde_json::to_string_pretty(&summary)
         .context("Failed to serialize summary to JSON")?;
@@ -265,12 +265,12 @@ async fn make_api_request(endpoint: &str, api_key: &str) -> Result<serde_json::V
 fn upload_to_stage(file_path: &str, stage_path: &str) -> Result<()> {
     // Upload file to Snowflake internal stage using PUT command
     // In SPCS, containers can use the Snowflake CLI or SQL to interact with stages
-    // 
+    //
     // This uses the Snowflake CLI's stage put command to upload files.
     // The container must have the Snowflake CLI installed and configured.
     //
     // Alternative approach: Use SQL PUT via JDBC/ODBC driver
-    
+
     let output = Command::new("snow")
         .args([
             "stage",
@@ -295,4 +295,3 @@ fn upload_to_stage(file_path: &str, stage_path: &str) -> Result<()> {
 
     Ok(())
 }
-

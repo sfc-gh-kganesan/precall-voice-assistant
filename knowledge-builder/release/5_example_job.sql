@@ -21,22 +21,22 @@ spec:
       # API_KEY:
       #   secretKeyRef:
       #     key: api_key_secret
-      
+
       # For demo purposes, use a dummy API key (public APIs don't validate this)
       API_KEY: "demo-key-12345"
-      
+
       # API endpoint to call
       API_ENDPOINT: "https://api.publicapis.org/entries"
-      
+
       # Number of API requests to make
       NUM_REQUESTS: "10"
-      
+
       # Rate limit (requests per second)
       RATE_LIMIT: "2"
-      
+
       # Snowflake stage to upload results (optional)
       # STAGE_PATH: "@api_results_stage"
-    
+
     resources:
       requests:
         memory: 512Mi
@@ -44,7 +44,7 @@ spec:
       limits:
         memory: 1Gi
         cpu: 1.0
-    
+
 
   # Platform monitoring for observability
   platformMonitor:
@@ -57,4 +57,3 @@ MIN_INSTANCES = 1
 MAX_INSTANCES = 1
 QUERY_WAREHOUSE = <% SPCS_WAREHOUSE_NAME %>
 EXTERNAL_ACCESS_INTEGRATIONS = (<% SPCS_EAI_NAME %>);
-

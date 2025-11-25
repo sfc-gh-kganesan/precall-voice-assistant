@@ -20,37 +20,37 @@ def extract_domains_handler(html_text):
     """
     if not isinstance(html_text, str) or not html_text:
         return ""
-    
+
     # Find href attributes and raw https links
     urls = re.findall(r'href=["\']?([^"\'>\s]+)', html_text, flags=re.IGNORECASE)
     urls += re.findall(r'https?://[^\s"\'>]+', html_text, flags=re.IGNORECASE)
-    
+
     domains = []
     for raw in urls:
         try:
             u = unquote(raw.strip())
-            
+
             # Add scheme if missing for www URLs
             if u.lower().startswith("www."):
                 u = "https://" + u
-            
+
             # Skip relative or malformed URLs
             if not u.lower().startswith(("http://", "https://")):
                 continue
-            
+
             parsed = urlparse(u)
             domain = parsed.netloc.lower()
-            
+
             # Ignore empty or invalid hostnames
             if not domain or domain in ("server", "localhost"):
                 continue
-            
+
             domains.append(domain)
-            
+
         except Exception:
             # Ignore malformed URLs silently
             continue
-    
+
     unique_domains = list(set(domains))
     return ",".join(sorted(unique_domains)) if unique_domains else ""
 $$;
@@ -95,7 +95,7 @@ FROM TABLE(<% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.SPLIT_DOMAINS('example.co
 
 /*
 -- Example 1: Extract domains from actual KB articles
-SELECT 
+SELECT
     SYS_ID,
     TITLE,
     <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.EXTRACT_DOMAINS_FROM_HTML(TEXT) AS OUTBOUND_DOMAINS
@@ -105,13 +105,13 @@ LIMIT 5;
 
 -- Example 2: Count top domains across all articles
 WITH article_domains AS (
-    SELECT 
+    SELECT
         SYS_ID,
         <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.EXTRACT_DOMAINS_FROM_HTML(TEXT) AS DOMAINS_CSV
     FROM YOUR_DATABASE.YOUR_SCHEMA.YOUR_KB_TABLE
     WHERE TEXT IS NOT NULL
 )
-SELECT 
+SELECT
     d.DOMAIN,
     COUNT(*) AS REFERENCE_COUNT
 FROM article_domains ad,
@@ -123,29 +123,28 @@ LIMIT 20;
 
 -- Example 3: Find Confluence/SharePoint/Atlassian references
 WITH article_domains AS (
-    SELECT 
+    SELECT
         SYS_ID,
         TITLE,
         <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.EXTRACT_DOMAINS_FROM_HTML(TEXT) AS DOMAINS_CSV
     FROM YOUR_DATABASE.YOUR_SCHEMA.YOUR_KB_TABLE
     WHERE TEXT IS NOT NULL
 )
-SELECT 
+SELECT
     ad.SYS_ID,
     ad.TITLE,
     d.DOMAIN,
-    CASE 
+    CASE
         WHEN LOWER(d.DOMAIN) LIKE '%confluence%' THEN 'Confluence'
         WHEN LOWER(d.DOMAIN) LIKE '%sharepoint%' THEN 'SharePoint'
         WHEN LOWER(d.DOMAIN) LIKE '%atlassian%' THEN 'Atlassian'
     END AS SYSTEM_TYPE
 FROM article_domains ad,
      TABLE(<% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.SPLIT_DOMAINS(ad.DOMAINS_CSV)) d
-WHERE 
+WHERE
     LOWER(d.DOMAIN) LIKE '%confluence%'
     OR LOWER(d.DOMAIN) LIKE '%sharepoint%'
     OR LOWER(d.DOMAIN) LIKE '%atlassian%'
 ORDER BY ad.SYS_ID, d.DOMAIN
 LIMIT 50;
 */
-
