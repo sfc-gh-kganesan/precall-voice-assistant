@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 from pydantic_ai import (
+    AgentRunResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     PartDeltaEvent,
@@ -129,7 +130,7 @@ async def startup_event():
         agent = create_dda_agent(
             model_name="claude-4-sonnet",
             mcp_server_url="http://fde-dda-service:8000/mcp",
-            glean_proxy_url="http://glean-proxy:8001/mcp",
+            glean_proxy_url="http://glean-proxy:8006/mcp",
             stateful=False,  # API manages history explicitly via storage
         )
         logger.info("✓ Agent initialized successfully")
@@ -147,7 +148,7 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         dda_server="http://fde-dda-service:8000/mcp",
-        glean_proxy="http://glean-proxy:8001/mcp",
+        glean_proxy="http://glean-proxy:8006/mcp",
     )
 
 
@@ -224,7 +225,7 @@ async def run_agent_with_fallback(
                         fallback_agent = create_dda_agent(
                             model_name="openai-o4-mini",  # Uses same Snowflake Cortex backend
                             mcp_server_url="http://fde-dda-service:8000/mcp",
-                            glean_proxy_url="http://glean-proxy:8001/mcp",
+                            glean_proxy_url="http://glean-proxy:8006/mcp",
                             stateful=False,  # API manages history explicitly
                         )
                         logger.info("✓ Fallback agent created successfully")
@@ -321,12 +322,26 @@ async def query_agent(request: QueryRequest):
         logger.info(f"Received query: {request.message[:100]}...")
 
     if request.stream:
+        # Load conversation history from storage
+        conversation_id = request.conversation_id or "default"
+        history = await storage.get_history(conversation_id)
+        logger.info(
+            f"Loaded {len(history)} messages from storage for streaming conversation {conversation_id}"
+        )
+
         # Streaming response using SSE
         async def event_stream():
-            try:
-                full_response = ""
+            full_response = ""
+            streamed_result = None
 
-                async for event in agent.run_stream_events(message_text):
+            try:
+                async for event in agent.run_stream_events(
+                    message_text, message_history=history
+                ):
+                    # Capture the result for history update
+                    if isinstance(event, AgentRunResultEvent):
+                        streamed_result = event.result
+
                     # Handle tool call events
                     if isinstance(event, FunctionToolCallEvent):
                         yield f"event: tool_call\ndata: {json.dumps({'tool': event.part.tool_name, 'args': event.part.args})}\n\n"
@@ -354,9 +369,24 @@ async def query_agent(request: QueryRequest):
                 yield f"event: final\ndata: {json.dumps({'content': full_response})}\n\n"
                 logger.info("Query completed successfully")
 
-            except Exception as e:
-                logger.error(f"Error processing query: {e}", exc_info=True)
-                yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+                # Save updated history to storage (fire-and-forget)
+                if streamed_result is not None:
+                    asyncio.create_task(
+                        storage.save_history(
+                            conversation_id, streamed_result.all_messages()
+                        )
+                    )
+                    logger.debug(
+                        f"Queued save of {len(streamed_result.all_messages())} messages for streaming conversation {conversation_id}"
+                    )
+
+            except BaseException as e:
+                # Catch BaseExceptionGroup and other exceptions
+                # Log the error but don't re-raise to avoid cancel scope issues
+                logger.error(
+                    f"Stream error: {type(e).__name__}: {str(e)[:200]}", exc_info=True
+                )
+                # Stream will close naturally when generator exits
 
         return StreamingResponse(
             event_stream(),

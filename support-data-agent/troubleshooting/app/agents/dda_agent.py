@@ -8,14 +8,22 @@ diagnose Snowflake customer issues. Uses Snowflake Cortex as the LLM provider.
 import asyncio
 import logging
 import os
+import re
 from typing import List
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from openai.types import chat
-from pydantic_ai import Agent, AgentRunResultEvent, ModelMessage, RunContext
+from pydantic_ai import (
+    Agent,
+    AgentRunResultEvent,
+    ModelMessage,
+    ModelSettings,
+    RunContext,
+)
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.mcp import MCPServerStreamableHTTP
+from pydantic_ai.messages import ModelRequest, RetryPromptPart
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -70,6 +78,13 @@ class SnowflakeCortexModel(OpenAIChatModel):
         logger.info(
             "Initialized SnowflakeCortexModel with streaming fix for missing 'index' fields"
         )
+        logger.info(
+            "✅ SnowflakeCortexModel._completions_create override is registered"
+        )
+        # Test to verify our override is active
+        logger.info(
+            f"Method resolution order: {[c.__name__ for c in self.__class__.__mro__]}"
+        )
 
     def _process_response(self, response):
         # Patch Snowflake's empty fields before validation
@@ -92,32 +107,146 @@ class SnowflakeCortexModel(OpenAIChatModel):
         return super()._process_response(fixed_response)
 
     def _normalize_tool_call_chunk(self, chunk):
-        """Inject synthetic index when missing from Cortex streaming chunks.
+        """Force index assignment and clean arguments for Snowflake Cortex.
 
-        Snowflake Cortex omits the 'index' field in streaming tool call chunks,
-        causing pydantic-ai to store all parallel tool calls under dict key None,
-        which concatenates their names. We inject a synthetic index based on
-        tool_call_id to keep them separate.
+        Snowflake Cortex sends index=0 for all parallel tool call chunks (not None),
+        causing pydantic-ai's routing logic to fail and concatenate tool names.
+        We always assign indices based on tool_call_id regardless of existing values.
+
+        Also cleans invalid JSON in tool call arguments (trailing null bytes, whitespace).
 
         Args:
             chunk: Tool call chunk from streaming response
 
         Returns:
-            Normalized chunk with synthetic index if needed
+            Chunk with corrected index field and cleaned arguments
         """
-        if chunk.index is None and hasattr(chunk, "id") and chunk.id:
-            # Use cached mapping for stability across chunks of same tool call
+        if hasattr(chunk, "id") and chunk.id:
+            # Use tool_call_id as stable identifier, assign sequential indices
             if chunk.id not in self._tool_call_index_map:
                 self._tool_call_index_map[chunk.id] = len(self._tool_call_index_map)
-                logger.debug(
-                    f"Injected synthetic index {self._tool_call_index_map[chunk.id]} "
-                    f"for tool_call_id={chunk.id} (missing from Cortex response)"
+                logger.info(
+                    f"✨ Assigning index {self._tool_call_index_map[chunk.id]} to tool_call_id={chunk.id}"
                 )
+            # Always overwrite existing index (Snowflake sends 0 for all)
             chunk.index = self._tool_call_index_map[chunk.id]
+
+        # Clean tool call arguments if present (PRIMARY DEFENSE against invalid JSON)
+        if hasattr(chunk, "function") and hasattr(chunk.function, "arguments"):
+            if chunk.function.arguments:
+                original_args = chunk.function.arguments
+                # Remove trailing null bytes and control characters
+                cleaned_args = re.sub(r"[\x00-\x1f]+$", "", original_args)
+                # Remove trailing whitespace
+                cleaned_args = cleaned_args.rstrip()
+
+                if cleaned_args != original_args:
+                    logger.warning(
+                        f"⚠️ Cleaned invalid JSON in tool call arguments: "
+                        f"removed {len(original_args) - len(cleaned_args)} trailing characters"
+                    )
+                    logger.debug(f"  Original: {repr(original_args[-50:])}")
+                    logger.debug(f"  Cleaned:  {repr(cleaned_args[-50:])}")
+                    chunk.function.arguments = cleaned_args
+
         return chunk
+
+    async def _completions_create(
+        self, messages, stream, model_settings, model_request_parameters
+    ):
+        """Log outbound requests to Snowflake Cortex.
+
+        Note: We don't filter messages here as that breaks streaming!
+        Filtering happens via history_processors before streaming starts.
+        """
+
+        logger.info("═" * 50)
+        logger.info("REQUEST TO SNOWFLAKE CORTEX")
+        logger.info("═" * 50)
+        logger.info(f"Stream: {stream}")
+        logger.info(f"Model Settings: {model_settings}")
+        logger.info(f"Total messages in history: {len(messages)}")
+
+        # Log message types for debugging
+        logger.info(f"Messages type: {type(messages)}")
+        if len(messages) > 0:
+            logger.info(f"First message type: {type(messages[0])}")
+
+        # Check for tool_calls in message history
+        for i, msg in enumerate(messages):
+            # Try multiple ways to access message data
+            if isinstance(msg, dict):
+                role = msg.get("role", "dict-unknown")
+                content = str(msg.get("content", ""))[:50]
+                tool_calls = msg.get("tool_calls", [])
+            elif hasattr(msg, "role"):
+                role = getattr(msg, "role", "attr-unknown")
+                content = str(getattr(msg, "content", ""))[:50]
+                tool_calls = getattr(msg, "tool_calls", []) or []
+            else:
+                logger.warning(f"Message {i}: Unknown message format: {type(msg)}")
+                logger.warning(f"  Message repr: {repr(msg)[:200]}")
+                continue
+
+            logger.info(f"Message {i}: role={role}, content_preview={content}")
+
+            # Check for tool_calls (assistant messages)
+            if tool_calls:
+                logger.info(f"  ↳ Contains {len(tool_calls)} tool_calls")
+
+                for tc_idx, tc in enumerate(tool_calls):
+                    if isinstance(tc, dict):
+                        tool_name = tc.get("function", {}).get("name", "unknown")
+                        tool_id = tc.get("id", "unknown")
+                    else:
+                        tool_name = (
+                            getattr(tc.function, "name", "unknown")
+                            if hasattr(tc, "function")
+                            else "unknown"
+                        )
+                        tool_id = getattr(tc, "id", "unknown")
+
+                    # Check for concatenated names (corruption indicator)
+                    if len(tool_name) > 80:  # Suspiciously long
+                        logger.error(
+                            f"  ❌ CORRUPTED TOOL NAME at index {tc_idx}: {tool_name}"
+                        )
+                    else:
+                        logger.info(
+                            f"    Tool {tc_idx}: {tool_name} (id={tool_id[:20] if tool_id and len(tool_id) > 20 else tool_id}...)"
+                        )
+
+            # Check for tool role (tool response messages)
+            if role == "tool":
+                if isinstance(msg, dict):
+                    tool_call_id = msg.get("tool_call_id", "unknown")
+                    content_preview = str(msg.get("content", ""))[:100]
+                else:
+                    tool_call_id = getattr(msg, "tool_call_id", "unknown")
+                    content_preview = str(getattr(msg, "content", ""))[:100]
+                logger.info(
+                    f"  ↳ Tool response for call_id={tool_call_id[:20] if tool_call_id and len(tool_call_id) > 20 else tool_call_id}..."
+                )
+                logger.debug(f"  Content preview: {content_preview}")
+
+        logger.info("═" * 50)
+
+        # Call parent to make actual request
+        try:
+            result = await super()._completions_create(
+                messages, stream, model_settings, model_request_parameters
+            )
+            logger.info("✅ Request to Snowflake Cortex succeeded")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Request to Snowflake Cortex failed: {e}")
+            raise
 
     async def _process_streamed_response(self, response, model_request_parameters):
         """Process streamed response and normalize chunks before pydantic-ai processes them."""
+        logger.info(
+            "🔍 _process_streamed_response called - applying synthetic index fix"
+        )
         self._tool_call_index_map.clear()  # Reset for each new request
 
         # Wrap the response to normalize chunks on-the-fly
@@ -131,6 +260,10 @@ class SnowflakeCortexModel(OpenAIChatModel):
 
             async def __anext__(self):
                 chunk = await self._stream.__anext__()
+
+                # Log every chunk we process
+                logger.debug(f"📦 Processing chunk: {type(chunk).__name__}")
+
                 # Normalize tool call chunks if present
                 if hasattr(chunk, "choices"):
                     for choice in chunk.choices:
@@ -139,9 +272,15 @@ class SnowflakeCortexModel(OpenAIChatModel):
                             and hasattr(choice.delta, "tool_calls")
                             and choice.delta.tool_calls
                         ):
+                            logger.info(
+                                f"🔧 Found {len(choice.delta.tool_calls)} tool_call chunks to normalize"
+                            )
                             choice.delta.tool_calls = [
                                 self._normalizer(tc) for tc in choice.delta.tool_calls
                             ]
+                            logger.info(
+                                f"✅ Normalized {len(choice.delta.tool_calls)} tool_call chunks"
+                            )
                 return chunk
 
         # Wrap the response stream
@@ -206,6 +345,8 @@ Choose your tools based on the question type:
    - Need internal context? → Glean + documentation if needed
 
 2. **Execute Efficiently**:
+   - **IMPORTANT: Call only ONE tool at a time. Never call multiple tools simultaneously.**
+   - Wait for each tool's results before deciding on the next tool call
    - Don't use multiple tools when one will suffice
    - For syntax questions, documentation alone is sufficient
    - For customer diagnostics, start with DDA to get environment-specific data
@@ -217,6 +358,62 @@ Choose your tools based on the question type:
 
 Always be thorough but concise. Format technical details clearly. Choose the right tool for each question type.
 """
+
+
+def filter_retry_prompts_from_history(
+    messages: list[ModelMessage],
+) -> list[ModelMessage]:
+    """
+    Filter RetryPromptPart from message history before sending to Snowflake Cortex.
+
+    Snowflake Cortex returns 500 errors when it receives RetryPromptPart messages.
+    This history processor runs BEFORE each model request (outside streaming context),
+    safely removing these problematic messages.
+
+    Args:
+        messages: Message history to filter
+
+    Returns:
+        Filtered message history without RetryPromptPart messages
+    """
+    filtered = []
+    retry_count = 0
+
+    for msg in messages:
+        # Check if this is a ModelRequest with RetryPromptPart
+        if isinstance(msg, ModelRequest):
+            # Filter out RetryPromptPart from parts using proper isinstance check
+            original_parts = msg.parts
+            filtered_parts = []
+
+            for part in original_parts:
+                if isinstance(part, RetryPromptPart):
+                    retry_count += 1
+                    logger.debug(f"🛡️ Filtering RetryPromptPart: {str(part)[:100]}...")
+                else:
+                    filtered_parts.append(part)
+
+            # If we removed all parts, skip this message entirely (even if it's the last message)
+            # Snowflake Cortex rejects placeholder messages, so it's better to skip entirely
+            if not filtered_parts:
+                logger.debug(
+                    "🛡️ Skipping empty ModelRequest after filtering RetryPromptPart"
+                )
+                continue
+
+            # If we filtered some parts, create new ModelRequest with remaining parts
+            if len(filtered_parts) < len(original_parts):
+                msg = ModelRequest(parts=filtered_parts)
+
+        filtered.append(msg)
+
+    if retry_count > 0:
+        logger.info(
+            f"🛡️ History processor filtered {retry_count} RetryPromptPart messages "
+            f"(prevents 500 errors from Snowflake Cortex)"
+        )
+
+    return filtered
 
 
 # Tool function for Snowflake documentation search
@@ -352,7 +549,7 @@ class StatefulAgent:
 def create_dda_agent(
     model_name: str = "claude-4-sonnet",
     mcp_server_url: str = "http://localhost:8000/mcp",
-    glean_proxy_url: str = "http://localhost:8001/mcp",
+    glean_proxy_url: str = "http://localhost:8006/mcp",
     stateful: bool = True,
 ) -> Agent:
     """
@@ -413,15 +610,22 @@ def create_dda_agent(
         custom_tools.append(search_snowflake_documentation)
         logger.info("✓ Added Snowflake documentation search tool")
 
-    # Create agent with MCP toolsets, custom tools, and history processors
+    # Create agent with MCP toolsets, custom tools, and history filter
     agent = Agent(
         model=model,
         toolsets=toolsets,
         tools=custom_tools if custom_tools else None,
         system_prompt=SYSTEM_PROMPT,
-        history_processors=[keep_last_n_tokens(25000)],
+        history_processors=[
+            filter_retry_prompts_from_history,  # Filter RetryPromptPart before requests
+            keep_last_n_tokens(25000),
+        ],
+        model_settings=ModelSettings(
+            parallel_tool_calls=False
+        ),  # Disable parallel tool calls for Snowflake Cortex stability
     )
 
+    logger.info("✓ Agent configured with RetryPromptPart filter (prevents 500 errors)")
     logger.info("✓ Agent configured with history limit of 25000 tokens")
     logger.info(
         f"✓ Agent configured with {len(toolsets)} MCP toolsets and {len(custom_tools)} custom tools"

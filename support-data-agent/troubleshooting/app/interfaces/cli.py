@@ -1,27 +1,21 @@
 """
 DDA Agent CLI
 
-An interactive command-line interface for the DDA agent.
+An interactive command-line interface for the DDA agent API.
 Allows support engineers to ask natural language questions about Snowflake cases,
-queries, and diagnostic issues.
+queries, and diagnostic issues via the agent API's streaming endpoint.
 """
 
 import asyncio
+import json
 import sys
 import traceback
+import uuid
 
+import httpx
 import typer
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
-from pydantic_ai import (
-    FunctionToolCallEvent,
-    FunctionToolResultEvent,
-    PartDeltaEvent,
-    PartStartEvent,
-    TextPartDelta,
-)
-
-from app.agents.dda_agent import create_dda_agent
 
 
 # ANSI color codes for terminal output
@@ -35,13 +29,14 @@ class Colors:
     BOLD = "\033[1m"
 
 
-async def stream_cli_response(agent, prompt: str):
+async def stream_cli_response_from_api(api_url: str, prompt: str, conversation_id: str):
     """
-    Stream agent response to terminal with real-time text and tool execution status.
+    Stream agent response from API to terminal with real-time text and tool execution status.
 
     Args:
-        agent: The PydanticAI agent instance
+        api_url: Base URL of the agent API (e.g., http://localhost:8002)
         prompt: User's question/query
+        conversation_id: Unique conversation identifier for history tracking
     """
     print()  # Start with a newline
 
@@ -49,114 +44,130 @@ async def stream_cli_response(agent, prompt: str):
     tools_pending = 0
     pending_tool_names = []  # Track multiple parallel tool calls
 
-    async for event in agent.run_stream_events(prompt):
-        # Track tool call start
-        if isinstance(event, FunctionToolCallEvent):
-            tools_pending += 1
-            tool_name = event.part.tool_name
+    # Prepare request payload
+    payload = {
+        "message": prompt,
+        "stream": True,
+        "conversation_id": conversation_id,
+    }
 
-            # DEBUG: Log to understand what's happening
-            import sys
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            async with client.stream(
+                "POST",
+                f"{api_url}/query",
+                json=payload,
+                headers={"Accept": "text/event-stream"},
+            ) as response:
+                response.raise_for_status()
 
-            print(
-                f"\n[DEBUG] FunctionToolCallEvent #{tools_pending}: tool_name='{tool_name}', pending_count={len(pending_tool_names)}",
-                file=sys.stderr,
-            )
+                # Parse Server-Sent Events
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
 
-            pending_tool_names.append(tool_name)
+                    # Parse SSE format: "event: <type>\ndata: <json>\n\n"
+                    if line.startswith("event: "):
+                        event_type = line[7:].strip()
+                        continue
 
-            # Print tool call - simple inline approach
-            if len(pending_tool_names) == 1:
-                # First tool - print the prefix
-                print(
-                    f"\n{Colors.YELLOW}🔧 Calling tool: {tool_name}",
-                    end="",
-                    flush=True,
-                )
-                print("", file=sys.stderr, flush=True)  # DEBUG: Force flush
-            else:
-                # Additional tools - just print comma and name inline
-                print(
-                    f", {tool_name}",
-                    end="",
-                    flush=True,
-                )
-                print("", file=sys.stderr, flush=True)  # DEBUG: Force flush
-            continue
+                    if line.startswith("data: "):
+                        data_str = line[6:].strip()
+                        try:
+                            data = json.loads(data_str)
+                        except json.JSONDecodeError:
+                            continue
 
-        # Track tool call completion
-        if isinstance(event, FunctionToolResultEvent):
-            tools_pending -= 1
-            tool_name = event.result.tool_name
+                        # Handle different event types
+                        if event_type == "tool_call":
+                            # Tool started
+                            tools_pending += 1
+                            tool_name = data.get("tool", "unknown")
+                            pending_tool_names.append(tool_name)
 
-            # On first result, close the tool list with ... and newline
-            if (
-                tools_pending == len(pending_tool_names) - 1
-                and len(pending_tool_names) > 0
-            ):
-                print(f"...{Colors.RESET}", flush=True)
+                            # Print tool call
+                            if len(pending_tool_names) == 1:
+                                print(
+                                    f"\n{Colors.YELLOW}🔧 Calling tool: {tool_name}",
+                                    end="",
+                                    flush=True,
+                                )
+                            else:
+                                print(f", {tool_name}", end="", flush=True)
 
-            # Remove from pending list
-            if tool_name in pending_tool_names:
-                pending_tool_names.remove(tool_name)
+                        elif event_type == "tool_result":
+                            # Tool completed
+                            tools_pending -= 1
+                            tool_name = data.get("tool", "unknown")
 
-            # Show completion
-            if tools_pending == 0:
-                # All tools done
-                print(
-                    f"{Colors.GREEN}✅ All tools completed{Colors.RESET}",
-                    flush=True,
-                )
-                pending_tool_names = []  # Reset for next batch
-            else:
-                # Still waiting on other tools
-                remaining = ", ".join(pending_tool_names)
-                print(
-                    f"{Colors.GREEN}✅ Tool completed: {tool_name}{Colors.RESET}",
-                    flush=True,
-                )
-                print(
-                    f"{Colors.YELLOW}⏳ Still running: {remaining}...{Colors.RESET}",
-                    flush=True,
-                )
+                            # On first result, close the tool list
+                            if (
+                                tools_pending == len(pending_tool_names) - 1
+                                and len(pending_tool_names) > 0
+                            ):
+                                print(f"...{Colors.RESET}", flush=True)
 
-            # Reset accumulator after all tools complete
-            if tools_pending == 0:
-                full_content = ""
-                print()  # Extra newline before final answer
-            continue
+                            # Remove from pending list
+                            if tool_name in pending_tool_names:
+                                pending_tool_names.remove(tool_name)
 
-        # Extract initial text content from PartStartEvent
-        if isinstance(event, PartStartEvent):
-            if hasattr(event.part, "content"):
-                text_content = event.part.content
-                if isinstance(text_content, str) and text_content:
-                    full_content += text_content
-                    print(text_content, end="", flush=True)
+                            # Show completion
+                            if tools_pending == 0:
+                                print(
+                                    f"{Colors.GREEN}✅ All tools completed{Colors.RESET}",
+                                    flush=True,
+                                )
+                                pending_tool_names = []
+                                full_content = ""
+                                print()  # Extra newline before final answer
 
-        # Extract streaming text content from PartDeltaEvent
-        if isinstance(event, PartDeltaEvent):
-            if isinstance(event.delta, TextPartDelta):
-                text_content = event.delta.content_delta
-                if text_content:
-                    full_content += text_content
-                    print(text_content, end="", flush=True)
+                        elif event_type == "text_delta":
+                            # Streaming text content
+                            text_content = data.get("content", "")
+                            if text_content:
+                                full_content += text_content
+                                print(text_content, end="", flush=True)
+
+                        elif event_type == "final":
+                            # Final response (redundant if we've been streaming, but good for validation)
+                            pass
+
+                        elif event_type == "error":
+                            # Error from API
+                            error_msg = data.get("error", "Unknown error")
+                            print(
+                                f"\n{Colors.RED}Error from API: {error_msg}{Colors.RESET}"
+                            )
+                            break
+
+    except httpx.HTTPStatusError as e:
+        print(f"\n{Colors.RED}HTTP Error: {e.response.status_code}{Colors.RESET}")
+        print(f"Details: {e.response.text}")
+    except httpx.RequestError as e:
+        print(
+            f"\n{Colors.RED}Connection Error: Could not connect to agent API at {api_url}{Colors.RESET}"
+        )
+        print(f"Details: {str(e)}")
+        print("\nMake sure the agent API is running:")
+        print("  docker-compose up")
+        print("  OR manually: uv run app/interfaces/api.py")
+    except Exception as e:
+        print(f"\n{Colors.RED}Unexpected error: {str(e)}{Colors.RESET}")
+        traceback.print_exc()
 
     print()  # Final newline after response
 
 
 async def run_cli(
-    model_name: str = "claude-4-sonnet",
-    server_url: str = "http://localhost:8000/mcp",
-    glean_proxy_url: str = "http://localhost:8001/mcp",
+    api_url: str = "http://localhost:8002",
+    conversation_id: str = None,
 ):
     """
     Run the interactive CLI for the DDA agent.
 
     Args:
-        model_name: The Snowflake Cortex model to use
-        server_url: URL of the DDA Native MCP server
-        glean_proxy_url: URL of the Glean proxy server (or None to disable)
+        api_url: Base URL of the agent API
+        conversation_id: Optional conversation ID for maintaining history across sessions
     """
     print("\n")
     print("    ╔═══════════════════════════════════════════════════╗")
@@ -172,17 +183,22 @@ async def run_cli(
     print("    ║       Your Snowflake troubleshooting AI          ║")
     print("    ║                                                   ║")
     print("    ╚═══════════════════════════════════════════════════╝")
-    print("\n  Initializing...")
+    print("\n  Connecting to agent API...")
 
+    # Generate conversation ID if not provided
+    if conversation_id is None:
+        conversation_id = str(uuid.uuid4())
+
+    # Test API connection
     try:
-        # Create the agent with both DDA and Glean toolsets
-        agent = create_dda_agent(
-            model_name=model_name,
-            mcp_server_url=server_url,
-            glean_proxy_url=glean_proxy_url,
-        )
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{api_url}/health")
+            response.raise_for_status()
+            health = response.json()
 
-        print("\n✓ Ready! I have access to:")
+        print(f"\n✓ Connected to agent API at {api_url}")
+        print(f"  Conversation ID: {conversation_id}")
+        print("\n✓ Agent has access to:")
         print("  • DDA diagnostic tools for deep case analysis")
         print("  • Enterprise knowledge base and documentation")
         print("  • Best practices and troubleshooting workflows")
@@ -190,78 +206,70 @@ async def run_cli(
         print("  • Investigate a case or query")
         print("  • Analyze performance or errors")
         print("  • Search documentation and past solutions")
-        print("\nType 'help' for examples or 'exit' to quit")
+        print("\nType 'help' for examples, 'clear' to reset history, or 'exit' to quit")
         print("=" * 60)
 
-        # Create prompt session with history
-        session = PromptSession(history=InMemoryHistory())
-
-        # Start the REPL loop
-        while True:
-            try:
-                # Get user input with history support
-                user_input = (await session.prompt_async("\n> ")).strip()
-
-                if not user_input:
-                    continue
-
-                # Handle special commands
-                if user_input.lower() in ["exit", "quit", "q"]:
-                    print("\nGoodbye!")
-                    break
-
-                if user_input.lower() == "help":
-                    print_help()
-                    continue
-
-                # Send query to agent with streaming
-                await stream_cli_response(agent, user_input)
-
-            except EOFError:
-                # Handle Ctrl+D gracefully
-                print("\n\nGoodbye!")
-                break
-            except KeyboardInterrupt:
-                print(
-                    "\n\nInterrupted. Type 'exit' to quit or continue asking questions."
-                )
-                continue
-            except RuntimeError as e:
-                # Workaround for pydantic-ai/MCP cancel scope bug during cleanup
-                if "cancel scope" in str(e).lower():
-                    print(
-                        f"\n{Colors.YELLOW}⚠️  Note: MCP cleanup warning (known issue, query completed successfully){Colors.RESET}"
-                    )
-                    continue
-                else:
-                    print(f"\nError: {e}")
-                    print("\nFull traceback:")
-                    traceback.print_exc()
-                    print("\nPlease try again or type 'exit' to quit.")
-            except Exception as e:
-                # Check for 500 errors (internal server errors)
-                if "500" in str(e) or "internal error" in str(e).lower():
-                    print(
-                        f"\n{Colors.YELLOW}⚠️  Snowflake API temporarily unavailable. "
-                        "The request has been automatically retried.{Colors.RESET}"
-                    )
-                    print(
-                        "If the issue persists, try rephrasing your question or try again in a moment.\n"
-                    )
-                else:
-                    print(f"\nError: {e}")
-
-                print("\nFull traceback:")
-                traceback.print_exc()
-                print("\nPlease try again or type 'exit' to quit.")
-
-    except Exception as e:
-        print(f"\nFailed to initialize agent: {e}")
-        print("\nMake sure:")
-        print("  1. The Native MCP server is running (python app/dda_mcp_native.py)")
-        print("  2. Your Snowflake credentials are set in .env")
-        print("  3. The server URL is correct")
+    except (httpx.HTTPStatusError, httpx.RequestError) as e:
+        print(
+            f"\n{Colors.RED}Failed to connect to agent API at {api_url}{Colors.RESET}"
+        )
+        print(f"Error: {str(e)}")
+        print("\nMake sure the agent API is running:")
+        print("  docker-compose up")
+        print("  OR manually: uv run app/interfaces/api.py")
         sys.exit(1)
+
+    # Create prompt session with history
+    session = PromptSession(history=InMemoryHistory())
+
+    # Start the REPL loop
+    while True:
+        try:
+            # Get user input with history support
+            user_input = (await session.prompt_async("\n> ")).strip()
+
+            if not user_input:
+                continue
+
+            # Handle special commands
+            if user_input.lower() in ["exit", "quit", "q"]:
+                print("\nGoodbye!")
+                break
+
+            if user_input.lower() == "help":
+                print_help()
+                continue
+
+            if user_input.lower() == "clear":
+                # Clear conversation history
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.delete(
+                            f"{api_url}/conversations/{conversation_id}/history"
+                        )
+                        response.raise_for_status()
+                    print(f"{Colors.GREEN}✓ Conversation history cleared{Colors.RESET}")
+                except Exception as e:
+                    print(
+                        f"{Colors.YELLOW}Warning: Could not clear history: {str(e)}{Colors.RESET}"
+                    )
+                continue
+
+            # Send query to agent API with streaming
+            await stream_cli_response_from_api(api_url, user_input, conversation_id)
+
+        except EOFError:
+            # Handle Ctrl+D gracefully
+            print("\n\nGoodbye!")
+            break
+        except KeyboardInterrupt:
+            print("\n\nInterrupted. Type 'exit' to quit or continue asking questions.")
+            continue
+        except Exception as e:
+            print(f"\n{Colors.RED}Error: {str(e)}{Colors.RESET}")
+            print("\nFull traceback:")
+            traceback.print_exc()
+            print("\nPlease try again or type 'exit' to quit.")
 
 
 def print_help():
@@ -291,6 +299,10 @@ def print_help():
     print("  - Find code examples for stored procedures")
     print("  - Who works on query optimization?")
     print("  - Read document at <url>")
+    print("\nSpecial Commands:")
+    print("  - clear : Clear conversation history and start fresh")
+    print("  - help  : Show this help message")
+    print("  - exit  : Quit the CLI")
     print("=" * 70)
 
 
@@ -300,23 +312,17 @@ app = typer.Typer(help="CX Copilot - AI-powered Snowflake troubleshooting assist
 
 @app.command()
 def main(
-    model: str = typer.Option(
-        "claude-4-sonnet",
-        "--model",
-        "-m",
-        help="The Snowflake Cortex model to use (e.g., claude-4-sonnet, claude-3-5-sonnet)",
+    api_url: str = typer.Option(
+        "http://localhost:8002",
+        "--api-url",
+        "-a",
+        help="Base URL of the agent API",
     ),
-    server_url: str = typer.Option(
-        "http://localhost:8000/mcp",
-        "--server-url",
-        "-s",
-        help="URL of the DDA Native MCP server",
-    ),
-    glean_proxy_url: str = typer.Option(
-        "http://localhost:8001/mcp",
-        "--glean-proxy-url",
-        "-g",
-        help="URL of the Glean proxy server",
+    conversation_id: str = typer.Option(
+        None,
+        "--conversation-id",
+        "-c",
+        help="Conversation ID for maintaining history across sessions (auto-generated if not provided)",
     ),
 ):
     """
@@ -328,9 +334,8 @@ def main(
     # Run the async CLI
     asyncio.run(
         run_cli(
-            model_name=model,
-            server_url=server_url,
-            glean_proxy_url=glean_proxy_url,
+            api_url=api_url,
+            conversation_id=conversation_id,
         )
     )
 

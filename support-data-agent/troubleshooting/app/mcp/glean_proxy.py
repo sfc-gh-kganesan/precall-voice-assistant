@@ -256,7 +256,7 @@ def main():
     print(f"\nConnecting to: {GLEAN_SERVER_URL}")
     print("Authentication: OAuth (browser-based)")
     print("\nStarting proxy server...")
-    print("  Local URL: http://localhost:8001/mcp")
+    print("  Local URL: http://localhost:8006/mcp")
     print("\nNote: A browser window will open for OAuth authentication.")
     print("=" * 70)
     print()
@@ -267,7 +267,7 @@ def main():
         logger.info("Starting HTTP server...")
 
         # Run the proxy on HTTP transport
-        await proxy.run_async(transport="http", host="0.0.0.0", port=8001, path="/mcp")
+        await proxy.run_async(transport="http", host="0.0.0.0", port=8006, path="/mcp")
 
     asyncio.run(run_proxy())
 

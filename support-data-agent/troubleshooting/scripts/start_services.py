@@ -101,7 +101,7 @@ def main():
     time.sleep(2)
 
     # Start Glean Proxy
-    glean_proc = start_service("Glean Proxy", "app/mcp/glean_proxy.py", 8001)
+    glean_proc = start_service("Glean Proxy", "app/mcp/glean_proxy.py", 8006)
     print(
         f"  {YELLOW}Note: OAuth browser window will open for Glean authentication{NC}"
     )
@@ -116,7 +116,7 @@ def main():
     print()
     print(f"{YELLOW}Services running:{NC}")
     print(f"  - DDA MCP Server:    http://localhost:8000/mcp (PID: {dda_proc.pid})")
-    print(f"  - Glean Proxy:       http://localhost:8001/mcp (PID: {glean_proc.pid})")
+    print(f"  - Glean Proxy:       http://localhost:8006/mcp (PID: {glean_proc.pid})")
     print(f"  - Agent API:         http://localhost:8002 (PID: {agent_api_proc.pid})")
     print()
     print(f"{YELLOW}Next steps:{NC}")
