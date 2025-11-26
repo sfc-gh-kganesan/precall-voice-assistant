@@ -48,8 +48,7 @@ async fn main() -> Result<()> {
     println!();
 
     // Read configuration from environment variables
-    let api_key = env::var("API_KEY")
-        .context("API_KEY environment variable not found")?;
+    let api_key = env::var("API_KEY").context("API_KEY environment variable not found")?;
 
     let api_endpoint = env::var("API_ENDPOINT")
         .unwrap_or_else(|_| "https://api.publicapis.org/entries".to_string());
@@ -64,12 +63,14 @@ async fn main() -> Result<()> {
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(2);
 
-    let stage_path = env::var("STAGE_PATH")
-        .unwrap_or_else(|_| "@api_results_stage".to_string());
+    let stage_path = env::var("STAGE_PATH").unwrap_or_else(|_| "@api_results_stage".to_string());
 
     println!("📋 Configuration:");
     println!("  API Endpoint: {}", api_endpoint);
-    println!("  API Key (first 4 chars): {}...", &api_key.chars().take(4).collect::<String>());
+    println!(
+        "  API Key (first 4 chars): {}...",
+        &api_key.chars().take(4).collect::<String>()
+    );
     println!("  Number of Requests: {}", num_requests);
     println!("  Rate Limit: {} requests/second", rate_limit);
     println!("  Stage Path: {}", stage_path);
@@ -83,8 +84,8 @@ async fn main() -> Result<()> {
         burst_size: rate_limit.max(1),
     };
 
-    let rate_nz = std::num::NonZeroU32::new(rate_limit)
-        .context("Rate limit must be greater than 0")?;
+    let rate_nz =
+        std::num::NonZeroU32::new(rate_limit).context("Rate limit must be greater than 0")?;
     let burst_nz = std::num::NonZeroU32::new(rate_limit_config.burst_size)
         .context("Burst size must be greater than 0")?;
 
@@ -92,7 +93,10 @@ async fn main() -> Result<()> {
     let limiter = Arc::new(RateLimiter::direct(quota));
 
     println!("🚦 Rate Limiter Configured:");
-    println!("  Quota: {} requests per second", rate_limit_config.requests_per_second);
+    println!(
+        "  Quota: {} requests per second",
+        rate_limit_config.requests_per_second
+    );
     println!("  Burst Size: {}", rate_limit_config.burst_size);
     println!();
 
@@ -121,8 +125,8 @@ async fn main() -> Result<()> {
         let (status_str, response_size) = match make_api_request(&api_endpoint, &api_key).await {
             Ok(response) => {
                 let duration = request_start.elapsed();
-                let response_str = serde_json::to_string(&response)
-                    .unwrap_or_else(|_| String::from("{}"));
+                let response_str =
+                    serde_json::to_string(&response).unwrap_or_else(|_| String::from("{}"));
                 let size = response_str.len();
 
                 println!("✅ SUCCESS ({}ms, {} bytes)", duration.as_millis(), size);
@@ -192,17 +196,15 @@ async fn main() -> Result<()> {
 
     // Save results to local file
     let output_dir = "/tmp/spcs_output";
-    fs::create_dir_all(output_dir)
-        .context("Failed to create output directory")?;
+    fs::create_dir_all(output_dir).context("Failed to create output directory")?;
 
     let summary_filename = format!("api_results_{}.json", run_id);
     let summary_path = format!("{}/{}", output_dir, summary_filename);
 
     println!("💾 Saving results to local file...");
-    let summary_json = serde_json::to_string_pretty(&summary)
-        .context("Failed to serialize summary to JSON")?;
-    fs::write(&summary_path, &summary_json)
-        .context("Failed to write summary file")?;
+    let summary_json =
+        serde_json::to_string_pretty(&summary).context("Failed to serialize summary to JSON")?;
+    fs::write(&summary_path, &summary_json).context("Failed to write summary file")?;
     println!("  ✅ Saved to: {}", summary_path);
     println!();
 
@@ -210,11 +212,17 @@ async fn main() -> Result<()> {
     println!("☁️  Uploading results to Snowflake stage...");
     match upload_to_stage(&summary_path, &stage_path) {
         Ok(_) => {
-            println!("  ✅ Successfully uploaded to {}/{}", stage_path, summary_filename);
+            println!(
+                "  ✅ Successfully uploaded to {}/{}",
+                stage_path, summary_filename
+            );
             println!();
             println!("📁 To view the file in Snowflake, run:");
             println!("  LIST {};", stage_path);
-            println!("  SELECT $1 FROM @api_results_stage/{} (FILE_FORMAT => (TYPE = JSON));", summary_filename);
+            println!(
+                "  SELECT $1 FROM @api_results_stage/{} (FILE_FORMAT => (TYPE = JSON));",
+                summary_filename
+            );
         }
         Err(e) => {
             println!("  ⚠️  Upload failed: {}", e);
@@ -226,7 +234,10 @@ async fn main() -> Result<()> {
     println!("✅ Demo Complete!");
     println!("This service demonstrated:");
     println!("  ✓ Reading secrets from Snowflake-injected environment variables");
-    println!("  ✓ Rate-limited API calls ({} req/s)", rate_limit_config.requests_per_second);
+    println!(
+        "  ✓ Rate-limited API calls ({} req/s)",
+        rate_limit_config.requests_per_second
+    );
     println!("  ✓ Detailed request tracking and metrics");
     println!("  ✓ File persistence to local storage");
     println!("  ✓ Upload to Snowflake internal stage");
@@ -250,7 +261,10 @@ async fn make_api_request(endpoint: &str, api_key: &str) -> Result<serde_json::V
     let status = response.status();
 
     if !status.is_success() {
-        let error_text = response.text().await.unwrap_or_else(|_| "Unable to read error".to_string());
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read error".to_string());
         anyhow::bail!("API returned error status {}: {}", status, error_text);
     }
 
@@ -272,13 +286,7 @@ fn upload_to_stage(file_path: &str, stage_path: &str) -> Result<()> {
     // Alternative approach: Use SQL PUT via JDBC/ODBC driver
 
     let output = Command::new("snow")
-        .args([
-            "stage",
-            "put",
-            file_path,
-            stage_path,
-            "--overwrite",
-        ])
+        .args(["stage", "put", file_path, stage_path, "--overwrite"])
         .output()
         .context("Failed to spawn snow CLI process")?;
 

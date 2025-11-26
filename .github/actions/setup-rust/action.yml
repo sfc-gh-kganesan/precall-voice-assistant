@@ -1,0 +1,25 @@
+name: Prepare Rust Builder
+description: 'Prepare Rust Build Environment'
+inputs:
+  rust-version:
+    description: 'version of rust to install (e.g. stable)'
+    required: true
+    default: 'stable'
+  targets:
+    description: 'The toolchain targets to add, comma-separated'
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Rust Toolchain
+      shell: bash
+      run: |
+        echo "Installing ${{ inputs.rust-version }}"
+        if [ -n "${{ inputs.targets }}" ]; then
+          rustup toolchain install ${{ inputs.rust-version }} -t ${{ inputs.targets }}
+        else
+          rustup toolchain install ${{ inputs.rust-version }}
+        fi
+        rustup default ${{ inputs.rust-version }}
+        rustup component add rustfmt clippy
