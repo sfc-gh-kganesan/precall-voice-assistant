@@ -292,3 +292,6 @@ support-data-agent/.claude/
 
 # Sales AI Platform
 *.sql.tmp
+
+# Ensure global user settings aren't retained
+.claude/
