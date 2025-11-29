@@ -1,6 +1,6 @@
 from snowflake.core import Root
 from snowflake.snowpark.context import get_active_session
-from snowflake.snowpark import functions as F, types as T
+from snowflake.snowpark import functions as F
 import pandas as pd
 
 
@@ -16,30 +16,22 @@ schema_ctx = root.databases["KNOWLEDGE_BUILDER"].schemas["PUBLIC"]
 ingest_knowledge()
 t = session.table("KB_KNOWLEDGE")
 
-clean_html = (
-    F.trim(
-        F.regexp_replace(
-            F.regexp_replace(F.col("TEXT"), r"<[^>]+>|&nbsp;", " "),
-            r"\s+", " "
-        )
+clean_html = F.trim(
+    F.regexp_replace(
+        F.regexp_replace(F.col("TEXT"), r"<[^>]+>|&nbsp;", " "), r"\s+", " "
     )
 )
 
 result = (
-    t
-    .with_column("HTML_TEXT", clean_html)
-    .ai
-    .split_text_recursive_character(
+    t.with_column("HTML_TEXT", clean_html)
+    .ai.split_text_recursive_character(
         text_to_split="HTML_TEXT",
         format="none",
         chunk_size=30,
         overlap=5,
-        output_column="CHUNKS"
+        output_column="CHUNKS",
     )
-    .join_table_function(
-        "flatten",
-        F.col("CHUNKS")
-    )
+    .join_table_function("flatten", F.col("CHUNKS"))
     .select("TEXT", "HTML_TEXT", F.col("CHUNKS").alias("TEXT_CHUNK"))
 )
 
@@ -57,14 +49,9 @@ AS (
 
 filter_expr = F.lit(1) == 1
 
-cols = [
-    F.col("TEXT"),
-    F.col("VERSION"),
-    F.col("SHORT_DESCRIPTION")
-]
+cols = [F.col("TEXT"), F.col("VERSION"), F.col("SHORT_DESCRIPTION")]
 (
-    session
-    .table("kb_knowledge")
+    session.table("kb_knowledge")
     .filter(filter_expr)
     .select(cols)
     .create_or_replace_view("KB_KNOWLEDGE_VIEW")
@@ -85,12 +72,7 @@ AS (
 table_service = schema_ctx.cortex_search_services["SEARCH_ON_TABLE"]
 view_service = schema_ctx.cortex_search_services["SEARCH_ON_VIEW"]
 
-search_args = dict(
-    query="Hello",
-    columns=["TEXT"],
-    filter={},
-    limit=5
-)
+search_args = dict(query="Hello", columns=["TEXT"], filter={}, limit=5)
 
 resp_1 = table_service.search(**search_args)
 resp_2 = view_service.search(**search_args)
