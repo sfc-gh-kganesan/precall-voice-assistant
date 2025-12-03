@@ -7,7 +7,7 @@ from HTML content, useful for identifying knowledge leakage to external systems.
 
 import re
 from typing import List
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote, urlparse
 
 
 def extract_domains_from_html(html_text: str) -> List[str]:
