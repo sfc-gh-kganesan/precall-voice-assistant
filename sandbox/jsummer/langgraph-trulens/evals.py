@@ -100,30 +100,18 @@ if __name__ == "__main__":
         time.sleep(3)
 
     # "correctness" is a built-in, server-side metric in TruLens that incorporates ground truth from span attributes.
-    run.compute_metrics(metrics=METRICS + ["correctness"])
+    print("DEBUG: Computing metrics...")
+    run.compute_metrics(metrics= METRICS + ["correctness"])
 
-    # Temporary polling logic to wait for metrics computation to complete.
-    # Reported to TruLens teams to make this smoother.
-    print("DEBUG: Waiting for metrics computation to complete...")
-    poll_interval = 5
-    while True:
-        metrics_meta = run.describe().get("run_metadata", {}).get("metrics") or {}
-        statuses = [
-            (entry or {}).get("completion_status", {}).get("status")
-            for entry in metrics_meta.values()
-        ]
-        if statuses and all(status and status != "STARTED" for status in statuses):
-            break
-        time.sleep(poll_interval)
+    # Calculate metric aggregate scores
+    print("DEBUG: Calculating metric aggregate scores...")
+    run_record = langgraph_workflow.get_run(run_name=run_name)
+    records = run_record.get_records()
 
-    print(f"DEBUG: Final run status: {run.get_status()}")
-
-    # Calculate client-side metric aggregate scores
-    run_name = langgraph_workflow.get_run(run_name=run_name)
-    records = run_name.get_records()
-    client_side_metric_scores = {}
-    for m in METRICS:
-        if m.metric_name in records.columns:
-            client_side_metric_scores[m.metric_name] = round(float(records[m.metric_name].mean()), 2)
-    print('CLIENT-SIDE METRIC SCORES:')
-    print(client_side_metric_scores)
+    metric_scores = {}
+    metric_names = [m.metric_name for m in METRICS] + ["correctness"]
+    for m in metric_names:
+        if m in records.columns:
+            metric_scores[m] = round(float(records[m].mean()), 2)
+    print('METRIC SCORES:')
+    print(metric_scores)
