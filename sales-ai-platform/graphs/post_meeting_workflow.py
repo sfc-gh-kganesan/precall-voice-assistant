@@ -5,6 +5,7 @@ This workflow processes a call transcipt to extract specific information.
 """
 
 import json
+import logging
 import os
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -118,9 +119,6 @@ def new_use_case_assistant(state: OverallState) -> OverallState:
     return {"new_use_cases": response_dict["new_use_cases"]}
 
 
-# TODO: Maybe create a node called find_most_similar_sfdc_use_case that uses cortex search to find the most similar SFDC use case (or 2) to the new use case and saves the ID in a col.
-
-
 # New use case insertion
 def new_use_case_insert(state: OverallState) -> OverallState:
     """
@@ -140,6 +138,10 @@ def new_use_case_insert(state: OverallState) -> OverallState:
     DATABASE = os.getenv("DATABASE")
     SCHEMA = os.getenv("SCHEMA")
     POTENTIAL_NEW_USE_CASES_TBL_NM = "POTENTIAL_NEW_USE_CASES"
+    DEDUP_NEW_USE_CASES = os.getenv("DEDUP_NEW_USE_CASES", "true").lower() == "true"
+
+    # Log the DEDUP_NEW_USE_CASES setting
+    logging.info(f"DEDUP_NEW_USE_CASES = {DEDUP_NEW_USE_CASES}")
 
     new_use_case_records_inserted = 0
     dedup_results_list = []
@@ -160,105 +162,111 @@ def new_use_case_insert(state: OverallState) -> OverallState:
             new_use_case_technical_use_cases = new_use_case["technical_use_cases"]
             new_use_case_incumbent_vendor = new_use_case["incumbent_vendor"]
 
-            # ------------------------------------------------------------
-            # Use an LLM to compare new use case description to other new use cases in the new uses cases table and to most recent 5 existing descriptions of current use cases in SFDC table.
-            # NOTE: 95% of the accounts have less than 5 existing use cases created in the last 6 months in the SFDC table.
-            # ------------------------------------------------------------
-            # # TODO: Uncomment this section when sfdc table is back:
-            # previous_use_cases_df = session.sql(f"""
-            # with extracted_use_case_summaries as (
-            #     select RECORD_CREATION_DTTM,
-            #         new_use_case_id,
-            #         use_case_name,
-            #         use_case_description,
-            #         object_construct('use_case_id', new_use_case_id, 'use_case_description', use_case_description, 'use_case_name', use_case_name) as use_case_summary
-            #     from {DATABASE}.{SCHEMA}.{POTENTIAL_NEW_USE_CASES_TBL_NM}
-            #     where OWNER_ID = '{owner_id}'
-            #         and SALESFORCE_ACCOUNT_ID = '{salesforce_account_id}'
-            #         and RECORD_CREATION_DTTM > dateadd('month', -6, CURRENT_DATE())
-            # ),
-            # actual_use_case_summaries as (
-            #     select CREATED_DATE,
-            #         ID,
-            #         VH_NAME_C,
-            #         VH_DESCRIPTION_C,
-            #         object_construct('use_case_id', ID, 'use_case_description', VH_DESCRIPTION_C, 'use_case_name', VH_NAME_C) as use_case_summary,
-            #         ROW_NUMBER() OVER (ORDER BY CREATED_DATE) as row_num
-            #     from SALES.KNOWLEDGE_ASSISTANT.VH_DELIVERABLE_C
-            #     where OWNER_ID = '{owner_id}'
-            #         and VH_ACCOUNT_C = '{salesforce_account_id}'
-            #         and CREATED_DATE > dateadd('month', -6, CURRENT_DATE())
-            #         and VH_NAME_C is not null
-            #         and VH_DESCRIPTION_C is not null
-            # ),
-            # unioned_summaries as (
-            #     select use_case_summary from extracted_use_case_summaries
-            #     union
-            #     select use_case_summary from actual_use_case_summaries where row_num <= 5
-            # )
-            # select array_agg(use_case_summary) as USE_CASE_SUMMARY_LIST
-            # from unioned_summaries
-            # """)
+            # SQL statement to insert a single new use case into the new uses cases table.
+            insert_statement = f"""
+            INSERT INTO {DATABASE}.{SCHEMA}.{POTENTIAL_NEW_USE_CASES_TBL_NM} (activity_date, activity_id, owner_id, salesforce_account_id, use_case_description, use_case_name, workloads, technical_use_cases, incumbent_vendor)
+                SELECT
+                '{activity_date}',
+                '{activity_id}',
+                '{owner_id}',
+                '{salesforce_account_id}',
+                $${new_use_case_description}$$,
+                $${new_use_case_name}$$,
+                {new_use_case_workloads},
+                {new_use_case_technical_use_cases},
+                $${new_use_case_incumbent_vendor}$$
+                """
 
-            # # TODO: Delete this section when sfdc table is back.
-            previous_use_cases_df = session.sql(f"""
-            with extracted_use_case_summaries as (
-                select RECORD_CREATION_DTTM,
-                    new_use_case_id,
-                    use_case_name,
-                    use_case_description,
-                    object_construct('use_case_id', new_use_case_id, 'use_case_description', use_case_description, 'use_case_name', use_case_name) as use_case_summary
-                from {DATABASE}.{SCHEMA}.{POTENTIAL_NEW_USE_CASES_TBL_NM}
-                where OWNER_ID = '{owner_id}'
-                    and SALESFORCE_ACCOUNT_ID = '{salesforce_account_id}'
-                    and RECORD_CREATION_DTTM > dateadd('month', -6, CURRENT_DATE())
-            )
-            select array_agg(use_case_summary) as USE_CASE_SUMMARY_LIST
-            from extracted_use_case_summaries
-            """)
+            if DEDUP_NEW_USE_CASES:
+                # ------------------------------------------------------------
+                # Use an LLM to compare new use case description to other new use cases in the new uses cases table and also to most recent 5 existing descriptions of current use cases in SFDC table.
+                # NOTE: 95% of the accounts have less than 5 existing use cases created in the last 6 months in the SFDC table.
+                # ------------------------------------------------------------
+                # # TODO: SFDC table access was temporarily unavailable. Uncomment this section when sfdc table is back if we want to also compare to actual use cases already in SFDC:
+                # previous_use_cases_df = session.sql(f"""
+                # with extracted_use_case_summaries as (
+                #     select RECORD_CREATION_DTTM,
+                #         new_use_case_id,
+                #         use_case_name,
+                #         use_case_description,
+                #         object_construct('use_case_id', new_use_case_id, 'use_case_description', use_case_description, 'use_case_name', use_case_name) as use_case_summary
+                #     from {DATABASE}.{SCHEMA}.{POTENTIAL_NEW_USE_CASES_TBL_NM}
+                #     where OWNER_ID = '{owner_id}'
+                #         and SALESFORCE_ACCOUNT_ID = '{salesforce_account_id}'
+                #         and RECORD_CREATION_DTTM > dateadd('month', -6, CURRENT_DATE())
+                # ),
+                # actual_use_case_summaries as (
+                #     select CREATED_DATE,
+                #         ID,
+                #         VH_NAME_C,
+                #         VH_DESCRIPTION_C,
+                #         object_construct('use_case_id', ID, 'use_case_description', VH_DESCRIPTION_C, 'use_case_name', VH_NAME_C) as use_case_summary,
+                #         ROW_NUMBER() OVER (ORDER BY CREATED_DATE) as row_num
+                #     from SALES.KNOWLEDGE_ASSISTANT.VH_DELIVERABLE_C
+                #     where OWNER_ID = '{owner_id}'
+                #         and VH_ACCOUNT_C = '{salesforce_account_id}'
+                #         and CREATED_DATE > dateadd('month', -6, CURRENT_DATE())
+                #         and VH_NAME_C is not null
+                #         and VH_DESCRIPTION_C is not null
+                # ),
+                # unioned_summaries as (
+                #     select use_case_summary from extracted_use_case_summaries
+                #     union
+                #     select use_case_summary from actual_use_case_summaries where row_num <= 5
+                # )
+                # select array_agg(use_case_summary) as USE_CASE_SUMMARY_LIST
+                # from unioned_summaries
+                # """)
 
-            previous_use_cases_list = json.loads(previous_use_cases_df.collect()[0]["USE_CASE_SUMMARY_LIST"])
+                # # TODO: Delete this section when sfdc table is back if we want to also compare to actual use cases already in SFDC.
+                previous_use_cases_df = session.sql(f"""
+                with extracted_use_case_summaries as (
+                    select RECORD_CREATION_DTTM,
+                        new_use_case_id,
+                        use_case_name,
+                        use_case_description,
+                        object_construct('use_case_id', new_use_case_id, 'use_case_description', use_case_description, 'use_case_name', use_case_name) as use_case_summary
+                    from {DATABASE}.{SCHEMA}.{POTENTIAL_NEW_USE_CASES_TBL_NM}
+                    where OWNER_ID = '{owner_id}'
+                        and SALESFORCE_ACCOUNT_ID = '{salesforce_account_id}'
+                        and RECORD_CREATION_DTTM > dateadd('month', -6, CURRENT_DATE())
+                )
+                select array_agg(use_case_summary) as USE_CASE_SUMMARY_LIST
+                from extracted_use_case_summaries
+                """)
 
-            new_use_case_summary = {
-                "use_case_description": new_use_case_description,
-                "use_case_name": new_use_case_name,
-            }
+                previous_use_cases_list = json.loads(previous_use_cases_df.collect()[0]["USE_CASE_SUMMARY_LIST"])
 
-            llm = get_llm(cortex_model_selection="openai-gpt-4.1")
-            system_prompt = SYSTEM_PROMPT_USE_CASE_DEDUP
-            human_prompt = HUMAN_MESSAGE_USE_CASE_DEDUP.format(proposed_new_use_case=new_use_case_summary, existing_use_cases=previous_use_cases_list)
-            messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=human_prompt),
-            ]
+                new_use_case_summary = {
+                    "use_case_description": new_use_case_description,
+                    "use_case_name": new_use_case_name,
+                }
 
-            response = llm.with_structured_output(DedupeStructuredOutputState).invoke(messages)
+                llm = get_llm(cortex_model_selection="openai-gpt-4.1")
+                system_prompt = SYSTEM_PROMPT_USE_CASE_DEDUP
+                human_prompt = HUMAN_MESSAGE_USE_CASE_DEDUP.format(proposed_new_use_case=new_use_case_summary, existing_use_cases=previous_use_cases_list)
+                messages = [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=human_prompt),
+                ]
 
-            response_dict = response.model_dump()
+                response = llm.with_structured_output(DedupeStructuredOutputState).invoke(messages)
 
-            # ------------------------------------------------------------
+                response_dict = response.model_dump()
 
-            # If use case does not already exists add it to the new uses cases table.
-            is_duplicate = response_dict.get("is_duplicate", 0)
+                # ------------------------------------------------------------
 
-            if is_duplicate:
-                dedup_results_list.append(response_dict)
+                # If use case does not already exists add it to the new uses cases table.
+                is_duplicate = response_dict.get("is_duplicate", 0)
+
+                if is_duplicate:
+                    dedup_results_list.append(response_dict)
+                else:
+                    session.sql(insert_statement).collect()
+                    new_use_case_records_inserted += 1
+
             else:
-                insert_statement = f"""
-                INSERT INTO {DATABASE}.{SCHEMA}.{POTENTIAL_NEW_USE_CASES_TBL_NM} (activity_date, activity_id, owner_id, salesforce_account_id, use_case_description, use_case_name, workloads, technical_use_cases, incumbent_vendor)
-                    SELECT
-                    '{activity_date}',
-                    '{activity_id}',
-                    '{owner_id}',
-                    '{salesforce_account_id}',
-                    $${new_use_case_description}$$,
-                    $${new_use_case_name}$$,
-                    {new_use_case_workloads},
-                    {new_use_case_technical_use_cases},
-                    $${new_use_case_incumbent_vendor}$$
-                    """
                 session.sql(insert_statement).collect()
-
                 new_use_case_records_inserted += 1
 
     return {"call_activity_previously_processed": call_already_exists_in_new_use_cases_table, "new_use_case_records_inserted": new_use_case_records_inserted, "new_use_case_dedup_results": dedup_results_list}

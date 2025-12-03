@@ -18,3 +18,6 @@ CREATE OR REPLACE TABLE  ${DATABASE}.${SCHEMA}.potential_new_use_cases(
     last_updated_dttm DATETIME DEFAULT NULL,
     last_update_by VARCHAR DEFAULT NULL
 );
+
+GRANT SELECT ON TABLE ${DATABASE}.${SCHEMA}.potential_new_use_cases TO ROLE SFDC_SALES_AI_RO_RL;
+GRANT UPDATE ON TABLE ${DATABASE}.${SCHEMA}.potential_new_use_cases TO ROLE SFDC_SALES_AI_RO_RL;
