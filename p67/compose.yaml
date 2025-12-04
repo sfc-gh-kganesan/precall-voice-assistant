@@ -1,0 +1,10 @@
+services:
+    harness:
+        build:
+            context: .
+            target: runner
+            args:
+                SERVICE_NAME: harness
+                SERVICE_PORT: 8000
+        ports:
+            - "3000:8000"

@@ -9,6 +9,8 @@ Experimental platform for building, testing, and deploying agentic workflows.
 ├── packages/
 │   ├── api/          # Fastify backend API
 │   └── web/          # React 19 + Vite frontend
+├── services/
+│   └── harness/      # Harness service
 ├── package.json
 └── pnpm-workspace.yaml
 ```
