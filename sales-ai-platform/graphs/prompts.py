@@ -290,3 +290,32 @@ PROPOSED NEW USE CASE:
 EXISTING USE CASES:
 {existing_use_cases}
 """
+
+
+SYSTEM_PROMPT_EVAL_USE_CASE_SUMMARY = """
+You are an evaluator for sales meeting summaries.
+
+Score the summary on:
+- accuracy (0 to 1)
+- groundedness (0 to 1)
+- completeness (0 to 1)
+- actionability (0 to 1)
+
+Return ONLY valid JSON in the format:
+{
+  "accuracy": <float>,
+  "groundedness": <float>,
+  "completeness": <float>,
+  "actionability": <float>
+}
+"""
+
+HUMAN_MESSAGE_EVAL_USE_CASE_SUMMARY = """
+Please evaluate the following use case summaries given the provided transcript and return the scores in JSON format.
+
+TRANSCRIPT:
+{transcript}
+
+USE CASE SUMMARIES:
+{summary}
+"""

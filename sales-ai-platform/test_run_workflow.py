@@ -10,7 +10,9 @@ import asyncio
 import os
 
 from dotenv import load_dotenv
+from langsmith.run_helpers import trace
 
+from graphs.langsmith_evals import judge_summary
 from graphs.post_meeting_workflow import graph
 from utils import get_snowflake_session
 
@@ -37,10 +39,11 @@ else:
         and OWNER_ID = '005VI00000QLxXZYA1'
         and lower(PARTICIPANT_NAMES) like '%tara%'
         and RAW_CONTENT not like '%## Quick recap%'
+    LIMIT 1
     """
 
     sdf = session.sql(query).collect()
-    input_records = [{"activity_id": row["ACTIVITY_ID"], "owner_id": row["OWNER_ID"], "salesforce_account_id": row["SALESFORCE_ACCOUNT_ID"]} for row in sdf]
+    input_records = [{"activity_id": row["ACTIVITY_ID"], "owner_id": row["OWNER_ID"], "salesforce_account_id": row["SALESFORCE_ACCOUNT_ID"], "transcript": row["RAW_CONTENT"], "takeaways": row["TAKEAWAYS"]} for row in sdf]
 
 
 async def run_workflow_async(test_inputs: list[dict]):
@@ -58,11 +61,25 @@ async def run_workflow_async(test_inputs: list[dict]):
 
         try:
             # Invoke the workflow graph
-            result = await graph.ainvoke(test_input)
+            with trace(name="post_meeting_workflow", run_type="chain") as ls:
+                result = await graph.ainvoke(test_input)
+                scores = judge_summary(test_input["transcript"], result["new_use_cases"])
+                ls.metadata["eval_scores"] = scores
+                ls.tags.append(f"acc:{scores['accuracy']:.2f}")
+                ls.tags.append(f"gnd:{scores['groundedness']:.2f}")
+                ls.tags.append(f"cmp:{scores['completeness']:.2f}")
+                ls.tags.append(f"act:{scores['actionability']:.2f}")
 
-            print("Workflow completed successfully! \n")
-            print("Full result:")
-            print(result)
+                print("Workflow completed successfully! \n")
+                print("Full result:")
+                print(result)
+                print("Evaluation scores:")
+                print(scores)
+
+                with trace(name="eval_judge", run_type="llm") as eval_run:
+                    eval_run.inputs["transcript"] = test_input["transcript"]
+                    eval_run.inputs["use_cases"] = result["new_use_cases"]
+                    eval_run.outputs["scores"] = scores
 
         except Exception as e:
             print(f"Workflow failed: {str(e)}")

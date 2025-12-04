@@ -28,13 +28,7 @@ install:
 dev port="8000": install
     echo "Starting development server on port {{port}}..."
 
-    # Local tracing directory
-    if [ $ENABLE_LOCAL_TRACING = true ]; then \
-        echo "Initializing local tracing directory: $LANGGRAPH_TRACING_DIR"; \
-        mkdir -p $LANGGRAPH_TRACING_DIR; \
-    fi
-
-    # Start LangGraph Studio in background
+    # Start LangSmith Tracing in background
     if [ $ENABLE_GRAPH_UI = true ]; then \
         echo "Starting LangGraph Studio..."; \
         cd local_langsmith && docker compose up -d --remove-orphans && cd ..; \
