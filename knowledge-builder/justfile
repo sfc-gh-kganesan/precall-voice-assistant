@@ -20,7 +20,7 @@ install:
 
 # Start dev server with auto-reload (optionally specify port, default: 8000)
 kb_builder_svc port="8000": install
-    uv run uvicorn --app-dir=./src kb_builder_svc:app --host 0.0.0.0 --port {{port}} --reload
+    uv run uvicorn --app-dir=./src/services kb_builder_svc:app --host 0.0.0.0 --port {{port}} --reload
 
 # Private: Get connection flag for snow CLI
 _connection-flag:
@@ -73,39 +73,39 @@ deploy:
     # Setup infrastructure
     echo "🏗️  Setting up Snowflake infrastructure..."
     echo "Creating database schema..."
-    just _run-sql release/1_database_schema.sql
+    just _run-sql database/schema/database_setup.sql
     echo "Creating network rules..."
-    just _run-sql release/2_network_rules.sql
+    just _run-sql database/infrastructure/network_rules.sql
     echo "Creating compute pool..."
-    just _run-sql release/3_compute_pool.sql
+    just _run-sql database/infrastructure/compute_pool.sql
     echo "🔧 Deploying optional HTML utility functions..."
-    just _run-sql release/7_optional_html_utils.sql
+    just _run-sql database/functions/html_utils.sql
 
     # Build and push Docker image
     echo "🐳 Building Docker image..."
     SPCS_REPO_URL=$(snow spcs image-repository url $SPCS_IMAGE_REPO_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --silent)
     echo "Building image..."
-    cd release && docker build --rm --platform linux/amd64 -t $SPCS_REPO_URL/$KB_BUILDER_IMAGE_NAME:latest -f Dockerfile.kb_builder_svc ../. --quiet
+    cd docker && docker build --rm --platform linux/amd64 -t $SPCS_REPO_URL/$KB_BUILDER_IMAGE_NAME:latest -f Dockerfile.kb_builder_svc ../. --quiet
     cd ..
     echo "📤 Pushing to Snowflake image repository..."
     docker push $SPCS_REPO_URL/kb-builder-svc:latest --quiet
 
     # Deploy service
     echo "🚢 Deploying service to Snowflake..."
-    just _run-sql release/4_service.sql "true"
+    just _run-sql database/infrastructure/kb_builder_service.sql "true"
 
     # Deploy example job
     echo "🦀 Building Rust example job Docker image..."
-    cd release && docker build --rm --platform linux/amd64 -t $SPCS_REPO_URL/example-job:latest -f Dockerfile.example_job ../. --quiet
+    cd docker && docker build --rm --platform linux/amd64 -t $SPCS_REPO_URL/example-job:latest -f Dockerfile.example_job ../. --quiet
     cd ..
     echo "📤 Pushing example-job to Snowflake..."
     docker push $SPCS_REPO_URL/example-job:latest --quiet
     echo "🚢 Deploying example job service..."
-    just _run-sql release/5_example_job.sql "true"
+    just _run-sql database/jobs/example_job_service.sql "true"
 
     # Deploy service functions
     echo "🔧 Deploying service functions..."
-    just _run-sql release/6_service_functions.sql "true"
+    just _run-sql database/functions/kb_service_functions.sql "true"
 
     echo "Waiting for service to initialize..."
     sleep 5

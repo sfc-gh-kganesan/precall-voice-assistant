@@ -28,4 +28,4 @@ ENV PYTHONPATH="/app"
 EXPOSE 8000
 
 # Run the FastAPI application with uvicorn
-CMD ["python", "-m", "uvicorn", "src.kb_builder_svc:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "src.services.kb_builder_svc:app", "--host", "0.0.0.0", "--port", "8000"]

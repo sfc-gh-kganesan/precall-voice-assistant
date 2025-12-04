@@ -146,7 +146,9 @@ with links_tab:
 
 with image_links_tab:
     st.subheader("Image Link Analysis")
-    st.caption("Categorized image sources from <img> tags (via ANALYZE_IMAGE_LINKS SPROC).")
+    st.caption(
+        "Categorized image sources from <img> tags (via ANALYZE_IMAGE_LINKS SPROC)."
+    )
 
     # Call the stored procedure - runs server-side in Snowflake
     image_summary = session.call("ANALYZE_IMAGE_LINKS").to_pandas()

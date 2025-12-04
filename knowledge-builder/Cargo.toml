@@ -5,7 +5,7 @@ edition = "2021"
 
 [[bin]]
 name = "example-job"
-path = "src/example_job/main.rs"
+path = "src/jobs/example_job/main.rs"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["json", "blocking"] }

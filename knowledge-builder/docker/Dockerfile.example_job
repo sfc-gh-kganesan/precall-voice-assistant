@@ -12,7 +12,7 @@ RUN apt-get update && \
 COPY Cargo.toml Cargo.lock* ./
 
 # Copy actual source code
-COPY src/example_job ./src/example_job
+COPY src/jobs/example_job ./src/jobs/example_job
 
 # Build the application (dependencies will be cached in Docker layers)
 RUN cargo build --release --bin example-job
