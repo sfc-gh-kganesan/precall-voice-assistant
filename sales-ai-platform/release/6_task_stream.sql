@@ -12,7 +12,6 @@ AS
 $$
 DECLARE
   rows_processed INTEGER DEFAULT 0;
-  batch_size INTEGER DEFAULT 100;
   insert_timestamp TIMESTAMP_NTZ;
 BEGIN
   -- Create tracking table to advance stream offset
@@ -34,7 +33,7 @@ BEGIN
   FROM ${DATABASE}.${SCHEMA}.all_engagement_details_stream
   WHERE type='MEETING' 
   AND raw_content IS NOT NULL
-  LIMIT :batch_size;
+  ;
   
   rows_processed := SQLROWCOUNT;
   
