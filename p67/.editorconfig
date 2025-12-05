@@ -9,6 +9,6 @@ insert_final_newline = true
 end_of_line = lf
 
 # Settings specifically for Makefiles
-[Makefile]
+[Makefile*]
 indent_style = tab
 indent_size = 4

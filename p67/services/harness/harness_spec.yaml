@@ -1,0 +1,17 @@
+spec:
+    containers:
+        - name: harness
+          image: /p67_src/core/img_repo/harness:latest
+          env:
+              PORT: 8000
+          resources:
+              requests:
+                  memory: 512Mi
+                  cpu: 0.5
+              limits:
+                  memory: 1Gi
+                  cpu: 1
+    endpoints:
+        - name: app
+          port: 8000
+          public: true

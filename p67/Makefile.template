@@ -1,0 +1,34 @@
+SNOW_CONNECTION?=<<snow_connection>>
+SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
+HARNESS_IMAGE=harness
+.PHONY: build build_harness deploy fix init-provider-account login push push_harness
+
+build: build_harness
+
+build_harness:
+	docker build \
+		--platform linux/amd64 \
+		--target runner \
+		--build-arg SERVICE_NAME=harness \
+		--build-arg SERVICE_PORT=3000 \
+		-t $(HARNESS_IMAGE) \
+		.
+
+deploy: login build push
+	snow app run -c $(SNOW_CONNECTION)
+
+fix:
+	pnpm lint:fix
+	pnpm format
+
+init-provider-account:
+	snow sql -f "./ops/provider_account_setup.sql" -c $(SNOW_CONNECTION)
+
+login:
+	snow spcs image-registry login -c $(SNOW_CONNECTION)
+
+push: push_harness
+
+push_harness:
+	docker tag $(HARNESS_IMAGE) $(SNOW_REPO)/$(HARNESS_IMAGE)
+	docker push $(SNOW_REPO)/$(HARNESS_IMAGE)

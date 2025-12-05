@@ -1,0 +1,31 @@
+manifest_version: 2
+
+version:
+    name: V1
+    label: "v1"
+
+configuration:
+    grant_callback: v1.create_services
+
+artifacts:
+    readme: README.md
+    setup_script: setup.sql
+
+    default_web_endpoint:
+        service: app.harness
+        endpoint: app
+
+    container_services:
+        images:
+            - /p67_src/core/img_repo/harness
+
+lifecycle_callbacks:
+    version_initializer: v1.init
+
+privileges:
+    - CREATE COMPUTE POOL:
+          description: "Enable application to create its own compute pool(s)"
+    - BIND SERVICE ENDPOINT:
+          description: "Enables application to expose service endpoints"
+    - CREATE WAREHOUSE:
+          description: "Enables application to create its own warehouse(s)"

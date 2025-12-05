@@ -1,0 +1,26 @@
+definition_version: 2
+env:
+    db: p67_src
+    schema: core
+    admin_rl: p67_provider_admin_rl
+    image_repo: img_repo
+    warehouse: p67_provider_wh
+    warehouse_size: xsmall
+
+entities:
+    p67_app_pkg:
+        type: application package
+        manifest: native-app/manifest.yml
+        artifacts:
+            - src: native-app/*
+              dest: ./
+            - src: services/harness/harness_spec.yaml
+              dest: services/harness/harness_spec.yaml
+        meta:
+            role: <% ctx.env.admin_rl %>
+            warehouse: <% ctx.env.warehouse %>
+    p67_app_instance:
+        type: application
+        from:
+            target: p67_app_pkg
+        debug: false
