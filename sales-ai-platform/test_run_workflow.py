@@ -22,6 +22,7 @@ demo_mode = os.getenv("DEMO_MODE", "false").lower()
 
 if demo_mode == "true":
     # Input records from synthetic table
+    # (NOTE: Deduplication should catch 2 duplicate use cases in this list of synthetic calls)
     input_records = [
         {"activity_id": "7578ghohjgt8rthljmvotur87947597935", "owner_id": "004G0005867qtHRAN", "salesforce_account_id": "00184759847rG98TAU78"},
         {"activity_id": "9chdhagbdhajj5jlj95584unajgljfdg94u8585", "owner_id": "004G0005867qtHRAN", "salesforce_account_id": "00184759847rG98TAU78"},
@@ -36,13 +37,16 @@ else:
     from sales.engagement360_pitch.all_engagement_details
     where TYPE = 'MEETING'
         and RAW_CONTENT is not null
-        and OWNER_ID = '005VI00000QLxXZYA1'
-        and lower(PARTICIPANT_NAMES) like '%tara%'
         and RAW_CONTENT not like '%## Quick recap%'
-    LIMIT 1
+        and (
+            (OWNER_ID = '005VI00000QLxXZYA1' and lower(PARTICIPANT_NAMES) like '%tara%')
+                or (ACTIVITY_ID in ('6qjqk93qior3pf1djgsmrt2d7o', 'b2fac4fb47d236725e24b1147fcfca79ce33ea7a72ab46181f2595dbc71196fb'))
+            )
     """
 
     sdf = session.sql(query).collect()
+
+    # Input records of real calls.
     input_records = [{"activity_id": row["ACTIVITY_ID"], "owner_id": row["OWNER_ID"], "salesforce_account_id": row["SALESFORCE_ACCOUNT_ID"], "transcript": row["RAW_CONTENT"], "takeaways": row["TAKEAWAYS"]} for row in sdf]
 
 
@@ -63,23 +67,26 @@ async def run_workflow_async(test_inputs: list[dict]):
             # Invoke the workflow graph
             with trace(name="post_meeting_workflow", run_type="chain") as ls:
                 result = await graph.ainvoke(test_input)
-                scores = judge_summary(test_input["transcript"], result["new_use_cases"])
-                ls.metadata["eval_scores"] = scores
-                ls.tags.append(f"acc:{scores['accuracy']:.2f}")
-                ls.tags.append(f"gnd:{scores['groundedness']:.2f}")
-                ls.tags.append(f"cmp:{scores['completeness']:.2f}")
-                ls.tags.append(f"act:{scores['actionability']:.2f}")
 
                 print("Workflow completed successfully! \n")
                 print("Full result:")
                 print(result)
-                print("Evaluation scores:")
-                print(scores)
 
-                with trace(name="eval_judge", run_type="llm") as eval_run:
-                    eval_run.inputs["transcript"] = test_input["transcript"]
-                    eval_run.inputs["use_cases"] = result["new_use_cases"]
-                    eval_run.outputs["scores"] = scores
+                if demo_mode == "false":
+                    scores = judge_summary(test_input["transcript"], result["new_use_cases"])
+                    ls.metadata["eval_scores"] = scores
+                    ls.tags.append(f"acc:{scores['accuracy']:.2f}")
+                    ls.tags.append(f"gnd:{scores['groundedness']:.2f}")
+                    ls.tags.append(f"cmp:{scores['completeness']:.2f}")
+                    ls.tags.append(f"act:{scores['actionability']:.2f}")
+
+                    print("Evaluation scores:")
+                    print(scores)
+
+                    with trace(name="eval_judge", run_type="llm") as eval_run:
+                        eval_run.inputs["transcript"] = test_input["transcript"]
+                        eval_run.inputs["use_cases"] = result["new_use_cases"]
+                        eval_run.outputs["scores"] = scores
 
         except Exception as e:
             print(f"Workflow failed: {str(e)}")

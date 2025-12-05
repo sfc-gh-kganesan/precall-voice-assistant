@@ -190,6 +190,7 @@ def new_use_case_insert(state: OverallState) -> OverallState:
                 # ------------------------------------------------------------
                 # Use an LLM to compare new use case description to other new use cases in the new uses cases table and also to most recent 5 existing descriptions of current use cases in SFDC table.
                 # NOTE: 95% of the accounts have less than 5 existing use cases created in the last 6 months in the SFDC table, so for now we only look at the most recent 5 use cases from the SFDC table.
+                # NOTE: In the call transcript table, sometimes the same call gets two records (often with two different owner_id values). So duplicates could appear for the same account in these situations.
                 # ------------------------------------------------------------
                 # NOTE: At one point we lost access to the SFDC table. If that happens again, we can comment this query out and use the query below instead.
                 previous_use_cases_df = session.sql(f"""
@@ -210,7 +211,7 @@ def new_use_case_insert(state: OverallState) -> OverallState:
                         VH_NAME_C,
                         VH_DESCRIPTION_C,
                         object_construct('use_case_id', ID, 'use_case_description', VH_DESCRIPTION_C, 'use_case_name', VH_NAME_C) as use_case_summary,
-                        ROW_NUMBER() OVER (ORDER BY CREATED_DATE) as row_num
+                        ROW_NUMBER() OVER (ORDER BY CREATED_DATE DESC) as row_num
                     from SALES.KNOWLEDGE_ASSISTANT.VH_DELIVERABLE_C
                     where OWNER_ID = '{owner_id}'
                         and VH_ACCOUNT_C = '{salesforce_account_id}'
