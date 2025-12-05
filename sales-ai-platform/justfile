@@ -172,6 +172,9 @@ deploy: check-env
     echo "Creating new use cases table to contain new use cases found in call transcripts..."
     just _run-sql release/8_potential_use_case_table.sql true
 
+    echo "Creating evaluation results table to contain evaluation results for use case summaries..."
+    just _run-sql release/9_logging_eval_table.sql true
+
     # Build and push Docker image
     echo "🐳 Building Docker image..."
     REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent)

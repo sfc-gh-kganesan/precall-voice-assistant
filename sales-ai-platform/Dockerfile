@@ -19,6 +19,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy application code
 COPY app.py utils.py ./
 COPY graphs/ ./graphs/
+COPY evals/ ./evals/
 
 # Set Python path and environment
 ENV PATH="/app/.venv/bin:$PATH"

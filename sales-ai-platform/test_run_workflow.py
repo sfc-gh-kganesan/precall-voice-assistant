@@ -12,7 +12,7 @@ import os
 from dotenv import load_dotenv
 from langsmith.run_helpers import trace
 
-from graphs.langsmith_evals import judge_summary
+from evals.langsmith_evals import judge_summary
 from graphs.post_meeting_workflow import graph
 from utils import get_snowflake_session
 

@@ -14,14 +14,14 @@ def get_llm(cortex_model_selection: str = "openai-gpt-4.1"):
     if llm_provider == "openai":
         if os.getenv("OPENAI_API_KEY") is None:
             raise Exception("OPENAI_API_KEY is not set")
-        print("get_llm: using OpenAI")
+        print("[Graph Logging] get_llm: using OpenAI")
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, max_retries=5, request_timeout=20)
         return llm
     else:
         snowflake_host = os.getenv("SNOWFLAKE_HOST")
         if snowflake_host is None:
             raise Exception("SNOWFLAKE_HOST is not set")
-        print("get_llm: using Snowflake Cortex")
+        print("[Graph Logging] get_llm: using Snowflake Cortex")
         base_url = f"https://{snowflake_host}/api/v2/cortex/openai"
         api_key = get_snowflake_token()  # Fresh token on each call
         llm = ChatOpenAI(
