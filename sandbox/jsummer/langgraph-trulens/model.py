@@ -6,8 +6,8 @@ from langchain_openai import ChatOpenAI
 
 from utils import is_running_in_spcs_container, get_spcs_container_token
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from utils import application_name
+logger = logging.getLogger(application_name)
 
 load_dotenv()
 
@@ -44,7 +44,7 @@ class CortexModel:
                 # include_response_headers = True, # Allows us to capture the Snowflake request ID for debugging
                 api_key=api_key)
             
-            
+            logger.info(f"LLM model initialized: {model.model_name}")
             return model
             
         except Exception as e:

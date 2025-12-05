@@ -1,5 +1,6 @@
 import uuid
 import time
+import logging
 
 from langchain_core.messages import HumanMessage
 
@@ -11,8 +12,11 @@ from trulens.otel.semconv.trace import SpanAttributes
 from trulens.apps.langgraph import TruGraph
 from trulens.core.run import Run, RunConfig
 
-from utils import get_snowpark_session
+from utils import get_snowpark_session, application_name
 from metrics import METRICS
+from graph import create_graph
+
+logger = logging.getLogger(application_name)
 
 # TruLens Snowflake Connector requires a Snowpark session
 # You can pass some credentials directly to it but it must be explicitly `['account', 'user', 'password', 'database', 'schema', 'warehouse', 'role']`
@@ -21,7 +25,6 @@ tru_snowflake_connector = SnowflakeConnector(snowpark_session=get_snowpark_sessi
 app_name = "langgraph-trulens-example2"
 app_version = "0.1.0"
 
-from graph import create_graph
 
 graph = create_graph()
 
@@ -44,7 +47,7 @@ class LanggraphWorkflow:
     )
     def run_query(self, message: str, id: str = str(uuid.uuid4()), reference_output: str = "") -> str:
         """Main method that TruLens will call for each query from the dataframe."""
-        print(f"DEBUG: Processing message={message}, id={id}")
+        logger.info(f"Processing message={message}, id={id}", extra={"input_message": message, "input_id": id})
         
         # Call the graph directly with proper RECORD_ROOT instrumentation
         state = {
@@ -100,11 +103,11 @@ if __name__ == "__main__":
         time.sleep(3)
 
     # "correctness" is a built-in, server-side metric in TruLens that incorporates ground truth from span attributes.
-    print("DEBUG: Computing metrics...")
+    logger.info("Computing metrics...")
     run.compute_metrics(metrics= METRICS + ["correctness"])
 
     # Calculate metric aggregate scores
-    print("DEBUG: Calculating metric aggregate scores...")
+    logger.info("Calculating metric aggregate scores...")
     run_record = langgraph_workflow.get_run(run_name=run_name)
     records = run_record.get_records()
 
@@ -113,5 +116,4 @@ if __name__ == "__main__":
     for m in metric_names:
         if m in records.columns:
             metric_scores[m] = round(float(records[m].mean()), 2)
-    print('METRIC SCORES:')
-    print(metric_scores)
+    logger.info('METRIC SCORES:', extra={"metric_scores": metric_scores})
