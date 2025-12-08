@@ -1,0 +1,12 @@
+# build folders
+dist
+
+# env files - ignore all .env* except .env.example
+.env*
+!.env.example
+
+# Editor/IDE
+# .idea/
+# .vscode/
+
+.DS_Store

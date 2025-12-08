@@ -1,7 +1,7 @@
 SNOW_CONNECTION?=<<snow_connection>>
 SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
 HARNESS_IMAGE=harness
-.PHONY: build build_harness deploy fix init-provider-account login push push_harness
+.PHONY: build build_harness deploy dev fix init-provider-account login push push_harness
 
 build: build_harness
 
@@ -16,6 +16,9 @@ build_harness:
 
 deploy: login build push
 	snow app run -c $(SNOW_CONNECTION)
+
+dev:
+	docker compose up --build
 
 fix:
 	pnpm lint:fix
