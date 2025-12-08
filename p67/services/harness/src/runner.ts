@@ -1,0 +1,77 @@
+import { fork } from 'child_process';
+import { resolve, dirname } from 'path';
+import { ExecuteMessage } from './schema';
+import { fileURLToPath } from 'url';
+
+export class Runner {
+  constructor(private readonly workflowDir: string) {}
+
+  public async start() {
+    console.log(`Running workflow from ${this.workflowDir}...`);
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const hostPath = resolve(__dirname, 'runner-host.js');
+
+    // Fork a new Node.js process to execute the code
+    const proc = fork(hostPath, [], {
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+    });
+
+    let output = '';
+    let errorOutput = '';
+
+    // Pipe stdout from child process
+    if (proc.stdout) {
+      proc.stdout.on('data', (data: Buffer) => {
+        const text = data.toString();
+        console.log('[Child stdout]:', text);
+        output += text;
+      });
+    }
+
+    // Pipe stderr from child process
+    if (proc.stderr) {
+      proc.stderr.on('data', (data: Buffer) => {
+        const text = data.toString();
+        console.error('[Child stderr]:', text);
+        errorOutput += text;
+      });
+    }
+
+    proc.on('message', (message) => {
+      console.log('main received from child: ', message);
+    });
+
+    proc.on('error', (error) => {
+      console.error('child process error:', error);
+    });
+
+    proc.on('exit', (code) => {
+      console.log(`Child process exited with code ${code}`);
+    });
+
+    const m: ExecuteMessage = {
+      dir: this.workflowDir,
+      action: 'run',
+    };
+
+    // Launch script
+    proc.send(m);
+
+    // Wait for the child process to complete
+    const exitCode = await new Promise<number>((resolve) => {
+      proc.on('exit', (code) => {
+        resolve(code || 0);
+      });
+
+      proc.on('error', (err) => {
+        console.error('[Child process error]:', err);
+        resolve(1);
+      });
+    });
+
+    console.log(output);
+    console.error(errorOutput);
+    console.log(`Runner process exited with code ${exitCode}`);
+  }
+}
