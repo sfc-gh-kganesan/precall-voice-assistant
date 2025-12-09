@@ -1,11 +1,24 @@
 SNOW_CONNECTION?=<<snow_connection>>
-SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
+SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/\
+p67_src/core/img_repo
 HARNESS_IMAGE=harness
-.PHONY: build build_harness deploy dev fix init-provider-account login push push_harness
+.PHONY: help build build_harness deploy describe dev fix \
+init-provider-account list-services login push push_harness \
+url
 
-build: build_harness
+.DEFAULT_GOAL := help
 
-build_harness:
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Available targets:'
+	@awk 'BEGIN {FS = ":.*##"; printf ""} \
+		/^[a-zA-Z_-]+:.*?##/ { printf "  %-20s %s\n", $$1, $$2 }' \
+		$(MAKEFILE_LIST)
+
+build: build-harness ## Build Docker images
+
+build-harness: ## Build harness Docker image for linux/amd64
 	docker build \
 		--platform linux/amd64 \
 		--target runner \
@@ -14,24 +27,37 @@ build_harness:
 		-t $(HARNESS_IMAGE) \
 		.
 
-deploy: login build push
+deploy: login build push ## Deploy to Snowflake (login, build, push, and run app)
 	snow app run -c $(SNOW_CONNECTION)
 
-dev:
+describe: ## Describe the p67.app.harness service
+	snow spcs service describe p67.app.harness --format json
+
+dev: ## Start local development environment with Docker Compose
 	docker compose up --build
 
-fix:
+fix: ## Fix linting and formatting issues
 	pnpm lint:fix
 	pnpm format
 
-init-provider-account:
+init-provider-account: ## Initialize provider account with setup SQL
 	snow sql -f "./ops/provider_account_setup.sql" -c $(SNOW_CONNECTION)
 
-login:
+list: ## List all services in p67 database
+	snow spcs service list --format json --in database p67
+
+login: ## Log in to Snowflake image registry
 	snow spcs image-registry login -c $(SNOW_CONNECTION)
 
-push: push_harness
+push: push_harness ## Push Docker images to Snowflake registry
 
-push_harness:
+push_harness: ## Tag and push harness image to Snowflake registry
 	docker tag $(HARNESS_IMAGE) $(SNOW_REPO)/$(HARNESS_IMAGE)
 	docker push $(SNOW_REPO)/$(HARNESS_IMAGE)
+
+url: ## Print the ingress URL for the running SPCS service
+	snow spcs service list-endpoints p67.app.harness \
+		-c $(SNOW_CONNECTION) \
+		--format json | \
+		jq '.[] | select(.name == "app") | .ingress_url' -r | \
+		xargs -I {} echo "https://{}"

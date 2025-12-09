@@ -19,8 +19,11 @@ entities:
         meta:
             role: <% ctx.env.admin_rl %>
             warehouse: <% ctx.env.warehouse %>
-    p67_app_instance:
+    p67:
         type: application
         from:
             target: p67_app_pkg
         debug: false
+        meta:
+            role: <% ctx.env.admin_rl %>
+            warehouse: <% ctx.env.warehouse %>

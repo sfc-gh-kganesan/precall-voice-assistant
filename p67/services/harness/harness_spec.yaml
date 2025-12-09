@@ -2,8 +2,12 @@ spec:
     containers:
         - name: harness
           image: /p67_src/core/img_repo/harness:latest
+          volumeMounts:
+              - name: local-storage
+                mountPath: /opt/local-storage
           env:
               PORT: 8000
+              DATA_ROOT: /opt/local-storage
           resources:
               requests:
                   memory: 512Mi
@@ -11,6 +15,10 @@ spec:
               limits:
                   memory: 1Gi
                   cpu: 1
+    volumes:
+        - name: local-storage
+          source: block
+          size: 1Gi
     endpoints:
         - name: app
           port: 8000
