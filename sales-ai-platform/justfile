@@ -35,7 +35,10 @@ dev port="8000": install
     fi
 
     echo "Starting FastAPI server..."
-    uv run uvicorn app:app --host 0.0.0.0 --port {{port}} --reload --env-file .env
+    uv run uvicorn app:app --host 0.0.0.0 --port {{port}} --reload --env-file .env &
+
+    echo "Starting Streamlit dashboard..."
+    streamlit run dashboard/dashboard.py --server.port=8502
 
 # Start production server (optionally specify port, default: 8000)
 api port="8000":
@@ -206,6 +209,39 @@ deploy: check-env
     echo "  just logs      - View service logs"
     echo "  just url       - Show public endpoint URL"
     echo ""
+
+# Deploy evals dashboard
+dashboard-deploy: check-env
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+
+    echo "🔐 Logging into Snowflake image registry..."
+    snow spcs image-registry login --role $ROLE $CONNECTION_FLAG --silent || true
+
+    echo "🐳 Building dashboard Docker image..."
+    REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent)
+    cp .env dashboard/.env && cd dashboard
+    docker build --platform linux/amd64 -t $REPO_URL/$DASHBOARD_IMAGE_NAME:$IMAGE_TAG . --quiet
+    docker push $REPO_URL/$DASHBOARD_IMAGE_NAME:$IMAGE_TAG --quiet
+    rm .env && cd ..
+
+    echo "🚢 Deploying dashboard service..."
+    just _run-sql release/dashboard_service.sql false true true
+
+    echo ""
+    echo "🎉 Dashboard deployment complete!"
+    echo ""
+    echo "Run: just dashboard-url  to get the endpoint"
+
+
+dashboard-url:
+    snow spcs service list-endpoints ${DATABASE}.${SCHEMA}.${DASHBOARD_SERVICE_NAME} --verbose
+
+dashboard-logs:
+    snow spcs service logs ${DATABASE}.${SCHEMA}.${DASHBOARD_SERVICE_NAME} --container-name dashboard --instance-id 0
+
+
 
 # Perform load testing
 load-test: check-env

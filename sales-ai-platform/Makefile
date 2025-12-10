@@ -2,7 +2,7 @@
 # This project uses justfile - this Makefile automatically installs just and delegates to it.
 
 # List of all targets from justfile (to avoid conflicts)
-TARGETS := help install dev api studio check-env deploy status logs url check fmt clean load-test load-test-reset
+TARGETS := help install dev api studio check-env deploy status logs url check fmt clean load-test load-test-reset dashboard-deploy dashboard-url dashboard-logs
 
 .PHONY: _ensure-just $(TARGETS)
 
