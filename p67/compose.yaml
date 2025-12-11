@@ -1,10 +1,14 @@
 services:
-    harness:
-        build:
-            context: .
-            target: runner
-            args:
-                SERVICE_NAME: harness
-                SERVICE_PORT: 8000
-        ports:
-            - "3000:8000"
+  harness:
+    build:
+      context: .
+      target: runner
+      args:
+        SERVICE_NAME: harness
+        SERVICE_PORT: 8000
+    ports:
+      - "3000:8000"
+    environment:
+      DATA_ROOT: /app/services/harness/.data_root
+    volumes:
+      - ./services/harness/.data_root:/app/services/harness/.data_root

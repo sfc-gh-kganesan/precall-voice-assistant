@@ -3,10 +3,16 @@ import { resolve, dirname } from 'path';
 import { ExecuteMessage } from './schema';
 import { fileURLToPath } from 'url';
 
+export type RunResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+};
+
 export class Runner {
   constructor(private readonly workflowDir: string) {}
 
-  public async start() {
+  public async start(): Promise<RunResult> {
     console.log(`Running workflow from ${this.workflowDir}...`);
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
@@ -73,5 +79,11 @@ export class Runner {
     console.log(output);
     console.error(errorOutput);
     console.log(`Runner process exited with code ${exitCode}`);
+
+    return {
+      stdout: output,
+      stderr: errorOutput,
+      exitCode,
+    };
   }
 }

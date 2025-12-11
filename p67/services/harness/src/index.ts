@@ -1,102 +1,39 @@
-import cors from '@fastify/cors';
-import Fastify from 'fastify';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import multipart from '@fastify/multipart';
-import { unzipToTemp } from './zip.js';
-import { randomUUID } from 'crypto';
-import { pipeline } from 'stream/promises';
-import { createWriteStream } from 'fs';
-import { rm } from 'fs/promises';
-import { Runner } from './runner.js';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { serve } from '@hono/node-server';
+import { errorHandler } from './middleware/error-handler.js';
+import { env, Env } from './middleware/env.js';
+import { initLogger } from './middleware/logger.js';
+import { getPort } from './lib/env.js';
+import apiRouter from './routes/api.js';
+import buildConfig from './config.js';
 
-const fastify = Fastify({
-  logger: true,
+const app = new Hono<Env>();
+const config = buildConfig();
+
+console.log(JSON.stringify(config, null, 2));
+
+app.use(env(config));
+app.use(initLogger(config));
+app.use(errorHandler);
+app.use(cors());
+
+app.route('/api', apiRouter);
+const port = getPort();
+
+console.log(`Server listening on port ${port}`);
+
+const server = serve({
+  fetch: app.fetch,
+  port,
 });
 
-// Register multipart plugin for file uploads
-fastify.register(multipart, {
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit - adjust as needed
-  },
-});
-
-// Register CORS
-await fastify.register(cors, {
-  origin: true,
-});
-
-// Routes
-fastify.get('/api/health', async () => {
-  return { status: 'ok', timestamp: new Date().toISOString() };
-});
-
-fastify.post('/run', async (request, reply) => {
-  try {
-    const data = await request.file();
-
-    if (!data) {
-      return reply.code(400).send({ error: 'No file uploaded' });
+process.on('SIGTERM', () => {
+  server.close((err) => {
+    if (err) {
+      console.error(err);
+      process.exit(1);
     }
-
-    // Validate file type
-    // if (data.mimetype !== 'application/zip' &&
-    //     data.mimetype !== 'application/x-zip-compressed') {
-    //     return reply.code(400).send({ error: 'File must be a zip archive' });
-    // }
-
-    // Save uploaded file to temporary location
-    const uploadedZipPath = join(tmpdir(), `upload-${randomUUID()}.zip`);
-    await pipeline(data.file, createWriteStream(uploadedZipPath));
-
-    // Unzip to temporary directory
-    const { tempDir, files } = await unzipToTemp(uploadedZipPath);
-    console.log(JSON.stringify({ tempDir, files }, null, 2));
-
-    // Clean up the uploaded zip file
-    await rm(uploadedZipPath, { force: true });
-
-    const runner = new Runner(tempDir);
-    runner.start();
-
-    //////
-    const exitCode = 0;
-    const output = 'ok';
-    const errorOutput = 'all good';
-
-    // Clean up temporary file
-    try {
-      await rm(tempDir, { force: true });
-    } catch (err) {
-      console.error('Failed to delete temp file:', err);
-    }
-
-    // Return the execution results
-    return reply.send({
-      exitCode,
-      stdout: output,
-      stderr: errorOutput,
-      success: exitCode === 0,
-    });
-  } catch (error) {
-    console.error('Error processing request:', error);
-    return reply.code(500).send({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+    process.exit(0);
+  });
 });
-
-// Start server
-const start = async () => {
-  try {
-    const port = process.env.PORT ? Number.parseInt(process.env.PORT) : 3000;
-    await fastify.listen({ port, host: '0.0.0.0' });
-    console.log(`Server listening on port ${port}`);
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-};
-
-start();

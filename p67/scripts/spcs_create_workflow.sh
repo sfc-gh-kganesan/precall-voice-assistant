@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"/p67
-SPCS_ENDPOINT="$("$ROOT/scripts/get_spcs_endpoint_harness.sh")"
-URL="$SPCS_ENDPOINT/run"
+ENDPOINT="$("$ROOT/scripts/get_spcs_endpoint_harness.sh")"
+URL="$ENDPOINT/api/workflow/create"
 
 if [ -z "$SNOWFLAKE_PAT" ]; then
     echo "Error: SNOWFLAKE_PAT environment variable is not set." >&2
