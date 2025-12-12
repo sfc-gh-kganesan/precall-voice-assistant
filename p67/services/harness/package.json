@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.7",
+    "@hono/swagger-ui": "^0.5.2",
+    "@hono/zod-openapi": "^1.1.5",
     "@types/adm-zip": "^0.5.7",
     "adm-zip": "^0.5.16",
     "dotenv": "^17.2.3",
