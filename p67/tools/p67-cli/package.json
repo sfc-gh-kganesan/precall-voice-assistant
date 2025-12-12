@@ -1,0 +1,41 @@
+{
+  "name": "@p67/cli",
+  "version": "0.1.0",
+  "description": "P67 CLI Tool",
+  "module": "index.ts",
+  "type": "module",
+  "bin": {
+    "p67": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "build": "bun build ./src/index.ts --compile --outfile ./bin/pss",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "type:check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
+    "eslint": "^9.39.1",
+    "globals": "^15.15.0",
+    "prettier": "^3.6.2",
+    "typescript-eslint": "^8.46.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@1password/op-js": "^0.1.13",
+    "@inquirer/prompts": "^8.0.2",
+    "commander": "^12.1.0",
+    "js-yaml": "^4.1.1",
+    "zod": "^4.1.13"
+  }
+}

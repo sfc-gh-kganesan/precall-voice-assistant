@@ -2,7 +2,7 @@ SNOW_CONNECTION?=<<snow_connection>>
 SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/\
 p67_src/core/img_repo
 HARNESS_IMAGE=harness
-.PHONY: help build build_harness deploy describe dev fix \
+.PHONY: help build build_harness ci deploy describe dev fix \
 init-provider-account list-services login push push_harness \
 url
 
@@ -26,6 +26,9 @@ build-harness: ## Build harness Docker image for linux/amd64
 		--build-arg SERVICE_PORT=3000 \
 		-t $(HARNESS_IMAGE) \
 		.
+
+ci:
+	pnpm run ci
 
 deploy: login build push ## Deploy to Snowflake (login, build, push, and run app)
 	snow app run -c $(SNOW_CONNECTION)

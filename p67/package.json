@@ -1,7 +1,7 @@
 {
   "name": "p67-root",
   "version": "1.0.0",
-  "description": "P67 with Fastify backend and React frontend",
+  "description": "P67 monorepo",
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel -r dev",
