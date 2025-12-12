@@ -13,20 +13,20 @@ describe('HarnessClient', () => {
   let originalFetch: typeof globalThis.fetch;
 
   beforeEach(() => {
-    client = new HarnessClient({ baseUrl: 'http://localhost:3000' });
+    client = new HarnessClient({ baseUrl: 'http://localhost:3000', pat: 'test-pat' });
     originalFetch = globalThis.fetch;
   });
 
   describe('constructor', () => {
     test('should initialize with baseUrl and default timeout', () => {
-      const client = new HarnessClient({ baseUrl: 'http://localhost:3000' });
+      const client = new HarnessClient({ baseUrl: 'http://localhost:3000', pat: 'test-pat' });
       expect(client).toBeDefined();
       expect(client.baseUrl).toBe('http://localhost:3000');
       expect(client.timeout).toBe(30000);
     });
 
     test('should strip trailing slash from baseUrl', () => {
-      const client = new HarnessClient({ baseUrl: 'http://localhost:3000/' });
+      const client = new HarnessClient({ baseUrl: 'http://localhost:3000/', pat: 'test-pat' });
       expect(client).toBeDefined();
       expect(client.baseUrl).toBe('http://localhost:3000');
     });
@@ -34,6 +34,7 @@ describe('HarnessClient', () => {
     test('should accept custom timeout', () => {
       const client = new HarnessClient({
         baseUrl: 'http://localhost:3000',
+        pat: 'test-pat',
         timeout: 60000,
       });
       expect(client).toBeDefined();
@@ -64,9 +65,10 @@ describe('HarnessClient', () => {
         'http://localhost:3000/api/health',
         expect.objectContaining({
           method: 'GET',
-          headers: {
+          headers: expect.objectContaining({
             'Content-Type': 'application/json',
-          },
+            Authorization: 'Snowflake Token="test-pat"',
+          }),
         }),
       );
 
@@ -229,9 +231,10 @@ describe('HarnessClient', () => {
         'http://localhost:3000/api/workflow/list',
         expect.objectContaining({
           method: 'GET',
-          headers: {
+          headers: expect.objectContaining({
             'Content-Type': 'application/json',
-          },
+            Authorization: 'Snowflake Token="test-pat"',
+          }),
         }),
       );
 
@@ -366,9 +369,12 @@ describe('HarnessClient', () => {
       globalThis.fetch = mock(async (url, options) => {
         expect(url).toBe(`http://localhost:3000/api/workflow/${workflowId}/run`);
         expect(options?.method).toBe('POST');
-        expect(options?.headers).toEqual({
-          'Content-Type': 'application/json',
-        });
+        expect(options?.headers).toEqual(
+          expect.objectContaining({
+            'Content-Type': 'application/json',
+            Authorization: 'Snowflake Token="test-pat"',
+          }),
+        );
 
         return new Response(JSON.stringify(mockResponse), {
           status: 200,

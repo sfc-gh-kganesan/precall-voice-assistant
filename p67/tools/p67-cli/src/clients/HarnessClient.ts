@@ -26,16 +26,19 @@ export interface ErrorResponse {
 
 export interface HarnessClientConfig {
   baseUrl: string;
+  pat: string;
   timeout?: number;
 }
 
 export class HarnessClient {
   private _baseUrl: string;
   private _timeout: number;
+  private _pat: string;
 
   constructor(config: HarnessClientConfig) {
     this._baseUrl = config.baseUrl.replace(/\/$/, '');
     this._timeout = config.timeout || 30000;
+    this._pat = config.pat;
   }
 
   public get baseUrl(): string {
@@ -46,14 +49,37 @@ export class HarnessClient {
     return this._timeout;
   }
 
-  async health(): Promise<HealthResponse> {
-    const response = await fetch(`${this._baseUrl}/api/health`, {
-      method: 'GET',
+  async fetch(path: string, options: RequestInit = {}): Promise<Response> {
+    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+    const url = `${this._baseUrl}/${cleanPath}`;
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Snowflake Token="${this._pat}"`,
+      ...options.headers,
+    };
+
+    const mergedOptions: RequestInit = {
+      ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...defaultHeaders,
+        ...options.headers,
       },
       signal: AbortSignal.timeout(this._timeout),
-    });
+    };
+
+    return fetch(url, mergedOptions);
+  }
+
+  async get(path: string, options: RequestInit = {}): Promise<Response> {
+    return this.fetch(path, { ...options, method: 'GET' });
+  }
+
+  async post(path: string, options: RequestInit = {}): Promise<Response> {
+    return this.fetch(path, { ...options, method: 'POST' });
+  }
+
+  async health(): Promise<HealthResponse> {
+    const response = await this.get('/api/health');
 
     if (!response.ok) {
       const error = (await response.json()) as ErrorResponse;
@@ -87,13 +113,7 @@ export class HarnessClient {
   }
 
   async listWorkflows(): Promise<WorkflowListResponse> {
-    const response = await fetch(`${this._baseUrl}/api/workflow/list`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: AbortSignal.timeout(this._timeout),
-    });
+    const response = await this.get('/api/workflow/list');
 
     if (!response.ok) {
       const error = (await response.json()) as ErrorResponse;
@@ -104,13 +124,7 @@ export class HarnessClient {
   }
 
   async runWorkflow(workflowId: string): Promise<WorkflowRunResponse> {
-    const response = await fetch(`${this._baseUrl}/api/workflow/${workflowId}/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: AbortSignal.timeout(this._timeout),
-    });
+    const response = await this.post(`/api/workflow/${workflowId}/run`);
 
     if (!response.ok) {
       const error = (await response.json()) as ErrorResponse;
