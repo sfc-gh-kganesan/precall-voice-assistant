@@ -25,33 +25,30 @@ create or replace procedure v1.init()
     execute as owner
 as $$
 begin
-    alter service if exists app.harness from specification_file='services/harness/harness_spec.yaml';
-    grant usage on service app.harness to application role app_user;
-    grant monitor on service app.harness to application role app_user;
+    alter service if exists app.controld from specification_file='controld_service_spec.yml';
     return 'INIT COMPLETE';
 end
 $$;
 
 grant usage on procedure v1.init() to application role app_admin;
 
-create or replace procedure v1.start_harness(pool_name varchar)
+create or replace procedure v1.start_controld(pool_name varchar)
     returns string
     language sql
     execute as owner
 as $$
 begin
-    create service if not exists app.harness
+    create service if not exists app.controld
         in compute pool identifier(:pool_name)
-        from specification_file='services/harness/harness_spec.yaml'
+        from specification_file='controld_service_spec.yml'
         query_warehouse = 'p67_app_wh';
-    grant usage on service app.harness to application role app_user;
-    grant monitor on service app.harness to application role app_user;
-    grant service role app.harness!all_endpoints_usage to application role app_user;
+    grant usage on service app.controld to application role app_user;
+    grant monitor on service app.controld to application role app_user;
+    grant service role app.controld!all_endpoints_usage to application role app_user;
     return 'START COMPLETE';
 end
 $$;
-
-grant usage on procedure v1.start_harness(varchar) to application role app_admin;
+grant usage on procedure v1.start_controld(varchar) to application role app_admin;
 
 create or replace procedure v1.create_services(privileges array)
     returns string
@@ -59,14 +56,14 @@ create or replace procedure v1.create_services(privileges array)
     execute as owner
 as $$
 begin
-    create compute pool if not exists harness_compute_pool
+    create compute pool if not exists service_compute_pool
     min_nodes = 1
-    max_nodes = 1
+    max_nodes = 5
     instance_family = cpu_x64_xs;
-    grant usage on compute pool harness_compute_pool to application role app_user;
-    grant usage on compute pool harness_compute_pool to application role app_admin;
+    grant usage on compute pool service_compute_pool to application role app_user;
+    grant usage on compute pool service_compute_pool to application role app_admin;
 
-    call v1.start_harness('harness_compute_pool');
+    call v1.start_controld('service_compute_pool');
     return 'CREATE_SERVICES COMPLETE';
 end
 $$;
@@ -78,7 +75,7 @@ create or replace procedure app.stop_app()
     execute as owner
 as $$
 begin
-    drop service if exists app.harness;
+    drop service if exists app.controld;
     return 'STOP_APP COMPLETE';
 end
 $$;
@@ -91,7 +88,7 @@ create or replace procedure v1.app_url()
 as $$
     declare ingress_url varchar;
 begin
-    show endpoints in service app.harness;
+    show endpoints in service app.controld;
     select "ingress_url" into :ingress_url from table (result_scan (last_query_id())) limit 1;
     return ingress_url;
 end

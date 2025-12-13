@@ -12,12 +12,12 @@ artifacts:
     setup_script: setup.sql
 
     default_web_endpoint:
-        service: app.harness
-        endpoint: app
+        service: app.controld
+        endpoint: web
 
     container_services:
         images:
-            - /p67_src/core/img_repo/harness
+            - /p67_src/core/img_repo/controld
 
 lifecycle_callbacks:
     version_initializer: v1.init

@@ -1,7 +1,7 @@
 SNOW_CONNECTION?=<<snow_connection>>
-SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/\
-p67_src/core/img_repo
+SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
 HARNESS_IMAGE=harness
+CONTROLD_IMAGE=controld
 .PHONY: help build build_harness ci deploy describe dev fix \
 init-provider-account list-services login push push_harness \
 url
@@ -16,7 +16,7 @@ help: ## Show this help message
 		/^[a-zA-Z_-]+:.*?##/ { printf "  %-20s %s\n", $$1, $$2 }' \
 		$(MAKEFILE_LIST)
 
-build: build-harness ## Build Docker images
+build: build-harness build-controld ## Build Docker images
 
 build-harness: ## Build harness Docker image for linux/amd64
 	docker build \
@@ -25,6 +25,15 @@ build-harness: ## Build harness Docker image for linux/amd64
 		--build-arg SERVICE_NAME=harness \
 		--build-arg SERVICE_PORT=3000 \
 		-t $(HARNESS_IMAGE) \
+		.
+
+build-controld: ## Build controld Docker image for linux/amd64
+	docker build \
+		--platform linux/amd64 \
+		--target runner \
+		--build-arg SERVICE_NAME=controld \
+		--build-arg SERVICE_PORT=8000 \
+		-t $(CONTROLD_IMAGE) \
 		.
 
 ci:
@@ -52,11 +61,15 @@ list: ## List all services in p67 database
 login: ## Log in to Snowflake image registry
 	snow spcs image-registry login -c $(SNOW_CONNECTION)
 
-push: push_harness ## Push Docker images to Snowflake registry
+push: push_harness push_controld ## Push Docker images to Snowflake registry
 
 push_harness: ## Tag and push harness image to Snowflake registry
 	docker tag $(HARNESS_IMAGE) $(SNOW_REPO)/$(HARNESS_IMAGE)
 	docker push $(SNOW_REPO)/$(HARNESS_IMAGE)
+
+push_controld: ## Tag and push controld image to Snowflake registry
+	docker tag $(CONTROLD_IMAGE) $(SNOW_REPO)/$(CONTROLD_IMAGE)
+	docker push $(SNOW_REPO)/$(CONTROLD_IMAGE)
 
 url: ## Print the ingress URL for the running SPCS service
 	snow spcs service list-endpoints p67.app.harness \

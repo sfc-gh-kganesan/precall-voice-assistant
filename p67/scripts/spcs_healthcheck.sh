@@ -3,7 +3,7 @@
 set -e
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"/p67
-SPCS_ENDPOINT="$("$ROOT/scripts/get_spcs_endpoint_harness.sh")"
+SPCS_ENDPOINT="$("$ROOT/scripts/get_spcs_endpoint_controld.sh")"
 URL="$SPCS_ENDPOINT/api/health"
 
 if [ -z "$SNOWFLAKE_PAT" ]; then

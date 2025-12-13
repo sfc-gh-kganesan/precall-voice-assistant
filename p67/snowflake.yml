@@ -14,8 +14,6 @@ entities:
         artifacts:
             - src: native-app/*
               dest: ./
-            - src: services/harness/harness_spec.yaml
-              dest: services/harness/harness_spec.yaml
         meta:
             role: <% ctx.env.admin_rl %>
             warehouse: <% ctx.env.warehouse %>

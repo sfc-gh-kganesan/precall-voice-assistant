@@ -1,0 +1,25 @@
+spec:
+    containers:
+        - name: controld
+          image: /p67_src/core/img_repo/controld:latest
+          volumeMounts:
+              - name: local-storage
+                mountPath: /opt/local-storage
+          env:
+              PORT: 80
+              DATA_ROOT: /opt/local-storage
+          resources:
+              requests:
+                  memory: 512Mi
+                  cpu: 0.5
+              limits:
+                  memory: 1Gi
+                  cpu: 1
+    volumes:
+        - name: local-storage
+          source: block
+          size: 1Gi
+    endpoints:
+        - name: web
+          port: 80
+          public: true
