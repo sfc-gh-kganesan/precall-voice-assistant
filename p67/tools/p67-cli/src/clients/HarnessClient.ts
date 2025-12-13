@@ -53,7 +53,6 @@ export class HarnessClient {
     const cleanPath = path.startsWith('/') ? path.substring(1) : path;
     const url = `${this._baseUrl}/${cleanPath}`;
     const defaultHeaders = {
-      'Content-Type': 'application/json',
       Authorization: `Snowflake Token="${this._pat}"`,
       ...options.headers,
     };
@@ -98,10 +97,8 @@ export class HarnessClient {
       formData.append('file', file, filename || 'workflow.zip');
     }
 
-    const response = await fetch(`${this._baseUrl}/api/workflow/create`, {
-      method: 'POST',
+    const response = await this.post('api/workflow/create', {
       body: formData,
-      signal: AbortSignal.timeout(this._timeout),
     });
 
     if (!response.ok) {
