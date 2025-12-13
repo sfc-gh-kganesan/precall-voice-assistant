@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Builder</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Menu Rail -->
+        <nav class="menu-rail">
+            <div class="rail-item active" title="Home">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+            </div>
+            <div class="rail-item" title="Worksheets">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+            </div>
+            <div class="rail-item" title="Data">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+            </div>
+            <div class="rail-item" title="Monitoring">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+            </div>
+            <div class="rail-item" title="Admin">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6m9.66-9H15m-6 0H1.34m17.66 0l-5.2 3m-5.6 0L1.34 12m17.66 0l-5.2-3m-5.6 0L1.34 12"/>
+                </svg>
+            </div>
+            <div class="rail-item" title="Marketplace">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="21" r="1"/>
+                    <circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                </svg>
+            </div>
+        </nav>
+        
+        <!-- Resize Handle: Menu Rail to Sidebar -->
+        <div class="resize-handle resize-handle-vertical" data-resize="sidebar"></div>
+        
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <rect width="24" height="24" rx="6" fill="#3B82F6"/>
+                        <path d="M8 8L16 16M8 16L16 8" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span>My Workflows</span>
+                </div>
+                <button class="menu-btn">⋯</button>
+            </div>
+
+            <div class="sidebar-search">
+                <input type="text" placeholder="Search for files" class="search-input">
+            </div>
+
+            <button class="add-new-btn">
+                <span class="plus-icon">+</span>
+                Add new
+            </button>
+
+            <nav class="workflow-list" id="workflowList">
+                {% for workflow in workflows %}
+                <a href="#" class="workflow-item" data-workflow-file="{{ workflow.filename }}">
+                    <svg class="workflow-icon" width="16" height="16" viewBox="0 0 16 16">
+                        <rect width="16" height="16" rx="2" fill="#9CA3AF"/>
+                    </svg>
+                    <span>{{ workflow.name }}</span>
+                </a>
+                {% endfor %}
+            </nav>
+        </aside>
+
+        <!-- Resize Handle: Sidebar to Main Content -->
+        <div class="resize-handle resize-handle-vertical" data-resize="main"></div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="toolbar">
+                <div class="tabs" id="workflowTabs">
+                </div>
+                <button class="tab-add">+</button>
+
+                <div class="toolbar-actions">
+                    <button class="toolbar-btn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M2 4h12M2 8h12M2 12h12"/>
+                        </svg>
+                        Source
+                    </button>
+                    <button class="toolbar-btn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M2 4h12M2 8h12M2 12h12"/>
+                        </svg>
+                        Transform
+                    </button>
+                    <button class="toolbar-btn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M2 4h12M2 8h12M2 12h12"/>
+                        </svg>
+                        Filter
+                    </button>
+                    <button class="toolbar-btn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M2 4h12M2 8h12M2 12h12"/>
+                        </svg>
+                        Analyze
+                    </button>
+                    <button class="toolbar-btn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M2 4h12M2 8h12M2 12h12"/>
+                        </svg>
+                        Output
+                    </button>
+                    <button class="run-btn">▶ Run</button>
+                    <button class="add-step-btn" id="add-step-btn">+ Add Step</button>
+                </div>
+            </header>
+
+            <!-- Workflow Viewer (Top Half) -->
+            <div class="workflow-viewer">
+                <!-- Database Info -->
+                <div class="db-info">
+                    PUBLIC / SNOWFLAKE_SAMPLE_DATA
+                </div>
+
+                <!-- Canvas -->
+                <div class="canvas" id="workflow-canvas">
+                    <!-- Nodes will be loaded dynamically from workflow.json -->
+                    
+                    <!-- Connections SVG -->
+                    <svg class="connections" id="connections-svg" width="100%" height="100%">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                <polygon points="0 0, 10 3, 0 6" fill="#94A3B8"/>
+                            </marker>
+                        </defs>
+                        <!-- Edges will be drawn dynamically -->
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Resize Handle: Workflow Viewer to NL Editor -->
+            <div class="resize-handle resize-handle-horizontal" data-resize="editor"></div>
+
+            <!-- Natural Language Editor (Bottom Half) -->
+            <div class="nl-editor">
+                <div class="editor-header">
+                    <div class="editor-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" fill="#7C3AED"/>
+                            <path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span id="editor-node-title">Natural Language Editor</span>
+                    </div>
+                    <button class="editor-close" onclick="document.getElementById('selected-node-info').style.display='none'">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="editor-content">
+                    <!-- Left 2/3: Chat Section -->
+                    <div class="chat-section">
+                        <div id="selected-node-info" class="node-info" style="display: none;">
+                            <div class="node-info-badge">
+                                <span id="node-type-badge">Source</span>
+                            </div>
+                            <div class="node-info-content" id="node-content-display">Customer Data</div>
+                        </div>
+
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="message assistant-message">
+                                <div class="message-avatar">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="10" fill="#7C3AED"/>
+                                        <path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                                <div class="message-content">
+                                    Click a workflow node above to edit it with natural language.
+                                </div>
+                            </div>
+                        </div>
+
+                        <form class="chat-input-form" 
+                              hx-post="/api/chat" 
+                              hx-target="#chat-messages" 
+                              hx-swap="beforeend" 
+                              hx-on::after-request="this.reset()">
+                            <input type="text" 
+                                   name="message" 
+                                   placeholder="Describe what you want this node to do..." 
+                                   class="chat-input" 
+                                   autocomplete="off">
+                            <button type="submit" class="send-btn">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M2 2l16 8-16 8V2zm2 6v4l8-2-8-2z"/>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Resize Handle: Chat to I/O Section -->
+                    <div class="resize-handle resize-handle-vertical" data-resize="io"></div>
+
+                    <!-- Right 1/3: Inputs/Progress/Outputs Section -->
+                    <div class="io-section">
+                        <!-- Inputs (Top) -->
+                        <div class="io-inputs">
+                            <div class="io-header">Inputs</div>
+                            <div class="io-content" id="node-inputs">
+                                <div class="io-empty">No inputs configured</div>
+                            </div>
+                        </div>
+
+                        <!-- Progress (Middle) -->
+                        <div class="io-progress">
+                            <div class="io-header">Progress</div>
+                            <div class="io-content" id="node-progress">
+                                <div class="progress-tabs">
+                                    <button class="progress-tab active" data-tab="stdout">stdout</button>
+                                    <button class="progress-tab" data-tab="traces">traces</button>
+                                    <button class="progress-tab" data-tab="thinking">thinking</button>
+                                </div>
+                                <div class="progress-content">
+                                    <div class="progress-panel active" id="stdout-panel">
+                                        <div class="io-empty">No output yet</div>
+                                    </div>
+                                    <div class="progress-panel" id="traces-panel">
+                                        <div class="io-empty">No traces yet</div>
+                                    </div>
+                                    <div class="progress-panel" id="thinking-panel">
+                                        <div class="io-empty">No thinking tokens yet</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Outputs (Bottom) -->
+                        <div class="io-outputs">
+                            <div class="io-header">Outputs</div>
+                            <div class="io-content" id="node-outputs">
+                                <div class="io-empty">No outputs configured</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Step Dialog -->
+    <div class="dialog-overlay" id="add-step-dialog" style="display: none;">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h3>Add New Step</h3>
+                <button class="dialog-close" id="close-dialog">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <form id="add-step-form">
+                    <div class="form-group">
+                        <label for="step-title">Title <span class="required">*</span></label>
+                        <input type="text" id="step-title" name="title" required placeholder="Enter step title">
+                    </div>
+                    <div class="form-group">
+                        <label for="step-color">Color</label>
+                        <div class="color-palette">
+                            <input type="radio" name="color" value="#2d6eaa" id="color-blue" checked>
+                            <label for="color-blue" class="color-swatch-btn" style="background-color: #2d6eaa;" title="Blue"></label>
+                            
+                            <input type="radio" name="color" value="#10b981" id="color-green">
+                            <label for="color-green" class="color-swatch-btn" style="background-color: #10b981;" title="Green"></label>
+                            
+                            <input type="radio" name="color" value="#7c3aed" id="color-purple">
+                            <label for="color-purple" class="color-swatch-btn" style="background-color: #7c3aed;" title="Purple"></label>
+                            
+                            <input type="radio" name="color" value="#f59e0b" id="color-orange">
+                            <label for="color-orange" class="color-swatch-btn" style="background-color: #f59e0b;" title="Orange"></label>
+                            
+                            <input type="radio" name="color" value="#ef4444" id="color-red">
+                            <label for="color-red" class="color-swatch-btn" style="background-color: #ef4444;" title="Red"></label>
+                            
+                            <input type="radio" name="color" value="#f97316" id="color-dark-orange">
+                            <label for="color-dark-orange" class="color-swatch-btn" style="background-color: #f97316;" title="Dark Orange"></label>
+                            
+                            <input type="radio" name="color" value="#ec4899" id="color-pink">
+                            <label for="color-pink" class="color-swatch-btn" style="background-color: #ec4899;" title="Pink"></label>
+                            
+                            <input type="radio" name="color" value="#8b5cf6" id="color-violet">
+                            <label for="color-violet" class="color-swatch-btn" style="background-color: #8b5cf6;" title="Violet"></label>
+                            
+                            <input type="radio" name="color" value="#06b6d4" id="color-cyan">
+                            <label for="color-cyan" class="color-swatch-btn" style="background-color: #06b6d4;" title="Cyan"></label>
+                            
+                            <input type="radio" name="color" value="#84cc16" id="color-lime">
+                            <label for="color-lime" class="color-swatch-btn" style="background-color: #84cc16;" title="Lime"></label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="step-description">Description</label>
+                        <textarea id="step-description" name="description" rows="3" placeholder="Enter optional description"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn-danger" id="delete-step" style="margin-right: auto;">Delete</button>
+                <button class="btn-secondary" id="cancel-dialog">Cancel</button>
+                <button class="btn-primary" id="submit-step">Add Step</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global workflow data
+        let workflowData = { nodes: [], edges: [] };
+        let editingNodeId = null;
+        let selectedEdgeId = null;
+        let openWorkflows = [];
+        let activeWorkflow = null;
+        
+        // Generate UUID
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        
+        // Load workflow from JSON
+        async function loadWorkflow(filename) {
+            if (!filename) {
+                console.error('No workflow filename provided');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/workflow/${filename}`);
+                workflowData = await response.json();
+                renderWorkflow();
+            } catch (error) {
+                console.error('Error loading workflow:', error);
+            }
+        }
+        
+        // Save workflow to JSON
+        async function saveWorkflow() {
+            if (!activeWorkflow) {
+                console.error('No active workflow');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/workflow/${activeWorkflow}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(workflowData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save workflow');
+                }
+            } catch (error) {
+                console.error('Error saving workflow:', error);
+                alert('Failed to save workflow changes');
+            }
+        }
+        
+        // Open a workflow in a new tab
+        function openWorkflowTab(filename, name) {
+            if (!openWorkflows.includes(filename)) {
+                openWorkflows.push(filename);
+            }
+            
+            activeWorkflow = filename;
+            renderTabs();
+            loadWorkflow(filename);
+        }
+        
+        // Close a workflow tab
+        function closeWorkflowTab(filename, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            
+            const index = openWorkflows.indexOf(filename);
+            if (index > -1) {
+                openWorkflows.splice(index, 1);
+            }
+            
+            if (activeWorkflow === filename) {
+                if (openWorkflows.length > 0) {
+                    const newIndex = Math.max(0, index - 1);
+                    activeWorkflow = openWorkflows[newIndex];
+                    loadWorkflow(activeWorkflow);
+                } else {
+                    activeWorkflow = null;
+                    workflowData = { nodes: [], edges: [] };
+                    renderWorkflow();
+                }
+            }
+            
+            renderTabs();
+        }
+        
+        // Render workflow tabs
+        function renderTabs() {
+            const tabsContainer = document.getElementById('workflowTabs');
+            tabsContainer.innerHTML = '';
+            
+            openWorkflows.forEach(filename => {
+                const name = filename.replace('.workflow.json', '');
+                const tab = document.createElement('div');
+                tab.className = 'tab';
+                if (filename === activeWorkflow) {
+                    tab.classList.add('active');
+                }
+                
+                tab.innerHTML = `
+                    <span class="tab-name">${name}</span>
+                    <button class="tab-close" data-filename="${filename}">&times;</button>
+                `;
+                
+                tab.querySelector('.tab-name').addEventListener('click', () => {
+                    activeWorkflow = filename;
+                    renderTabs();
+                    loadWorkflow(filename);
+                });
+                
+                tab.querySelector('.tab-close').addEventListener('click', (e) => {
+                    closeWorkflowTab(filename, e);
+                });
+                
+                tabsContainer.appendChild(tab);
+            });
+        }
+        
+        // Create new workflow
+        async function createNewWorkflow() {
+            try {
+                const response = await fetch('/api/workflows/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: 'untitled' })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    await refreshWorkflowList();
+                    openWorkflowTab(result.filename, result.name);
+                } else {
+                    alert('Failed to create workflow: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error creating workflow:', error);
+                alert('Failed to create new workflow');
+            }
+        }
+        
+        // Refresh workflow list in sidebar
+        async function refreshWorkflowList() {
+            try {
+                const response = await fetch('/api/workflows');
+                const workflows = await response.json();
+                
+                const workflowList = document.getElementById('workflowList');
+                workflowList.innerHTML = '';
+                
+                workflows.forEach(workflow => {
+                    const item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'workflow-item';
+                    item.dataset.workflowFile = workflow.filename;
+                    item.innerHTML = `
+                        <svg class="workflow-icon" width="16" height="16" viewBox="0 0 16 16">
+                            <rect width="16" height="16" rx="2" fill="#9CA3AF"/>
+                        </svg>
+                        <span>${workflow.name}</span>
+                    `;
+                    
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        openWorkflowTab(workflow.filename, workflow.name);
+                    });
+                    
+                    workflowList.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Error refreshing workflow list:', error);
+            }
+        }
+        
+        // Render workflow nodes and edges
+        function renderWorkflow() {
+            const canvas = document.getElementById('workflow-canvas');
+            const connectionsSvg = document.getElementById('connections-svg');
+            
+            // Clear existing nodes (except SVG)
+            const existingNodes = canvas.querySelectorAll('.node');
+            existingNodes.forEach(node => node.remove());
+            
+            // Clear existing edges
+            const existingPaths = connectionsSvg.querySelectorAll('path');
+            existingPaths.forEach(path => path.remove());
+            
+            // Render nodes
+            workflowData.nodes.forEach(node => {
+                const nodeElement = createNodeElement(node);
+                canvas.insertBefore(nodeElement, connectionsSvg);
+            });
+            
+            // Render edges
+            workflowData.edges.forEach(edge => {
+                createEdgeElement(edge);
+            });
+            
+            // Re-attach event listeners
+            attachNodeEventListeners();
+            
+            // Scroll canvas to top-left
+            canvas.scrollTo(0, 0);
+        }
+        
+        // Create a node DOM element
+        function createNodeElement(node) {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'node';
+            nodeDiv.id = node.id;
+            nodeDiv.style.left = node.x + 'px';
+            nodeDiv.style.top = node.y + 'px';
+            nodeDiv.draggable = !node.isStart; // Start node is not draggable
+            nodeDiv.dataset.nodeId = node.id;
+            
+            // Add special class for start node
+            if (node.isStart) {
+                nodeDiv.classList.add('node-start');
+            }
+            
+            // Determine node type class from title
+            const nodeType = node.title.toLowerCase().replace(/\s+/g, '-');
+            nodeDiv.classList.add(`node-${nodeType}`);
+            
+            // Set custom color if provided
+            if (node.color) {
+                nodeDiv.style.setProperty('--node-color', node.color);
+            }
+            
+            nodeDiv.innerHTML = `
+                <div class="node-header" style="background-color: ${node.color};">
+                    <svg class="node-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <circle cx="8" cy="8" r="6" fill="white"/>
+                    </svg>
+                    <span style="color: white;">${node.title}</span>
+                </div>
+                <div class="node-body">
+                    <div class="node-content">${node.description}</div>
+                </div>
+                <div class="node-connector node-connector-top"></div>
+                <div class="node-connector node-connector-bottom"></div>
+            `;
+            
+            return nodeDiv;
+        }
+        
+        // Create an edge SVG path
+        function createEdgeElement(edge) {
+            const sourceNode = document.getElementById(edge.source);
+            const targetNode = document.getElementById(edge.target);
+            
+            if (!sourceNode || !targetNode) {
+                console.warn('Edge references missing nodes:', edge);
+                return;
+            }
+            
+            const sourceBounds = sourceNode.getBoundingClientRect();
+            const targetBounds = targetNode.getBoundingClientRect();
+            const canvas = document.getElementById('workflow-canvas');
+            const canvasBounds = canvas.getBoundingClientRect();
+            
+            // Calculate positions relative to canvas
+            const sourceX = sourceBounds.left - canvasBounds.left + sourceBounds.width / 2;
+            const sourceY = sourceBounds.bottom - canvasBounds.top;
+            const targetX = targetBounds.left - canvasBounds.left + targetBounds.width / 2;
+            const targetY = targetBounds.top - canvasBounds.top;
+            
+            // Use control point if available, otherwise calculate default
+            let controlX, controlY;
+            if (edge.controlPoint) {
+                controlX = edge.controlPoint.x;
+                controlY = edge.controlPoint.y;
+            } else {
+                // Default: midpoint curve
+                controlX = (sourceX + targetX) / 2;
+                controlY = (sourceY + targetY) / 2;
+            }
+            
+            // Create curved path
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`);
+            path.setAttribute('stroke', '#94A3B8');
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('fill', 'none');
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+            path.setAttribute('class', 'edge');
+            path.dataset.edgeId = edge.id;
+            path.style.cursor = 'pointer';
+            
+            // Add invisible wider path for easier clicking
+            const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            hitPath.setAttribute('d', `M ${sourceX} ${sourceY} Q ${controlX} ${controlY} ${targetX} ${targetY}`);
+            hitPath.setAttribute('stroke', 'transparent');
+            hitPath.setAttribute('stroke-width', '20');
+            hitPath.setAttribute('fill', 'none');
+            hitPath.setAttribute('class', 'edge-hit-area');
+            hitPath.dataset.edgeId = edge.id;
+            hitPath.style.cursor = 'pointer';
+            
+            // Click handler for edge
+            const handleEdgeClick = function(e) {
+                e.stopPropagation();
+                selectEdge(edge.id);
+            };
+            
+            path.addEventListener('click', handleEdgeClick);
+            hitPath.addEventListener('click', handleEdgeClick);
+            
+            const svg = document.getElementById('connections-svg');
+            svg.appendChild(hitPath);
+            svg.appendChild(path);
+            
+            // Create control point if edge is selected
+            if (selectedEdgeId === edge.id) {
+                createControlPoint(edge, sourceX, sourceY, targetX, targetY, controlX, controlY);
+            }
+        }
+        
+        // Redraw only edges (not nodes)
+        function redrawEdges() {
+            const connectionsSvg = document.getElementById('connections-svg');
+            
+            // Clear existing edges (but keep the temporary edge if present)
+            const existingPaths = connectionsSvg.querySelectorAll('path:not(.temp-edge), circle.control-point, g.delete-button');
+            existingPaths.forEach(element => element.remove());
+            
+            // Render edges
+            workflowData.edges.forEach(edge => {
+                createEdgeElement(edge);
+            });
+        }
+        
+        // Select an edge
+        function selectEdge(edgeId) {
+            selectedEdgeId = edgeId;
+            redrawEdges();
+        }
+        
+        // Deselect edge
+        function deselectEdge() {
+            selectedEdgeId = null;
+            redrawEdges();
+        }
+        
+        // Delete selected edge
+        function deleteEdge(edgeId) {
+            workflowData.edges = workflowData.edges.filter(e => e.id !== edgeId);
+            selectedEdgeId = null;
+            saveWorkflow();
+            redrawEdges();
+        }
+        
+        // Create control point for edge
+        function createControlPoint(edge, sourceX, sourceY, targetX, targetY, controlX, controlY) {
+            const svg = document.getElementById('connections-svg');
+            
+            // Create draggable control point circle
+            const controlPoint = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            controlPoint.setAttribute('cx', controlX);
+            controlPoint.setAttribute('cy', controlY);
+            controlPoint.setAttribute('r', '6');
+            controlPoint.setAttribute('fill', '#2d6eaa');
+            controlPoint.setAttribute('stroke', 'white');
+            controlPoint.setAttribute('stroke-width', '2');
+            controlPoint.setAttribute('class', 'control-point');
+            controlPoint.style.cursor = 'move';
+            
+            let isDragging = false;
+            
+            controlPoint.addEventListener('mousedown', function(e) {
+                e.stopPropagation();
+                isDragging = true;
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const canvas = document.getElementById('workflow-canvas');
+                const canvasBounds = canvas.getBoundingClientRect();
+                const newX = e.clientX - canvasBounds.left;
+                const newY = e.clientY - canvasBounds.top;
+                
+                controlPoint.setAttribute('cx', newX);
+                controlPoint.setAttribute('cy', newY);
+                
+                // Update the path
+                const path = svg.querySelector(`path[data-edge-id="${edge.id}"]:not(.edge-hit-area)`);
+                const hitPath = svg.querySelector(`path.edge-hit-area[data-edge-id="${edge.id}"]`);
+                if (path) {
+                    path.setAttribute('d', `M ${sourceX} ${sourceY} Q ${newX} ${newY} ${targetX} ${targetY}`);
+                }
+                if (hitPath) {
+                    hitPath.setAttribute('d', `M ${sourceX} ${sourceY} Q ${newX} ${newY} ${targetX} ${targetY}`);
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    
+                    // Save new control point position
+                    const newX = parseFloat(controlPoint.getAttribute('cx'));
+                    const newY = parseFloat(controlPoint.getAttribute('cy'));
+                    edge.controlPoint = { x: newX, y: newY };
+                    saveWorkflow();
+                }
+            });
+            
+            svg.appendChild(controlPoint);
+            
+            // Create delete button
+            const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            deleteBtn.setAttribute('class', 'delete-button');
+            deleteBtn.style.cursor = 'pointer';
+            
+            const deleteCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            deleteCircle.setAttribute('cx', controlX);
+            deleteCircle.setAttribute('cy', controlY - 25);
+            deleteCircle.setAttribute('r', '10');
+            deleteCircle.setAttribute('fill', '#ef4444');
+            deleteCircle.setAttribute('stroke', 'white');
+            deleteCircle.setAttribute('stroke-width', '2');
+            
+            const deleteX = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            deleteX.setAttribute('x', controlX);
+            deleteX.setAttribute('y', controlY - 25);
+            deleteX.setAttribute('text-anchor', 'middle');
+            deleteX.setAttribute('dominant-baseline', 'middle');
+            deleteX.setAttribute('fill', 'white');
+            deleteX.setAttribute('font-size', '14');
+            deleteX.setAttribute('font-weight', 'bold');
+            deleteX.textContent = '×';
+            
+            deleteBtn.appendChild(deleteCircle);
+            deleteBtn.appendChild(deleteX);
+            
+            deleteBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                deleteEdge(edge.id);
+            });
+            
+            svg.appendChild(deleteBtn);
+        }
+        
+        // Edge creation state
+        let isCreatingEdge = false;
+        let edgeSourceNode = null;
+        let tempEdgeLine = null;
+        
+        // Start creating an edge
+        function startEdgeCreation(nodeId, connectorType) {
+            isCreatingEdge = true;
+            edgeSourceNode = { nodeId, connectorType };
+            
+            // Change cursor
+            document.body.style.cursor = 'crosshair';
+            
+            // Create temporary edge line
+            const svg = document.getElementById('connections-svg');
+            tempEdgeLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            tempEdgeLine.setAttribute('stroke', '#2d6eaa');
+            tempEdgeLine.setAttribute('stroke-width', '2');
+            tempEdgeLine.setAttribute('fill', 'none');
+            tempEdgeLine.setAttribute('stroke-dasharray', '5,5');
+            tempEdgeLine.classList.add('temp-edge');
+            svg.appendChild(tempEdgeLine);
+        }
+        
+        // Complete edge creation
+        function completeEdgeCreation(targetNodeId, targetConnectorType) {
+            if (!isCreatingEdge || !edgeSourceNode) return;
+            
+            // Don't allow connecting to the same node
+            if (edgeSourceNode.nodeId === targetNodeId) {
+                cancelEdgeCreation();
+                return;
+            }
+            
+            // Don't allow connecting output to input (enforce direction)
+            if (edgeSourceNode.connectorType === 'top') {
+                cancelEdgeCreation();
+                return;
+            }
+            
+            if (targetConnectorType === 'bottom') {
+                cancelEdgeCreation();
+                return;
+            }
+            
+            // Create new edge
+            const newEdge = {
+                id: generateUUID(),
+                source: edgeSourceNode.nodeId,
+                target: targetNodeId
+            };
+            
+            // Check if edge already exists
+            const edgeExists = workflowData.edges.some(e => 
+                e.source === newEdge.source && e.target === newEdge.target
+            );
+            
+            if (!edgeExists) {
+                workflowData.edges.push(newEdge);
+                redrawEdges();
+                
+                // Save edge to backend
+                saveWorkflow();
+            }
+            
+            cancelEdgeCreation();
+        }
+        
+        // Cancel edge creation
+        function cancelEdgeCreation() {
+            isCreatingEdge = false;
+            edgeSourceNode = null;
+            document.body.style.cursor = '';
+            
+            if (tempEdgeLine) {
+                tempEdgeLine.remove();
+                tempEdgeLine = null;
+            }
+        }
+        
+        // Update temporary edge position
+        function updateTempEdge(e) {
+            if (!isCreatingEdge || !tempEdgeLine || !edgeSourceNode) return;
+            
+            const sourceNode = document.getElementById(edgeSourceNode.nodeId);
+            if (!sourceNode) return;
+            
+            const sourceBounds = sourceNode.getBoundingClientRect();
+            const canvas = document.getElementById('workflow-canvas');
+            const canvasBounds = canvas.getBoundingClientRect();
+            
+            // Calculate source position
+            const sourceX = sourceBounds.left - canvasBounds.left + sourceBounds.width / 2;
+            const sourceY = edgeSourceNode.connectorType === 'bottom' 
+                ? sourceBounds.bottom - canvasBounds.top 
+                : sourceBounds.top - canvasBounds.top;
+            
+            // Calculate target position (mouse)
+            const targetX = e.clientX - canvasBounds.left;
+            const targetY = e.clientY - canvasBounds.top;
+            
+            // Draw line
+            tempEdgeLine.setAttribute('d', `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`);
+        }
+        
+        // Attach event listeners to nodes
+        function attachNodeEventListeners() {
+            const nodes = document.querySelectorAll('.node');
+            let draggedNode = null;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            nodes.forEach(node => {
+                node.addEventListener('dragstart', function(e) {
+                    draggedNode = this;
+                    const rect = this.getBoundingClientRect();
+                    offsetX = e.clientX - rect.left;
+                    offsetY = e.clientY - rect.top;
+                    this.style.opacity = '0.5';
+                });
+
+                node.addEventListener('dragend', function(e) {
+                    this.style.opacity = '1';
+                    const canvas = document.getElementById('workflow-canvas');
+                    const canvasRect = canvas.getBoundingClientRect();
+                    const x = e.clientX - canvasRect.left - offsetX;
+                    const y = e.clientY - canvasRect.top - offsetY;
+                    this.style.left = x + 'px';
+                    this.style.top = y + 'px';
+                    
+                    // Update node position in workflow data
+                    const nodeId = this.dataset.nodeId;
+                    const nodeData = workflowData.nodes.find(n => n.id === nodeId);
+                    if (nodeData) {
+                        nodeData.x = x;
+                        nodeData.y = y;
+                        
+                        // Save position to backend
+                        saveWorkflow();
+                    }
+                    
+                    // Redraw only edges (not all nodes)
+                    redrawEdges();
+                });
+
+                // Node click handlers
+                node.addEventListener('click', function(e) {
+                    // Don't trigger if clicking on connector
+                    if (e.target.classList.contains('node-connector')) {
+                        return;
+                    }
+                    
+                    const nodeId = this.dataset.nodeId;
+                    const nodeData = workflowData.nodes.find(n => n.id === nodeId);
+                    
+                    if (nodeData) {
+                        document.getElementById('selected-node-info').style.display = 'flex';
+                        document.getElementById('node-type-badge').textContent = nodeData.title;
+                        document.getElementById('node-content-display').textContent = nodeData.description;
+                        document.getElementById('editor-node-title').textContent = `Edit ${nodeData.title} Node`;
+                        
+                        // Add active state
+                        document.querySelectorAll('.node').forEach(n => n.classList.remove('node-active'));
+                        this.classList.add('node-active');
+                    }
+                });
+                
+                // Node double-click handler for editing
+                node.addEventListener('dblclick', function(e) {
+                    // Don't trigger if clicking on connector
+                    if (e.target.classList.contains('node-connector')) {
+                        return;
+                    }
+                    
+                    const nodeId = this.dataset.nodeId;
+                    window.openEditDialog(nodeId);
+                });
+                
+                // Connector click handlers
+                const connectors = node.querySelectorAll('.node-connector');
+                connectors.forEach(connector => {
+                    connector.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Prevent node click
+                        e.preventDefault();
+                        
+                        const nodeId = node.dataset.nodeId;
+                        const connectorType = this.classList.contains('node-connector-top') ? 'top' : 'bottom';
+                        
+                        if (isCreatingEdge) {
+                            // Complete edge creation
+                            completeEdgeCreation(nodeId, connectorType);
+                        } else {
+                            // Start edge creation (only from bottom connector)
+                            if (connectorType === 'bottom') {
+                                startEdgeCreation(nodeId, connectorType);
+                            }
+                        }
+                    });
+                    
+                    // Prevent drag when clicking connector
+                    connector.addEventListener('mousedown', function(e) {
+                        e.stopPropagation();
+                    });
+                });
+            });
+
+            const canvas = document.getElementById('workflow-canvas');
+            canvas.addEventListener('dragover', function(e) {
+                e.preventDefault();
+            });
+            
+            // Canvas mouse move for temporary edge
+            canvas.addEventListener('mousemove', function(e) {
+                if (isCreatingEdge) {
+                    updateTempEdge(e);
+                }
+            });
+            
+            // Canvas click to cancel edge creation
+            canvas.addEventListener('click', function(e) {
+                if (isCreatingEdge && e.target === canvas) {
+                    cancelEdgeCreation();
+                }
+            });
+        }
+
+        // Handle drag and drop for nodes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize workflow list
+            refreshWorkflowList();
+            
+            // Bind Add New button
+            document.querySelector('.add-new-btn').addEventListener('click', createNewWorkflow);
+            
+            // Bind workflow items (delegated event handler)
+            document.getElementById('workflowList').addEventListener('click', (e) => {
+                const item = e.target.closest('.workflow-item');
+                if (item) {
+                    e.preventDefault();
+                    const filename = item.dataset.workflowFile;
+                    const name = filename.replace('.workflow.json', '');
+                    openWorkflowTab(filename, name);
+                }
+            });
+            
+            // Click on canvas to deselect edge
+            const canvas = document.getElementById('workflow-canvas');
+            canvas.addEventListener('click', function(e) {
+                if (e.target === canvas || e.target.id === 'connections-svg') {
+                    deselectEdge();
+                }
+            });
+
+            // Progress tab handlers
+            const progressTabs = document.querySelectorAll('.progress-tab');
+            progressTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const targetTab = this.dataset.tab;
+                    
+                    // Update active tab
+                    progressTabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update active panel
+                    document.querySelectorAll('.progress-panel').forEach(p => p.classList.remove('active'));
+                    document.getElementById(targetTab + '-panel').classList.add('active');
+                });
+            });
+
+            // Chat form handling
+            document.body.addEventListener('htmx:afterRequest', function(event) {
+                if (event.detail.pathInfo.requestPath === '/api/chat') {
+                    const response = JSON.parse(event.detail.xhr.response);
+                    const chatMessages = document.getElementById('chat-messages');
+                    
+                    response.messages.forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = `message ${msg.role}-message`;
+                        messageDiv.innerHTML = `
+                            <div class="message-avatar">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" fill="${msg.role === 'assistant' ? '#7C3AED' : '#3B82F6'}"/>
+                                    <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${msg.role === 'assistant' ? 'AI' : 'U'}</text>
+                                </svg>
+                            </div>
+                            <div class="message-content">
+                                <p>${msg.content}</p>
+                                <span class="message-time">${msg.timestamp}</span>
+                            </div>
+                        `;
+                        chatMessages.appendChild(messageDiv);
+                    });
+                    
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            });
+
+            // Resize functionality
+            let isResizing = false;
+            let currentHandle = null;
+            let startX = 0;
+            let startY = 0;
+            let startWidth = 0;
+            let startHeight = 0;
+            let targetElement = null;
+            
+            const resizeHandles = document.querySelectorAll('.resize-handle');
+            
+            resizeHandles.forEach(handle => {
+                handle.addEventListener('mousedown', function(e) {
+                    console.log('Mousedown on resize handle:', this.dataset.resize);
+                    isResizing = true;
+                    currentHandle = this;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    
+                    const resizeType = this.dataset.resize;
+                    
+                    // Identify target element based on resize type
+                    if (resizeType === 'sidebar') {
+                        targetElement = document.querySelector('.sidebar');
+                        startWidth = targetElement.offsetWidth;
+                    } else if (resizeType === 'main') {
+                        targetElement = document.querySelector('.sidebar');
+                        startWidth = targetElement.offsetWidth;
+                    } else if (resizeType === 'editor') {
+                        targetElement = document.querySelector('.workflow-viewer');
+                        startHeight = targetElement.offsetHeight;
+                    } else if (resizeType === 'io') {
+                        targetElement = document.querySelector('.chat-section');
+                        startWidth = targetElement.offsetWidth;
+                    }
+                    
+                    console.log('Target element:', targetElement, 'Start width/height:', startWidth || startHeight);
+                    
+                    this.classList.add('resizing');
+                    document.body.style.cursor = this.classList.contains('resize-handle-vertical') ? 'col-resize' : 'row-resize';
+                    document.body.style.userSelect = 'none';
+                    
+                    e.preventDefault();
+                });
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+                
+                console.log('Mouse move, isResizing:', isResizing);
+                const resizeType = currentHandle.dataset.resize;
+                
+                if (resizeType === 'sidebar' || resizeType === 'main') {
+                    // Horizontal resize for sidebar
+                    const deltaX = e.clientX - startX;
+                    const newWidth = startWidth + deltaX;
+                    console.log('Sidebar resize - deltaX:', deltaX, 'newWidth:', newWidth);
+                    if (newWidth >= 200 && newWidth <= 500) {
+                        targetElement.style.width = newWidth + 'px';
+                        targetElement.style.flex = 'none';
+                        console.log('Applied width:', newWidth + 'px');
+                    }
+                } else if (resizeType === 'editor') {
+                    // Vertical resize for workflow viewer / nl editor
+                    const deltaY = e.clientY - startY;
+                    const newHeight = startHeight + deltaY;
+                    const container = targetElement.parentElement;
+                    const containerHeight = container.offsetHeight - 4; // Account for resize handle
+                    
+                    if (newHeight >= 200 && newHeight <= containerHeight - 200) {
+                        const flexGrow = newHeight / containerHeight;
+                        targetElement.style.flex = flexGrow;
+                        const nlEditor = document.querySelector('.nl-editor');
+                        nlEditor.style.flex = (1 - flexGrow);
+                    }
+                } else if (resizeType === 'io') {
+                    // Horizontal resize for chat vs io section
+                    const deltaX = e.clientX - startX;
+                    const newWidth = startWidth + deltaX;
+                    const container = targetElement.parentElement;
+                    const containerWidth = container.offsetWidth - 4; // Account for resize handle
+                    
+                    if (newWidth >= 300 && newWidth <= containerWidth - 250) {
+                        const flexGrow = newWidth / containerWidth;
+                        targetElement.style.flex = flexGrow * 3; // Multiply to maintain ratio
+                        const ioSection = document.querySelector('.io-section');
+                        ioSection.style.flex = (1 - flexGrow) * 3;
+                    }
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    if (currentHandle) {
+                        currentHandle.classList.remove('resizing');
+                        currentHandle = null;
+                    }
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                    targetElement = null;
+                }
+            });
+            
+            // Add Step Dialog handlers
+            const addStepBtn = document.getElementById('add-step-btn');
+            const addStepDialog = document.getElementById('add-step-dialog');
+            const closeDialogBtn = document.getElementById('close-dialog');
+            const cancelDialogBtn = document.getElementById('cancel-dialog');
+            const submitStepBtn = document.getElementById('submit-step');
+            const deleteStepBtn = document.getElementById('delete-step');
+            const addStepForm = document.getElementById('add-step-form');
+            const dialogTitle = document.querySelector('.dialog-header h3');
+            
+            // Open dialog for creating new node
+            addStepBtn.addEventListener('click', function() {
+                editingNodeId = null;
+                dialogTitle.textContent = 'Add New Step';
+                submitStepBtn.textContent = 'Add Step';
+                deleteStepBtn.style.display = 'none'; // Hide delete button when creating
+                
+                // Hide editor panel if open
+                const editorPanel = document.getElementById('selected-node-info');
+                if (editorPanel) {
+                    editorPanel.style.display = 'none';
+                }
+                
+                // Show dialog
+                addStepDialog.style.display = 'flex';
+                document.getElementById('step-title').focus();
+            });
+            
+            // Open dialog for editing existing node
+            window.openEditDialog = function(nodeId) {
+                const node = workflowData.nodes.find(n => n.id === nodeId);
+                if (!node) return;
+                
+                // Don't allow editing the Start node
+                if (node.isStart) {
+                    alert('The Start node cannot be edited.');
+                    return;
+                }
+                
+                editingNodeId = nodeId;
+                dialogTitle.textContent = 'Edit Step';
+                submitStepBtn.textContent = 'Save Changes';
+                deleteStepBtn.style.display = 'block'; // Show delete button when editing
+                
+                // Populate form
+                document.getElementById('step-title').value = node.title;
+                document.getElementById('step-description').value = node.description || '';
+                
+                // Select the color
+                const colorRadio = document.querySelector(`input[name="color"][value="${node.color}"]`);
+                if (colorRadio) {
+                    colorRadio.checked = true;
+                }
+                
+                // Hide editor panel if open
+                const editorPanel = document.getElementById('selected-node-info');
+                if (editorPanel) {
+                    editorPanel.style.display = 'none';
+                }
+                
+                // Show dialog
+                addStepDialog.style.display = 'flex';
+                document.getElementById('step-title').focus();
+            };
+            
+            // Close dialog handlers
+            function closeDialog() {
+                addStepDialog.style.display = 'none';
+                addStepForm.reset();
+                editingNodeId = null;
+            }
+            
+            closeDialogBtn.addEventListener('click', closeDialog);
+            cancelDialogBtn.addEventListener('click', closeDialog);
+            
+            // Close on overlay click
+            addStepDialog.addEventListener('click', function(e) {
+                if (e.target === addStepDialog) {
+                    closeDialog();
+                }
+            });
+            
+            // Submit form
+            submitStepBtn.addEventListener('click', async function() {
+                const titleInput = document.getElementById('step-title');
+                const descriptionInput = document.getElementById('step-description');
+                const colorInput = document.querySelector('input[name="color"]:checked');
+                
+                // Validate
+                if (!titleInput.value.trim()) {
+                    titleInput.focus();
+                    return;
+                }
+                
+                if (editingNodeId) {
+                    // Update existing node
+                    const node = workflowData.nodes.find(n => n.id === editingNodeId);
+                    if (node) {
+                        node.title = titleInput.value.trim();
+                        node.description = descriptionInput.value.trim() || '';
+                        node.color = colorInput.value;
+                    }
+                } else {
+                    // Create new node
+                    const newNode = {
+                        id: generateUUID(),
+                        title: titleInput.value.trim(),
+                        description: descriptionInput.value.trim() || '',
+                        color: colorInput.value,
+                        x: 280,
+                        y: 100
+                    };
+                    
+                    // Add to workflow data
+                    workflowData.nodes.push(newNode);
+                }
+                
+                // Save to backend
+                await saveWorkflow();
+                
+                // Re-render workflow
+                renderWorkflow();
+                
+                // Close dialog
+                closeDialog();
+            });
+            
+            // Delete node handler
+            deleteStepBtn.addEventListener('click', async function() {
+                if (!editingNodeId) return;
+                
+                // Confirm deletion
+                if (!confirm('Are you sure you want to delete this step?')) {
+                    return;
+                }
+                
+                // Remove node from workflow data
+                workflowData.nodes = workflowData.nodes.filter(n => n.id !== editingNodeId);
+                
+                // Remove any edges connected to this node
+                workflowData.edges = workflowData.edges.filter(e => 
+                    e.source !== editingNodeId && e.target !== editingNodeId
+                );
+                
+                // Save to backend
+                await saveWorkflow();
+                
+                // Re-render workflow
+                renderWorkflow();
+                
+                // Close dialog
+                closeDialog();
+            });
+        });
+    </script>
+</body>
+</html>
