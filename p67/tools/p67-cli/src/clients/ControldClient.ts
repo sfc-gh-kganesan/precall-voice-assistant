@@ -24,18 +24,18 @@ export interface ErrorResponse {
   message?: string;
 }
 
-export interface HarnessClientConfig {
+export interface ControldClientConfig {
   baseUrl: string;
   pat: string;
   timeout?: number;
 }
 
-export class HarnessClient {
+export class ControldClient {
   private _baseUrl: string;
   private _timeout: number;
   private _pat: string;
 
-  constructor(config: HarnessClientConfig) {
+  constructor(config: ControldClientConfig) {
     this._baseUrl = config.baseUrl.replace(/\/$/, '');
     this._timeout = config.timeout || 30000;
     this._pat = config.pat;

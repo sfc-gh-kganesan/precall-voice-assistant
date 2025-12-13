@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ProjectConfig } from '../../config/ProjectConfig.ts';
-import { HarnessClient } from '../../clients/HarnessClient.ts';
+import { ControldClient } from '../../clients/ControldClient.ts';
 import { getSnowflakePat } from '../../secrets/1password.ts';
 
 export const deployCommand = new Command('deploy')
@@ -49,7 +49,7 @@ export const deployCommand = new Command('deploy')
       const filename = path.basename(resolvedPath);
 
       const endpoint = config.getRuntimeEndpoint();
-      const client = new HarnessClient({ baseUrl: endpoint, pat: pat.value });
+      const client = new ControldClient({ baseUrl: endpoint, pat: pat.value });
 
       const result = await client.createWorkflow(blob, filename);
 

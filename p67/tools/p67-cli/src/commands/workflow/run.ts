@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { select } from '@inquirer/prompts';
 import { ProjectConfig } from '../../config/ProjectConfig.ts';
-import { HarnessClient } from '../../clients/HarnessClient.ts';
+import { ControldClient } from '../../clients/ControldClient.ts';
 import { getSnowflakePat } from '../../secrets/1password.ts';
 
 export const runCommand = new Command('run')
@@ -25,7 +25,7 @@ export const runCommand = new Command('run')
       }
 
       const endpoint = config.getRuntimeEndpoint();
-      const client = new HarnessClient({ baseUrl: endpoint, pat: pat.value });
+      const client = new ControldClient({ baseUrl: endpoint, pat: pat.value });
 
       let selectedWorkflowId = workflowId;
 

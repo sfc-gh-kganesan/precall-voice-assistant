@@ -266,7 +266,6 @@ fastify.get('/example', async (request, reply) => {
 
 ## Related Services
 
-- **Harness** (`p67/services/harness`) - Workflow execution service (Hono-based)
 - **API** (`p67/packages/api`) - Backend service (Fastify-based)
 - **Web** (`p67/packages/web`) - React frontend application
 

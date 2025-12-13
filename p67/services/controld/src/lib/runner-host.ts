@@ -1,6 +1,12 @@
-import { ExecuteMessage, ExecuteMessageSchema } from './schema.js';
+import { ExecuteMessage } from './runner.js';
+import { z } from 'zod';
 import * as path from 'path';
 import * as fs from 'fs';
+
+const ExecuteMessageSchema = z.object({
+  dir: z.string(),
+  action: z.literal('run'),
+});
 
 function error(err: Error | string) {
   process.send!({
@@ -10,6 +16,7 @@ function error(err: Error | string) {
 }
 
 process.on('message', async (message: ExecuteMessage) => {
+  console.log(message);
   const m = ExecuteMessageSchema.safeParse(message);
   if (!m.success) {
     error(m.error);
@@ -17,7 +24,6 @@ process.on('message', async (message: ExecuteMessage) => {
   }
 
   try {
-    // Dynamically import the script
     const scriptPath = path.resolve(m.data.dir, 'index.js');
     if (!fs.existsSync(scriptPath)) {
       throw new Error(`${scriptPath} does not exist, exiting.`);
@@ -27,18 +33,14 @@ process.on('message', async (message: ExecuteMessage) => {
     const script = await import(scriptPath);
     console.log(`Loaded script!`);
 
-    // Check if main function exists
     if (typeof script.main !== 'function') {
       throw new Error('Script does not export a main function');
     }
 
-    // Execute the main function with the provided data
     const result = await script.main();
 
-    // Send the result back to parent
     process.send!({ type: 'result', data: result });
   } catch (error) {
-    // Send error back to parent
     process.send!({
       type: 'error',
       error: error instanceof Error ? error.message : String(error),

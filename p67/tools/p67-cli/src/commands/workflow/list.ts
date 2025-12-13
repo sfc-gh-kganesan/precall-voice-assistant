@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { ProjectConfig } from '../../config/ProjectConfig.ts';
-import { HarnessClient } from '../../clients/HarnessClient.ts';
+import { ControldClient } from '../../clients/ControldClient.ts';
 import { getSnowflakePat } from '../../secrets/1password.ts';
 
 export const listCommand = new Command('list')
@@ -23,7 +23,7 @@ export const listCommand = new Command('list')
       }
 
       const endpoint = config.getRuntimeEndpoint();
-      const client = new HarnessClient({ baseUrl: endpoint, pat: pat.value });
+      const client = new ControldClient({ baseUrl: endpoint, pat: pat.value });
       const result = await client.listWorkflows();
 
       if (result.workflows.length === 0) {

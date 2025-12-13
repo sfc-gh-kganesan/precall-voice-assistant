@@ -1,2 +1,3 @@
 runtime:
-  endpoint: https://jjb46h6e-sfengineering-aifde.snowflakecomputing.app
+    # endpoint: https://bmb46h6e-sfengineering-aifde.snowflakecomputing.app
+    endpoint: http://localhost:3002

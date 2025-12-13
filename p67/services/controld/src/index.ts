@@ -7,6 +7,7 @@ await server.register(apiRouter, { prefix: '/api' });
 const start = async () => {
   try {
     await server.listen({ port: server.config.port, host: '0.0.0.0' });
+    console.log(`Config: ${JSON.stringify(server.config, null, 2)}`);
     console.log(`Server listening on port ${server.config.port}`);
     console.log(`OpenAPI schema available at http://localhost:${server.config.port}/docs/json`);
     console.log(`Swagger UI available at http://localhost:${server.config.port}/docs`);

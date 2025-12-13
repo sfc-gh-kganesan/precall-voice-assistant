@@ -14,10 +14,11 @@ const health: FastifyPluginAsync = async (fastify) => {
         },
       },
     },
-    async () => {
+    async (request) => {
       return {
         status: 'ok',
         timestamp: new Date().toISOString(),
+        localStoragePath: request.server.config.localStoragePath,
       };
     },
   );

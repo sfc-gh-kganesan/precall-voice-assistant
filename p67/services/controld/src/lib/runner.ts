@@ -1,6 +1,5 @@
 import { fork } from 'child_process';
 import { resolve, dirname } from 'path';
-import { ExecuteMessage } from './schema';
 import { fileURLToPath } from 'url';
 
 export type RunResult = {
@@ -8,6 +7,11 @@ export type RunResult = {
   stderr: string;
   exitCode: number;
 };
+
+export interface ExecuteMessage {
+  dir: string;
+  action: 'run';
+}
 
 export class Runner {
   constructor(private readonly workflowDir: string) {}
@@ -18,7 +22,6 @@ export class Runner {
     const __dirname = dirname(__filename);
     const hostPath = resolve(__dirname, 'runner-host.js');
 
-    // Fork a new Node.js process to execute the code
     const proc = fork(hostPath, [], {
       stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
     });
@@ -26,7 +29,6 @@ export class Runner {
     let output = '';
     let errorOutput = '';
 
-    // Pipe stdout from child process
     if (proc.stdout) {
       proc.stdout.on('data', (data: Buffer) => {
         const text = data.toString();
@@ -35,7 +37,6 @@ export class Runner {
       });
     }
 
-    // Pipe stderr from child process
     if (proc.stderr) {
       proc.stderr.on('data', (data: Buffer) => {
         const text = data.toString();
@@ -61,10 +62,8 @@ export class Runner {
       action: 'run',
     };
 
-    // Launch script
     proc.send(m);
 
-    // Wait for the child process to complete
     const exitCode = await new Promise<number>((resolve) => {
       proc.on('exit', (code) => {
         resolve(code || 0);

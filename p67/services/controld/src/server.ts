@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import multipart from '@fastify/multipart';
 import Fastify, { FastifyInstance } from 'fastify';
 import { loadConfig, ServerConfig } from './config.js';
 import {
@@ -34,6 +35,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   server.decorate('config', config);
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
+
+  await server.register(multipart);
+
   await server.register(cors, {
     origin: true,
   });

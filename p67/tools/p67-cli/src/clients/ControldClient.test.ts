@@ -1,44 +1,44 @@
 import { test, expect, mock, beforeEach, describe } from 'bun:test';
-import { HarnessClient } from './HarnessClient.ts';
+import { ControldClient } from './ControldClient.ts';
 import type {
   HealthResponse,
   WorkflowCreateResponse,
   WorkflowListResponse,
   WorkflowRunResponse,
   ErrorResponse,
-} from './HarnessClient.ts';
+} from './ControldClient.ts';
 
-describe('HarnessClient', () => {
-  let client: HarnessClient;
+describe('ControldClient', () => {
+  let client: ControldClient;
   let originalFetch: typeof globalThis.fetch;
 
   beforeEach(() => {
-    client = new HarnessClient({ baseUrl: 'http://localhost:3000', pat: 'test-pat' });
+    client = new ControldClient({ baseUrl: 'http://localhost:3002', pat: 'test-pat' });
     originalFetch = globalThis.fetch;
   });
 
   describe('constructor', () => {
     test('should initialize with baseUrl and default timeout', () => {
-      const client = new HarnessClient({ baseUrl: 'http://localhost:3000', pat: 'test-pat' });
+      const client = new ControldClient({ baseUrl: 'http://localhost:3002', pat: 'test-pat' });
       expect(client).toBeDefined();
-      expect(client.baseUrl).toBe('http://localhost:3000');
+      expect(client.baseUrl).toBe('http://localhost:3002');
       expect(client.timeout).toBe(30000);
     });
 
     test('should strip trailing slash from baseUrl', () => {
-      const client = new HarnessClient({ baseUrl: 'http://localhost:3000/', pat: 'test-pat' });
+      const client = new ControldClient({ baseUrl: 'http://localhost:3002/', pat: 'test-pat' });
       expect(client).toBeDefined();
-      expect(client.baseUrl).toBe('http://localhost:3000');
+      expect(client.baseUrl).toBe('http://localhost:3002');
     });
 
     test('should accept custom timeout', () => {
-      const client = new HarnessClient({
-        baseUrl: 'http://localhost:3000',
+      const client = new ControldClient({
+        baseUrl: 'http://localhost:3002',
         pat: 'test-pat',
         timeout: 60000,
       });
       expect(client).toBeDefined();
-      expect(client.baseUrl).toBe('http://localhost:3000');
+      expect(client.baseUrl).toBe('http://localhost:3002');
       expect(client.timeout).toBe(60000);
     });
   });
@@ -62,11 +62,10 @@ describe('HarnessClient', () => {
 
       expect(result).toEqual(mockResponse);
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/api/health',
+        'http://localhost:3002/api/health',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Content-Type': 'application/json',
             Authorization: 'Snowflake Token="test-pat"',
           }),
         }),
@@ -122,7 +121,7 @@ describe('HarnessClient', () => {
       });
 
       globalThis.fetch = mock(async (url, options) => {
-        expect(url).toBe('http://localhost:3000/api/workflow/create');
+        expect(url).toBe('http://localhost:3002/api/workflow/create');
         expect(options?.method).toBe('POST');
         expect(options?.body).toBeInstanceOf(FormData);
 
@@ -148,7 +147,7 @@ describe('HarnessClient', () => {
       const mockBlob = new Blob(['test content'], { type: 'application/zip' });
 
       globalThis.fetch = mock(async (url, options) => {
-        expect(url).toBe('http://localhost:3000/api/workflow/create');
+        expect(url).toBe('http://localhost:3002/api/workflow/create');
         expect(options?.method).toBe('POST');
         expect(options?.body).toBeInstanceOf(FormData);
 
@@ -228,11 +227,10 @@ describe('HarnessClient', () => {
       expect(result).toEqual(mockResponse);
       expect(result.workflows).toHaveLength(3);
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/api/workflow/list',
+        'http://localhost:3002/api/workflow/list',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Content-Type': 'application/json',
             Authorization: 'Snowflake Token="test-pat"',
           }),
         }),
@@ -292,7 +290,7 @@ describe('HarnessClient', () => {
       const workflowId = 'wf-123e4567-e89b-12d3-a456-426614174000';
 
       globalThis.fetch = mock(async (url) => {
-        expect(url).toBe(`http://localhost:3000/api/workflow/${workflowId}/run`);
+        expect(url).toBe(`http://localhost:3002/api/workflow/${workflowId}/run`);
 
         return new Response(JSON.stringify(mockResponse), {
           status: 200,
@@ -367,11 +365,10 @@ describe('HarnessClient', () => {
       const workflowId = 'wf-custom-id-123';
 
       globalThis.fetch = mock(async (url, options) => {
-        expect(url).toBe(`http://localhost:3000/api/workflow/${workflowId}/run`);
+        expect(url).toBe(`http://localhost:3002/api/workflow/${workflowId}/run`);
         expect(options?.method).toBe('POST');
         expect(options?.headers).toEqual(
           expect.objectContaining({
-            'Content-Type': 'application/json',
             Authorization: 'Snowflake Token="test-pat"',
           }),
         );

@@ -8,7 +8,7 @@ P67 (Project 67, also known as "Cortex Mesh") is an experimental platform for bu
 
 The repository contains:
 - **packages/**: Traditional web application packages (API and frontend)
-- **services/**: Backend microservices (Harness workflow service)
+- **services/**: Backend microservices (Controld control plane service)
 - **tools/**: Command-line interface tools (p67 CLI)
 - **native-app/**: Snowflake Native Application configuration
 - **scripts/**: Shell scripts for workflow operations
@@ -20,7 +20,7 @@ The repository contains:
 P67 enables users to:
 1. Build agentic workflows using LangGraph or other frameworks
 2. Package workflows as ZIP files
-3. Deploy workflows to the Harness service (local or Snowflake SPCS)
+3. Deploy workflows to the Controld service (local or Snowflake SPCS)
 4. Execute workflows and retrieve results
 5. Manage workflows via CLI or API
 
@@ -34,7 +34,7 @@ P67 enables users to:
 
 ### Backend Stack
 - **API Service**: Fastify 5.2.0
-- **Harness Service**: Hono 4.10.8
+- **Controld Service**: Fastify 5.2.0
 - **Runtime**: Node.js with ESM modules
 - **Language**: TypeScript 5.9.3
 
@@ -81,26 +81,23 @@ p67/
 │       └── tsconfig*.json
 │
 ├── services/                       # Backend microservices
-│   └── harness/                    # Workflow harness service
+│   └── controld/                   # Control plane service
 │       ├── src/
-│       │   ├── index.ts            # Main Hono server
+│       │   ├── index.ts            # Main Fastify server
+│       │   ├── server.ts           # Server setup
 │       │   ├── config.ts           # Configuration
 │       │   ├── schema.ts           # Zod schemas
-│       │   ├── runner.ts           # Workflow execution
 │       │   ├── routes/             # API routes
 │       │   │   ├── api.ts          # Main API router
 │       │   │   ├── health.ts       # Health check
 │       │   │   └── workflow.ts     # Workflow operations
-│       │   ├── middleware/         # Middleware
-│       │   │   ├── error-handler.ts
-│       │   │   ├── logger.ts
-│       │   │   └── env.ts
 │       │   └── lib/                # Utilities
 │       │       ├── file-storage.ts # File system ops
 │       │       ├── zip.ts          # ZIP handling
-│       │       └── env.ts          # Env helpers
+│       │       ├── runner.ts       # Workflow execution
+│       │       └── runner-host.ts  # Workflow runner host
 │       ├── Dockerfile              # Service Docker image
-│       ├── harness_spec.yaml       # SPCS service spec
+│       ├── controld_spec.yaml      # SPCS service spec
 │       ├── package.json
 │       └── tsconfig.json
 │
@@ -119,7 +116,7 @@ p67/
 │       │   ├── config/
 │       │   │   └── ProjectConfig.ts # Config management
 │       │   ├── clients/
-│       │   │   └── HarnessClient.ts # HTTP client
+│       │   │   └── ControldClient.ts # HTTP client
 │       │   └── secrets/
 │       │       └── 1password.ts    # 1Password integration
 │       ├── bin/                    # Compiled binary
@@ -140,7 +137,7 @@ p67/
 │   ├── spcs_list_workflows.sh      # List SPCS workflows
 │   ├── spcs_run_workflow.sh        # Run workflow on SPCS
 │   ├── spcs_healthcheck.sh         # SPCS health check
-│   └── get_spcs_endpoint_harness.sh # Get SPCS endpoint
+│   └── get_spcs_endpoint_controld.sh # Get SPCS endpoint
 │
 ├── coco/                           # Claude Code environment
 │   ├── commands/                   # Custom slash commands
@@ -227,47 +224,47 @@ p67/
 - `pnpm format` / `pnpm format:check` - Prettier
 - `pnpm type:check` - TypeScript validation
 
-### 2. Services (@p67/harness)
+### 2. Services (@p67/controld)
 
-#### @p67/harness - Workflow Harness Service
+#### @p67/controld - Control Plane Service
 
-**Purpose**: Executes and manages agentic workflows. This is the core service that runs workflows deployed by users.
+**Purpose**: Control plane service for the P67 platform. Executes and manages agentic workflows. This is the core service that runs workflows deployed by users.
 
 **Technology Stack**:
 - **Runtime**: Node.js with ESM modules
-- **Framework**: Hono 4.10.8 (lightweight, fast web framework)
-- **Server**: @hono/node-server
-- **API Documentation**: @hono/swagger-ui, @hono/zod-openapi
-- **Validation**: Zod 4.1.13 for schema validation
-- **Logging**: Pino 10.1.0 with hono-pino
+- **Framework**: Fastify 5.2.0 (fast, low-overhead web framework)
+- **API Documentation**: @fastify/swagger, @fastify/swagger-ui
+- **Type Provider**: fastify-type-provider-zod
+- **Validation**: Zod 3.23.8 for schema validation
+- **Logging**: Pino (built-in with Fastify) with pino-pretty
 - **File Handling**: adm-zip for ZIP operations
 - **Language**: TypeScript 5.9.3
 - **Target**: ES2022
-- **Port**: 8000 (configurable via PORT env var)
+- **Port**: 3002 (configurable via PORT env var)
 
 **Architecture**:
 - OpenAPI 3.1.0 compliant REST API
 - Swagger UI documentation at `/docs`
 - File-based workflow storage (configurable via `DATA_ROOT`)
 - ZIP file upload/extraction for workflow deployment
-- Workflow execution runtime
+- Workflow execution runtime via forked child process
 
 **API Endpoints**:
-- `GET /api/health` - Health check endpoint
-- `POST /api/workflows` - Create workflow (accepts ZIP file upload)
-- `GET /api/workflows` - List all workflows
-- `POST /api/workflows/:workflowId/run` - Execute a workflow
+- `GET /api/health` - Health check endpoint (returns status, timestamp, localStoragePath)
+- `POST /api/workflow/create` - Create workflow (accepts ZIP file upload)
+- `GET /api/workflow/list` - List all workflows
+- `POST /api/workflow/:workflowId/run` - Execute a workflow
 
 **Storage**:
-- Local file system storage (default: `.local-storage/`)
+- Local file system storage (default: temp directory)
 - Configurable via `DATA_ROOT` environment variable
 - Workflows stored as extracted ZIP contents
 
 **Deployment**:
 - Docker containerized (multi-stage Dockerfile)
 - Snowflake SPCS (Snowpark Container Services) ready
-- Local development via Docker Compose
-- Service specification in `harness_spec.yaml`
+- Local development via Docker Compose or tsx watch
+- Service specification in `controld_spec.yaml`
 
 **Scripts**:
 - `pnpm dev` - Development server with tsx watch
@@ -296,13 +293,13 @@ p67/
 **Configuration (p67.yml)**:
 ```yaml
 runtime:
-  endpoint: <harness-service-url>
+  endpoint: <controld-service-url>
 ```
 
 **Commands**:
 - `p67 init` - Initialize p67.yml configuration file
 - `p67 env` - Show environment configuration and secrets
-- `p67 workflow deploy` - Deploy a workflow ZIP to the harness
+- `p67 workflow deploy` - Deploy a workflow ZIP to the controld service
 - `p67 workflow list` - List all deployed workflows
 - `p67 workflow run <workflowId>` - Execute a workflow
 
@@ -342,7 +339,7 @@ runtime:
 - Stored procedures:
   - `v1.init()` - Version initializer
   - `v1.create_services()` - Create compute pool and services
-  - `v1.start_harness()` - Start harness service
+  - `v1.start_controld()` - Start controld service
   - `v1.app_url()` - Get application URL
   - `app.stop_app()` - Stop application
 
@@ -353,8 +350,8 @@ runtime:
 The root `Makefile` provides key operational commands:
 
 **Build & Deploy**:
-- `make build` / `make build-harness` - Build Docker images for linux/amd64
-- `make push` / `make push_harness` - Push images to Snowflake registry
+- `make build` / `make build-controld` - Build Docker images for linux/amd64
+- `make push` / `make push-controld` - Push images to Snowflake registry
 - `make deploy` - Full deployment (login, build, push, run)
 - `make login` - Authenticate with Snowflake registry
 
@@ -365,7 +362,7 @@ The root `Makefile` provides key operational commands:
 
 **Snowflake SPCS**:
 - `make list` - List SPCS services
-- `make describe` - Describe harness service
+- `make describe` - Describe controld service
 - `make url` - Get service ingress URL
 - `make init-provider-account` - Initialize provider account
 
@@ -378,8 +375,8 @@ The root `Makefile` provides key operational commands:
 - Supports building any service in the monorepo
 
 **docker-compose.yaml**:
-- Service: harness
-- Port mapping: 3000:8000
+- Service: controld
+- Port mapping: 3002:3002
 - Volume: `.local-storage` for persistent data
 - Environment: Development configuration
 
@@ -407,7 +404,7 @@ The `scripts/` directory contains shell scripts for workflow operations:
 - `spcs_list_workflows.sh` - List SPCS workflows
 - `spcs_run_workflow.sh` - Run workflow on SPCS
 - `spcs_healthcheck.sh` - SPCS health check
-- `get_spcs_endpoint_harness.sh` - Get SPCS endpoint URL
+- `get_spcs_endpoint_controld.sh` - Get SPCS endpoint URL
 
 ### 7. Example Workflows
 
@@ -550,7 +547,7 @@ start();
 
 ### Individual Packages
 
-Each package (api, web, harness, p67-cli) has similar scripts:
+Each package (api, web, controld, p67-cli) has similar scripts:
 - `pnpm dev` - Development mode
 - `pnpm build` - Production build
 - `pnpm start` - Run production build (where applicable)
@@ -561,7 +558,7 @@ Each package (api, web, harness, p67-cli) has similar scripts:
 Use `pnpm --filter <package-name>` to run scripts for specific packages:
 ```bash
 pnpm --filter @p67/api dev
-pnpm --filter @p67/harness build
+pnpm --filter @p67/controld build
 pnpm --filter @p67/cli start
 ```
 
@@ -571,7 +568,7 @@ pnpm --filter @p67/cli start
 1. Install dependencies: `pnpm install`
 2. Choose your development path:
    - **Full stack**: `pnpm dev` (runs API + Web)
-   - **Harness service**: `make dev` (Docker Compose)
+   - **Controld service**: `make dev` (Docker Compose) or `cd services/controld && pnpm dev`
    - **CLI development**: `cd tools/p67-cli && pnpm start`
 
 ### Starting Development
@@ -583,16 +580,16 @@ pnpm dev
 # Web runs on http://localhost:5173
 ```
 
-**Harness Service Development**:
+**Controld Service Development**:
 ```bash
 # Local Docker development
 make dev
-# Harness runs on http://localhost:3000
+# Controld runs on http://localhost:3002
 
 # OR native development
-cd services/harness
+cd services/controld
 pnpm dev
-# Harness runs on http://localhost:8000
+# Controld runs on http://localhost:3002
 ```
 
 **CLI Development**:
@@ -627,15 +624,15 @@ To develop and test a workflow:
 4. Test locally with `pnpm --filter <package> dev`
 5. Run `pnpm build` to ensure production build works
 
-**To Harness Service**:
-1. Edit files in `services/harness/src/`
+**To Controld Service**:
+1. Edit files in `services/controld/src/`
 2. Add routes in `src/routes/` if needed
 3. Update schema in `src/schema.ts` for API changes
-4. Test with `make dev` or `pnpm --filter @p67/harness dev`
+4. Test with `make dev` or `pnpm --filter @p67/controld dev`
 
 **To CLI**:
 1. Edit or add commands in `tools/p67-cli/src/commands/`
-2. Update HarnessClient if API changes needed
+2. Update ControldClient if API changes needed
 3. Test with `pnpm start -- <command>`
 
 ### Adding Dependencies
@@ -644,7 +641,7 @@ To develop and test a workflow:
 # Add to specific package
 pnpm --filter @p67/api add <package-name>
 pnpm --filter @p67/web add <package-name>
-pnpm --filter @p67/harness add <package-name>
+pnpm --filter @p67/controld add <package-name>
 pnpm --filter @p67/cli add <package-name>
 
 # Add as dev dependency
@@ -673,7 +670,7 @@ Each package has its own `eslint.config.js` using the new flat config format.
 - JSX support enabled
 - React hooks rules enforced
 
-**Backend Packages (@p67/api, @p67/harness)**:
+**Backend Packages (@p67/api, @p67/controld)**:
 - Node.js globals enabled
 - Relaxed rules for backend development
 - Allows unused parameters with `_` prefix
@@ -706,7 +703,7 @@ Shared configuration at the root level:
 - **Target**: ES2022
 - **Module**: ESNext
 - **Strict mode**: Enabled
-- **Module resolution**: bundler (web, cli) / node (api, harness)
+- **Module resolution**: bundler (web, cli) / node (api, controld)
 - **Source maps**: Enabled
 - **Declaration maps**: Enabled (libraries)
 
@@ -718,11 +715,11 @@ Shared configuration at the root level:
 
 ## Debugging
 
-### API/Harness Debugging
-- Fastify/Hono loggers enabled by default
+### API/Controld Debugging
+- Fastify loggers enabled by default
 - Check console output for request logs
 - Use `console.log` for debugging (appears in terminal)
-- Pino structured logging in harness service
+- Pino structured logging in controld service
 
 ### Web Debugging
 - Use browser DevTools
@@ -732,15 +729,15 @@ Shared configuration at the root level:
 ### CLI Debugging
 - Add `console.log` statements in command handlers
 - Use Bun's built-in debugger
-- Check network requests to harness service
+- Check network requests to controld service
 
 ### Docker Debugging
 ```bash
-# View harness logs
-docker compose logs -f harness
+# View controld logs
+docker compose logs -f controld
 
 # Exec into container
-docker compose exec harness sh
+docker compose exec controld sh
 
 # Check service status
 make describe
@@ -756,9 +753,9 @@ make describe
 - Vite environment variables prefixed with `VITE_`
 - See Vite documentation for details
 
-### Harness Service
-- `PORT`: Server port (default: 8000)
-- `DATA_ROOT`: Storage directory (default: `.local-storage`)
+### Controld Service
+- `PORT`: Server port (default: 3002)
+- `DATA_ROOT`: Storage directory (default: temp directory)
 - `NODE_ENV`: Environment (development/production)
 
 ### CLI Tool
@@ -780,7 +777,7 @@ make describe
 - Use async/await for asynchronous operations
 - Prefer functional components and hooks in React
 - Use proper error handling with try/catch
-- Validate inputs with Zod schemas (harness, cli)
+- Validate inputs with Zod schemas (controld, cli)
 
 ### Monorepo Considerations
 - Changes to shared types should be reflected in all packages
@@ -790,21 +787,21 @@ make describe
 - Workspace protocol (`workspace:*`) for internal dependencies
 
 ### Service Development
-- Update OpenAPI schemas when changing harness API
+- Update OpenAPI schemas when changing controld API
 - Add proper Zod validation for new endpoints
 - Document new CLI commands in CLAUDE.md
 - Test Docker builds before deploying to SPCS
-- Update harness_spec.yaml for SPCS configuration changes
+- Update controld_spec.yaml for SPCS configuration changes
 
 ## Common Tasks
 
-### Deploy Harness Locally
+### Deploy Controld Locally
 ```bash
 make dev
-# Service runs on http://localhost:3000
+# Service runs on http://localhost:3002
 ```
 
-### Deploy Harness to Snowflake SPCS
+### Deploy Controld to Snowflake SPCS
 ```bash
 make deploy
 # Or step by step:
@@ -854,16 +851,16 @@ npm run build
 zip -r ../my-workflow.zip .
 ```
 
-### Add a Harness API Endpoint
-1. Define schema in `services/harness/src/schema.ts` using Zod
-2. Add route in `services/harness/src/routes/workflow.ts` (or new file)
-3. Register route in `services/harness/src/routes/api.ts`
-4. Test locally with `pnpm --filter @p67/harness dev`
-5. Update CLI client if needed in `tools/p67-cli/src/clients/HarnessClient.ts`
+### Add a Controld API Endpoint
+1. Define schema in `services/controld/src/schema.ts` using Zod
+2. Add route in `services/controld/src/routes/workflow.ts` (or new file)
+3. Register route in `services/controld/src/routes/api.ts`
+4. Test locally with `pnpm --filter @p67/controld dev`
+5. Update CLI client if needed in `tools/p67-cli/src/clients/ControldClient.ts`
 
 ### Update CLI Command
 1. Edit command file in `tools/p67-cli/src/commands/`
-2. Update HarnessClient if API changes needed
+2. Update ControldClient if API changes needed
 3. Test with `pnpm --filter @p67/cli start -- <command>`
 4. Update CLAUDE.md documentation
 
@@ -883,8 +880,7 @@ zip -r ../my-workflow.zip .
 5. **Port Conflicts**: Ensure required ports are available:
    - 3001 (API)
    - 5173 (Web)
-   - 8000 (Harness native)
-   - 3000 (Harness Docker)
+   - 3002 (Controld)
 6. **Semicolons**: Always include semicolons in TypeScript/JavaScript
 7. **Docker Platform**: Build for linux/amd64 when deploying to SPCS
 8. **Snowflake Access**: SPCS deployment requires Snowflake account
@@ -893,7 +889,6 @@ zip -r ../my-workflow.zip .
 
 ### Frameworks & Libraries
 - Fastify Documentation: https://fastify.dev
-- Hono Documentation: https://hono.dev
 - React Documentation: https://react.dev
 - Vite Documentation: https://vite.dev
 - Mantine UI Documentation: https://mantine.dev
