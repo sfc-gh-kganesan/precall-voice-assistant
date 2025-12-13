@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from 'commander';
 import { initCommand } from './commands/init.ts';
-import { workflowCommand } from './commands/workflow.ts';
+import { workflowCommand } from './commands/workflow';
 import { envCommand } from './commands/env.ts';
 
 const VERSION = '0.1.0';
