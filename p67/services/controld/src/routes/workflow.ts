@@ -2,17 +2,17 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { randomUUID } from 'crypto';
 import { readdir } from 'fs/promises';
-import { unzip } from '../lib/zip.js';
+import { unzip } from '@controld/lib/zip.js';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { Runner } from '../lib/runner.js';
+import { Runner } from '@controld/lib/runner.js';
 import {
   WorkflowCreateResponseSchema,
   WorkflowListResponseSchema,
   WorkflowRunResponseSchema,
   WorkflowRunParamsSchema,
   ErrorResponseSchema,
-} from '../schema.js';
+} from '@controld/schema.js';
 
 const workflowRoutes = async (server: FastifyInstance) => {
   const fastify = server.withTypeProvider<ZodTypeProvider>();

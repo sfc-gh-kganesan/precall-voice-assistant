@@ -3,7 +3,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import multipart from '@fastify/multipart';
 import Fastify, { FastifyInstance } from 'fastify';
-import { loadConfig, ServerConfig } from './config.js';
+import { loadConfig, ServerConfig } from '@controld/config.js';
 import {
   serializerCompiler,
   validatorCompiler,

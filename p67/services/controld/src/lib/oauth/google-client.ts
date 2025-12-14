@@ -1,4 +1,4 @@
-import { GoogleTokenResponseSchema, GoogleUserInfoSchema } from '../../schema.js';
+import { GoogleTokenResponseSchema, GoogleUserInfoSchema } from '@controld/schema.js';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';

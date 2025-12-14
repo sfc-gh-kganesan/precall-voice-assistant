@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { HealthResponseSchema } from '../schema.js';
+import { HealthResponseSchema } from '@controld/schema.js';
 
 const health: FastifyPluginAsync = async (fastify) => {
   fastify.get(

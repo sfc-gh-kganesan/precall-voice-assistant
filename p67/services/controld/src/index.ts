@@ -1,5 +1,5 @@
-import apiRouter from './routes/api.js';
-import { buildServer } from './server.js';
+import apiRouter from '@controld/routes/api.js';
+import { buildServer } from '@controld/server.js';
 
 const server = await buildServer();
 await server.register(apiRouter, { prefix: '/api' });

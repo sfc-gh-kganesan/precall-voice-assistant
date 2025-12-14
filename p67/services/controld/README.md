@@ -95,10 +95,63 @@ controld/
 └── .gitignore              # Git ignore patterns
 ```
 
+## Import Paths
+
+This project uses **absolute imports** via TypeScript path aliases for cleaner, more maintainable code.
+
+### Path Alias Configuration
+
+All imports use the `@controld/*` alias pattern, configured in `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@controld/*": ["src/*"]
+    }
+  }
+}
+```
+
+### Import Examples
+
+```typescript
+// Instead of relative imports:
+import { HealthResponseSchema } from '../schema.js';
+import { GoogleOAuthClient } from '../lib/oauth/google-client.js';
+import health from './health.js';
+
+// Use absolute imports:
+import { HealthResponseSchema } from '@controld/schema.js';
+import { GoogleOAuthClient } from '@controld/lib/oauth/google-client.js';
+import health from '@controld/routes/health.js';
+```
+
+### How It Works
+
+**Development Mode (`pnpm dev`)**
+- Uses `tsx` which natively supports TypeScript path aliases
+- No transformation needed - imports work directly
+
+**Production Mode (`pnpm build` + `pnpm start`)**
+- TypeScript compiler (`tsc`) compiles `.ts` to `.js`
+- `tsc-alias` transforms path aliases to relative paths in compiled output
+- Node.js runs the transformed code with standard relative imports
+
+**Note**: All imports must include the `.js` extension (ESM requirement), even when importing `.ts` files during development.
+
+### Benefits
+
+- **Cleaner imports**: No need to calculate relative path depth (`../../`)
+- **Easy refactoring**: Move files without updating import paths
+- **Better IDE support**: Improved autocomplete and navigation
+- **Consistent**: All imports follow the same `@controld/*` pattern
+
 ## Scripts
 
 - `pnpm dev` - Start development server with hot reload (tsx watch)
-- `pnpm build` - Compile TypeScript to JavaScript
+- `pnpm build` - Compile TypeScript to JavaScript and transform path aliases
 - `pnpm start` - Run production server
 - `pnpm lint` - Check code quality with ESLint
 - `pnpm lint:fix` - Auto-fix ESLint issues
@@ -133,13 +186,16 @@ NODE_ENV=development
 
 ```typescript
 import { FastifyPluginAsync } from 'fastify';
+import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 const MyResponseSchema = z.object({
   message: z.string(),
 });
 
-const myRoute: FastifyPluginAsync = async (fastify) => {
+const myRoute: FastifyPluginAsync = async (server) => {
+  const fastify = server.withTypeProvider<ZodTypeProvider>();
+
   fastify.get(
     '/',
     {
@@ -165,6 +221,7 @@ export default myRoute;
 
 ```typescript
 import { FastifyPluginAsync } from 'fastify';
+import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 const RequestBodySchema = z.object({
@@ -176,7 +233,9 @@ const ResponseSchema = z.object({
   message: z.string(),
 });
 
-const myRoute: FastifyPluginAsync = async (fastify) => {
+const myRoute: FastifyPluginAsync = async (server) => {
+  const fastify = server.withTypeProvider<ZodTypeProvider>();
+
   fastify.post(
     '/',
     {

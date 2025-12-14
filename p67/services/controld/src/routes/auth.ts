@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { OAuthCallbackQuerySchema, OAuthCallbackResponse } from '../schema.js';
-import { GoogleOAuthClient } from '../lib/oauth/google-client.js';
+import { OAuthCallbackQuerySchema, OAuthCallbackResponse } from '@controld/schema.js';
+import { GoogleOAuthClient } from '@controld/lib/oauth/google-client.js';
 
 const authRoutes = async (server: FastifyInstance) => {
   const fastify = server.withTypeProvider<ZodTypeProvider>();
