@@ -1,0 +1,9 @@
+---
+login_name: msenthilkumar
+display_name: msenthilkumar
+first_name: Malini
+last_name: Senthilkumar
+email: malini.senthilkumar@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
