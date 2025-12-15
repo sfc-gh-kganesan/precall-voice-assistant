@@ -7,7 +7,4 @@ export const workflowCommand = new Command('workflow')
   .description('Operate on workflows')
   .addCommand(listCommand)
   .addCommand(runCommand)
-  .addCommand(deployCommand)
-  .action(async () => {
-    console.log('Not implemented.');
-  });
+  .addCommand(deployCommand);

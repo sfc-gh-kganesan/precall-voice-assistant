@@ -1,5 +1,7 @@
 import { Command } from 'commander';
+import { CocoCommands } from '@p67-cli/coco/CocoCommands';
 import { input, confirm } from '@inquirer/prompts';
+import { mkdir } from 'node:fs/promises';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -12,15 +14,26 @@ interface P67Config {
 
 export const initCommand = new Command('init')
   .description('Initialize a new p67 configuration file')
-  .action(async () => {
+  .argument('[name]', 'Optional project name')
+  .action(async (name?: string) => {
     const options = initCommand.optsWithGlobals();
-    const targetDir = path.resolve(options.cwd as string);
+    const targetDir = path.resolve(options.cwd as string, name || '');
     const configPath = path.join(targetDir, 'p67.yml');
 
     // Check if directory exists
     if (!fs.existsSync(targetDir)) {
-      console.error(`✗ Error: Directory ${targetDir} does not exist`);
-      process.exit(1);
+      const createDir = await confirm({
+        message: `Project directory ${targetDir} does not exist. Create?`,
+        default: true,
+      });
+
+      if (!createDir) {
+        console.log('✗ Initialization cancelled');
+        return;
+      }
+
+      // Create directory
+      await mkdir(targetDir, { recursive: true });
     }
 
     // Check if config file already exists
@@ -36,12 +49,10 @@ export const initCommand = new Command('init')
       }
     }
 
-    console.log('\nInitializing P67 configuration...\n');
-
     // Prompt for runtime service endpoint
     const endpoint = await input({
       message: 'Enter the runtime service endpoint URL',
-      default: 'https://jjb46h6e-sfengineering-aifde.snowflakecomputing.app',
+      default: 'https://jnb46h6e-sfengineering-aifde.snowflakecomputing.app',
     });
 
     if (!endpoint || endpoint.trim() === '') {
@@ -69,6 +80,14 @@ export const initCommand = new Command('init')
       console.log(`  Location: ${configPath}\n`);
     } catch (error) {
       console.error('✗ Error writing configuration file:', error);
-      process.exit(1);
+      return;
+    }
+
+    // Initialize Cortex Code commands
+    const mgr = new CocoCommands(targetDir);
+    const res = await mgr.installCommands();
+
+    for (const cmd of res.installedCommands) {
+      console.log(`✔︎ Installed ${cmd}`);
     }
   });
