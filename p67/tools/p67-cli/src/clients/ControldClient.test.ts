@@ -1,12 +1,12 @@
 import { test, expect, mock, beforeEach, describe } from 'bun:test';
-import { ControldClient } from './ControldClient.ts';
+import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import type {
   HealthResponse,
   WorkflowCreateResponse,
   WorkflowListResponse,
   WorkflowRunResponse,
   ErrorResponse,
-} from './ControldClient.ts';
+} from '@p67-cli/clients/ControldClient.ts';
 
 describe('ControldClient', () => {
   let client: ControldClient;

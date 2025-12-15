@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { select } from '@inquirer/prompts';
-import { ProjectConfig } from '../../config/ProjectConfig.ts';
-import { ControldClient } from '../../clients/ControldClient.ts';
-import { getSnowflakePat } from '../../secrets/1password.ts';
+import { ProjectConfig } from '@p67-cli/config/ProjectConfig.ts';
+import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
+import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
 
 export const runCommand = new Command('run')
   .description('Run a workflow')

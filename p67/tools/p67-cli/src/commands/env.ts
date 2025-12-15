@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getSnowflakePat } from '../secrets/1password.ts';
+import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
 
 export const envCommand = new Command('env')
   .description('Print environment configuration for debugging')
