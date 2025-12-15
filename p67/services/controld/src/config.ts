@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'fs';
+import { readFileSync, existsSync, mkdtempSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
@@ -25,16 +25,29 @@ export type ServerConfig = {
   oauth: OAuthConfig;
 };
 
+function readFileIfExistsSync(filePath: string): string | null {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  return readFileSync(filePath, 'utf-8');
+}
+
 export const loadConfig = (): ServerConfig => {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
 
   // Validate required OAuth env vars
-  const googleClientId = process.env.GOOGLE_CLIENT_ID;
-  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const googleClientId =
+    readFileIfExistsSync('/opt/creds/google_oauth_client_id/secret_string') ??
+    process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret =
+    readFileIfExistsSync('/opt/creds/google_oauth_client_secret/secret_string') ??
+    process.env.GOOGLE_CLIENT_SECRET;
 
   if (!googleClientId || !googleClientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are required');
+    console.log('🔥 RUH-ROH: missing google oauth secrets');
+    // throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are required');
   }
 
   return {
@@ -43,8 +56,8 @@ export const loadConfig = (): ServerConfig => {
     localStoragePath: resolve(__dirname, process.env.DATA_ROOT || createTempDir()),
     oauth: {
       google: {
-        clientId: googleClientId,
-        clientSecret: googleClientSecret,
+        clientId: googleClientId ?? '<not set>',
+        clientSecret: googleClientSecret ?? '<not set>',
         redirectUri:
           process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3002/api/auth/google/callback',
       },

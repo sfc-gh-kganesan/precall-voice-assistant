@@ -2,7 +2,7 @@ SNOW_CONNECTION?=<<snow_connection>>
 SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
 CONTROLD_IMAGE=controld
 .PHONY: help build build-controld ci deploy describe dev fix \
-init-provider-account list-services login push push-controld \
+init-provider-account list-services login logs push push-controld \
 url
 
 .DEFAULT_GOAL := help
@@ -50,6 +50,9 @@ list: ## List all services in p67 database
 
 login: ## Log in to Snowflake image registry
 	snow spcs image-registry login -c $(SNOW_CONNECTION)
+
+logs: ## show spcs service logs
+	snow spcs service logs p67.app.controld --container-name controld --instance-id 0
 
 push: push-controld ## Push Docker images to Snowflake registry
 

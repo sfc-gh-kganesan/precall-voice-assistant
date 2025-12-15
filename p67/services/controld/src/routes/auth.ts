@@ -72,6 +72,7 @@ const authRoutes = async (server: FastifyInstance) => {
           picture: userInfo.picture,
         });
       } catch (error) {
+        console.log('🦊 Uh oh:', error);
         return reply
           .code(400)
           .send({ error: error instanceof Error ? error.message : String(error) });

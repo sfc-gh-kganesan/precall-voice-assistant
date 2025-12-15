@@ -3,7 +3,6 @@ create application role if not exists app_user;
 grant application role app_user to application role app_admin;
 
 create schema if not exists app;
-
 grant usage on schema app to application role app_admin;
 grant usage on schema app to application role app_user;
 
@@ -14,6 +13,10 @@ create warehouse if not exists p67_app_wh with warehouse_size='xsmall' auto_susp
 grant usage on warehouse p67_app_wh to application role app_admin;
 grant usage on warehouse p67_app_wh to application role app_user;
 grant monitor on warehouse p67_app_wh to application role app_admin;
+
+
+execute immediate from 'register_callbacks.sql';
+execute immediate from 'configure_callbacks.sql';
 
 -- The version initializer callback is executed after a successful installation, upgrade, or
 -- downgrade of an application object. In case the application fails to upgrade, the version
@@ -26,6 +29,7 @@ create or replace procedure v1.init()
 as $$
 begin
     alter service if exists app.controld from specification_file='controld_service_spec.yml';
+    alter service if exists app.controld set external_access_integrations=( reference('google_oauth_eai') );
     return 'INIT COMPLETE';
 end
 $$;
@@ -41,6 +45,7 @@ begin
     create service if not exists app.controld
         in compute pool identifier(:pool_name)
         from specification_file='controld_service_spec.yml'
+        external_access_integrations=( reference('google_oauth_eai') )
         query_warehouse = 'p67_app_wh';
     grant usage on service app.controld to application role app_user;
     grant monitor on service app.controld to application role app_user;

@@ -19,6 +19,34 @@ artifacts:
         images:
             - /p67_src/core/img_repo/controld
 
+references:
+    - google_oauth_eai:
+          label: "Google Oauth Access Integration"
+          description: "External Access Integration for Egress from Native App + SPCS"
+          privileges: [USAGE]
+          object_type: EXTERNAL_ACCESS_INTEGRATION
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: true
+    - google_oauth_client_id:
+          label: "OAuth2 Client ID for Google"
+          description: "Secret holding OAuth2 Client ID for the external Google provider"
+          privileges:
+              - READ
+          object_type: SECRET
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: true
+    - google_oauth_client_secret:
+          label: "OAuth2 Client Secret for Google"
+          description: "Secret holding OAuth2 Client Secret for the external Google provider"
+          privileges:
+              - READ
+          object_type: SECRET
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: true
+
 lifecycle_callbacks:
     version_initializer: v1.init
 

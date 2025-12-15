@@ -8,6 +8,7 @@ spec:
           env:
               PORT: 80
               DATA_ROOT: /opt/local-storage
+              GOOGLE_REDIRECT_URI: https://jnb46h6e-sfengineering-aifde.snowflakecomputing.app/api/auth/google/callback
           resources:
               requests:
                   memory: 512Mi
@@ -15,6 +16,13 @@ spec:
               limits:
                   memory: 1Gi
                   cpu: 1
+          secrets:
+              - snowflakeSecret:
+                    objectReference: google_oauth_client_id
+                directoryPath: /opt/creds/google_oauth_client_id
+              - snowflakeSecret:
+                    objectReference: google_oauth_client_secret
+                directoryPath: /opt/creds/google_oauth_client_secret
     volumes:
         - name: local-storage
           source: block
