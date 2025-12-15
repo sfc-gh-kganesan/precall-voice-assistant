@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 # File paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
-P67_BIN="${SCRIPT_DIR}/bin/pss"
+P67_BIN="${SCRIPT_DIR}/bin/p67"
 
 # Function to print colored messages
 print_error() {
@@ -87,7 +87,7 @@ echo $INSTALL_DIR
 echo "P67_INSTALL_DIR=\"$INSTALL_DIR\"" > "$ENV_FILE"
 print_success "Saved install directory to $ENV_FILE"
 
-# Step 6: Ensure ./bin/pss exists
+# Step 6: Ensure ./bin/p67 exists
 if [[ ! -f "$P67_BIN" ]]; then
     print_error "Source file does not exist: $P67_BIN"
     exit 1
@@ -100,7 +100,7 @@ if [[ ! -x "$P67_BIN" ]]; then
 fi
 
 # Step 7: Create symlink
-SYMLINK_PATH="${INSTALL_DIR}/pss"
+SYMLINK_PATH="${INSTALL_DIR}/p67"
 
 # Remove existing symlink or file if it exists
 if [[ -L "$SYMLINK_PATH" ]]; then
@@ -125,4 +125,4 @@ ln -s "$P67_BIN" "$SYMLINK_PATH" || {
 
 print_success "Created symlink: $SYMLINK_PATH -> $P67_BIN"
 echo ""
-echo "Installation complete! You can now run: pss"
+echo "Installation complete! You can now run: p67"

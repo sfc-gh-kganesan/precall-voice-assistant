@@ -10,7 +10,7 @@
   "scripts": {
     "start": "bun src/index.ts",
     "test": "bun test",
-    "build": "bun build ./src/index.ts --compile --outfile ./bin/pss",
+    "build": "bun build ./src/index.ts --compile --outfile ./bin/p67",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.ts\"",
