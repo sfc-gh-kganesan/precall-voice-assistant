@@ -3,6 +3,7 @@ import indexts from '@p67-cli/workspace/boiler-plate/src/index.ts.src' with { ty
 import buildjs from '@p67-cli/workspace/boiler-plate/build.js.src' with { type: 'file' };
 import packagejson from '@p67-cli/workspace/boiler-plate/package.json.src' with { type: 'file' };
 import tsconfigjson from '@p67-cli/workspace/boiler-plate/tsconfig.json.src' with { type: 'file' };
+import makefile from '@p67-cli/workspace/boiler-plate/Makefile.src' with { type: 'file' };
 import { mkdir } from 'node:fs/promises';
 import { file } from 'bun';
 import { join, dirname } from 'path';
@@ -13,6 +14,7 @@ const files: Record<string, string> = {
   [buildjs]: 'build.js',
   [packagejson]: 'package.json',
   [tsconfigjson]: 'tsconfig.json',
+  [makefile]: 'Makefile',
 };
 
 export class Workspace {

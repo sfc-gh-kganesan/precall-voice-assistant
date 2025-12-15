@@ -1,0 +1,13 @@
+.PHONY: clean zip
+
+all: dist zip
+
+clean:
+	rm -rf ./dist
+
+dist:
+	npm install
+	npm run build
+
+zip:
+	cd dist && rm -f workflow.zip && zip -r -X ./workflow.zip .
