@@ -19,16 +19,13 @@ try {
         platform: 'node',
         target: 'node20',
         format: 'esm',
-        outfile: 'dist/bundle.src',
+        outfile: 'dist/index.js',
         sourcemap: true,
-        minify: false,
-        packages: 'bundle', // Bundle all dependencies
-        legalComments: 'inline', // Preserve comments in output
     });
 
-    console.log('Bundle completed successfully!');
-    console.log('Output: dist/bundle.src');
+    console.log('Build completed successfully!');
+    console.log('Output: dist/index.js');
 } catch (error) {
-    console.error('Bundle failed:', error);
+    console.error('Build failed:', error);
     process.exit(1);
 }

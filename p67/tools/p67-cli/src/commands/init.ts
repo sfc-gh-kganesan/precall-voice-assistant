@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { CocoCommands } from '@p67-cli/coco/CocoCommands';
+import { Workspace } from '@p67-cli/workspace/Workspace';
 import { input, confirm } from '@inquirer/prompts';
 import { mkdir } from 'node:fs/promises';
 import * as yaml from 'js-yaml';
@@ -9,6 +10,9 @@ import * as path from 'node:path';
 interface P67Config {
   runtime: {
     endpoint: string;
+  };
+  workflow: {
+    entrypoint: string;
   };
 }
 
@@ -65,6 +69,9 @@ export const initCommand = new Command('init')
       runtime: {
         endpoint: endpoint.trim(),
       },
+      workflow: {
+        entrypoint: './dist/index.js',
+      },
     };
 
     try {
@@ -90,4 +97,8 @@ export const initCommand = new Command('init')
     for (const cmd of res.installedCommands) {
       console.log(`✔︎ Installed ${cmd}`);
     }
+
+    // bootstrap workspace files
+    const workspc = new Workspace(targetDir);
+    await workspc.bootstrap();
   });

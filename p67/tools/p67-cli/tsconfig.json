@@ -18,7 +18,8 @@
     "baseUrl": ".",
     "paths": {
       "@p67-cli/*": ["./src/*"],
-      "@coco/*": ["../../coco/*"]
+      "@coco/*": ["../../coco/*"],
+      "@agent-sdk/*": ["../../packages/agent-sdk/*"]
     },
 
     // Best practices
