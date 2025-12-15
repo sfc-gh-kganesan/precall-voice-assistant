@@ -6,6 +6,7 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"/p67/coco
 mkdir -p ~/.snowflake/cortex/commands
 ln -sf $ROOT/commands/define-workflow.md ~/.snowflake/cortex/commands/p67-define-workflow.md
 ln -sf $ROOT/commands/generate-workflow.md ~/.snowflake/cortex/commands/p67-generate-workflow.md
+ln -sf $ROOT/commands/generate-workflow-ts.md ~/.snowflake/cortex/commands/p67-generate-workflow-ts.md
 ln -sf $ROOT/commands/p67 ~/.snowflake/cortex/commands/p67
 
 # Prepare demo directory
