@@ -5,11 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel -r dev",
-    "dev:api": "pnpm --filter @p67/api dev",
-    "dev:web": "pnpm --filter @p67/web dev",
     "build": "pnpm -r build",
-    "build:api": "pnpm --filter @p67/api build",
-    "build:web": "pnpm --filter @p67/web build",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "format": "pnpm -r format",
