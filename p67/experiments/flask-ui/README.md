@@ -6,7 +6,7 @@
 brew install uv
 ```
 
-if you don't have bash
+if you don't have brew
 
 Run
 
