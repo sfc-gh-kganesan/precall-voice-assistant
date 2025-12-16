@@ -9,6 +9,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
+import { databasePlugin } from '@p67/db';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -35,6 +36,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   server.decorate('config', config);
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
+
+  // Register database plugin
+  await server.register(databasePlugin, {
+    databaseUrl: config.database.url,
+  });
 
   await server.register(multipart);
 

@@ -23,6 +23,9 @@ export type ServerConfig = {
   nodeEnv: string;
   localStoragePath: string;
   oauth: OAuthConfig;
+  database: {
+    url: string;
+  };
 };
 
 function readFileIfExistsSync(filePath: string): string | null {
@@ -50,6 +53,14 @@ export const loadConfig = (): ServerConfig => {
     // throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are required');
   }
 
+  // Database configuration
+  const databaseUrl =
+    readFileIfExistsSync('/opt/creds/database_url/secret_string') ?? process.env.DATABASE_URL;
+
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
+
   return {
     port: parseInt(process.env.PORT || '3002'),
     nodeEnv: process.env.NODE_ENV || 'development',
@@ -61,6 +72,9 @@ export const loadConfig = (): ServerConfig => {
         redirectUri:
           process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3002/api/auth/google/callback',
       },
+    },
+    database: {
+      url: databaseUrl,
     },
   };
 };

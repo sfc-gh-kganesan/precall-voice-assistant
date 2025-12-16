@@ -18,6 +18,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 FROM deps AS builder
 RUN pnpm run build
 
+# Generate Prisma Client for database package
+RUN cd packages/db && pnpm db:generate
+
 # Generic service runner stage
 FROM base AS runner
 ARG SERVICE_NAME

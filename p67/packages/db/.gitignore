@@ -1,9 +1,6 @@
 dist
 node_modules
 *.log
-.env
-.env.local
-.local-storage
 
 # Prisma
 .prisma/

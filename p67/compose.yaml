@@ -1,4 +1,22 @@
 services:
+    postgres:
+        image: postgres:17-alpine
+        container_name: p67-postgres
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: controld_dev
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
     controld:
         build:
             context: .
@@ -10,5 +28,14 @@ services:
             - "3002:3002"
         environment:
             DATA_ROOT: /app/services/controld/.local-storage
+            DATABASE_URL: postgresql://postgres:password@postgres:5432/controld_dev?schema=public
+            NODE_ENV: development
         volumes:
             - ./services/controld/.data_root:/app/services/controld/.local-storage
+        depends_on:
+            postgres:
+                condition: service_healthy
+        command: sh -c "cd /app/services/controld && pnpm prisma migrate deploy && node dist/index.js"
+
+volumes:
+    postgres_data:

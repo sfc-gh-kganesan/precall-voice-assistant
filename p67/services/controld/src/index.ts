@@ -26,8 +26,27 @@ const start = async () => {
 };
 
 process.on('SIGTERM', async () => {
-  await server.close();
-  process.exit(0);
+  server.log.info('SIGTERM received, shutting down gracefully');
+  try {
+    await server.close();
+    server.log.info('Server closed successfully');
+    process.exit(0);
+  } catch (error) {
+    server.log.error({ error }, 'Error during shutdown');
+    process.exit(1);
+  }
+});
+
+process.on('SIGINT', async () => {
+  server.log.info('SIGINT received, shutting down gracefully');
+  try {
+    await server.close();
+    server.log.info('Server closed successfully');
+    process.exit(0);
+  } catch (error) {
+    server.log.error({ error }, 'Error during shutdown');
+    process.exit(1);
+  }
 });
 
 start();
