@@ -1,0 +1,49 @@
+{
+  "edges": [
+    {
+      "controlPoint": {
+        "x": 83,
+        "y": 270
+      },
+      "id": "cd48b4be-b5c8-4991-bcc0-ed68458c5a26",
+      "source": "start",
+      "target": "d516610a-bba3-4426-b545-0a604423108e"
+    },
+    {
+      "controlPoint": {
+        "x": 377,
+        "y": 497
+      },
+      "id": "8da86a54-eb25-4ced-a344-39347beb4a65",
+      "source": "d516610a-bba3-4426-b545-0a604423108e",
+      "target": "bcf20544-6c02-483e-9840-39b7fe50d994"
+    }
+  ],
+  "nodes": [
+    {
+      "color": "#6b7280",
+      "description": "",
+      "id": "start",
+      "isStart": true,
+      "title": "Start",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "color": "#06b6d4",
+      "description": "# Description",
+      "id": "d516610a-bba3-4426-b545-0a604423108e",
+      "title": "step 1",
+      "x": 587,
+      "y": 102
+    },
+    {
+      "color": "#ec4899",
+      "description": "This is the description",
+      "id": "bcf20544-6c02-483e-9840-39b7fe50d994",
+      "title": "step 2",
+      "x": 220,
+      "y": 525
+    }
+  ]
+}
