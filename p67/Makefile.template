@@ -2,7 +2,7 @@ SNOW_CONNECTION?=<<snow_connection>>
 SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
 CONTROLD_IMAGE=controld
 .PHONY: help build build-controld ci deploy describe dev fix \
-init-provider-account list-services login logs push push-controld \
+init-provider-account install-cli list-services login logs push push-controld \
 url
 
 .DEFAULT_GOAL := help
@@ -44,6 +44,11 @@ fix: ## Fix linting and formatting issues
 
 init-provider-account: ## Initialize provider account with setup SQL
 	snow sql -f "./ops/provider_account_setup.sql" -c $(SNOW_CONNECTION)
+
+install-cli: ## Install the P67 CLI tool
+	pnpm install --filter "@p67/agent-sdk" --filter "@p67/cli"
+	pnpm --filter "@p67/agent-sdk" run build
+	make clean install -C ./tools/p67-cli
 
 list: ## List all services in p67 database
 	snow spcs service list --format json --in database p67
