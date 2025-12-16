@@ -9,5 +9,5 @@ CREATE USER IF NOT EXISTS <% login_name %>
   DEFAULT_WAREHOUSE = <% default_warehouse %>
   DEFAULT_ROLE = <% default_role %>;
 
-GRANT ROLE ACCOUNTADMIN TO USER <% login_name %>;
 GRANT ROLE SIADMIN TO USER <% login_name %>;
+GRANT ROLE P67_USER_RL TO USER <% login_name %>;

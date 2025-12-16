@@ -1,9 +1,0 @@
----
-login_name: foobar
-display_name: foobar
-first_name: Foo
-last_name: Bar
-email: foobar@snowflake.com
-must_change_password: TRUE
-default_warehouse: compute_wh
-default_role: accountadmin

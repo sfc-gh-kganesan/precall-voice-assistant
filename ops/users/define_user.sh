@@ -31,7 +31,7 @@ last_name: ${last_name}
 email: ${email_address}
 must_change_password: TRUE
 default_warehouse: compute_wh
-default_role: accountadmin
+default_role: public
 EOF
 
 echo "Successfully created ${output_file}"

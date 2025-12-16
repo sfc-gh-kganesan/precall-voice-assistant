@@ -1,0 +1,9 @@
+---
+login_name: dtaylor
+display_name: dtaylor
+first_name: David
+last_name: Tayler
+email: david.taylor@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public

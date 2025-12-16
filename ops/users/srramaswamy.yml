@@ -1,0 +1,9 @@
+---
+login_name: srramaswamy
+display_name: srramaswamy
+first_name: Sridhar
+last_name: Ramaswamy
+email: sridhar.ramaswamy@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
