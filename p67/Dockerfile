@@ -35,7 +35,7 @@ COPY services/${SERVICE_NAME}/package.json ./services/${SERVICE_NAME}/
 
 # Install production dependencies for specific service
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --prod --frozen-lockfile --filter=${SERVICE_NAME}...
+    pnpm install --frozen-lockfile --filter=${SERVICE_NAME}...
 
 # Copy built artifacts from builder
 COPY --from=builder /app/packages ./packages

@@ -29,7 +29,7 @@ create or replace procedure v1.init()
 as $$
 begin
     alter service if exists app.controld from specification_file='controld_service_spec.yml';
-    alter service if exists app.controld set external_access_integrations=( reference('google_oauth_eai') );
+    alter service if exists app.controld set external_access_integrations=( reference('google_oauth_eai'), reference('postgres_eai') );
     return 'INIT COMPLETE';
 end
 $$;
@@ -45,7 +45,7 @@ begin
     create service if not exists app.controld
         in compute pool identifier(:pool_name)
         from specification_file='controld_service_spec.yml'
-        external_access_integrations=( reference('google_oauth_eai') )
+        external_access_integrations=( reference('google_oauth_eai'), reference('postgres_eai') )
         query_warehouse = 'p67_app_wh';
     grant usage on service app.controld to application role app_user;
     grant monitor on service app.controld to application role app_user;

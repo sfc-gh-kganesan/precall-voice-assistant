@@ -55,7 +55,8 @@ export const loadConfig = (): ServerConfig => {
 
   // Database configuration
   const databaseUrl =
-    readFileIfExistsSync('/opt/creds/database_url/secret_string') ?? process.env.DATABASE_URL;
+    readFileIfExistsSync('/opt/creds/postgres_connection_url/secret_string') ??
+    process.env.DATABASE_URL;
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL environment variable is required');

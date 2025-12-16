@@ -23,6 +23,9 @@ spec:
               - snowflakeSecret:
                     objectReference: google_oauth_client_secret
                 directoryPath: /opt/creds/google_oauth_client_secret
+              - snowflakeSecret:
+                    objectReference: postgres_connection_url
+                directoryPath: /opt/creds/postgres_connection_url
     volumes:
         - name: local-storage
           source: block

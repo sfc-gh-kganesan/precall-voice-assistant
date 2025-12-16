@@ -31,6 +31,23 @@ begin
                     "type": "GENERIC_STRING"
                 }
             }';
+        when 'POSTGRES_EAI' then
+            return '{
+                "type": "CONFIGURATION",
+                "payload": {
+                    "host_ports": [
+                        "xe5sle7s5bc3jovhaefnmrc5qq.sfengineering-aifde.us-west-2.aws.postgres.snowflake.app:5432"
+                    ],
+                    "allowed_secrets": "NONE"
+                }
+            }';
+        when 'POSTGRES_CONNECTION_URL' then
+            return '{
+                "type": "CONFIGURATION",
+                "payload": {
+                    "type": "GENERIC_STRING"
+                }
+            }';
         else
             return '';
     end case;
