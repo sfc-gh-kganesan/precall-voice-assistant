@@ -18,3 +18,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Test/dev files
+driver.ts

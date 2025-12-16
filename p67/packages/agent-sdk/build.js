@@ -22,8 +22,8 @@ try {
         outfile: 'dist/bundle.src',
         sourcemap: true,
         minify: false,
-        packages: 'bundle', // Bundle all dependencies
-        legalComments: 'inline', // Preserve comments in output
+        packages: 'external',
+        legalComments: 'inline',
     });
 
     console.log('Bundle completed successfully!');

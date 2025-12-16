@@ -18,6 +18,9 @@
     "dev": "tsc --watch",
     "build": "tsc",
     "bundle": "node build.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -25,16 +28,22 @@
     "type:check": "tsc --noEmit",
     "postinstall": "pnpm build && pnpm bundle"
   },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "snowflake-sdk": "^2.3.3"
+  },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/ui": "^4.0.9",
     "esbuild": "^0.27.1",
     "eslint": "^9.0.0",
     "globals": "^15.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^4.0.9"
   }
 }
