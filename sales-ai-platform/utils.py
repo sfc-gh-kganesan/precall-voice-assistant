@@ -88,6 +88,8 @@ def get_snowflake_connection():
                 account=os.getenv("SNOWFLAKE_ACCOUNT"),
                 token=get_snowflake_token(),
                 authenticator="oauth",
+                database=os.getenv("SNOWFLAKE_DATABASE"),
+                schema=os.getenv("SNOWFLAKE_SCHEMA"),
             )
         else:
             _snowflake_raw_conn = snowflake.connector.connect(
