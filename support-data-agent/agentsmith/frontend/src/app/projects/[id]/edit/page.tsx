@@ -75,21 +75,21 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
   }
 
   if (initialLoading) {
-    return <div className="p-8 text-center text-parchment-200">Loading...</div>
+    return <div className="p-8 text-center text-text-secondary">Loading...</div>
   }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-semibold text-parchment-100">Edit Project</h1>
-        <p className="mt-2 text-sm text-parchment-200">
+        <h1 className="text-3xl font-semibold text-text-primary">Edit Project</h1>
+        <p className="mt-2 text-sm text-text-secondary">
           Update your AI agent configuration
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 bg-slate-900 shadow-sm rounded border border-slate-700 p-6">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-navy-950 shadow-sm rounded border border-navy-800 p-6">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-parchment-200">
+          <label htmlFor="name" className="block text-sm font-medium text-text-secondary">
             Project Name *
           </label>
           <input
@@ -98,13 +98,13 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
             required
             value={formData.name}
             onChange={(e) => setFormData({...formData, name: e.target.value})}
-            className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+            className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
             placeholder="My AI Agent Project"
           />
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-parchment-200">
+          <label htmlFor="description" className="block text-sm font-medium text-text-secondary">
             Description
           </label>
           <input
@@ -112,13 +112,13 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
             id="description"
             value={formData.description || ''}
             onChange={(e) => setFormData({...formData, description: e.target.value})}
-            className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+            className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
             placeholder="Brief description of your agent"
           />
         </div>
 
         <div>
-          <label htmlFor="business_context" className="block text-sm font-medium text-parchment-200">
+          <label htmlFor="business_context" className="block text-sm font-medium text-text-secondary">
             Business Context *
           </label>
           <textarea
@@ -127,16 +127,16 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
             value={formData.business_context}
             onChange={(e) => setFormData({...formData, business_context: e.target.value})}
             rows={4}
-            className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+            className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
             placeholder="Describe what your agent does, what questions it can answer, what data it has access to..."
           />
-          <p className="mt-1 text-xs text-parchment-300">
+          <p className="mt-1 text-xs text-text-tertiary">
             This context helps generate realistic test scenarios
           </p>
         </div>
 
         <div>
-          <label htmlFor="agent_endpoint" className="block text-sm font-medium text-parchment-200">
+          <label htmlFor="agent_endpoint" className="block text-sm font-medium text-text-secondary">
             Agent Endpoint URL *
           </label>
           <input
@@ -145,21 +145,21 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
             required
             value={formData.agent_endpoint}
             onChange={(e) => setFormData({...formData, agent_endpoint: e.target.value})}
-            className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+            className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
             placeholder="https://your-agent.com/api/chat"
           />
         </div>
 
         {/* Data Source Section */}
-        <div className="pt-6 border-t border-slate-700">
-          <h3 className="text-lg font-semibold text-parchment-100 mb-4">Data Source</h3>
-          <p className="text-sm text-parchment-300 mb-4">
+        <div className="pt-6 border-t border-navy-800">
+          <h3 className="text-lg font-semibold text-text-primary mb-4">Data Source</h3>
+          <p className="text-sm text-text-tertiary mb-4">
             Snowflake table containing conversation traces for analysis
           </p>
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="source_database" className="block text-sm font-medium text-parchment-200">
+              <label htmlFor="source_database" className="block text-sm font-medium text-text-secondary">
                 Database Name
               </label>
               <input
@@ -167,13 +167,13 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 id="source_database"
                 value={formData.source_database || ''}
                 onChange={(e) => setFormData({...formData, source_database: e.target.value})}
-                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
                 placeholder="AI_FDE"
               />
             </div>
 
             <div>
-              <label htmlFor="source_schema" className="block text-sm font-medium text-parchment-200">
+              <label htmlFor="source_schema" className="block text-sm font-medium text-text-secondary">
                 Schema Name
               </label>
               <input
@@ -181,13 +181,13 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 id="source_schema"
                 value={formData.source_schema || ''}
                 onChange={(e) => setFormData({...formData, source_schema: e.target.value})}
-                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
                 placeholder="CX360_DEMO"
               />
             </div>
 
             <div>
-              <label htmlFor="source_table" className="block text-sm font-medium text-parchment-200">
+              <label htmlFor="source_table" className="block text-sm font-medium text-text-secondary">
                 Table Name
               </label>
               <input
@@ -195,10 +195,10 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 id="source_table"
                 value={formData.source_table || ''}
                 onChange={(e) => setFormData({...formData, source_table: e.target.value})}
-                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
                 placeholder="AGENT_TRACES"
               />
-              <p className="mt-1 text-xs text-parchment-300">
+              <p className="mt-1 text-xs text-text-tertiary">
                 Leave blank to use environment defaults (AI_FDE.CX360_DEMO.AGENT_TRACES)
               </p>
             </div>
@@ -206,15 +206,15 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {/* GitHub Configuration Section */}
-        <div className="pt-6 border-t border-slate-700">
-          <h3 className="text-lg font-semibold text-parchment-100 mb-4">GitHub Configuration</h3>
-          <p className="text-sm text-parchment-300 mb-4">
+        <div className="pt-6 border-t border-navy-800">
+          <h3 className="text-lg font-semibold text-text-primary mb-4">GitHub Configuration</h3>
+          <p className="text-sm text-text-tertiary mb-4">
             Configure GitHub repository for code recommendations and issue creation
           </p>
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="github_owner" className="block text-sm font-medium text-parchment-200">
+              <label htmlFor="github_owner" className="block text-sm font-medium text-text-secondary">
                 GitHub Owner/Organization
               </label>
               <input
@@ -222,13 +222,13 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 id="github_owner"
                 value={formData.github_owner || ''}
                 onChange={(e) => setFormData({...formData, github_owner: e.target.value})}
-                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
                 placeholder="snowflakedb"
               />
             </div>
 
             <div>
-              <label htmlFor="github_repo" className="block text-sm font-medium text-parchment-200">
+              <label htmlFor="github_repo" className="block text-sm font-medium text-text-secondary">
                 GitHub Repository Name
               </label>
               <input
@@ -236,13 +236,13 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 id="github_repo"
                 value={formData.github_repo || ''}
                 onChange={(e) => setFormData({...formData, github_repo: e.target.value})}
-                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
                 placeholder="aura"
               />
             </div>
 
             <div>
-              <label htmlFor="target_path" className="block text-sm font-medium text-parchment-200">
+              <label htmlFor="target_path" className="block text-sm font-medium text-text-secondary">
                 Target Code Path (Optional)
               </label>
               <input
@@ -250,10 +250,10 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 id="target_path"
                 value={formData.target_path || ''}
                 onChange={(e) => setFormData({...formData, target_path: e.target.value})}
-                className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
                 placeholder="src/agent"
               />
-              <p className="mt-1 text-xs text-parchment-300">
+              <p className="mt-1 text-xs text-text-tertiary">
                 Specific path in repository where agent code lives (optional)
               </p>
             </div>
@@ -261,14 +261,14 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div>
-          <label htmlFor="auth_type" className="block text-sm font-medium text-parchment-200">
+          <label htmlFor="auth_type" className="block text-sm font-medium text-text-secondary">
             Authentication Type
           </label>
           <select
             id="auth_type"
             value={formData.auth_type}
             onChange={(e) => setFormData({...formData, auth_type: e.target.value})}
-            className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+            className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
           >
             <option value="none">None</option>
             <option value="bearer">Bearer Token</option>
@@ -279,7 +279,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
 
         {formData.auth_type !== 'none' && (
           <div>
-            <label htmlFor="auth_token" className="block text-sm font-medium text-parchment-200">
+            <label htmlFor="auth_token" className="block text-sm font-medium text-text-secondary">
               {formData.auth_type === 'bearer' ? 'Bearer Token' :
                formData.auth_type === 'api_key' ? 'API Key' :
                'Username:Password'}
@@ -292,10 +292,10 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 ...formData,
                 auth_credentials: {token: e.target.value}
               })}
-              className="mt-1 block w-full rounded border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 shadow-sm focus:border-strategic-600 focus:outline-none focus:ring-1 focus:ring-strategic-600"
+              className="mt-1 block w-full rounded border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-colors"
               placeholder={formData.auth_type === 'basic' ? 'username:password' : 'Your token/key (leave blank to keep existing)'}
             />
-            <p className="mt-1 text-xs text-parchment-300">
+            <p className="mt-1 text-xs text-text-tertiary">
               Leave blank to keep existing credentials
             </p>
           </div>
@@ -305,14 +305,14 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
           <button
             type="button"
             onClick={() => router.push(`/projects/${projectId}`)}
-            className="px-4 py-2 text-sm font-medium text-parchment-200 bg-slate-800 border border-slate-700 rounded shadow-sm hover:bg-slate-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-text-secondary bg-navy-900 border border-navy-800 rounded shadow-sm hover:bg-navy-800 transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-parchment-50 bg-strategic-600 rounded shadow-sm hover:bg-strategic-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-cyan-500 rounded shadow-sm hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Updating...' : 'Update Project'}
           </button>

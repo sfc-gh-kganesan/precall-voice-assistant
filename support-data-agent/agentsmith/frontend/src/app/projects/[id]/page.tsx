@@ -200,7 +200,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-parchment-200">Loading...</div>
+    return <div className="p-8 text-center text-text-secondary">Loading...</div>
   }
 
   if (error || !project) {
@@ -209,7 +209,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <div className="bg-red-900/30 border border-red-700 text-red-200 rounded p-4">
           {error || 'Deployment not found'}
         </div>
-        <Link href="/projects" className="mt-4 inline-block text-strategic-500 hover:text-strategic-400">
+        <Link href="/projects" className="mt-4 inline-block text-cyan-400 hover:text-cyan-300">
           ← Back to Deployments
         </Link>
       </div>
@@ -222,13 +222,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   const getStatusBadge = (status: string) => {
     const colors = {
-      pending: 'bg-slate-800 text-parchment-300 border border-slate-700',
-      running: 'bg-strategic-900/40 text-strategic-400 border border-strategic-700',
-      completed: 'bg-green-900/40 text-green-400 border border-green-700',
-      failed: 'bg-red-900/40 text-red-400 border border-red-700'
+      pending: 'bg-navy-800 text-text-tertiary border-navy-700',
+      running: 'bg-cyan-900/40 text-cyan-400 border-cyan-700',
+      completed: 'bg-green-900/40 text-green-400 border-green-700',
+      failed: 'bg-red-900/40 text-red-400 border-red-700'
     }
     return (
-      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${colors[status as keyof typeof colors] || colors.pending}`}>
+      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${colors[status as keyof typeof colors] || colors.pending}`}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     )
@@ -238,15 +238,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-6">
-        <Link href="/projects" className="text-sm text-strategic-500 hover:text-strategic-400 mb-2 inline-block">
+        <Link href="/projects" className="text-sm text-cyan-400 hover:text-cyan-300 mb-2 inline-block">
           ← Back to Deployments
         </Link>
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-serif font-semibold text-parchment-100">{project.name}</h1>
-            <p className="mt-2 text-sm text-parchment-200">{project.description}</p>
+            <h1 className="text-3xl font-semibold text-text-primary">{project.name}</h1>
+            <p className="mt-2 text-sm text-text-secondary">{project.description}</p>
             {project.agent_endpoint && (
-              <div className="mt-2 text-sm text-parchment-300">
+              <div className="mt-2 text-sm text-text-tertiary">
                 <span className="font-medium">Endpoint:</span> {project.agent_endpoint}
               </div>
             )}
@@ -254,13 +254,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div className="flex gap-2">
             <Link
               href={`/projects/${projectId}/edit`}
-              className="inline-flex items-center rounded bg-slate-700 px-4 py-2 text-sm font-medium text-parchment-50 shadow hover:bg-slate-600 transition-colors"
+              className="inline-flex items-center rounded bg-navy-800 px-4 py-2 text-sm font-medium text-text-secondary shadow hover:bg-navy-700 transition-colors"
             >
               Edit Deployment
             </Link>
             <Link
               href={`/projects/${projectId}/simulate`}
-              className="inline-flex items-center rounded bg-green-700 px-4 py-2 text-sm font-medium text-parchment-50 shadow hover:bg-green-600 transition-colors"
+              className="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-green-500 transition-colors"
             >
               Run Analysis
             </Link>
@@ -270,46 +270,46 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Live Metrics */}
       <div className="mb-8">
-        <h2 className="text-xl font-serif font-semibold text-parchment-100 mb-4">Live Metrics from Snowflake</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-4">Live Metrics from Snowflake</h2>
         {metricsLoading ? (
-          <div className="text-center py-8 text-parchment-300">Loading metrics...</div>
+          <div className="text-center py-8 text-text-tertiary">Loading metrics...</div>
         ) : metrics && metrics.total_conversations > 0 ? (
           <>
             <div className="grid grid-cols-5 gap-4 mb-4">
-              <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-                <div className="text-sm font-medium text-parchment-300">Total Conversations</div>
-                <div className="text-3xl font-serif font-semibold text-parchment-100 mt-2">{metrics.total_conversations}</div>
+              <div className="bg-navy-950 rounded-lg border border-navy-800 p-6">
+                <div className="text-sm font-medium text-text-tertiary">Total Conversations</div>
+                <div className="text-3xl font-semibold text-text-primary mt-2">{metrics.total_conversations}</div>
               </div>
-              <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-                <div className="text-sm font-medium text-parchment-300">Avg Duration</div>
-                <div className="text-3xl font-serif font-semibold text-parchment-100 mt-2">
+              <div className="bg-navy-950 rounded-lg border border-navy-800 p-6">
+                <div className="text-sm font-medium text-text-tertiary">Avg Duration</div>
+                <div className="text-3xl font-semibold text-text-primary mt-2">
                   {metrics.avg_duration_ms ? formatDuration(metrics.avg_duration_ms) : '-'}
                 </div>
               </div>
-              <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-                <div className="text-sm font-medium text-parchment-300">Avg Turns</div>
-                <div className="text-3xl font-serif font-semibold text-parchment-100 mt-2">
+              <div className="bg-navy-950 rounded-lg border border-navy-800 p-6">
+                <div className="text-sm font-medium text-text-tertiary">Avg Turns</div>
+                <div className="text-3xl font-semibold text-text-primary mt-2">
                   {metrics.avg_turns ? metrics.avg_turns.toFixed(1) : '-'}
                 </div>
               </div>
-              <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-                <div className="text-sm font-medium text-parchment-300">Error Rate</div>
-                <div className={`text-3xl font-serif font-semibold mt-2 ${metrics.error_rate && metrics.error_rate > 0.1 ? 'text-red-400' : 'text-green-400'}`}>
+              <div className="bg-navy-950 rounded-lg border border-navy-800 p-6">
+                <div className="text-sm font-medium text-text-tertiary">Error Rate</div>
+                <div className={`text-3xl font-semibold mt-2 ${metrics.error_rate && metrics.error_rate > 0.1 ? 'text-red-400' : 'text-green-400'}`}>
                   {metrics.error_rate ? `${(metrics.error_rate * 100).toFixed(1)}%` : '0%'}
                 </div>
               </div>
-              <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
-                <div className="text-sm font-medium text-parchment-300">Interactions</div>
-                <div className="text-2xl font-serif font-semibold text-parchment-100 mt-2">
+              <div className="bg-navy-950 rounded-lg border border-navy-800 p-6">
+                <div className="text-sm font-medium text-text-tertiary">Interactions</div>
+                <div className="text-2xl font-semibold text-text-primary mt-2">
                   🎤 {metrics.total_voice_interactions} | 💬 {metrics.total_text_interactions}
                 </div>
               </div>
             </div>
           </>
         ) : (
-          <div className="bg-slate-900 rounded-lg border border-slate-700 p-12 text-center">
-            <div className="text-parchment-300">No conversation data available yet</div>
-            <div className="text-sm text-parchment-400 mt-2">Conversations will appear here once they are logged to Snowflake</div>
+          <div className="bg-navy-950 rounded-lg border border-navy-800 p-12 text-center">
+            <div className="text-text-tertiary">No conversation data available yet</div>
+            <div className="text-sm text-text-muted mt-2">Conversations will appear here once they are logged to Snowflake</div>
           </div>
         )}
       </div>
@@ -317,13 +317,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Latest Insights from Most Recent Analysis */}
       {latestAnalysis && (
         <div className="mb-8">
-          <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
+          <div className="bg-navy-950 rounded-lg border border-navy-800 overflow-hidden">
+            <div className="px-6 py-4 border-b border-navy-800 bg-navy-900/50 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">🎯</span>
-                <h2 className="text-xl font-serif font-semibold text-parchment-100">Latest Insights</h2>
+                <h2 className="text-xl font-semibold text-text-primary">Latest Insights</h2>
                 {latestAnalysis && (
-                  <span className="px-2 py-1 text-xs rounded bg-slate-700 text-parchment-300">
+                  <span className="px-2 py-1 text-xs rounded bg-navy-800 text-text-tertiary">
                     Analysis #{latestAnalysis.id} · {formatDate(latestAnalysis.completed_at || latestAnalysis.created_at)}
                   </span>
                 )}
@@ -331,7 +331,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               {latestAnalysis && (
                 <Link
                   href={`/simulations/${latestAnalysis.id}/results`}
-                  className="px-4 py-2 bg-strategic-600 text-parchment-50 rounded hover:bg-strategic-500 transition-colors text-sm font-medium"
+                  className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-400 transition-colors text-sm font-medium"
                 >
                   View Full Analysis
                 </Link>
@@ -339,41 +339,41 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             {insightsLoading ? (
-              <div className="p-8 text-center text-parchment-300">Loading insights...</div>
+              <div className="p-8 text-center text-text-tertiary">Loading insights...</div>
             ) : latestInsights.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="text-4xl mb-2">✨</div>
-                <div className="text-parchment-300">No issues detected in latest analysis. Great job!</div>
+                <div className="text-text-tertiary">No issues detected in latest analysis. Great job!</div>
               </div>
             ) : (
               <div className="p-6">
                 {/* Insights Summary Grid */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                   {/* High Priority Issues */}
-                  <div className="bg-red-900/20 border border-red-700 rounded-lg p-4">
+                  <div className="bg-red-900/20 border border-red-800 rounded-lg p-4">
                     <div className="text-xs font-medium text-red-300 uppercase mb-1">High Priority</div>
                     <div className="text-3xl font-semibold text-red-400">
                       {latestInsights.filter(i => i.priority === 'high').length}
                     </div>
-                    <div className="text-xs text-parchment-400 mt-1">issues require attention</div>
+                    <div className="text-xs text-text-muted mt-1">issues require attention</div>
                   </div>
 
                   {/* Medium Priority Issues */}
-                  <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-4">
+                  <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-4">
                     <div className="text-xs font-medium text-amber-300 uppercase mb-1">Medium Priority</div>
                     <div className="text-3xl font-semibold text-amber-400">
                       {latestInsights.filter(i => i.priority === 'medium').length}
                     </div>
-                    <div className="text-xs text-parchment-400 mt-1">optimization opportunities</div>
+                    <div className="text-xs text-text-muted mt-1">optimization opportunities</div>
                   </div>
 
                   {/* Low Priority Issues */}
-                  <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+                  <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4">
                     <div className="text-xs font-medium text-blue-300 uppercase mb-1">Low Priority</div>
                     <div className="text-3xl font-semibold text-blue-400">
                       {latestInsights.filter(i => i.priority === 'low').length}
                     </div>
-                    <div className="text-xs text-parchment-400 mt-1">minor improvements</div>
+                    <div className="text-xs text-text-muted mt-1">minor improvements</div>
                   </div>
                 </div>
 
@@ -387,9 +387,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       .map((insight) => (
                         <div key={insight.id} className="border-l-4 border-red-600 bg-red-900/30 p-4 rounded">
                           <h4 className="font-semibold text-red-300 mb-1">{insight.title}</h4>
-                          <p className="text-sm text-parchment-200">{insight.description}</p>
+                          <p className="text-sm text-text-secondary">{insight.description}</p>
                           {insight.evidence && (
-                            <div className="mt-2 text-xs text-parchment-400">
+                            <div className="mt-2 text-xs text-text-muted">
                               {insight.evidence.conversation_ids && (
                                 <span>Affects {insight.evidence.conversation_ids.length} conversation(s)</span>
                               )}
@@ -406,17 +406,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Conversations Browser */}
-      <div className="bg-slate-900 rounded border border-slate-700 overflow-hidden mb-8">
+      <div className="bg-navy-950 rounded border border-navy-800 overflow-hidden mb-8">
         <div
-          className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 cursor-pointer hover:bg-slate-800/70 transition-colors"
+          className="px-6 py-4 border-b border-navy-800 bg-navy-900/50 cursor-pointer hover:bg-navy-900 transition-colors"
           onClick={() => setConversationsExpanded(!conversationsExpanded)}
         >
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <span className="text-2xl">{conversationsExpanded ? '▼' : '►'}</span>
               <div>
-                <h2 className="text-lg font-serif font-semibold text-parchment-100">Conversation Browser</h2>
-                <p className="text-sm text-parchment-200 mt-1">{conversationsTotal} total conversation(s)</p>
+                <h2 className="text-lg font-semibold text-text-primary">Conversation Browser</h2>
+                <p className="text-sm text-text-secondary mt-1">{conversationsTotal} total conversation(s)</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -425,7 +425,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   e.stopPropagation()
                   setErrorsOnly(!errorsOnly)
                 }}
-                className={`px-3 py-1.5 text-sm rounded transition-colors ${errorsOnly ? 'bg-red-600 text-white' : 'bg-slate-700 text-parchment-200 hover:bg-slate-600'}`}
+                className={`px-3 py-1.5 text-sm rounded transition-colors ${errorsOnly ? 'bg-red-600 text-white' : 'bg-navy-800 text-text-secondary hover:bg-navy-700'}`}
               >
                 {errorsOnly ? 'Show All' : 'Errors Only'}
               </button>
@@ -436,7 +436,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   setConversationsFilter(e.target.value || null)
                 }}
                 onClick={(e) => e.stopPropagation()}
-                className="px-3 py-1.5 text-sm bg-slate-700 text-parchment-200 rounded border-0 focus:ring-2 focus:ring-strategic-500"
+                className="px-3 py-1.5 text-sm bg-navy-800 text-text-secondary rounded border-0 focus:ring-2 focus:ring-cyan-400"
               >
                 <option value="">All Channels</option>
                 <option value="voice">Voice</option>
@@ -449,39 +449,39 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         {conversationsExpanded && (
           <>
             {conversationsLoading ? (
-              <div className="text-center py-12 text-parchment-300">Loading conversations...</div>
+              <div className="text-center py-12 text-text-tertiary">Loading conversations...</div>
             ) : conversations.length === 0 ? (
-              <div className="text-center py-12 px-4 text-parchment-300">
+              <div className="text-center py-12 px-4 text-text-tertiary">
                 No conversations found
               </div>
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-700">
-                    <thead className="bg-slate-800/30">
+                  <table className="min-w-full divide-y divide-navy-800">
+                    <thead className="bg-navy-900/30">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Start Time</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Duration</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Turns</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Channel</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Start Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Duration</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Turns</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Channel</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-slate-900 divide-y divide-slate-800">
+                    <tbody className="bg-navy-950 divide-y divide-navy-900">
                       {conversations.map((conv) => (
                         <tr
                           key={conv.conversation_id}
                           onClick={() => loadConversationDetails(conv.conversation_id)}
-                          className="hover:bg-slate-800/50 transition-colors cursor-pointer"
+                          className="hover:bg-navy-900/50 transition-colors cursor-pointer"
                         >
-                          <td className="px-6 py-4 text-sm font-mono text-parchment-200">{conv.conversation_id.substring(0, 8)}...</td>
-                          <td className="px-6 py-4 text-sm text-parchment-200">{formatDate(conv.start_time)}</td>
-                          <td className="px-6 py-4 text-sm text-parchment-200">
+                          <td className="px-6 py-4 text-sm font-mono text-text-secondary">{conv.conversation_id.substring(0, 8)}...</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">{formatDate(conv.start_time)}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">
                             {conv.duration_ms ? formatDuration(conv.duration_ms) : '-'}
                           </td>
-                          <td className="px-6 py-4 text-sm text-parchment-200">{conv.turn_count}</td>
-                          <td className="px-6 py-4 text-sm text-parchment-200">
+                          <td className="px-6 py-4 text-sm text-text-secondary">{conv.turn_count}</td>
+                          <td className="px-6 py-4 text-sm text-text-secondary">
                             {conv.triggered_by || '-'}
                           </td>
                           <td className="px-6 py-4">
@@ -496,22 +496,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 {/* Pagination */}
                 {conversationsTotal > conversationsLimit && (
-                  <div className="px-6 py-4 border-t border-slate-700 flex justify-between items-center">
-                    <div className="text-sm text-parchment-300">
+                  <div className="px-6 py-4 border-t border-navy-800 flex justify-between items-center">
+                    <div className="text-sm text-text-tertiary">
                       Showing {conversationsOffset + 1} to {Math.min(conversationsOffset + conversationsLimit, conversationsTotal)} of {conversationsTotal}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setConversationsOffset(Math.max(0, conversationsOffset - conversationsLimit))}
                         disabled={conversationsOffset === 0}
-                        className="px-3 py-1 text-sm bg-slate-700 text-parchment-200 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1 text-sm bg-navy-800 text-text-secondary rounded hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Previous
                       </button>
                       <button
                         onClick={() => setConversationsOffset(conversationsOffset + conversationsLimit)}
                         disabled={conversationsOffset + conversationsLimit >= conversationsTotal}
-                        className="px-3 py-1 text-sm bg-slate-700 text-parchment-200 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1 text-sm bg-navy-800 text-text-secondary rounded hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Next
                       </button>
@@ -525,56 +525,56 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Analysis History (Collapsible) */}
-      <div className="bg-slate-900 rounded border border-slate-700 overflow-hidden">
+      <div className="bg-navy-950 rounded border border-navy-800 overflow-hidden">
         <div
-          className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center cursor-pointer hover:bg-slate-800/70 transition-colors"
+          className="px-6 py-4 border-b border-navy-800 bg-navy-900/50 flex justify-between items-center cursor-pointer hover:bg-navy-900 transition-colors"
           onClick={() => setHistoryExpanded(!historyExpanded)}
         >
           <div className="flex items-center gap-3">
             <span className="text-2xl">📊</span>
-            <h2 className="text-lg font-serif font-semibold text-parchment-100">Analysis History</h2>
+            <h2 className="text-lg font-semibold text-text-primary">Analysis History</h2>
             {simulations.length > 0 && (
-              <span className="px-2 py-1 text-xs rounded bg-slate-700 text-parchment-300">
+              <span className="px-2 py-1 text-xs rounded bg-navy-800 text-text-tertiary">
                 {simulations.length} run{simulations.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
-          <span className="text-2xl text-parchment-400">{historyExpanded ? '▼' : '►'}</span>
+          <span className="text-2xl text-text-muted">{historyExpanded ? '▼' : '►'}</span>
         </div>
 
         {historyExpanded && (
           <>
             {simulations.length === 0 ? (
               <div className="text-center py-12 px-4">
-                <p className="text-parchment-200 mb-4">No analysis runs yet for this deployment.</p>
+                <p className="text-text-secondary mb-4">No analysis runs yet for this deployment.</p>
                 <Link
                   href={`/projects/${projectId}/simulate`}
-                  className="inline-flex items-center rounded bg-strategic-600 px-4 py-2 text-sm font-medium text-parchment-50 shadow hover:bg-strategic-500 transition-colors"
+                  className="inline-flex items-center rounded bg-cyan-500 px-4 py-2 text-sm font-medium text-white shadow hover:bg-cyan-400 transition-colors"
                 >
                   Run First Analysis
                 </Link>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-700">
-                  <thead className="bg-slate-800/30">
+                <table className="min-w-full divide-y divide-navy-800">
+                  <thead className="bg-navy-900/30">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Conversations</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Created</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Completed</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Conversations</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Completed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-slate-900 divide-y divide-slate-800">
+                  <tbody className="bg-navy-950 divide-y divide-navy-900">
                     {simulations.map((sim) => (
-                      <tr key={sim.id} className="hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-parchment-100">{sim.id}</td>
+                      <tr key={sim.id} className="hover:bg-navy-900/50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-primary">{sim.id}</td>
                         <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(sim.status)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-parchment-200">{sim.conversation_count}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-parchment-200">{formatDate(sim.created_at)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-parchment-200">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{sim.conversation_count}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{formatDate(sim.created_at)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
                           {sim.completed_at ? formatDate(sim.completed_at) : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -582,7 +582,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             {sim.status === 'completed' && (
                               <Link
                                 href={`/simulations/${sim.id}/results`}
-                                className="p-2 text-strategic-500 hover:text-strategic-400 hover:bg-strategic-900/30 rounded transition-colors"
+                                className="p-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30 rounded transition-colors"
                                 title="View Results"
                               >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -594,7 +594,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                               <>
                                 <Link
                                   href={`/simulations/${sim.id}`}
-                                  className="p-2 text-strategic-500 hover:text-strategic-400 hover:bg-strategic-900/30 rounded transition-colors"
+                                  className="p-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30 rounded transition-colors"
                                   title="Monitor"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -639,36 +639,36 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Conversation Details Modal */}
       {selectedConversationId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedConversationId(null)}>
-          <div className="bg-slate-900 rounded-lg border border-slate-700 max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-6 border-b border-slate-700">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setSelectedConversationId(null)}>
+          <div className="bg-navy-950 rounded-lg border border-navy-800 max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-6 border-b border-navy-800">
               <div>
-                <h2 className="text-xl font-serif font-semibold text-parchment-100">Conversation Details</h2>
-                <p className="text-sm text-parchment-400 mt-1 font-mono">{selectedConversationId}</p>
+                <h2 className="text-xl font-semibold text-text-primary">Conversation Details</h2>
+                <p className="text-sm text-text-muted mt-1 font-mono">{selectedConversationId}</p>
               </div>
-              <button onClick={() => setSelectedConversationId(null)} className="text-parchment-300 hover:text-parchment-100 text-2xl">×</button>
+              <button onClick={() => setSelectedConversationId(null)} className="text-text-tertiary hover:text-text-primary text-2xl">×</button>
             </div>
 
             {detailsLoading ? (
-              <div className="p-8 text-center text-parchment-200">Loading conversation...</div>
+              <div className="p-8 text-center text-text-secondary">Loading conversation...</div>
             ) : conversationDetails ? (
               <>
                 {/* Conversation Metadata */}
-                <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-700 flex gap-6 text-sm">
+                <div className="px-6 py-4 bg-navy-900/50 border-b border-navy-800 flex gap-6 text-sm">
                   <div>
-                    <span className="text-parchment-400">Turns:</span>
-                    <span className="text-parchment-100 ml-2 font-semibold">{conversationDetails.turn_count}</span>
+                    <span className="text-text-muted">Turns:</span>
+                    <span className="text-text-primary ml-2 font-semibold">{conversationDetails.turn_count}</span>
                   </div>
                   <div>
-                    <span className="text-parchment-400">Duration:</span>
-                    <span className="text-parchment-100 ml-2 font-semibold">
+                    <span className="text-text-muted">Duration:</span>
+                    <span className="text-text-primary ml-2 font-semibold">
                       {conversationDetails.duration_ms ? formatDuration(conversationDetails.duration_ms) : '-'}
                     </span>
                   </div>
                   {conversationDetails.triggered_by && (
                     <div>
-                      <span className="text-parchment-400">Channel:</span>
-                      <span className="text-parchment-100 ml-2 font-semibold">{conversationDetails.triggered_by}</span>
+                      <span className="text-text-muted">Channel:</span>
+                      <span className="text-text-primary ml-2 font-semibold">{conversationDetails.triggered_by}</span>
                     </div>
                   )}
                 </div>
@@ -681,23 +681,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         key={i}
                         className={`p-4 rounded-lg ${
                           msg.role === 'user'
-                            ? 'bg-strategic-900/40 border border-strategic-700'
-                            : 'bg-slate-800 border border-slate-700'
+                            ? 'bg-cyan-900/40 border border-cyan-800'
+                            : 'bg-navy-900 border border-navy-800'
                         }`}
                       >
-                        <div className="text-xs font-medium text-parchment-300 mb-1">
+                        <div className="text-xs font-medium text-text-tertiary mb-1">
                           {msg.role === 'user' ? '👤 User' : '🤖 Assistant'}
                         </div>
-                        <div className="text-sm text-parchment-200 whitespace-pre-wrap">{msg.content}</div>
+                        <div className="text-sm text-text-secondary whitespace-pre-wrap">{msg.content}</div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-parchment-400 py-8">No messages found</div>
+                    <div className="text-center text-text-muted py-8">No messages found</div>
                   )}
                 </div>
               </>
             ) : (
-              <div className="p-8 text-center text-parchment-400">Failed to load conversation</div>
+              <div className="p-8 text-center text-text-muted">Failed to load conversation</div>
             )}
           </div>
         </div>

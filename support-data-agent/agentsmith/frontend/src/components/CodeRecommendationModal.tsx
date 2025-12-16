@@ -67,8 +67,9 @@ function buildGithubIssueBody(insight: ImprovementSuggestion, simulationId: numb
 
   // Implementation checklist
   parts.push('\n### Implementation Checklist\n')
-  if (insight.code_recommendation?.file_changes?.length > 0) {
-    insight.code_recommendation.file_changes.forEach((change: any) => {
+  const fileChanges = insight.code_recommendation?.file_changes
+  if (fileChanges && fileChanges.length > 0) {
+    fileChanges.forEach((change: any) => {
       parts.push(`- [ ] Update \`${change.file || 'unknown'}\``)
     })
   } else {
@@ -136,24 +137,24 @@ export default function CodeRecommendationModal({
 
   return (
     <div
-      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm overflow-y-auto z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-navy-900/80 backdrop-blur-sm overflow-y-auto z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="relative mx-auto border-2 border-slate-700 w-full max-w-4xl shadow-2xl rounded-lg bg-slate-900 max-h-[90vh] overflow-y-auto"
+        className="relative mx-auto border-2 border-navy-800 w-full max-w-4xl shadow-2xl rounded-lg bg-navy-950 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-slate-900 border-b border-slate-700 px-6 py-4 flex justify-between items-start z-10">
+        <div className="sticky top-0 bg-navy-950 border-b border-navy-800 px-6 py-4 flex justify-between items-start z-10">
           <div>
-            <h3 className="text-lg font-serif font-semibold text-parchment-100">
+            <h3 className="text-lg font-semibold text-text-primary">
               Code Recommendation
             </h3>
-            <p className="text-sm text-parchment-300 mt-1">{codeRec.title}</p>
+            <p className="text-sm text-text-tertiary mt-1">{codeRec.title}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-parchment-300 hover:text-parchment-100 text-2xl"
+            className="text-text-tertiary hover:text-text-primary text-2xl"
           >
             ×
           </button>
@@ -163,14 +164,14 @@ export default function CodeRecommendationModal({
         <div className="px-6 py-4 space-y-6">
           {/* Description */}
           <div>
-            <h4 className="text-sm font-semibold text-parchment-200 mb-2">Description</h4>
-            <p className="text-sm text-parchment-300">{codeRec.description}</p>
+            <h4 className="text-sm font-semibold text-text-secondary mb-2">Description</h4>
+            <p className="text-sm text-text-tertiary">{codeRec.description}</p>
           </div>
 
           {/* Priority & Status */}
           <div className="flex gap-4">
             <div>
-              <span className="text-xs text-parchment-400">Priority:</span>
+              <span className="text-xs text-text-muted">Priority:</span>
               <span
                 className={`ml-2 px-2 py-1 text-xs rounded ${
                   codeRec.priority === 'high'
@@ -185,8 +186,8 @@ export default function CodeRecommendationModal({
             </div>
             {codeRec.status && (
               <div>
-                <span className="text-xs text-parchment-400">Status:</span>
-                <span className="ml-2 px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600">
+                <span className="text-xs text-text-muted">Status:</span>
+                <span className="ml-2 px-2 py-1 text-xs rounded bg-navy-900 text-text-tertiary border border-navy-700">
                   {codeRec.status}
                 </span>
               </div>
@@ -196,21 +197,21 @@ export default function CodeRecommendationModal({
           {/* File Changes */}
           {codeRec.file_changes && codeRec.file_changes.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-parchment-200 mb-3">
+              <h4 className="text-sm font-semibold text-text-secondary mb-3">
                 Proposed Changes ({codeRec.file_changes.length} file{codeRec.file_changes.length !== 1 ? 's' : ''})
               </h4>
               <div className="space-y-4">
                 {codeRec.file_changes.map((change, index) => (
-                  <div key={index} className="border border-slate-700 rounded-lg overflow-hidden">
+                  <div key={index} className="border border-navy-800 rounded-lg overflow-hidden">
                     {/* File path header */}
-                    <div className="bg-slate-800/50 px-4 py-2 border-b border-slate-700">
+                    <div className="bg-navy-900/50 px-4 py-2 border-b border-navy-800">
                       <div className="text-sm font-mono text-strategic-400">{change.file}</div>
                     </div>
 
                     {/* Diff */}
-                    <div className="bg-slate-950">
+                    <div className="bg-navy-900">
                       <pre className="text-xs font-mono p-4 overflow-x-auto">
-                        <code className="text-parchment-300">{change.diff}</code>
+                        <code className="text-text-tertiary">{change.diff}</code>
                       </pre>
                     </div>
                   </div>
@@ -246,10 +247,10 @@ export default function CodeRecommendationModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="sticky bottom-0 bg-slate-900 border-t border-slate-700 px-6 py-4 flex justify-end gap-3">
+        <div className="sticky bottom-0 bg-navy-950 border-t border-navy-800 px-6 py-4 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-slate-600 text-parchment-300 rounded hover:bg-slate-800 transition-colors"
+            className="px-4 py-2 text-sm border border-navy-700 text-text-tertiary rounded hover:bg-navy-900 transition-colors"
           >
             Close
           </button>
@@ -258,7 +259,7 @@ export default function CodeRecommendationModal({
             <button
               onClick={handleOpenPreview}
               disabled={isCreatingIssue}
-              className="px-4 py-2 text-sm bg-strategic-600 text-parchment-50 rounded hover:bg-strategic-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm bg-cyan-500 text-white rounded hover:bg-cyan-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               Create GitHub Issue
             </button>
@@ -269,7 +270,7 @@ export default function CodeRecommendationModal({
               href={codeRec.github_issue_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 text-sm bg-strategic-600 text-parchment-50 rounded hover:bg-strategic-500 transition-colors"
+              className="px-4 py-2 text-sm bg-cyan-500 text-white rounded hover:bg-cyan-400 transition-colors"
             >
               View GitHub Issue
             </a>
@@ -280,24 +281,24 @@ export default function CodeRecommendationModal({
       {/* Issue Preview Dialog */}
       {showIssuePreview && (
         <div
-          className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-navy-900/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
           onClick={() => setShowIssuePreview(false)}
         >
           <div
-            className="relative mx-auto border-2 border-slate-700 w-full max-w-4xl shadow-2xl rounded-lg bg-slate-900 max-h-[90vh] overflow-y-auto"
+            className="relative mx-auto border-2 border-navy-800 w-full max-w-4xl shadow-2xl rounded-lg bg-navy-950 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="sticky top-0 bg-slate-900 border-b border-slate-700 px-6 py-4 flex justify-between items-start z-10">
+            <div className="sticky top-0 bg-navy-950 border-b border-navy-800 px-6 py-4 flex justify-between items-start z-10">
               <div>
-                <h3 className="text-lg font-serif font-semibold text-parchment-100">
+                <h3 className="text-lg font-semibold text-text-primary">
                   Preview GitHub Issue
                 </h3>
-                <p className="text-sm text-parchment-300 mt-1">Edit the title and body before creating</p>
+                <p className="text-sm text-text-tertiary mt-1">Edit the title and body before creating</p>
               </div>
               <button
                 onClick={() => setShowIssuePreview(false)}
-                className="text-parchment-300 hover:text-parchment-100 text-2xl"
+                className="text-text-tertiary hover:text-text-primary text-2xl"
               >
                 ×
               </button>
@@ -307,31 +308,31 @@ export default function CodeRecommendationModal({
             <div className="px-6 py-4 space-y-4">
               {/* Title Input */}
               <div>
-                <label className="block text-sm font-semibold text-parchment-200 mb-2">
+                <label className="block text-sm font-semibold text-text-secondary mb-2">
                   Issue Title
                 </label>
                 <input
                   type="text"
                   value={issueTitle}
                   onChange={(e) => setIssueTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-parchment-100 focus:outline-none focus:border-strategic-500"
+                  className="w-full px-3 py-2 bg-navy-900 border border-navy-700 rounded text-text-primary focus:outline-none focus:border-strategic-500"
                   placeholder="Enter issue title..."
                 />
               </div>
 
               {/* Body Textarea */}
               <div>
-                <label className="block text-sm font-semibold text-parchment-200 mb-2">
+                <label className="block text-sm font-semibold text-text-secondary mb-2">
                   Issue Body (Markdown)
                 </label>
                 <textarea
                   value={issueBody}
                   onChange={(e) => setIssueBody(e.target.value)}
                   rows={20}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-parchment-100 font-mono text-sm focus:outline-none focus:border-strategic-500 resize-y"
+                  className="w-full px-3 py-2 bg-navy-900 border border-navy-700 rounded text-text-primary font-mono text-sm focus:outline-none focus:border-strategic-500 resize-y"
                   placeholder="Enter issue body in markdown format..."
                 />
-                <p className="text-xs text-parchment-400 mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   Supports markdown formatting (headers, lists, code blocks, etc.)
                 </p>
               </div>
@@ -346,11 +347,11 @@ export default function CodeRecommendationModal({
             </div>
 
             {/* Footer Actions */}
-            <div className="sticky bottom-0 bg-slate-900 border-t border-slate-700 px-6 py-4 flex justify-end gap-3">
+            <div className="sticky bottom-0 bg-navy-950 border-t border-navy-800 px-6 py-4 flex justify-end gap-3">
               <button
                 onClick={() => setShowIssuePreview(false)}
                 disabled={isCreatingIssue}
-                className="px-4 py-2 text-sm border border-slate-600 text-parchment-300 rounded hover:bg-slate-800 transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm border border-navy-700 text-text-tertiary rounded hover:bg-navy-900 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -358,7 +359,7 @@ export default function CodeRecommendationModal({
               <button
                 onClick={handleCreateIssue}
                 disabled={isCreatingIssue || !issueTitle.trim() || !issueBody.trim()}
-                className="px-4 py-2 text-sm bg-strategic-600 text-parchment-50 rounded hover:bg-strategic-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-cyan-500 text-white rounded hover:bg-cyan-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isCreatingIssue ? (
                   <>

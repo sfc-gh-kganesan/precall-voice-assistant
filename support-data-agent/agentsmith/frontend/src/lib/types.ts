@@ -176,6 +176,7 @@ export interface Conversation {
   num_turns: number
   total_duration_ms: number
   stop_reason?: string
+  error_message?: string
   started_at: string
   completed_at?: string
   messages: Message[]

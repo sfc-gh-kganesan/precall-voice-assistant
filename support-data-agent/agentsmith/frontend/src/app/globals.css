@@ -1,18 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Alegreya:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #1a1a1a;
-  --foreground: #f5f1e8;
+  --background: #0a0d14;
+  --foreground: #f9fafb;
+  --accent-cyan: #29B5E8;
+  --navy-900: #1F2937;
+  --navy-950: #111827;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: 'Alegreya', Georgia, serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer utilities {

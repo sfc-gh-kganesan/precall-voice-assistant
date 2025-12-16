@@ -146,8 +146,8 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     )
   }
 
-  if (loading) return <div className="p-8 text-center text-parchment-200">Loading...</div>
-  if (!results) return <div className="p-8 text-center text-parchment-200">No results available</div>
+  if (loading) return <div className="p-8 text-center text-text-secondary">Loading...</div>
+  if (!results) return <div className="p-8 text-center text-text-secondary">No results available</div>
 
   const successRate = (results.successful / results.num_simulations) * 100
 
@@ -208,23 +208,23 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Breadcrumb Navigation */}
       <div className="mb-4">
-        <nav className="flex items-center gap-2 text-sm text-parchment-400">
-          <Link href="/projects" className="hover:text-parchment-200 transition-colors">
+        <nav className="flex items-center gap-2 text-sm text-text-muted">
+          <Link href="/projects" className="hover:text-text-secondary transition-colors">
             Deployments
           </Link>
           <span>›</span>
-          <Link href={`/projects/${results.project_id}`} className="hover:text-parchment-200 transition-colors">
+          <Link href={`/projects/${results.project_id}`} className="hover:text-text-secondary transition-colors">
             Deployment
           </Link>
           <span>›</span>
-          <span className="text-parchment-200">Analysis Results</span>
+          <span className="text-text-secondary">Analysis Results</span>
         </nav>
       </div>
 
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-3xl font-serif font-semibold text-parchment-100">Analysis Results</h1>
-          <p className="text-sm text-parchment-300 mt-2">ID: {results.id}</p>
+          <h1 className="text-3xl font-semibold text-text-primary">Analysis Results</h1>
+          <p className="text-sm text-text-tertiary mt-2">ID: {results.id}</p>
         </div>
         <button onClick={() => {
           const data = JSON.stringify({ results, conversations, insights: aiInsights }, null, 2)
@@ -234,37 +234,37 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
           a.href = url
           a.download = `simulation-${simulationId}.json`
           a.click()
-        }} className="px-4 py-2 bg-strategic-600 text-parchment-50 rounded hover:bg-strategic-500 transition-colors">
+        }} className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-400 transition-colors">
           Export
         </button>
       </div>
 
-      <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 mb-4">
-        <h2 className="text-base font-serif font-semibold text-parchment-100 mb-3">Performance Overview</h2>
+      <div className="bg-navy-950 rounded-lg border border-navy-800 p-4 mb-4">
+        <h2 className="text-base font-semibold text-text-primary mb-3">Performance Overview</h2>
 
         <div className="grid grid-cols-4 gap-3">
           {/* Total */}
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <div className="text-xs font-medium text-parchment-300">Total</div>
-            <div className="text-2xl font-serif font-semibold text-parchment-100 mt-1">{conversations.length}</div>
+          <div className="bg-navy-900 rounded-lg border border-navy-800 p-4">
+            <div className="text-xs font-medium text-text-tertiary">Total</div>
+            <div className="text-2xl font-semibold text-text-primary mt-1">{conversations.length}</div>
           </div>
 
           {/* Success Rate */}
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <div className="text-xs font-medium text-parchment-300">Success Rate</div>
-            <div className="text-2xl font-serif font-semibold text-green-400 mt-1">{successRate.toFixed(1)}%</div>
+          <div className="bg-navy-900 rounded-lg border border-navy-800 p-4">
+            <div className="text-xs font-medium text-text-tertiary">Success Rate</div>
+            <div className="text-2xl font-semibold text-green-400 mt-1">{successRate.toFixed(1)}%</div>
           </div>
 
           {/* Successful */}
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <div className="text-xs font-medium text-parchment-300">Successful</div>
-            <div className="text-2xl font-serif font-semibold text-green-400 mt-1">{results.successful}</div>
+          <div className="bg-navy-900 rounded-lg border border-navy-800 p-4">
+            <div className="text-xs font-medium text-text-tertiary">Successful</div>
+            <div className="text-2xl font-semibold text-green-400 mt-1">{results.successful}</div>
           </div>
 
           {/* Failed */}
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-            <div className="text-xs font-medium text-parchment-300">Failed</div>
-            <div className="text-2xl font-serif font-semibold text-red-400 mt-1">{results.failed}</div>
+          <div className="bg-navy-900 rounded-lg border border-navy-800 p-4">
+            <div className="text-xs font-medium text-text-tertiary">Failed</div>
+            <div className="text-2xl font-semibold text-red-400 mt-1">{results.failed}</div>
           </div>
         </div>
       </div>
@@ -288,41 +288,41 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
         if (!hasEvaluationData) return null
 
         return (
-          <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 mb-4">
-            <h2 className="text-base font-serif font-semibold text-parchment-100 mb-3">Gap Analysis Summary</h2>
+          <div className="bg-navy-950 rounded-lg border border-navy-800 p-4 mb-4">
+            <h2 className="text-base font-semibold text-text-primary mb-3">Gap Analysis Summary</h2>
 
             <div className="grid grid-cols-4 gap-3">
               {/* Average Quality */}
               <div className="border-l-4 border-strategic-600 pl-4">
-                <div className="text-xs font-medium text-parchment-300 uppercase">Avg Quality</div>
-                <div className="text-2xl font-semibold text-parchment-100 mt-2">{(avgQuality * 100).toFixed(0)}%</div>
-                <div className="text-xs text-parchment-400 mt-1">across evaluated conversations</div>
+                <div className="text-xs font-medium text-text-tertiary uppercase">Avg Quality</div>
+                <div className="text-2xl font-semibold text-text-primary mt-2">{(avgQuality * 100).toFixed(0)}%</div>
+                <div className="text-xs text-text-muted mt-1">across evaluated conversations</div>
               </div>
 
               {/* Ending Quality */}
               <div className="border-l-4 border-green-600 pl-4">
-                <div className="text-xs font-medium text-parchment-300 uppercase">Ending Quality</div>
+                <div className="text-xs font-medium text-text-tertiary uppercase">Ending Quality</div>
                 <div className="mt-2 space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="text-green-400">✓ Appropriate</span>
-                    <span className="font-semibold text-parchment-100">{appropriateCount}</span>
+                    <span className="font-semibold text-text-primary">{appropriateCount}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-yellow-400">⚠ Premature</span>
-                    <span className="font-semibold text-parchment-100">{prematureCount}</span>
+                    <span className="font-semibold text-text-primary">{prematureCount}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-orange-400">⏳ Excessive</span>
-                    <span className="font-semibold text-parchment-100">{excessiveCount}</span>
+                    <span className="font-semibold text-text-primary">{excessiveCount}</span>
                   </div>
                 </div>
               </div>
 
               {/* Knowledge Gaps */}
               <div className="border-l-4 border-blue-600 pl-4">
-                <div className="text-xs font-medium text-parchment-300 uppercase">Knowledge Gaps</div>
+                <div className="text-xs font-medium text-text-tertiary uppercase">Knowledge Gaps</div>
                 <div className="text-2xl font-semibold text-blue-300 mt-2">{knowledgeGapCount}</div>
-                <div className="text-xs text-parchment-400 mt-1">
+                <div className="text-xs text-text-muted mt-1">
                   {knowledgeGapCount > 0 ?
                     `${(knowledgeGapCount / conversations.length * 100).toFixed(0)}% of conversations` :
                     'No gaps detected'
@@ -332,9 +332,9 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
 
               {/* Capability Gaps */}
               <div className="border-l-4 border-purple-600 pl-4">
-                <div className="text-xs font-medium text-parchment-300 uppercase">Capability Gaps</div>
+                <div className="text-xs font-medium text-text-tertiary uppercase">Capability Gaps</div>
                 <div className="text-2xl font-semibold text-purple-300 mt-2">{capabilityGapCount}</div>
-                <div className="text-xs text-parchment-400 mt-1">
+                <div className="text-xs text-text-muted mt-1">
                   {capabilityGapCount > 0 ?
                     `${(capabilityGapCount / conversations.length * 100).toFixed(0)}% of conversations` :
                     'No gaps detected'
@@ -347,16 +347,16 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
       })()}
 
       {/* Quality Insights Section */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-4">
+      <div className="bg-navy-950 rounded-lg border border-navy-800 overflow-hidden mb-4">
         <div
-          className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center cursor-pointer hover:bg-slate-800/70 transition-colors"
+          className="px-6 py-4 border-b border-navy-800 bg-navy-900/50 flex justify-between items-center cursor-pointer hover:bg-navy-900/70 transition-colors"
           onClick={() => setInsightsExpanded(!insightsExpanded)}
         >
           <div className="flex items-center gap-3">
             <span className="text-2xl">🎯</span>
-            <h2 className="text-lg font-serif font-semibold text-parchment-100">Quality Insights</h2>
+            <h2 className="text-lg font-semibold text-text-primary">Quality Insights</h2>
             {aiInsights.length > 0 && (
-              <span className="px-2 py-1 text-xs rounded bg-slate-700 text-parchment-300">
+              <span className="px-2 py-1 text-xs rounded bg-navy-800 text-text-tertiary">
                 {aiInsights.length} issue{aiInsights.length !== 1 ? 's' : ''} found
               </span>
             )}
@@ -373,12 +373,12 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                   e.stopPropagation()
                   regenerateInsights()
                 }}
-                className="px-3 py-1 text-sm border border-strategic-600 text-strategic-500 rounded hover:bg-strategic-600/10 transition-colors"
+                className="px-3 py-1 text-sm border border-strategic-600 text-cyan-400 rounded hover:bg-cyan-500/10 transition-colors"
               >
                 Regenerate
               </button>
             )}
-            <span className="text-2xl text-parchment-400">{insightsExpanded ? '▼' : '►'}</span>
+            <span className="text-2xl text-text-muted">{insightsExpanded ? '▼' : '►'}</span>
           </div>
         </div>
 
@@ -386,8 +386,8 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
           <div className="p-6">
             {aiInsightsLoading && (
               <div className="text-center py-8">
-                <div className="text-parchment-300">Analyzing conversations with AI...</div>
-                <div className="text-sm text-parchment-400 mt-2">This may take a moment</div>
+                <div className="text-text-tertiary">Analyzing conversations with AI...</div>
+                <div className="text-sm text-text-muted mt-2">This may take a moment</div>
               </div>
             )}
 
@@ -405,7 +405,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
             )}
 
             {!aiInsightsLoading && !aiInsightsError && aiInsights.length === 0 && (
-              <div className="text-center py-8 text-parchment-300">
+              <div className="text-center py-8 text-text-tertiary">
                 <div className="text-4xl mb-2">✨</div>
                 <div>No issues detected. Great job!</div>
               </div>
@@ -419,16 +419,16 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                   <div className="bg-gradient-to-r from-strategic-900/40 to-slate-900/40 rounded-lg p-5 border-2 border-strategic-600">
                     <div className="flex items-center gap-2 mb-4">
                       <span className="text-2xl">🎯</span>
-                      <h3 className="text-lg font-serif font-semibold text-strategic-400">Executive Summary</h3>
+                      <h3 className="text-lg font-semibold text-cyan-300">Executive Summary</h3>
                       <span className="px-2 py-1 text-xs rounded bg-strategic-900/50 border border-strategic-600 text-strategic-300">
                         {aiInsights.length} issue{aiInsights.length !== 1 ? 's' : ''} found
                       </span>
                     </div>
 
-                    <div className="space-y-4 text-parchment-200">
+                    <div className="space-y-4 text-text-secondary">
                       {/* Overall Assessment */}
                       <div>
-                        <div className="font-semibold text-parchment-100 mb-2">Overall Performance</div>
+                        <div className="font-semibold text-text-primary mb-2">Overall Performance</div>
                         <p className="text-sm leading-relaxed">
                           {(() => {
                             const successRate = (results.successful / results.num_simulations) * 100
@@ -452,7 +452,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                             <span>⚠️</span>
                             Top Concerns
                           </div>
-                          <ul className="text-sm space-y-1 list-disc list-inside text-parchment-300">
+                          <ul className="text-sm space-y-1 list-disc list-inside text-text-tertiary">
                             {insightsByPriority.high.slice(0, 3).map(insight => (
                               <li key={insight.id}>{insight.title}</li>
                             ))}
@@ -463,14 +463,14 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                       {/* Recommended Actions */}
                       <div>
                         <div className="font-semibold text-strategic-300 mb-2">Recommended Actions</div>
-                        <ol className="text-sm space-y-2 list-decimal list-inside text-parchment-300">
+                        <ol className="text-sm space-y-2 list-decimal list-inside text-text-tertiary">
                           {(() => {
                             const actions = []
 
                             // Prioritize high priority issues
                             if (insightsByPriority.high.length > 0) {
                               const topHigh = insightsByPriority.high[0]
-                              actions.push(`Address "${topHigh.title}" - affecting ${topHigh.evidence?.conversation_ids?.length || topHigh.evidence?.conversation_count || 0} conversations`)
+                              actions.push(`Address "${topHigh.title}" - affecting ${topHigh.evidence?.conversation_ids?.length || 0} conversations`)
                             }
 
                             // Add category-specific recommendations
@@ -500,17 +500,17 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                 </div>
 
                 {/* Compact Filter Bar */}
-                <div className="bg-slate-800/30 border-b border-slate-700 py-2 px-4 -mx-6 mb-0 flex items-center gap-4 text-sm">
+                <div className="bg-navy-900/30 border-b border-navy-800 py-2 px-4 -mx-6 mb-0 flex items-center gap-4 text-sm">
                   {/* Priority Filters */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-parchment-400 uppercase">Priority:</span>
+                    <span className="text-xs font-medium text-text-muted uppercase">Priority:</span>
                     <div className="flex gap-1">
                       <button
                         onClick={() => togglePriority('high')}
                         className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                           selectedPriorities.has('high')
                             ? 'bg-red-900/50 border-red-600 text-red-300'
-                            : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-red-600/50'
+                            : 'bg-navy-900 border-navy-700 text-text-muted hover:border-red-600/50'
                         }`}
                       >
                         {selectedPriorities.has('high') ? '✓ ' : ''}High ({insightsByPriority.high.length})
@@ -520,7 +520,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                         className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                           selectedPriorities.has('medium')
                             ? 'bg-amber-900/50 border-amber-600 text-amber-300'
-                            : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-amber-600/50'
+                            : 'bg-navy-900 border-navy-700 text-text-muted hover:border-amber-600/50'
                         }`}
                       >
                         {selectedPriorities.has('medium') ? '✓ ' : ''}Medium ({insightsByPriority.medium.length})
@@ -530,7 +530,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                         className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                           selectedPriorities.has('low')
                             ? 'bg-blue-900/50 border-blue-600 text-blue-300'
-                            : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-blue-600/50'
+                            : 'bg-navy-900 border-navy-700 text-text-muted hover:border-blue-600/50'
                         }`}
                       >
                         {selectedPriorities.has('low') ? '✓ ' : ''}Low ({insightsByPriority.low.length})
@@ -546,7 +546,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                   {/* Category Filters */}
                   {allCategories.length > 0 && (
                     <div className="flex items-center gap-2 flex-1">
-                      <span className="text-xs font-medium text-parchment-400 uppercase">Category:</span>
+                      <span className="text-xs font-medium text-text-muted uppercase">Category:</span>
                       <div className="flex flex-wrap gap-1">
                         {allCategories.map(category => {
                           const count = aiInsights.filter(i => i.category === category).length
@@ -557,7 +557,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                               className={`px-2 py-0.5 text-xs rounded border transition-colors ${
                                 selectedCategories.has(category)
                                   ? 'bg-strategic-900/50 border-strategic-600 text-strategic-300'
-                                  : 'bg-slate-800 border-slate-600 text-parchment-400 hover:border-strategic-600/50'
+                                  : 'bg-navy-900 border-navy-700 text-text-muted hover:border-strategic-600/50'
                               }`}
                             >
                               {categoryIcons[category] || '📌'} {selectedCategories.has(category) ? '✓ ' : ''}{category} ({count})
@@ -569,7 +569,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                   )}
 
                   {/* Result Count */}
-                  <div className="text-xs text-parchment-400 whitespace-nowrap">
+                  <div className="text-xs text-text-muted whitespace-nowrap">
                     {filteredInsights.length} results
                   </div>
                 </div>
@@ -577,13 +577,13 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                 {/* Insights Cards */}
                 <div className="space-y-2 mt-4">
                   {filteredInsights.length === 0 ? (
-                    <div className="text-center py-8 text-parchment-300">
+                    <div className="text-center py-8 text-text-tertiary">
                       No insights match the selected filters.
                     </div>
                   ) : (
                     filteredInsights.map(insight => {
                       const isExpanded = expandedInsightIds.has(insight.id)
-                      const conversationCount = insight.evidence?.conversation_ids?.length || insight.evidence?.conversation_count || 0
+                      const conversationCount = insight.evidence?.conversation_ids?.length || 0
 
                       // Determine card styling based on priority
                       const priorityStyles = {
@@ -614,7 +614,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                               {insight.title}
                             </h4>
                             <div className="flex gap-2 shrink-0">
-                              <span className="px-2 py-1 text-xs rounded bg-slate-800 text-parchment-300 border border-slate-600">
+                              <span className="px-2 py-1 text-xs rounded bg-navy-900 text-text-tertiary border border-navy-700">
                                 {insight.category}
                               </span>
                               <span className={`px-2 py-1 text-xs rounded border ${
@@ -626,7 +626,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                               </span>
                             </div>
                           </div>
-                          <p className="text-sm text-parchment-200 mb-3">{insight.description}</p>
+                          <p className="text-sm text-text-secondary mb-3">{insight.description}</p>
 
                           {/* Recommendation Buttons */}
                           <div className="flex gap-2 mb-3">
@@ -634,7 +634,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                             {insight.code_recommendation && (
                               <button
                                 onClick={() => setSelectedInsightForModal(insight)}
-                                className="px-3 py-1.5 text-xs bg-strategic-600/20 text-strategic-400 border border-strategic-600 rounded hover:bg-strategic-600/30 transition-colors flex items-center gap-2"
+                                className="px-3 py-1.5 text-xs bg-cyan-500/20 text-cyan-300 border border-strategic-600 rounded hover:bg-cyan-500/30 transition-colors flex items-center gap-2"
                               >
                                 <span>💡</span>
                                 View Code Recommendation
@@ -656,29 +656,29 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                             )}
                           </div>
 
-                          <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded border border-slate-700">
-                            <div className="flex gap-4 text-xs text-parchment-400">
+                          <div className="flex items-center justify-between p-2 bg-navy-900/50 rounded border border-navy-800">
+                            <div className="flex gap-4 text-xs text-text-muted">
                               {conversationCount > 0 && (
-                                <div><span className="text-parchment-300 font-medium">{conversationCount}</span> conversations</div>
+                                <div><span className="text-text-tertiary font-medium">{conversationCount}</span> conversations</div>
                               )}
                             </div>
                             <button
                               onClick={() => toggleInsightDetail(insight.id)}
-                              className="text-xs text-strategic-500 hover:text-strategic-400 transition-colors"
+                              className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
                             >
                               {isExpanded ? 'Hide' : 'Show'} Details
                             </button>
                           </div>
 
                           {isExpanded && insight.evidence && (
-                            <div className="mt-2 p-2 bg-slate-800/50 rounded border border-slate-700">
-                              <div className="text-xs text-parchment-400 space-y-1">
+                            <div className="mt-2 p-2 bg-navy-900/50 rounded border border-navy-800">
+                              <div className="text-xs text-text-muted space-y-1">
                                 {insight.evidence.pattern && (
-                                  <div><span className="text-parchment-300">Pattern:</span> {insight.evidence.pattern}</div>
+                                  <div><span className="text-text-tertiary">Pattern:</span> {insight.evidence.pattern}</div>
                                 )}
                                 {insight.evidence.conversation_ids && insight.evidence.conversation_ids.length > 0 && (
                                   <div>
-                                    <span className="text-parchment-300">Conversation IDs:</span>{' '}
+                                    <span className="text-text-tertiary">Conversation IDs:</span>{' '}
                                     {insight.evidence.conversation_ids.slice(0, 10).map((convId, idx) => (
                                       <span key={convId}>
                                         {idx > 0 && ', '}
@@ -687,7 +687,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                                             e.stopPropagation()
                                             loadSnowflakeConversation(String(convId))
                                           }}
-                                          className="text-strategic-500 hover:text-strategic-400 hover:underline transition-colors"
+                                          className="text-cyan-400 hover:text-cyan-300 hover:underline transition-colors"
                                         >
                                           {convId}
                                         </button>
@@ -711,17 +711,17 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* All Conversations Table */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-8">
+      <div className="bg-navy-950 rounded-lg border border-navy-800 overflow-hidden mb-8">
         <div
-          className="px-6 py-4 border-b border-slate-700 bg-slate-800/50 cursor-pointer hover:bg-slate-800/70 transition-colors"
+          className="px-6 py-4 border-b border-navy-800 bg-navy-900/50 cursor-pointer hover:bg-navy-900/70 transition-colors"
           onClick={() => setConversationsExpanded(!conversationsExpanded)}
         >
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <span className="text-2xl">{conversationsExpanded ? '▼' : '►'}</span>
               <div>
-                <h2 className="text-lg font-serif font-semibold text-parchment-100">All Conversations</h2>
-                <p className="text-sm text-parchment-200 mt-1">{conversations.length} total conversation(s)</p>
+                <h2 className="text-lg font-semibold text-text-primary">All Conversations</h2>
+                <p className="text-sm text-text-secondary mt-1">{conversations.length} total conversation(s)</p>
               </div>
             </div>
           </div>
@@ -729,25 +729,25 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
 
         {conversationsExpanded && (
           <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-700">
-            <thead className="bg-slate-800/30">
+          <table className="min-w-full divide-y divide-navy-800">
+            <thead className="bg-navy-900/30">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Persona</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Quality</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Ending</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Gaps</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Turns</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Duration</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-parchment-200 uppercase">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Persona</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Quality</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Ending</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Gaps</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Turns</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Duration</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-slate-900 divide-y divide-slate-800">
+            <tbody className="bg-navy-950 divide-y divide-navy-900">
               {conversations.map(conv => (
-                <tr key={conv.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.id}</td>
-                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.persona?.name || 'Unknown'}</td>
+                <tr key={conv.id} className="hover:bg-navy-900/50 transition-colors">
+                  <td className="px-6 py-4 text-sm text-text-secondary">{conv.id}</td>
+                  <td className="px-6 py-4 text-sm text-text-secondary">{conv.persona?.name || 'Unknown'}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${conv.success ? 'bg-green-900/40 text-green-400 border-green-700' : 'bg-red-900/40 text-red-400 border-red-700'}`}>
                       {conv.success ? 'Success' : 'Failed'}
@@ -759,7 +759,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                     {conv.scenario?.evaluation?.quality_score !== undefined ? (
                       <QualityScoreBadge score={conv.scenario.evaluation.quality_score} compact />
                     ) : (
-                      <span className="text-xs text-parchment-400">—</span>
+                      <span className="text-xs text-text-muted">—</span>
                     )}
                   </td>
 
@@ -768,7 +768,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                     {conv.scenario?.evaluation?.ending_assessment ? (
                       <EndingAssessmentBadge assessment={conv.scenario.evaluation.ending_assessment} compact />
                     ) : (
-                      <span className="text-xs text-parchment-400">—</span>
+                      <span className="text-xs text-text-muted">—</span>
                     )}
                   </td>
 
@@ -782,15 +782,15 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                         <CapabilityGapBadge gap={conv.scenario.evaluation.capability_gap} compact />
                       )}
                       {!conv.scenario?.evaluation?.knowledge_gap && !conv.scenario?.evaluation?.capability_gap && (
-                        <span className="text-xs text-parchment-400">—</span>
+                        <span className="text-xs text-text-muted">—</span>
                       )}
                     </div>
                   </td>
 
-                  <td className="px-6 py-4 text-sm text-parchment-200">{conv.num_turns}</td>
-                  <td className="px-6 py-4 text-sm text-parchment-200">{formatDuration(conv.total_duration_ms)}</td>
+                  <td className="px-6 py-4 text-sm text-text-secondary">{conv.num_turns}</td>
+                  <td className="px-6 py-4 text-sm text-text-secondary">{formatDuration(conv.total_duration_ms)}</td>
                   <td className="px-6 py-4">
-                    <button onClick={() => loadConversation(conv.id)} className="text-strategic-500 hover:text-strategic-400 text-sm font-medium">
+                    <button onClick={() => loadConversation(conv.id)} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium">
                       View
                     </button>
                   </td>
@@ -803,12 +803,12 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {selectedConv && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm overflow-y-auto z-50" onClick={() => setSelectedConv(null)}>
-          <div className="relative top-20 mx-auto p-5 border-2 border-slate-700 w-11/12 max-w-4xl shadow-2xl rounded-lg bg-slate-900" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-navy-900/80 backdrop-blur-sm overflow-y-auto z-50" onClick={() => setSelectedConv(null)}>
+          <div className="relative top-20 mx-auto p-5 border-2 border-navy-800 w-11/12 max-w-4xl shadow-2xl rounded-lg bg-navy-950" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between mb-4">
               <div>
-                <h3 className="text-lg font-serif font-semibold text-parchment-100">Conversation - {selectedConv.persona?.name}</h3>
-                <div className="flex items-center gap-4 mt-1 text-sm text-parchment-300">
+                <h3 className="text-lg font-semibold text-text-primary">Conversation - {selectedConv.persona?.name}</h3>
+                <div className="flex items-center gap-4 mt-1 text-sm text-text-tertiary">
                   <span>Turns: {selectedConv.num_turns}</span>
                   <span>Duration: {formatDuration(selectedConv.total_duration_ms)}</span>
                   <span className={selectedConv.success ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}>
@@ -816,7 +816,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                   </span>
                 </div>
               </div>
-              <button onClick={() => setSelectedConv(null)} className="text-parchment-300 hover:text-parchment-100 text-2xl">×</button>
+              <button onClick={() => setSelectedConv(null)} className="text-text-tertiary hover:text-text-primary text-2xl">×</button>
             </div>
 
             {/* Error details for failed conversations */}
@@ -838,9 +838,9 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
 
             <div className="space-y-4 max-h-96 overflow-y-auto">
               {selectedConv.messages.map((msg, i) => (
-                <div key={i} className={`p-4 rounded-lg ${msg.role === 'user' ? 'bg-strategic-900/40 border border-strategic-700' : 'bg-slate-800 border border-slate-700'}`}>
-                  <div className="text-xs font-medium text-parchment-300 mb-1">{msg.role === 'user' ? '👤 User' : '🤖 Assistant'}</div>
-                  <div className="text-sm text-parchment-200">{msg.content}</div>
+                <div key={i} className={`p-4 rounded-lg ${msg.role === 'user' ? 'bg-strategic-900/40 border border-strategic-700' : 'bg-navy-900 border border-navy-800'}`}>
+                  <div className="text-xs font-medium text-text-tertiary mb-1">{msg.role === 'user' ? '👤 User' : '🤖 Assistant'}</div>
+                  <div className="text-sm text-text-secondary">{msg.content}</div>
                 </div>
               ))}
             </div>
@@ -851,35 +851,35 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
       {/* Snowflake Conversation Details Modal */}
       {selectedSnowflakeConvId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedSnowflakeConvId(null)}>
-          <div className="bg-slate-900 rounded-lg border border-slate-700 max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-6 border-b border-slate-700">
+          <div className="bg-navy-950 rounded-lg border border-navy-800 max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-6 border-b border-navy-800">
               <div>
-                <h2 className="text-xl font-serif font-semibold text-parchment-100">Conversation Details</h2>
-                <p className="text-sm text-parchment-400 mt-1 font-mono">{selectedSnowflakeConvId}</p>
+                <h2 className="text-xl font-semibold text-text-primary">Conversation Details</h2>
+                <p className="text-sm text-text-muted mt-1 font-mono">{selectedSnowflakeConvId}</p>
               </div>
-              <button onClick={() => setSelectedSnowflakeConvId(null)} className="text-parchment-300 hover:text-parchment-100 text-2xl">×</button>
+              <button onClick={() => setSelectedSnowflakeConvId(null)} className="text-text-tertiary hover:text-text-primary text-2xl">×</button>
             </div>
 
             {snowflakeConvLoading ? (
-              <div className="p-8 text-center text-parchment-200">Loading conversation...</div>
+              <div className="p-8 text-center text-text-secondary">Loading conversation...</div>
             ) : snowflakeConvDetails ? (
               <>
                 {/* Conversation Metadata */}
-                <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-700 flex gap-6 text-sm">
+                <div className="px-6 py-4 bg-navy-900/50 border-b border-navy-800 flex gap-6 text-sm">
                   <div>
-                    <span className="text-parchment-400">Turns:</span>
-                    <span className="text-parchment-100 ml-2 font-semibold">{snowflakeConvDetails.turn_count}</span>
+                    <span className="text-text-muted">Turns:</span>
+                    <span className="text-text-primary ml-2 font-semibold">{snowflakeConvDetails.turn_count}</span>
                   </div>
                   <div>
-                    <span className="text-parchment-400">Duration:</span>
-                    <span className="text-parchment-100 ml-2 font-semibold">
+                    <span className="text-text-muted">Duration:</span>
+                    <span className="text-text-primary ml-2 font-semibold">
                       {snowflakeConvDetails.duration_ms ? formatDuration(snowflakeConvDetails.duration_ms) : '-'}
                     </span>
                   </div>
                   {snowflakeConvDetails.triggered_by && (
                     <div>
-                      <span className="text-parchment-400">Channel:</span>
-                      <span className="text-parchment-100 ml-2 font-semibold">{snowflakeConvDetails.triggered_by}</span>
+                      <span className="text-text-muted">Channel:</span>
+                      <span className="text-text-primary ml-2 font-semibold">{snowflakeConvDetails.triggered_by}</span>
                     </div>
                   )}
                 </div>
@@ -893,22 +893,22 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                         className={`p-4 rounded-lg ${
                           msg.role === 'user'
                             ? 'bg-strategic-900/40 border border-strategic-700'
-                            : 'bg-slate-800 border border-slate-700'
+                            : 'bg-navy-900 border border-navy-800'
                         }`}
                       >
-                        <div className="text-xs font-medium text-parchment-300 mb-1">
+                        <div className="text-xs font-medium text-text-tertiary mb-1">
                           {msg.role === 'user' ? '👤 User' : '🤖 Assistant'}
                         </div>
-                        <div className="text-sm text-parchment-200 whitespace-pre-wrap">{msg.content}</div>
+                        <div className="text-sm text-text-secondary whitespace-pre-wrap">{msg.content}</div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-parchment-400 py-8">No messages found</div>
+                    <div className="text-center text-text-muted py-8">No messages found</div>
                   )}
                 </div>
               </>
             ) : (
-              <div className="p-8 text-center text-parchment-400">Failed to load conversation</div>
+              <div className="p-8 text-center text-text-muted">Failed to load conversation</div>
             )}
           </div>
         </div>

@@ -11,43 +11,47 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
-        // Dark mode strategy game palette with more variety
-        parchment: {
-          50: '#faf8f3',
-          100: '#f5f1e8',
-          200: '#ebe3d1',
-          300: '#d4c4a8',
+        // Snowflake-inspired color palette
+        navy: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#b9e6fe',
+          300: '#7cd4fd',
+          400: '#36bffa',
+          500: '#0ba5e9',
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#1e3a5f',
+          900: '#1F2937',  // Main dark background
+          950: '#111827',  // Darker sections
         },
-        slate: {
-          700: '#374151',
-          800: '#1f2937',
-          850: '#1a1f2e',
-          900: '#111827',
-          950: '#0a0d14',
+        // Accent cyan/blue
+        cyan: {
+          50: '#ecfeff',
+          100: '#cffafe',
+          200: '#a5f3fc',
+          300: '#67e8f9',
+          400: '#29B5E8',  // Primary accent
+          500: '#06b6d4',
+          600: '#0891b2',
+          700: '#0e7490',
         },
-        strategic: {
-          500: '#6b8caf',
-          600: '#4a5f7f',
-          700: '#3d4f6a',
+        // Text colors
+        text: {
+          primary: '#f9fafb',
+          secondary: '#d1d5db',
+          tertiary: '#9ca3af',
+          muted: '#6b7280',
         },
-        bronze: {
-          400: '#e8a75f',
-          500: '#cd7f32',
-          600: '#b8860b',
-        },
-        teal: {
-          500: '#3d8b8f',
-          600: '#2d6f73',
-          700: '#2d5f6f',
-        },
-        amber: {
-          500: '#f59e0b',
-          600: '#d97706',
+        // Borders
+        border: {
+          light: '#374151',
+          DEFAULT: '#1f2937',
         },
       },
       fontFamily: {
-        'serif': ['Cinzel', 'serif'],
-        'body': ['Alegreya', 'Georgia', 'serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['Fira Code', 'Courier New', 'monospace'],
       },
     },
   },

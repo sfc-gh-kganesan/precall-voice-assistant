@@ -46,7 +46,7 @@ export function QualityScoreBadge({ score, showLabel = false, compact = false }:
       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${colorClass}`}>
         {displayScore}%
       </span>
-      {showLabel && <span className="text-xs text-parchment-300">{label}</span>}
+      {showLabel && <span className="text-xs text-text-tertiary">{label}</span>}
     </div>
   )
 }
@@ -104,7 +104,7 @@ export function EndingAssessmentBadge({ assessment, showLabel = false, compact =
       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${colorClass}`}>
         {icon} {label}
       </span>
-      {showLabel && <span className="text-xs text-parchment-400">{tooltip}</span>}
+      {showLabel && <span className="text-xs text-text-muted">{tooltip}</span>}
     </div>
   )
 }
@@ -143,11 +143,11 @@ export function KnowledgeGapBadge({ gap, compact = false }: GapBadgeProps) {
       <span>{typeLabel}</span>
 
       {/* Tooltip */}
-      <div className="invisible group-hover:visible absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
-        <div className="text-xs font-semibold text-parchment-200 mb-1">{typeLabel}</div>
-        <div className="text-xs text-parchment-300 mb-2">{gap.description}</div>
+      <div className="invisible group-hover:visible absolute bottom-full left-0 mb-2 w-64 p-3 bg-navy-900 border border-navy-800 rounded-lg shadow-xl z-50">
+        <div className="text-xs font-semibold text-text-secondary mb-1">{typeLabel}</div>
+        <div className="text-xs text-text-tertiary mb-2">{gap.description}</div>
         {gap.evidence && (
-          <div className="text-xs text-parchment-400 italic border-l-2 border-blue-700 pl-2">
+          <div className="text-xs text-text-muted italic border-l-2 border-blue-700 pl-2">
             "{gap.evidence}"
           </div>
         )}
@@ -194,11 +194,11 @@ export function CapabilityGapBadge({ gap, compact = false }: GapBadgeProps) {
       <span>{typeLabel}</span>
 
       {/* Tooltip */}
-      <div className="invisible group-hover:visible absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
-        <div className="text-xs font-semibold text-parchment-200 mb-1">{typeLabel}</div>
-        <div className="text-xs text-parchment-300 mb-2">{gap.description}</div>
+      <div className="invisible group-hover:visible absolute bottom-full left-0 mb-2 w-64 p-3 bg-navy-900 border border-navy-800 rounded-lg shadow-xl z-50">
+        <div className="text-xs font-semibold text-text-secondary mb-1">{typeLabel}</div>
+        <div className="text-xs text-text-tertiary mb-2">{gap.description}</div>
         {gap.evidence && (
-          <div className="text-xs text-parchment-400 italic border-l-2 border-purple-700 pl-2">
+          <div className="text-xs text-text-muted italic border-l-2 border-purple-700 pl-2">
             "{gap.evidence}"
           </div>
         )}
@@ -251,9 +251,9 @@ export function GapCard({ type, gap }: GapCardProps) {
           <div className={`text-sm font-semibold ${titleColorClass} mb-1`}>
             {typeLabel}
           </div>
-          <div className="text-sm text-parchment-200 mb-2">{gap.description}</div>
+          <div className="text-sm text-text-secondary mb-2">{gap.description}</div>
           {gap.evidence && (
-            <div className="text-xs text-parchment-400 italic border-l-2 border-current pl-2">
+            <div className="text-xs text-text-muted italic border-l-2 border-current pl-2">
               "{gap.evidence}"
             </div>
           )}

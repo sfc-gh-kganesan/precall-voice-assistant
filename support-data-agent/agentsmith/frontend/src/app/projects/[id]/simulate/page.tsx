@@ -110,32 +110,32 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
   }
 
   if (!project) {
-    return <div className="p-8 text-center text-parchment-200">Loading...</div>
+    return <div className="p-8 text-center text-text-secondary">Loading...</div>
   }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold text-parchment-100">Configure AI Analysis</h1>
-        <p className="mt-2 text-sm text-parchment-200">
+        <h1 className="text-3xl font-sans font-bold text-text-primary">Configure AI Analysis</h1>
+        <p className="mt-2 text-sm text-text-secondary">
           Analyzing: {project.name}
         </p>
-        <p className="mt-1 text-xs text-parchment-300">
+        <p className="mt-1 text-xs text-text-tertiary">
           Analyze existing conversations from Snowflake to identify patterns, errors, and improvement opportunities
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Conversation Selection */}
-        <div className="bg-slate-900 shadow-sm rounded-lg border border-slate-700 p-6">
-          <h2 className="text-lg font-serif font-semibold text-parchment-100 mb-4">Conversation Selection</h2>
-          <p className="text-sm text-parchment-300 mb-4">Choose which conversations to analyze from your Snowflake data</p>
+        <div className="bg-navy-950 shadow-sm rounded-lg border border-navy-800 p-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-4">Conversation Selection</h2>
+          <p className="text-sm text-text-tertiary mb-4">Choose which conversations to analyze from your Snowflake data</p>
 
           <div className="space-y-4">
             {/* Date Range Options */}
             <div className="space-y-3">
               {/* Default: Last 7 days */}
-              <label className="flex items-center space-x-3 p-3 rounded-md cursor-pointer transition-colors bg-slate-800 border border-slate-700 hover:border-slate-600">
+              <label className="flex items-center space-x-3 p-3 rounded-md cursor-pointer transition-colors bg-navy-900 border border-navy-800 hover:border-navy-700">
                 <input
                   type="radio"
                   name="dateRange"
@@ -147,14 +147,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                   className="text-strategic-600"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-parchment-100">Last 7 days</div>
-                  <div className="text-xs text-parchment-300">Analyze conversations from the past week</div>
+                  <div className="text-sm font-medium text-text-primary">Last 7 days</div>
+                  <div className="text-xs text-text-tertiary">Analyze conversations from the past week</div>
                 </div>
               </label>
 
               {/* Since Last Analysis */}
               {lastAnalysisDate && (
-                <label className="flex items-center space-x-3 p-3 rounded-md cursor-pointer transition-colors bg-slate-800 border border-slate-700 hover:border-slate-600">
+                <label className="flex items-center space-x-3 p-3 rounded-md cursor-pointer transition-colors bg-navy-900 border border-navy-800 hover:border-navy-700">
                   <input
                     type="radio"
                     name="dateRange"
@@ -166,8 +166,8 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                     className="text-strategic-600"
                   />
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-parchment-100">New since last analysis</div>
-                    <div className="text-xs text-parchment-300">
+                    <div className="text-sm font-medium text-text-primary">New since last analysis</div>
+                    <div className="text-xs text-text-tertiary">
                       Since {lastAnalysisDate.toLocaleDateString()} at {lastAnalysisDate.toLocaleTimeString()}
                     </div>
                   </div>
@@ -175,7 +175,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
               )}
 
               {/* Custom Date Range */}
-              <label className="flex items-center space-x-3 p-3 rounded-md cursor-pointer transition-colors bg-slate-800 border border-slate-700 hover:border-slate-600">
+              <label className="flex items-center space-x-3 p-3 rounded-md cursor-pointer transition-colors bg-navy-900 border border-navy-800 hover:border-navy-700">
                 <input
                   type="radio"
                   name="dateRange"
@@ -187,34 +187,34 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                   className="text-strategic-600"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-parchment-100">Custom date range</div>
-                  <div className="text-xs text-parchment-300">Specify exact start and end dates</div>
+                  <div className="text-sm font-medium text-text-primary">Custom date range</div>
+                  <div className="text-xs text-text-tertiary">Specify exact start and end dates</div>
                 </div>
               </label>
 
               {/* Custom Date Inputs */}
               {useCustomDateRange && (
-                <div className="ml-8 grid grid-cols-2 gap-4 p-4 bg-slate-800/50 rounded-md">
+                <div className="ml-8 grid grid-cols-2 gap-4 p-4 bg-navy-900/50 rounded-md">
                   <div>
-                    <label className="block text-sm font-medium text-parchment-200 mb-1">
+                    <label className="block text-sm font-medium text-text-secondary mb-1">
                       From Date
                     </label>
                     <input
                       type="date"
                       value={formatDate(formData.date_from)}
                       onChange={(e) => setFormData({...formData, date_from: e.target.value ? new Date(e.target.value) : null})}
-                      className="w-full rounded-md border border-slate-700 bg-slate-900 text-parchment-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-strategic-600"
+                      className="w-full rounded-md border border-navy-800 bg-navy-950 text-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-parchment-200 mb-1">
+                    <label className="block text-sm font-medium text-text-secondary mb-1">
                       To Date
                     </label>
                     <input
                       type="date"
                       value={formatDate(formData.date_to)}
                       onChange={(e) => setFormData({...formData, date_to: e.target.value ? new Date(e.target.value) : null})}
-                      className="w-full rounded-md border border-slate-700 bg-slate-900 text-parchment-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-strategic-600"
+                      className="w-full rounded-md border border-navy-800 bg-navy-950 text-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
                     />
                   </div>
                 </div>
@@ -222,15 +222,15 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
             </div>
 
             {/* Filters */}
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700">
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-navy-800">
               <div>
-                <label className="block text-sm font-medium text-parchment-200 mb-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">
                   Channel Filter
                 </label>
                 <select
                   value={formData.triggered_by || ''}
                   onChange={(e) => setFormData({...formData, triggered_by: e.target.value || null})}
-                  className="w-full rounded-md border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-strategic-600"
+                  className="w-full rounded-md border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
                 >
                   <option value="">All Channels</option>
                   <option value="voice">Voice Only</option>
@@ -239,7 +239,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-parchment-200 mb-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">
                   Max Conversations
                 </label>
                 <input
@@ -248,14 +248,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                   max="1000"
                   value={formData.num_simulations}
                   onChange={(e) => setFormData({...formData, num_simulations: parseInt(e.target.value) || 1})}
-                  className="w-full rounded-md border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-strategic-600"
+                  className="w-full rounded-md border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
                 />
-                <p className="mt-1 text-xs text-parchment-300">Maximum number of conversations to analyze</p>
+                <p className="mt-1 text-xs text-text-tertiary">Maximum number of conversations to analyze</p>
               </div>
             </div>
 
             {/* Errors Only Toggle */}
-            <label className="flex items-center space-x-2 p-3 rounded-md cursor-pointer transition-colors bg-slate-800 border border-slate-700 hover:border-slate-600">
+            <label className="flex items-center space-x-2 p-3 rounded-md cursor-pointer transition-colors bg-navy-900 border border-navy-800 hover:border-navy-700">
               <input
                 type="checkbox"
                 checked={formData.include_errors_only}
@@ -263,21 +263,21 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                 className="rounded text-strategic-600"
               />
               <div className="flex-1">
-                <div className="text-sm font-medium text-parchment-100">Analyze errors only</div>
-                <div className="text-xs text-parchment-300">Focus analysis on conversations that had errors</div>
+                <div className="text-sm font-medium text-text-primary">Analyze errors only</div>
+                <div className="text-xs text-text-tertiary">Focus analysis on conversations that had errors</div>
               </div>
             </label>
           </div>
         </div>
 
         {/* Analysis Configuration */}
-        <div className="bg-slate-900 shadow-sm rounded-lg border border-slate-700 p-6">
-          <h2 className="text-lg font-serif font-semibold text-parchment-100 mb-4">Analysis Configuration</h2>
-          <p className="text-sm text-parchment-300 mb-4">Configure how conversations are analyzed and evaluated</p>
+        <div className="bg-navy-950 shadow-sm rounded-lg border border-navy-800 p-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-4">Analysis Configuration</h2>
+          <p className="text-sm text-text-tertiary mb-4">Configure how conversations are analyzed and evaluated</p>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-parchment-200">
+              <label className="block text-sm font-medium text-text-secondary">
                 Concurrency
               </label>
               <input
@@ -286,13 +286,13 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                 max="10"
                 value={formData.concurrency}
                 onChange={(e) => setFormData({...formData, concurrency: parseInt(e.target.value) || 1})}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded-md border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               />
-              <p className="mt-1 text-xs text-parchment-300">Number of conversations to analyze in parallel</p>
+              <p className="mt-1 text-xs text-text-tertiary">Number of conversations to analyze in parallel</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-parchment-200">
+              <label className="block text-sm font-medium text-text-secondary">
                 Timeout (seconds)
               </label>
               <input
@@ -301,19 +301,19 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                 max="600"
                 value={formData.timeout_seconds}
                 onChange={(e) => setFormData({...formData, timeout_seconds: parseInt(e.target.value) || 30})}
-                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-800 text-parchment-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-strategic-600"
+                className="mt-1 block w-full rounded-md border border-navy-800 bg-navy-900 text-text-primary px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               />
-              <p className="mt-1 text-xs text-parchment-300">Timeout for stop conditions evaluation</p>
+              <p className="mt-1 text-xs text-text-tertiary">Timeout for stop conditions evaluation</p>
             </div>
           </div>
 
           {/* Stop Conditions */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-parchment-200 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Evaluation Criteria
             </label>
             <div className="space-y-2">
-              <label className="flex items-center space-x-2 text-sm text-parchment-200">
+              <label className="flex items-center space-x-2 text-sm text-text-secondary">
                 <input
                   type="checkbox"
                   checked={formData.stop_conditions?.includes('llm_judge') ?? false}
@@ -327,7 +327,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                 />
                 <span>LLM Judge - AI evaluates conversation success</span>
               </label>
-              <label className="flex items-center space-x-2 text-sm text-parchment-200">
+              <label className="flex items-center space-x-2 text-sm text-text-secondary">
                 <input
                   type="checkbox"
                   checked={formData.stop_conditions?.includes('max_turns') ?? false}
@@ -346,11 +346,11 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
 
           {/* Metrics */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-parchment-200 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Metrics to Calculate
             </label>
             <div className="space-y-2">
-              <label className="flex items-center space-x-2 text-sm text-parchment-200">
+              <label className="flex items-center space-x-2 text-sm text-text-secondary">
                 <input
                   type="checkbox"
                   checked={formData.metrics_config?.includes('efficiency') ?? false}
@@ -364,7 +364,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                 />
                 <span>Efficiency - Duration, turns, latency</span>
               </label>
-              <label className="flex items-center space-x-2 text-sm text-parchment-200">
+              <label className="flex items-center space-x-2 text-sm text-text-secondary">
                 <input
                   type="checkbox"
                   checked={formData.metrics_config?.includes('quality') ?? false}
@@ -378,7 +378,7 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
                 />
                 <span>Quality - Success rate, error patterns</span>
               </label>
-              <label className="flex items-center space-x-2 text-sm text-parchment-200">
+              <label className="flex items-center space-x-2 text-sm text-text-secondary">
                 <input
                   type="checkbox"
                   checked={formData.metrics_config?.includes('tool_usage') ?? false}
@@ -401,14 +401,14 @@ export default function AnalyzePage({ params }: { params: Promise<{ id: string }
           <button
             type="button"
             onClick={() => router.push(`/projects/${projectId}`)}
-            className="px-4 py-2 text-sm font-medium text-parchment-200 bg-slate-800 border border-slate-700 rounded-md hover:bg-slate-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-text-secondary bg-navy-900 border border-navy-800 rounded-md hover:bg-navy-800 transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 text-sm font-medium text-parchment-50 bg-green-700 rounded-md hover:bg-green-600 disabled:opacity-50 transition-colors"
+            className="px-6 py-2 text-sm font-medium text-white bg-green-700 rounded-md hover:bg-green-600 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Starting Analysis...' : 'Start Analysis'}
           </button>
