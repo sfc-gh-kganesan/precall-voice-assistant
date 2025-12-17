@@ -14,12 +14,20 @@ vi.mock('dotenv', () => ({
   },
 }));
 
-import * as sdk from './index.js';
+import {
+  AgentSDK,
+  version,
+  type CortexAnalystResponse,
+  type CortexAgentResponse,
+  type AgentStreamEvent,
+  type CortexAgentOptions,
+} from './index.js';
 
-// Mock environment variables
 const originalEnv = process.env;
 
 describe('agent-sdk', () => {
+  let sdk: AgentSDK;
+
   beforeEach(() => {
     vi.resetModules();
     process.env = {
@@ -32,16 +40,24 @@ describe('agent-sdk', () => {
       SNOWFLAKE_DATABASE: 'test_database',
       SNOWFLAKE_SCHEMA: 'test_schema',
     };
+    sdk = new AgentSDK();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await sdk.close();
     process.env = originalEnv;
     vi.clearAllMocks();
   });
 
   describe('version', () => {
     it('should export version', () => {
-      expect(sdk.version).toBe('0.1.0');
+      expect(version).toBe('0.1.0');
+    });
+  });
+
+  describe('AgentSDK class', () => {
+    it('should create an instance', () => {
+      expect(sdk).toBeInstanceOf(AgentSDK);
     });
   });
 
@@ -216,15 +232,15 @@ describe('agent-sdk', () => {
    * - Incomplete message handling
    */
 
-  describe('closeConnection', () => {
+  describe('close', () => {
     it('should resolve immediately if no connection exists', async () => {
-      await expect(sdk.closeConnection()).resolves.toBeUndefined();
+      await expect(sdk.close()).resolves.toBeUndefined();
     });
   });
 
   describe('TypeScript interfaces', () => {
     it('should export CortexAnalystResponse interface', () => {
-      const response: sdk.CortexAnalystResponse = {
+      const response: CortexAnalystResponse = {
         success: true,
         data: {},
       };
@@ -232,7 +248,7 @@ describe('agent-sdk', () => {
     });
 
     it('should export CortexAgentResponse interface', () => {
-      const response: sdk.CortexAgentResponse = {
+      const response: CortexAgentResponse = {
         success: true,
         status_code: 200,
       };
@@ -240,7 +256,7 @@ describe('agent-sdk', () => {
     });
 
     it('should export AgentStreamEvent interface', () => {
-      const event: sdk.AgentStreamEvent = {
+      const event: AgentStreamEvent = {
         eventName: 'test',
         data: {},
       };
@@ -248,7 +264,7 @@ describe('agent-sdk', () => {
     });
 
     it('should export CortexAgentOptions interface', () => {
-      const options: sdk.CortexAgentOptions = {
+      const options: CortexAgentOptions = {
         agentDatabase: 'DB',
         agentSchema: 'SCHEMA',
         agentName: 'AGENT',

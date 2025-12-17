@@ -11,9 +11,6 @@ export const version = '0.1.0';
 import snowflake from 'snowflake-sdk';
 import dotenv from 'dotenv';
 
-// Load the .env file
-dotenv.config();
-
 /**
  * Snowflake connection configuration
  */
@@ -32,7 +29,7 @@ export interface SnowflakeConfig {
 /**
  * Query execution result
  */
-interface QueryResult {
+export interface QueryResult {
   statement: unknown;
   rows: unknown[];
 }
@@ -84,552 +81,581 @@ export interface CortexAgentOptions {
   onStream?: (event: AgentStreamEvent) => void;
 }
 
-// Connection state management
-let cachedConnection: snowflake.Connection | null = null;
-let isConnecting = false;
-let connectionPromise: Promise<snowflake.Connection> | null = null;
-
 /**
- * Gets Snowflake connection configuration from environment variables
- * @throws {Error} If required environment variables are missing
- * @returns {SnowflakeConfig} Connection configuration
- */
-function getConnectionConfig(): SnowflakeConfig {
-  const account = process.env.SNOWFLAKE_ACCOUNT;
-  const username = process.env.SNOWFLAKE_USER;
-
-  if (!account) {
-    throw new Error('SNOWFLAKE_ACCOUNT environment variable is required');
-  }
-
-  if (!username) {
-    throw new Error('SNOWFLAKE_USER environment variable is required');
-  }
-
-  let accessUrl = process.env.SNOWFLAKE_ACCESS_URL;
-  if (!accessUrl) {
-    const accountLocator = account.replaceAll('_', '-').toLowerCase();
-    accessUrl = `https://${accountLocator}.snowflakecomputing.com`;
-  }
-
-  let authenticator = process.env.SNOWFLAKE_AUTHENTICATOR;
-  const token = process.env.SNOWFLAKE_TOKEN;
-  const password = process.env.SNOWFLAKE_PASSWORD;
-  if (!authenticator) {
-    if (token) {
-      authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
-    } else if (password) {
-      authenticator = 'PASSWORD';
-    } else {
-      throw new Error('SNOWFLAKE_AUTHENTICATOR environment variable is required');
-    }
-  }
-  if (authenticator === 'PROGRAMMATIC_ACCESS_TOKEN' && !token) {
-    throw new Error('SNOWFLAKE_TOKEN environment variable is required');
-  }
-  if (authenticator === 'PASSWORD' && !password) {
-    throw new Error('SNOWFLAKE_PASSWORD environment variable is required');
-  }
-  if (token && password) {
-    throw new Error('SNOWFLAKE_TOKEN and SNOWFLAKE_PASSWORD cannot be used together');
-  }
-
-  return {
-    account,
-    username,
-    authenticator,
-    accessUrl,
-    token,
-    password,
-    warehouse: process.env.SNOWFLAKE_WAREHOUSE,
-    database: process.env.SNOWFLAKE_DATABASE,
-    schema: process.env.SNOWFLAKE_SCHEMA,
-  };
-}
-
-/**
- * Checks if the cached connection is healthy
- * @returns {Promise<boolean>} True if connection is healthy, false otherwise
- */
-async function isConnectionHealthy(): Promise<boolean> {
-  if (!cachedConnection) {
-    return false;
-  }
-
-  try {
-    await new Promise((resolve, reject) => {
-      cachedConnection!.execute({
-        sqlText: 'SELECT 1',
-        complete: (err, _stmt, _rows) => {
-          if (err) reject(err);
-          else resolve(true);
-        },
-      });
-    });
-    return true;
-  } catch {
-    cachedConnection = null;
-    return false;
-  }
-}
-
-/**
- * Establishes a connection to Snowflake with caching and connection reuse
- * Uses environment variables for configuration:
- * - SNOWFLAKE_ACCOUNT (required)
- * - SNOWFLAKE_USER (required)
- * - SNOWFLAKE_TOKEN or SNOWFLAKE_PASSWORD (exactly one of these is required)
- * - SNOWFLAKE_WAREHOUSE (optional)
- * - SNOWFLAKE_DATABASE (optional)
- * - SNOWFLAKE_SCHEMA (optional)
- * @returns {Promise<snowflake.Connection>} Connected Snowflake connection
- * @throws {Error} If required environment variables are missing or connection fails
- */
-async function getSnowflakeConnection(): Promise<snowflake.Connection> {
-  // Return cached connection if healthy
-  if (cachedConnection) {
-    const healthy = await isConnectionHealthy();
-    if (healthy) {
-      return cachedConnection;
-    }
-  }
-
-  // Wait for in-progress connection
-  if (isConnecting && connectionPromise) {
-    return connectionPromise;
-  }
-
-  // Create new connection
-  const config = getConnectionConfig();
-
-  isConnecting = true;
-  connectionPromise = new Promise((resolve, reject) => {
-    const connection = snowflake.createConnection(config);
-
-    connection.connect((err, conn) => {
-      isConnecting = false;
-
-      if (err) {
-        cachedConnection = null;
-        connectionPromise = null;
-        reject(new Error(`Failed to connect to Snowflake: ${err.message}`));
-      } else {
-        cachedConnection = conn;
-        resolve(conn);
-      }
-    });
-  });
-
-  return connectionPromise;
-}
-
-/**
- * Checks if a SQL query is a read-only SELECT statement
- * Allows SELECT, WITH (CTE), SHOW, and DESCRIBE statements
- * Rejects DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements
- *
- * @param {string} sql - SQL query to validate
- * @returns {boolean} True if query is read-only
- * @throws {Error} If query contains multiple statements
- */
-function isSelectQuery(sql: string): boolean {
-  const trimmed = sql.trim();
-  const withoutComments = trimmed
-    .replace(/^--.*$/gm, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .trim();
-
-  if (withoutComments.includes(';')) {
-    throw new Error(
-      'Multiple statements are not allowed. Only single SELECT queries are permitted.',
-    );
-  }
-
-  const firstKeyword = withoutComments.split(/\s+/)[0]?.toUpperCase();
-
-  return (
-    firstKeyword === 'SELECT' ||
-    firstKeyword === 'WITH' ||
-    firstKeyword === 'SHOW' ||
-    firstKeyword === 'DESCRIBE' ||
-    firstKeyword === 'DESC'
-  );
-}
-
-/**
- * Executes a SQL query against Snowflake
- * Internal function - use executeQueryReadOnly for read-only queries
- *
- * @param {string} query - SQL query to execute
- * @returns {Promise<QueryResult>} Query results with statement and rows
- * @throws {Error} If query execution fails
- */
-async function executeQuery(query: string): Promise<QueryResult> {
-  const conn = await getSnowflakeConnection();
-
-  return new Promise((resolve, reject) => {
-    conn.execute({
-      sqlText: query,
-      complete: (err, stmt, rows) => {
-        if (err) {
-          reject(new Error(`Query execution failed: ${err.message}`));
-        } else {
-          resolve({ statement: stmt, rows: rows || [] });
-        }
-      },
-    });
-  });
-}
-
-/**
- * Executes a read-only SELECT query against Snowflake
- * Validates that the query is read-only before execution
- * Rejects DML and DDL statements for safety
- *
- * @param {string} query - SQL SELECT query to execute
- * @returns {Promise<QueryResult>} Query results with statement and rows
- * @throws {Error} If query is not read-only or execution fails
+ * P67 Agent SDK Client
+ * Encapsulates all API functions for interacting with Snowflake and Cortex services
  *
  * @example
- * const result = await executeQueryReadOnly('SELECT * FROM my_table LIMIT 10');
- * console.log(result.rows);
- */
-export async function executeQueryReadOnly(query: string): Promise<QueryResult> {
-  if (!isSelectQuery(query)) {
-    throw new Error(
-      'Only SELECT queries are allowed. DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements are not permitted.',
-    );
-  }
-  return executeQuery(query);
-}
-
-/**
- * Queries Cortex Analyst with a natural language question
- * Uses the Snowflake Cortex Analyst API to convert questions to SQL and execute them
+ * // Load environment variables
+ * dotenv.config();
  *
- * @param {string} question - Natural language question to ask
- * @param {string} [semanticModel] - Path to semantic model file (stage path or @stage/file.yaml)
- *                                   Defaults to CORTEX_ANALYST_SEMANTIC_MODEL env var
- * @returns {Promise<CortexAnalystResponse>} Response with success status and data or error
- * @throws Never throws - returns error in response object
+ * // Create client instance
+ * const sdk = new AgentSDK();
  *
- * @example
- * const response = await queryCortexAnalyst(
- *   'What were the top 5 products by revenue last month?',
- *   '@my_stage/semantic_model.yaml'
- * );
- * if (response.success) {
- *   console.log(response.data);
- * } else {
- *   console.error(response.error);
- * }
- */
-export async function queryCortexAnalyst(
-  question: string,
-  semanticModel?: string,
-): Promise<CortexAnalystResponse> {
-  try {
-    const model = semanticModel || process.env.CORTEX_ANALYST_SEMANTIC_MODEL;
-
-    if (!model) {
-      throw new Error(
-        'CORTEX_ANALYST_SEMANTIC_MODEL environment variable is required or semantic model must be provided',
-      );
-    }
-
-    const config = getConnectionConfig();
-
-    const headers = {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json',
-    };
-
-    const url = `${config.accessUrl}/api/v2/cortex/analyst/message`;
-
-    const payload = {
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: question,
-            },
-          ],
-        },
-      ],
-      semantic_model_file: model,
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(180000), // 3 minute timeout
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return { success: true, data };
-    } else {
-      const errorText = await response.text();
-      return {
-        success: false,
-        error: `HTTP ${response.status}: ${errorText}`,
-      };
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-/**
- * Calls a Cortex Agent with a question and streams the response
- * Supports conversational context via parentMessageId
+ * // Execute queries
+ * const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table');
  *
- * @param {string} question - Question or message to send to the agent
- * @param {CortexAgentOptions} [options] - Configuration options
- * @param {string} [options.agentDatabase] - Database containing the agent (defaults to AGENT_DATABASE env var)
- * @param {string} [options.agentSchema] - Schema containing the agent (defaults to AGENT_SCHEMA env var)
- * @param {string} [options.agentName] - Name of the agent (defaults to AGENT_NAME env var)
- * @param {string} [options.parentMessageId] - Parent message ID for conversation continuity (defaults to '0')
- * @param {Function} [options.onStream] - Callback for streaming events
- * @returns {Promise<CortexAgentResponse>} Response with success status, data, and debugging info
- * @throws Never throws - returns error in response object
+ * // Query Cortex Analyst
+ * const analystResponse = await sdk.queryCortexAnalyst('What were sales last month?');
  *
- * @example
- * const response = await callCortexAgent('What is the weather today?', {
- *   agentDatabase: 'MY_DB',
- *   agentSchema: 'MY_SCHEMA',
- *   agentName: 'weather_agent',
- *   onStream: (event) => {
- *     console.log(`Event: ${event.eventName}`, event.data);
- *   }
+ * // Call Cortex Agent
+ * const agentResponse = await sdk.callCortexAgent('Hello', {
+ *   agentDatabase: 'DB',
+ *   agentSchema: 'SCHEMA',
+ *   agentName: 'my_agent'
  * });
  *
- * if (response.success) {
- *   console.log(response.data.message.content);
- * } else {
- *   console.error(response.error);
- *   console.error('Request:', response.request);
- * }
+ * // Cleanup when done
+ * await sdk.close();
  */
-export async function callCortexAgent(
-  question: string,
-  options?: CortexAgentOptions,
-): Promise<CortexAgentResponse> {
-  try {
-    const config = getConnectionConfig();
-    const database = options?.agentDatabase || config.database;
-    const schema = options?.agentSchema || config.schema;
-    const name = options?.agentName;
-    const parentMessageId = options?.parentMessageId || '0';
-    const onStream = options?.onStream;
+export class AgentSDK {
+  private cachedConnection: snowflake.Connection | null = null;
+  private isConnecting = false;
+  private connectionPromise: Promise<snowflake.Connection> | null = null;
 
-    if (!database) {
-      throw new Error('AGENT_DATABASE is required via environment variable or options');
-    }
+  constructor() {
+    dotenv.config();
+  }
 
-    if (!schema) {
-      throw new Error('AGENT_SCHEMA is required via environment variable or options');
-    }
-
-    if (!name) {
-      throw new Error('AGENT_NAME is required via environment variable or options');
-    }
-
+  /**
+   * Gets Snowflake connection configuration from environment variables
+   * @throws {Error} If required environment variables are missing
+   * @returns {SnowflakeConfig} Connection configuration
+   */
+  private getConnectionConfig(): SnowflakeConfig {
     const account = process.env.SNOWFLAKE_ACCOUNT;
+    const username = process.env.SNOWFLAKE_USER;
+
     if (!account) {
       throw new Error('SNOWFLAKE_ACCOUNT environment variable is required');
     }
 
+    if (!username) {
+      throw new Error('SNOWFLAKE_USER environment variable is required');
+    }
+
+    let accessUrl = process.env.SNOWFLAKE_ACCESS_URL;
+    if (!accessUrl) {
+      const accountLocator = account.replaceAll('_', '-').toLowerCase();
+      accessUrl = `https://${accountLocator}.snowflakecomputing.com`;
+    }
+
+    let authenticator = process.env.SNOWFLAKE_AUTHENTICATOR;
     const token = process.env.SNOWFLAKE_TOKEN;
-    if (!token) {
+    const password = process.env.SNOWFLAKE_PASSWORD;
+    if (!authenticator) {
+      if (token) {
+        authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
+      } else if (password) {
+        authenticator = 'PASSWORD';
+      } else {
+        throw new Error('SNOWFLAKE_AUTHENTICATOR environment variable is required');
+      }
+    }
+    if (authenticator === 'PROGRAMMATIC_ACCESS_TOKEN' && !token) {
       throw new Error('SNOWFLAKE_TOKEN environment variable is required');
     }
-
-    // Prevent actual network calls with invalid token
-    if (token === 'undefined' || !token.trim()) {
-      throw new Error('SNOWFLAKE_TOKEN must be a valid token, not empty or undefined');
+    if (authenticator === 'PASSWORD' && !password) {
+      throw new Error('SNOWFLAKE_PASSWORD environment variable is required');
+    }
+    if (token && password) {
+      throw new Error('SNOWFLAKE_TOKEN and SNOWFLAKE_PASSWORD cannot be used together');
     }
 
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+    return {
+      account,
+      username,
+      authenticator,
+      accessUrl,
+      token,
+      password,
+      warehouse: process.env.SNOWFLAKE_WAREHOUSE,
+      database: process.env.SNOWFLAKE_DATABASE,
+      schema: process.env.SNOWFLAKE_SCHEMA,
     };
+  }
 
-    const url = `${config.accessUrl}/api/v2/databases/${database}/schemas/${schema}/agents/${name}:run`;
-
-    const payload = {
-      parent_message_id: parentMessageId,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: question,
-            },
-          ],
-        },
-      ],
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(120000), // 2 minute timeout
-    });
-
-    // Redact auth token from debug info
-    const sanitizedHeaders = {
-      'Content-Type': headers['Content-Type'],
-      Accept: headers.Accept,
-    };
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return {
-        success: false,
-        status_code: response.status,
-        error: errorText,
-        request: {
-          url,
-          headers: sanitizedHeaders,
-          payload,
-        },
-      };
+  /**
+   * Checks if the cached connection is healthy
+   * @returns {Promise<boolean>} True if connection is healthy, false otherwise
+   */
+  private async isConnectionHealthy(): Promise<boolean> {
+    if (!this.cachedConnection) {
+      return false;
     }
-
-    let finalMessage: { content?: string } | null = null;
-    let currentEventName: string | null = null;
-
-    if (!response.body) {
-      return {
-        success: false,
-        status_code: response.status,
-        error: 'No response body received',
-        request: {
-          url,
-          headers: sanitizedHeaders,
-          payload,
-        },
-      };
-    }
-
-    // Stream processing
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
+      await new Promise((resolve, reject) => {
+        this.cachedConnection!.execute({
+          sqlText: 'SELECT 1',
+          complete: (err, _stmt, _rows) => {
+            if (err) reject(err);
+            else resolve(true);
+          },
+        });
+      });
+      return true;
+    } catch {
+      this.cachedConnection = null;
+      return false;
+    }
+  }
 
-        if (done) break;
+  /**
+   * Establishes a connection to Snowflake with caching and connection reuse
+   * Uses environment variables for configuration:
+   * - SNOWFLAKE_ACCOUNT (required)
+   * - SNOWFLAKE_USER (required)
+   * - SNOWFLAKE_TOKEN or SNOWFLAKE_PASSWORD (exactly one of these is required)
+   * - SNOWFLAKE_WAREHOUSE (optional)
+   * - SNOWFLAKE_DATABASE (optional)
+   * - SNOWFLAKE_SCHEMA (optional)
+   * @returns {Promise<snowflake.Connection>} Connected Snowflake connection
+   * @throws {Error} If required environment variables are missing or connection fails
+   */
+  private async getSnowflakeConnection(): Promise<snowflake.Connection> {
+    if (this.cachedConnection) {
+      const healthy = await this.isConnectionHealthy();
+      if (healthy) {
+        return this.cachedConnection;
+      }
+    }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+    if (this.isConnecting && this.connectionPromise) {
+      return this.connectionPromise;
+    }
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
+    const config = this.getConnectionConfig();
 
-          if (line.startsWith('event: ')) {
-            currentEventName = line.substring(7).trim();
-          } else if (line.startsWith('data: ')) {
-            const dataStr = line.substring(6).trim();
+    this.isConnecting = true;
+    this.connectionPromise = new Promise((resolve, reject) => {
+      const connection = snowflake.createConnection(config);
 
-            if (dataStr === '[DONE]') {
-              reader.cancel();
-              break;
-            }
+      connection.connect((err, conn) => {
+        this.isConnecting = false;
 
-            try {
-              const eventData = JSON.parse(dataStr);
+        if (err) {
+          this.cachedConnection = null;
+          this.connectionPromise = null;
+          reject(new Error(`Failed to connect to Snowflake: ${err.message}`));
+        } else {
+          this.cachedConnection = conn;
+          resolve(conn);
+        }
+      });
+    });
 
-              if (onStream && currentEventName) {
-                onStream({ eventName: currentEventName, data: eventData });
+    return this.connectionPromise;
+  }
+
+  /**
+   * Checks if a SQL query is a read-only SELECT statement
+   * Allows SELECT, WITH (CTE), SHOW, and DESCRIBE statements
+   * Rejects DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements
+   *
+   * @param {string} sql - SQL query to validate
+   * @returns {boolean} True if query is read-only
+   * @throws {Error} If query contains multiple statements
+   */
+  private isSelectQuery(sql: string): boolean {
+    const trimmed = sql.trim();
+    const withoutComments = trimmed
+      .replace(/^--.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .trim();
+
+    if (withoutComments.includes(';')) {
+      throw new Error(
+        'Multiple statements are not allowed. Only single SELECT queries are permitted.',
+      );
+    }
+
+    const firstKeyword = withoutComments.split(/\s+/)[0]?.toUpperCase();
+
+    return (
+      firstKeyword === 'SELECT' ||
+      firstKeyword === 'WITH' ||
+      firstKeyword === 'SHOW' ||
+      firstKeyword === 'DESCRIBE' ||
+      firstKeyword === 'DESC'
+    );
+  }
+
+  /**
+   * Executes a SQL query against Snowflake
+   * Internal function - use executeQueryReadOnly for read-only queries
+   *
+   * @param {string} query - SQL query to execute
+   * @returns {Promise<QueryResult>} Query results with statement and rows
+   * @throws {Error} If query execution fails
+   */
+  private async executeQuery(query: string): Promise<QueryResult> {
+    const conn = await this.getSnowflakeConnection();
+
+    return new Promise((resolve, reject) => {
+      conn.execute({
+        sqlText: query,
+        complete: (err, stmt, rows) => {
+          if (err) {
+            reject(new Error(`Query execution failed: ${err.message}`));
+          } else {
+            resolve({ statement: stmt, rows: rows || [] });
+          }
+        },
+      });
+    });
+  }
+
+  /**
+   * Executes a read-only SELECT query against Snowflake
+   * Validates that the query is read-only before execution
+   * Rejects DML and DDL statements for safety
+   *
+   * @param {string} query - SQL SELECT query to execute
+   * @returns {Promise<QueryResult>} Query results with statement and rows
+   * @throws {Error} If query is not read-only or execution fails
+   *
+   * @example
+   * const sdk = new AgentSDK();
+   * const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table LIMIT 10');
+   * console.log(result.rows);
+   */
+  async executeQueryReadOnly(query: string): Promise<QueryResult> {
+    if (!this.isSelectQuery(query)) {
+      throw new Error(
+        'Only SELECT queries are allowed. DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements are not permitted.',
+      );
+    }
+    return this.executeQuery(query);
+  }
+
+  /**
+   * Queries Cortex Analyst with a natural language question
+   * Uses the Snowflake Cortex Analyst API to convert questions to SQL and execute them
+   *
+   * @param {string} question - Natural language question to ask
+   * @param {string} [semanticModel] - Path to semantic model file (stage path or @stage/file.yaml)
+   *                                   Defaults to CORTEX_ANALYST_SEMANTIC_MODEL env var
+   * @returns {Promise<CortexAnalystResponse>} Response with success status and data or error
+   * @throws Never throws - returns error in response object
+   *
+   * @example
+   * const sdk = new AgentSDK();
+   * const response = await sdk.queryCortexAnalyst(
+   *   'What were the top 5 products by revenue last month?',
+   *   '@my_stage/semantic_model.yaml'
+   * );
+   * if (response.success) {
+   *   console.log(response.data);
+   * } else {
+   *   console.error(response.error);
+   * }
+   */
+  async queryCortexAnalyst(
+    question: string,
+    semanticModel?: string,
+  ): Promise<CortexAnalystResponse> {
+    try {
+      const model = semanticModel || process.env.CORTEX_ANALYST_SEMANTIC_MODEL;
+
+      if (!model) {
+        throw new Error(
+          'CORTEX_ANALYST_SEMANTIC_MODEL environment variable is required or semantic model must be provided',
+        );
+      }
+
+      const config = this.getConnectionConfig();
+
+      const headers = {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const url = `${config.accessUrl}/api/v2/cortex/analyst/message`;
+
+      const payload = {
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: question,
+              },
+            ],
+          },
+        ],
+        semantic_model_file: model,
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(180000),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, data };
+      } else {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${errorText}`,
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Calls a Cortex Agent with a question and streams the response
+   * Supports conversational context via parentMessageId
+   *
+   * @param {string} question - Question or message to send to the agent
+   * @param {CortexAgentOptions} [options] - Configuration options
+   * @param {string} [options.agentDatabase] - Database containing the agent (defaults to AGENT_DATABASE env var)
+   * @param {string} [options.agentSchema] - Schema containing the agent (defaults to AGENT_SCHEMA env var)
+   * @param {string} [options.agentName] - Name of the agent (defaults to AGENT_NAME env var)
+   * @param {string} [options.parentMessageId] - Parent message ID for conversation continuity (defaults to '0')
+   * @param {Function} [options.onStream] - Callback for streaming events
+   * @returns {Promise<CortexAgentResponse>} Response with success status, data, and debugging info
+   * @throws Never throws - returns error in response object
+   *
+   * @example
+   * const sdk = new AgentSDK();
+   * const response = await sdk.callCortexAgent('What is the weather today?', {
+   *   agentDatabase: 'MY_DB',
+   *   agentSchema: 'MY_SCHEMA',
+   *   agentName: 'weather_agent',
+   *   onStream: (event) => {
+   *     console.log(`Event: ${event.eventName}`, event.data);
+   *   }
+   * });
+   *
+   * if (response.success) {
+   *   console.log(response.data.message.content);
+   * } else {
+   *   console.error(response.error);
+   *   console.error('Request:', response.request);
+   * }
+   */
+  async callCortexAgent(
+    question: string,
+    options?: CortexAgentOptions,
+  ): Promise<CortexAgentResponse> {
+    try {
+      const config = this.getConnectionConfig();
+      const database = options?.agentDatabase || config.database;
+      const schema = options?.agentSchema || config.schema;
+      const name = options?.agentName;
+      const parentMessageId = options?.parentMessageId || '0';
+      const onStream = options?.onStream;
+
+      if (!database) {
+        throw new Error('AGENT_DATABASE is required via environment variable or options');
+      }
+
+      if (!schema) {
+        throw new Error('AGENT_SCHEMA is required via environment variable or options');
+      }
+
+      if (!name) {
+        throw new Error('AGENT_NAME is required via environment variable or options');
+      }
+
+      const account = process.env.SNOWFLAKE_ACCOUNT;
+      if (!account) {
+        throw new Error('SNOWFLAKE_ACCOUNT environment variable is required');
+      }
+
+      const token = process.env.SNOWFLAKE_TOKEN;
+      if (!token) {
+        throw new Error('SNOWFLAKE_TOKEN environment variable is required');
+      }
+
+      if (token === 'undefined' || !token.trim()) {
+        throw new Error('SNOWFLAKE_TOKEN must be a valid token, not empty or undefined');
+      }
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      };
+
+      const url = `${config.accessUrl}/api/v2/databases/${database}/schemas/${schema}/agents/${name}:run`;
+
+      const payload = {
+        parent_message_id: parentMessageId,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: question,
+              },
+            ],
+          },
+        ],
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(120000),
+      });
+
+      const sanitizedHeaders = {
+        'Content-Type': headers['Content-Type'],
+        Accept: headers.Accept,
+      };
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          status_code: response.status,
+          error: errorText,
+          request: {
+            url,
+            headers: sanitizedHeaders,
+            payload,
+          },
+        };
+      }
+
+      let finalMessage: { content?: string } | null = null;
+      let currentEventName: string | null = null;
+
+      if (!response.body) {
+        return {
+          success: false,
+          status_code: response.status,
+          error: 'No response body received',
+          request: {
+            url,
+            headers: sanitizedHeaders,
+            payload,
+          },
+        };
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            if (line.startsWith('event: ')) {
+              currentEventName = line.substring(7).trim();
+            } else if (line.startsWith('data: ')) {
+              const dataStr = line.substring(6).trim();
+
+              if (dataStr === '[DONE]') {
+                reader.cancel();
+                break;
               }
 
-              if (currentEventName === 'response' && eventData.content) {
-                finalMessage = eventData;
+              try {
+                const eventData = JSON.parse(dataStr);
+
+                if (onStream && currentEventName) {
+                  onStream({ eventName: currentEventName, data: eventData });
+                }
+
+                if (currentEventName === 'response' && eventData.content) {
+                  finalMessage = eventData;
+                }
+              } catch {
+                continue;
               }
-            } catch {
-              // Skip malformed JSON lines
-              continue;
             }
           }
         }
+      } finally {
+        reader.releaseLock();
       }
-    } finally {
-      reader.releaseLock();
-    }
 
-    if (!finalMessage) {
+      if (!finalMessage) {
+        return {
+          success: false,
+          status_code: response.status,
+          error: 'No complete message received from agent',
+          request: {
+            url,
+            headers: sanitizedHeaders,
+            payload,
+          },
+        };
+      }
+
       return {
-        success: false,
-        status_code: response.status,
-        error: 'No complete message received from agent',
+        success: true,
+        status_code: 200,
+        data: {
+          message: {
+            role: 'agent',
+            content: finalMessage.content || [],
+          },
+        },
         request: {
           url,
           headers: sanitizedHeaders,
           payload,
         },
       };
+    } catch (error) {
+      return {
+        success: false,
+        status_code: 0,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
-
-    return {
-      success: true,
-      status_code: 200,
-      data: {
-        message: {
-          role: 'agent',
-          content: finalMessage.content || [],
-        },
-      },
-      request: {
-        url,
-        headers: sanitizedHeaders,
-        payload,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      status_code: 0,
-      error: error instanceof Error ? error.message : String(error),
-    };
   }
-}
 
-/**
- * Closes the cached Snowflake connection
- * Call this when shutting down to properly cleanup resources
- *
- * @returns {Promise<void>}
- *
- * @example
- * // At application shutdown
- * await closeConnection();
- */
-export async function closeConnection(): Promise<void> {
-  if (cachedConnection) {
-    return new Promise((resolve) => {
-      cachedConnection!.destroy((err) => {
-        if (err) {
-          console.error('Error closing connection:', err.message);
-        }
-        cachedConnection = null;
-        connectionPromise = null;
-        isConnecting = false;
-        resolve();
+  /**
+   * Closes the cached Snowflake connection
+   * Call this when shutting down to properly cleanup resources
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * const sdk = new AgentSDK();
+   * // ... use sdk ...
+   * await sdk.close();
+   */
+  async close(): Promise<void> {
+    if (this.cachedConnection) {
+      return new Promise((resolve) => {
+        this.cachedConnection!.destroy((err) => {
+          if (err) {
+            console.error('Error closing connection:', err.message);
+          }
+          this.cachedConnection = null;
+          this.connectionPromise = null;
+          this.isConnecting = false;
+          resolve();
+        });
       });
-    });
+    }
   }
 }
