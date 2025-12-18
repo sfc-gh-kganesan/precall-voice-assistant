@@ -1,0 +1,152 @@
+# Agent OS Demo - justfile
+# Run `just` or `just help` to see available commands
+
+# Load environment variables from .env
+set dotenv-load := true
+
+# Export all variables
+set export := true
+
+# Allow passing positional arguments
+set positional-arguments := true
+
+# Default recipe (run `just` with no args)
+default: help
+
+# Show this help message
+help:
+    echo "Agent OS Demo"
+    echo ""
+    @just --list --unsorted
+    echo ""
+
+# Setup development environment
+install:
+    uv sync
+
+# check environment variables
+check-env:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🔍 Checking environment variables..."
+    if [ ! -f .env ]; then
+        echo "❌ .env file not found"
+        echo "Create .env from template:"
+        echo "  cp .env.example .env"
+        exit 1
+    fi
+
+    MISSING=""
+    for var in SNOWFLAKE_ACCOUNT SNOWFLAKE_USER AGENT_REGISTRY_TABLE; do
+        if ! grep -q "^$var=..*" .env 2>/dev/null; then
+            MISSING="$MISSING $var"
+        fi
+    done
+    if [ -n "$MISSING" ]; then
+        echo "❌ Missing or empty required variables:$MISSING"
+        exit 1
+    fi
+    echo "✅ Environment variables are set"
+
+
+# Private: Get connection flag for snow CLI
+_connection-flag:
+    #!/usr/bin/env bash
+    if [ "$SNOW_CONNECTION" != "default" ]; then
+        echo "--connection $SNOW_CONNECTION"
+    fi
+
+# Private: Run SQL file with optional envsubst and snow sql
+_run-sql sql_file continue_on_error="false" substitute_vars="true" run_for_loadtest="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+
+    # Create temporary directory
+    mkdir -p tmp
+
+    # Get repository URL and export for envsubst (needed for agent.sql)
+    export REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE 2>/dev/null || echo "")
+
+    # Process SQL file
+    SQL_BASENAME=$(basename "{{sql_file}}")
+    if [ "{{substitute_vars}}" = "true" ]; then
+        sed 's/SYSTEM\$/__SYSTEM_DOLLAR__/g' "{{sql_file}}" \
+        | envsubst \
+        | sed 's/__SYSTEM_DOLLAR__/SYSTEM\$/g' \
+        > "tmp/${SQL_BASENAME}.tmp"
+    else
+        cp "{{sql_file}}" "tmp/${SQL_BASENAME}.tmp"
+    fi
+
+    echo "Executing SQL file: tmp/${SQL_BASENAME}.tmp with role: $ROLE" 
+
+    
+    # Execute SQL with --silent to avoid leaking secrets
+    if [ "{{continue_on_error}}" = "true" ]; then
+        snow sql -f "tmp/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent 2>/dev/null || echo "⚠️  Skipped (may lack permissions or already exists. Run without --silent to see what happened.)"
+    else
+        snow sql -f "tmp/${SQL_BASENAME}.tmp" $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent
+    fi
+    
+    # Cleanup
+    rm -f "tmp/${SQL_BASENAME}.tmp"
+
+# Start backend development server
+backend-dev: check-env install
+    echo "🔍 Starting backend development server..."
+    uv run uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload --env-file .env
+    echo "✅ Backend development server started"
+
+
+backend-deploy: check-env install
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONNECTION_FLAG=$(just _connection-flag)
+    
+    echo "make sure agent registry table exists"
+    just _run-sql release/agent.sql false
+    echo "build and push docker image"
+    REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $CONNECTION_FLAG --database $DATABASE --schema $SCHEMA --role $ROLE --silent)
+    echo "REPO_URL: $REPO_URL"
+    echo "building image $REPO_URL/$IMAGE_NAME:$IMAGE_TAG"
+    docker build -f backend/Dockerfile --rm --platform linux/amd64 -t $REPO_URL/$IMAGE_NAME:$IMAGE_TAG . --quiet
+    echo "📤 Pushing to Snowflake image repository..."
+    docker push $REPO_URL/$IMAGE_NAME:$IMAGE_TAG --quiet
+    rm -f backend/.env backend/uv.lock backend/pyproject.toml
+    echo "deploy service"
+    just _run-sql release/backend.sql false
+    echo "✅ Backend deployed"
+
+# Check code quality (used by CI)
+check:
+    echo "🔍 Checking import sorting..."
+    uv run ruff check --select I
+    echo "🔍 Checking linting..."
+    uv run ruff check
+    echo "🔍 Checking formatting..."
+    uv run ruff format --check
+    echo "✅ All checks passed"
+
+# Format and lint Python code (auto-fix)
+fmt:
+    uv run ruff check --fix . --no-cache
+    uv run ruff format . --no-cache
+    uv run ruff check --fix . --no-cache
+    echo "✅ Code formatted and linted"
+
+
+alias format := fmt
+
+# Clean build artifacts and cache
+clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🧹 Cleaning up..."
+    find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name '.ruff_cache' -exec rm -rf {} + 2>/dev/null || true
+    find . -type f -name '*.pyc' -delete 2>/dev/null || true
+    rm -rf dist/ build/ *.egg-info/ 2>/dev/null || true
+    echo "✅ Cleanup complete"
+
