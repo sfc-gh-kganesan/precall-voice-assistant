@@ -7,7 +7,26 @@ Modern chat widget with AI-powered support for the Snowflake AI Data Cloud.
 - Docker & Docker Compose
 - Node.js 18+
 
+## Docker Setup
+
+This project uses shared Docker resources with AgentSmith:
+
+- **Shared Network** (`aura-shared-network`) - Allows webagent and agentsmith to communicate
+- **Shared Volume** (`aura-glean-tokens`) - Stores Glean OAuth tokens across services
+- **Shared Services** - glean-proxy and github-proxy run in webagent, consumed by agentsmith
+
+**Create the shared resources** (one-time setup):
+
+```bash
+docker network create aura-shared-network
+docker volume create aura-glean-tokens
+```
+
+These resources only need to be created once and will persist across container restarts.
+
 ## Quick Start
+
+**Note:** Make sure you've completed the [Docker Setup](#docker-setup) first (one-time setup).
 
 **1. Start the backend:**
 ```bash
@@ -68,7 +87,8 @@ That's it! The chat widget should appear in the bottom-right corner.
 - **Chat Widget** - TypeScript/React with Vite
 - **Backend API** - FastAPI + PydanticAI agent (port 8003)
 - **Demo Server** - Nginx serving static HTML (port 8004)
-- **Glean Proxy** - MCP server for internal knowledge (ports 8001, 8090)
+- **Glean Proxy** - MCP server for internal knowledge (ports 8001, 8090) - **shared with AgentSmith**
+- **GitHub Proxy** - MCP server for GitHub integration (port 8005) - **shared with AgentSmith**
 
 ## Development
 
@@ -120,18 +140,44 @@ OPENAI_API_KEY=sk-your-key-here
 
 # Conversation History Limit
 CONVERSATION_HISTORY_LIMIT=10
+
+# Glean Configuration (optional)
+# Controls whether webagent uses Glean for internal knowledge search
+# Set to 'false' to disable Glean access (webagent will only use Snowflake docs)
+# Set to 'true' to enable Glean search (requires glean-proxy service)
+# Note: When false, glean-proxy still starts for AgentSmith to use
+GLEAN_ENABLED=false
 ```
 
-### Running with Troubleshooting Services
+**About GLEAN_ENABLED:**
+- When `false` (default): The webagent only uses Cortex Search for Snowflake documentation. The glean-proxy service still starts to provide Glean access to AgentSmith.
+- When `true`: The webagent can also search internal Glean knowledge in addition to Snowflake docs.
 
-If you're also running the troubleshooting agent (which uses the same glean-proxy), start only the web-support-agent:
+### Running with AgentSmith
 
-```bash
-# Start only web-support-agent (skip glean-proxy to avoid port conflicts)
-docker compose up -d web-support-agent
-```
+This webagent project hosts shared services (glean-proxy and github-proxy) that AgentSmith connects to via the `aura-shared-network`.
 
-This reuses troubleshooting's glean-proxy service.
+**Startup order:**
+
+1. **Create shared resources** (if not already created):
+   ```bash
+   docker network create aura-shared-network
+   docker volume create aura-glean-tokens
+   ```
+
+2. **Start webagent** (hosts the shared services):
+   ```bash
+   cd /path/to/webagent
+   docker compose up -d
+   ```
+
+3. **Start agentsmith** (connects to shared services):
+   ```bash
+   cd /path/to/agentsmith
+   docker compose up -d
+   ```
+
+AgentSmith will automatically connect to the glean-proxy (port 8001) and github-proxy (port 8005) running in webagent.
 
 ## Troubleshooting
 

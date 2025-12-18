@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { projectsApi, simulationsApi } from '@/lib/api'
 import type { Project, Simulation } from '@/lib/types'
@@ -62,23 +62,58 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [latestInsights, setLatestInsights] = useState<any[]>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [conversationsExpanded, setConversationsExpanded] = useState(false)
+  const dataLoadedRef = useRef(false)
 
   useEffect(() => {
-    loadData()
-    loadMetrics()
-    loadConversations()
+    if (!dataLoadedRef.current) {
+      dataLoadedRef.current = true
+      loadAllData()
+    }
   }, [])
 
   useEffect(() => {
     loadConversations()
   }, [conversationsOffset, conversationsFilter, errorsOnly])
 
-  useEffect(() => {
-    // Load latest insights when simulations change
-    if (simulations.length > 0) {
-      loadLatestInsights()
+  const loadAllData = async () => {
+    try {
+      setLoading(true)
+
+      // Fetch everything in parallel
+      const [projectRes, simulationsRes, metricsRes, conversationsRes] = await Promise.all([
+        projectsApi.get(projectId),
+        projectsApi.getSimulations(projectId),
+        projectsApi.getMetrics(projectId),
+        projectsApi.getConversations(projectId, {
+          limit: conversationsLimit,
+          offset: conversationsOffset,
+          triggered_by: conversationsFilter || undefined,
+          errors_only: errorsOnly
+        })
+      ])
+
+      // Set all state
+      setProject(projectRes.data)
+      setSimulations(simulationsRes.data)
+      setMetrics(metricsRes.data)
+      setConversations(conversationsRes.data.conversations)
+      setConversationsTotal(conversationsRes.data.total)
+      setError(null)
+
+      // Load insights if we have completed simulations
+      const completedAnalyses = simulationsRes.data.filter((s: Simulation) => s.status === 'completed')
+      if (completedAnalyses.length > 0) {
+        await loadLatestInsights(completedAnalyses)
+      }
+    } catch (err) {
+      setError('Failed to load deployment data')
+      console.error(err)
+    } finally {
+      setLoading(false)
+      setMetricsLoading(false)
+      setConversationsLoading(false)
     }
-  }, [simulations])
+  }
 
   const loadData = async () => {
     try {
@@ -90,9 +125,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       setProject(projectRes.data)
       setSimulations(simulationsRes.data)
       setError(null)
-
-      // Load latest insights after simulations are loaded
-      // We'll call it separately since it depends on simulations state
     } catch (err) {
       setError('Failed to load deployment data')
       console.error(err)
@@ -131,11 +163,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const loadLatestInsights = async () => {
+  const loadLatestInsights = async (completedSimulations?: Simulation[]) => {
     try {
       setInsightsLoading(true)
       // Find the most recent completed analysis
-      const completedAnalyses = simulations.filter(s => s.status === 'completed').sort((a, b) => {
+      const completedAnalyses = (completedSimulations || simulations).filter(s => s.status === 'completed').sort((a, b) => {
         return new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime()
       })
 

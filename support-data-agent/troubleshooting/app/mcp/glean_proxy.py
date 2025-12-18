@@ -12,6 +12,7 @@ Usage:
 """
 
 import asyncio
+import keyword
 import logging
 import os
 
@@ -78,6 +79,11 @@ EXCLUDED_TOOLS = {
 glean_client = None
 
 
+def sanitize_param_name(name: str) -> str:
+    """Sanitize parameter name by appending underscore if it's a Python keyword."""
+    return f"{name}_" if keyword.iskeyword(name) else name
+
+
 def create_tool_wrapper(tool_name: str, input_schema: dict, glean_client):
     """
     Dynamically create a wrapper function with explicit parameters from JSON schema.
@@ -90,11 +96,17 @@ def create_tool_wrapper(tool_name: str, input_schema: dict, glean_client):
     required_fields = set(input_schema.get("required", []))
 
     # Build function parameters and extract parameter names
-    param_signatures = []
+    required_params = []
+    optional_params = []
     param_names = []
+    param_mapping = {}  # Maps sanitized name → original name
 
     for param_name, param_schema in properties.items():
         param_type = param_schema.get("type", "string")
+
+        # Sanitize parameter name to avoid Python reserved keywords
+        safe_param_name = sanitize_param_name(param_name)
+        param_mapping[safe_param_name] = param_name
 
         # Map JSON schema types to Python type hints
         type_hint = {
@@ -106,22 +118,22 @@ def create_tool_wrapper(tool_name: str, input_schema: dict, glean_client):
             "object": "dict",
         }.get(param_type, "str")
 
-        # Add parameter with type hint
+        # Separate required and optional parameters (required must come first in Python)
         if param_name in required_fields:
-            param_signatures.append(f"{param_name}: {type_hint}")
+            required_params.append(f"{safe_param_name}: {type_hint}")
         else:
-            param_signatures.append(f"{param_name}: {type_hint} = None")
+            optional_params.append(f"{safe_param_name}: {type_hint} = None")
 
-        # Store just the parameter name for later use
-        param_names.append(param_name)
+        # Store sanitized parameter name
+        param_names.append(safe_param_name)
 
-    # Generate function code
-    param_str = ", ".join(param_signatures)
+    # Generate function code (required params first, then optional)
+    param_str = ", ".join(required_params + optional_params)
 
-    # Build parameter collection code
+    # Build parameter collection code (map back to original names for Glean API)
     param_collection = "\n".join(
-        f"    if {name} is not None:\n        params['{name}'] = {name}"
-        for name in param_names
+        f"    if {safe_name} is not None:\n        params['{param_mapping[safe_name]}'] = {safe_name}"
+        for safe_name in param_names
     )
 
     func_code = f'''
