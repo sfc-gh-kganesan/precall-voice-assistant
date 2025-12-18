@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { ProjectConfig } from '@p67-cli/config/ProjectConfig.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
+import type { SnowflakePat1p } from '@p67-cli/secrets/1password.ts';
 
 export const deployCommand = new Command('deploy')
   .description('Deploy a workflow from a zip file')
@@ -19,10 +20,18 @@ export const deployCommand = new Command('deploy')
         process.exit(1);
       }
 
-      const pat = getSnowflakePat();
-      if (!pat.value) {
-        console.error('Unable to load Snowflake PAT from 1password.');
-        process.exit(1);
+      console.log(config);
+
+      // If we're running on localhost, we don't need a PAT.
+      let pat: SnowflakePat1p | null = null;
+      if (config.getRuntimeEndpoint().includes('localhost')) {
+        pat = null;
+      } else {
+        pat = getSnowflakePat();
+        if (!pat.value) {
+          console.error('Unable to load Snowflake PAT from 1password.');
+          process.exit(1);
+        }
       }
 
       // Resolve the file path
@@ -49,7 +58,7 @@ export const deployCommand = new Command('deploy')
       const filename = path.basename(resolvedPath);
 
       const endpoint = config.getRuntimeEndpoint();
-      const client = new ControldClient({ baseUrl: endpoint, pat: pat.value });
+      const client = new ControldClient({ baseUrl: endpoint, pat: pat?.value || '' });
 
       const result = await client.createWorkflow(blob, filename);
 

@@ -3,6 +3,7 @@ import { select } from '@inquirer/prompts';
 import { ProjectConfig } from '@p67-cli/config/ProjectConfig.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
+import type { SnowflakePat1p } from '@p67-cli/secrets/1password.ts';
 
 export const runCommand = new Command('run')
   .description('Run a workflow')
@@ -17,15 +18,20 @@ export const runCommand = new Command('run')
         console.error('  Run "p67 init" to create a configuration file');
         process.exit(1);
       }
-
-      const pat = getSnowflakePat();
-      if (!pat.value) {
-        console.error('Unable to load Snowflake PAT from 1password.');
-        process.exit(1);
+      // If we're running on localhost, we don't need a PAT.
+      let pat: SnowflakePat1p | null = null;
+      if (config.getRuntimeEndpoint().includes('localhost')) {
+        pat = null;
+      } else {
+        pat = getSnowflakePat();
+        if (!pat.value) {
+          console.error('Unable to load Snowflake PAT from 1password.');
+          process.exit(1);
+        }
       }
 
       const endpoint = config.getRuntimeEndpoint();
-      const client = new ControldClient({ baseUrl: endpoint, pat: pat.value });
+      const client = new ControldClient({ baseUrl: endpoint, pat: pat?.value || '' });
 
       let selectedWorkflowId = workflowId;
 
