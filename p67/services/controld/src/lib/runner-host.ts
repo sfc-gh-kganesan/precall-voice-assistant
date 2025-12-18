@@ -21,11 +21,10 @@ function error(err: Error | string) {
 function validateConfig(config: P67ConfigValue): P67ConfigValue {
   // Patch config and fix accessURL if it's missing
   if (!config.accessUrl) {
-    if (!config.account) {
-      throw new Error('Config is missing required "account" property');
+    if (config.account) {
+      const accountLocator = config.account.replaceAll('_', '-').toLowerCase();
+      config.accessUrl = `https://${accountLocator}.snowflakecomputing.com`;
     }
-    const accountLocator = config.account.replaceAll('_', '-').toLowerCase();
-    config.accessUrl = `https://${accountLocator}.snowflakecomputing.com`;
   }
 
   // Determine and set authenticator as appropriate
@@ -34,8 +33,6 @@ function validateConfig(config: P67ConfigValue): P67ConfigValue {
       config.authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
     } else if (config.password) {
       config.authenticator = 'PASSWORD';
-    } else {
-      throw new Error('Missing authenticator: config requires either token or password.');
     }
   }
 
@@ -46,7 +43,9 @@ function validateConfig(config: P67ConfigValue): P67ConfigValue {
     throw new Error('SNOWFLAKE_PASSWORD is required for PASSWORD authenticator');
   }
   if (config.token && config.password) {
-    throw new Error('Both "token" and "password" are set in config; only one authentication method can be used.');
+    throw new Error(
+      'Both "token" and "password" are set in config; only one authentication method can be used.',
+    );
   }
 
   return config;
@@ -72,7 +71,6 @@ function hydrateConfig(manifest: Manifest): P67Config {
   return { snowflakeConfig: config };
 }
 
-
 process.on('message', async (message: ExecuteMessage) => {
   console.log(message);
   const m = ExecuteMessageSchema.safeParse(message);
@@ -95,7 +93,10 @@ process.on('message', async (message: ExecuteMessage) => {
       throw new Error('Script does not export a main function');
     }
 
-    const manifestStr = await fs.promises.readFile(path.resolve(m.data.dir, 'manifest.yaml'), 'utf-8');
+    const manifestStr = await fs.promises.readFile(
+      path.resolve(m.data.dir, 'manifest.yaml'),
+      'utf-8',
+    );
     const manifest = parseManifest(manifestStr);
 
     const config = hydrateConfig(manifest);

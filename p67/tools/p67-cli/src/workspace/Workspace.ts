@@ -4,6 +4,7 @@ import buildjs from '@p67-cli/workspace/boiler-plate/build.js.src' with { type: 
 import packagejson from '@p67-cli/workspace/boiler-plate/package.json.src' with { type: 'file' };
 import tsconfigjson from '@p67-cli/workspace/boiler-plate/tsconfig.json.src' with { type: 'file' };
 import makefile from '@p67-cli/workspace/boiler-plate/Makefile.src' with { type: 'file' };
+import manifestyaml from '@p67-cli/workspace/boiler-plate/manifest.yaml.src' with { type: 'file' };
 import { mkdir } from 'node:fs/promises';
 import { file } from 'bun';
 import { join, dirname } from 'path';
@@ -15,6 +16,7 @@ const files: Record<string, string> = {
   [packagejson]: 'package.json',
   [tsconfigjson]: 'tsconfig.json',
   [makefile]: 'Makefile',
+  [manifestyaml]: 'manifest.yaml',
 };
 
 export class Workspace {

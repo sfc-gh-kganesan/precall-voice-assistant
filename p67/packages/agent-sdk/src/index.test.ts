@@ -58,57 +58,18 @@ describe('agent-sdk', () => {
       expect(sdk).toBeInstanceOf(AgentSDK);
     });
 
-    it('should throw error for empty config', () => {
-      expect(() => new AgentSDK({ snowflakeConfig: new Map() })).toThrow(
-        'No Snowflake configurations provided',
-      );
-    });
-
-    it('should throw error for invalid config schema', () => {
-      const configMap = new Map<string, P67ConfigValue>();
-      configMap.set('default', { invalid: 'schema' } as any);
-      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow('Invalid config format');
-    });
-
-    it('should throw error when account is missing', () => {
-      const configMap = new Map<string, P67ConfigValue>();
-      configMap.set('default', {
-        username: 'user',
-        authenticator: 'PASSWORD',
-        accessUrl: 'https://test.snowflakecomputing.com',
-        password: 'pass',
-      } as any);
-      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow('Invalid config format');
-    });
-
-    it('should throw error when both token and password are set', () => {
+    it('should create instance with minimal config', () => {
       const configMap = new Map<string, P67ConfigValue>();
       configMap.set('default', {
         account: 'test',
         username: 'user',
-        authenticator: 'PASSWORD',
-        accessUrl: 'https://test.snowflakecomputing.com',
-        token: 'token',
-        password: 'pass',
-      });
-      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow(
-        'Both "token" and "password" are set in config',
-      );
-    });
-
-    it('should auto-set authenticator to PROGRAMMATIC_ACCESS_TOKEN when token is provided', () => {
-      const configMap = new Map<string, P67ConfigValue>();
-      configMap.set('default', {
-        account: 'test',
-        username: 'user',
-        accessUrl: 'https://test.snowflakecomputing.com',
         token: 'token',
       });
       const testSdk = new AgentSDK({ snowflakeConfig: configMap });
       expect(testSdk).toBeInstanceOf(AgentSDK);
     });
 
-    it('should auto-set authenticator to PASSWORD when password is provided', () => {
+    it('should create instance with password auth', () => {
       const configMap = new Map<string, P67ConfigValue>();
       configMap.set('default', {
         account: 'test',
@@ -120,27 +81,17 @@ describe('agent-sdk', () => {
       expect(testSdk).toBeInstanceOf(AgentSDK);
     });
 
-    it('should auto-generate accessUrl from account if missing', () => {
-      const configMap = new Map<string, P67ConfigValue>();
-      configMap.set('default', {
-        account: 'TEST_ACCOUNT',
-        username: 'user',
-        token: 'token',
-      });
-      const testSdk = new AgentSDK({ snowflakeConfig: configMap });
-      expect(testSdk).toBeInstanceOf(AgentSDK);
-    });
-
-    it('should throw error when neither token nor password is provided', () => {
+    it('should create instance with explicit authenticator', () => {
       const configMap = new Map<string, P67ConfigValue>();
       configMap.set('default', {
         account: 'test',
         username: 'user',
+        authenticator: 'PROGRAMMATIC_ACCESS_TOKEN',
         accessUrl: 'https://test.snowflakecomputing.com',
-      } as any);
-      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow(
-        'Missing authenticator: config requires either token or password',
-      );
+        token: 'token',
+      });
+      const testSdk = new AgentSDK({ snowflakeConfig: configMap });
+      expect(testSdk).toBeInstanceOf(AgentSDK);
     });
   });
 

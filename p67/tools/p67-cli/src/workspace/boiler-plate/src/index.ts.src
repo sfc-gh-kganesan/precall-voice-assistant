@@ -1,4 +1,5 @@
 import { StateGraph, Annotation } from "@langchain/langgraph";
+import { AgentSDK } from "./sdk.js";
 
 // Define the state structure
 const StateAnnotation = Annotation.Root({
@@ -6,6 +7,9 @@ const StateAnnotation = Annotation.Root({
         reducer: (left, right) => left.concat(right),
     }),
     currentNode: Annotation<string>({
+        reducer: (_, right) => right,
+    }),
+    sdk: Annotation<AgentSDK>({
         reducer: (_, right) => right,
     }),
 });
@@ -51,12 +55,13 @@ const workflow = new StateGraph(StateAnnotation)
 const app = workflow.compile();
 
 // Execute the graph
-export async function main() {
+export async function main(sdk: AgentSDK) {
     console.log("Starting LangGraph execution...\n");
 
     const result = await app.invoke({
         messages: [],
         currentNode: "",
+        sdk: sdk,
     });
 
     console.log("\n=== Final Result ===");

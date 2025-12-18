@@ -14,7 +14,7 @@ export interface ExecuteMessage {
 }
 
 export class Runner {
-  constructor(private readonly workflowDir: string) { }
+  constructor(private readonly workflowDir: string) {}
 
   public async start(): Promise<RunResult> {
     console.log(`Running workflow from ${this.workflowDir}...`);

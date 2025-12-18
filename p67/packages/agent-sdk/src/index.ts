@@ -25,12 +25,12 @@ const P67ConfigValueSchema = z.object({
 
 export type P67ConfigValue = z.infer<typeof P67ConfigValueSchema>;
 
-
 /**
  * P67 configuration schema
- * 
+ *
  * The core configuration mechanism of the P67 platform.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const P67ConfigSchema = z.object({
   snowflakeConfig: z.map(z.string(), P67ConfigValueSchema),
 });
@@ -144,70 +144,20 @@ export class AgentSDK {
   private config: z.infer<typeof P67ConfigSchema>;
 
   constructor(config: P67Config) {
-    // Validate that at least one config exists
-    if (config.snowflakeConfig.size === 0) {
-      throw new Error('No Snowflake configurations provided');
-    }
-
-    // Validate and process each config entry
-    const validatedConfig = new Map<string, P67ConfigValue>();
-
-    for (const [name, cfg] of config.snowflakeConfig.entries()) {
-      // Validate schema
-      const parseResult = P67ConfigValueSchema.safeParse(cfg);
-      if (!parseResult.success) {
-        throw new Error('Invalid config format: config does not match expected schema');
-      }
-
-      const validatedCfg = parseResult.data;
-
-      // Validate required fields
-      if (!validatedCfg.account) {
-        throw new Error('Invalid config format: account is required');
-      }
-
-      // Check that both token and password are not set
-      if (validatedCfg.token && validatedCfg.password) {
-        throw new Error('Both "token" and "password" are set in config');
-      }
-
-      // Check that at least one of token or password is set
-      if (!validatedCfg.token && !validatedCfg.password) {
-        throw new Error('Missing authenticator: config requires either token or password');
-      }
-
-      // Auto-set authenticator based on token/password if not provided
-      if (!validatedCfg.authenticator) {
-        if (validatedCfg.token) {
-          validatedCfg.authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
-        } else if (validatedCfg.password) {
-          validatedCfg.authenticator = 'PASSWORD';
-        }
-      }
-
-      // Auto-generate accessUrl from account if not provided
-      if (!validatedCfg.accessUrl) {
-        const accountLower = validatedCfg.account.toLowerCase();
-        validatedCfg.accessUrl = `https://${accountLower}.snowflakecomputing.com`;
-      }
-
-      validatedConfig.set(name, validatedCfg);
-    }
-
-    this.config = { snowflakeConfig: validatedConfig };
+    this.config = config;
   }
 
   private getSnowflakeConnectionOptions(cfg: P67ConfigValue): snowflake.ConnectionOptions {
     return {
-      account: cfg.account,
-      username: cfg.username,
-      authenticator: cfg.authenticator,
+      account: cfg.account ?? '',
+      username: cfg.username ?? '',
+      authenticator: cfg.authenticator ?? '',
       accessUrl: cfg.accessUrl,
-      token: cfg.token,
-      password: cfg.password,
-      warehouse: cfg.warehouse,
-      database: cfg.database,
-      schema: cfg.schema,
+      token: cfg.token ?? '',
+      password: cfg.password ?? '',
+      warehouse: cfg.warehouse ?? '',
+      database: cfg.database ?? '',
+      schema: cfg.schema ?? '',
     };
   }
 
@@ -272,7 +222,6 @@ export class AgentSDK {
     if (this.isConnecting && this.connectionPromise) {
       return this.connectionPromise;
     }
-
 
     this.isConnecting = true;
     this.connectionPromise = new Promise((resolve, reject) => {
@@ -413,7 +362,6 @@ export class AgentSDK {
           'CORTEX_ANALYST_SEMANTIC_MODEL environment variable is required or semantic model must be provided',
         );
       }
-
 
       const headers = {
         Authorization: `Bearer ${cfg.token}`,

@@ -5,9 +5,10 @@ all: dist zip
 clean:
 	rm -rf ./dist
 
-dist:
+dist: src/* manifest.yaml
 	npm install
 	npm run build
+	cp manifest.yaml dist/
 
 zip:
 	cd dist && rm -f workflow.zip && zip -r -X ./workflow.zip .
