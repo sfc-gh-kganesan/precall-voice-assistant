@@ -1,0 +1,189 @@
+{
+  "type": "json",
+  "schema": {
+    "type": "object",
+    "description": "Simple schema for extracting key contract terms for later non-compliance analysis.",
+    "required": ["document", "parties", "terms"],
+    "properties": {
+      "document": {
+        "type": "object",
+        "description": "Basic information about the contract or amendment.",
+        "required": ["suncor_agrmnt_num", "counter_party_agrmnt_num", "title"],
+        "properties": {
+          "suncor_agrmnt_num": {
+            "type": "string",
+            "description": "Suncor Agreement Number - Suncor identifier or filename for this document or agreement."
+          },
+          "counter_party_agrmnt_num": {
+            "type": "string",
+            "description": "Counter Party Agreement Number - Agreement numberor filename associated with Counter Party."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title or description of the contract."
+          },
+          "effective_start": {
+            "type": "string",
+            "description": "Effective start date if stated (free-form, not necessarily ISO)."
+          },
+          "effective_end": {
+            "type": "string",
+            "description": "Effective end date or term description if stated."
+          },
+          "governing_law": {
+            "type": "string",
+            "description": "Governing law / jurisdiction if stated."
+          },
+          "amends_documents": {
+            "type": "array",
+            "description": "Identifiers of prior documents this document amends or supersedes.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "parties": {
+        "type": "array",
+        "description": "Parties mentioned in the contract.",
+        "items": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Legal or business name, e.g. \"Suncor Energy Inc.\"."
+            },
+            "short_name": {
+              "type": "string",
+              "description": "Short name or defined term in the contract, e.g. \"Seller\", \"Suncor\"."
+            },
+            "role": {
+              "type": "string",
+              "description": "Role in the contract, e.g. \"Buyer\", \"Seller\", \"Operator\"."
+            }
+          }
+        }
+      },
+      "terms": {
+        "type": "array",
+        "description": "Key terms/obligations/specifications that can be evaluated for compliance.",
+        "items": {
+          "type": "object",
+          "required": ["term_id", "category", "summary", "source_text"],
+          "properties": {
+            "term_id": {
+              "type": "string",
+              "description": "Unique id for this extracted term within this document."
+            },
+            "category": {
+              "type": "string",
+              "description": "High-level category of the term.",
+              "enum": [
+                "Payment",
+                "Delivery",
+                "Quality",
+                "Pricing",
+                "FeeOrPenalty",
+                "Reporting",
+                "CreditOrSecurity",
+                "Operational",
+                "ForceMajeureOrException",
+                "Other"
+              ]
+            },
+            "summary": {
+              "type": "string",
+              "description": "Short plain-language summary of what this term requires or specifies."
+            },
+            "obligor": {
+              "type": "string",
+              "description": "Party primarily responsible for complying with this term (use party name or short_name)."
+            },
+            "obligee": {
+              "type": "string",
+              "description": "Party that benefits from or can enforce this term (if clear)."
+            },
+            "conditions": {
+              "type": "array",
+              "description": "Short descriptions of conditions under which this term applies (e.g. \"only undisputed invoices\").",
+              "items": {
+                "type": "string"
+              }
+            },
+            "timeframe": {
+              "type": "object",
+              "description": "Timing information relevant to compliance for this term.",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "Plain description of timing, e.g. \"within 5 Business Days after invoice receipt\"."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type of timing rule, if identifiable.",
+                  "enum": ["RelativeToEvent", "FixedDate", "Recurring", "NotSpecified", "Other"]
+                },
+                "anchor_event": {
+                  "type": "string",
+                  "description": "Name or description of the event the timing is relative to, e.g. \"invoice receipt\", \"cargo delivery\"."
+                },
+                "offset_value": {
+                  "type": "string",
+                  "description": "Offset as described in the contract, e.g. \"5 Business Days\", \"30 days\", \"end of month\"."
+                }
+              }
+            },
+            "quantitative_details": {
+              "type": "object",
+              "description": "Numeric or measurable aspects of the term, if any.",
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "description": "Amount or quantity as described, e.g. \"100,000 bbl per month\", \"USD 25,000 per day\"."
+                },
+                "unit": {
+                  "type": "string",
+                  "description": "Unit of measure or currency, e.g. \"bbl\", \"m3\", \"USD\", \"CAD\"."
+                },
+                "tolerance_or_range": {
+                  "type": "string",
+                  "description": "Any stated tolerance or range, e.g. \"+/- 5%\", \"minimum 34 API\"."
+                },
+                "price_or_rate_formula": {
+                  "type": "string",
+                  "description": "Any described formula for price, rate, interest, or fees."
+                }
+              }
+            },
+            "exceptions_or_relief": {
+              "type": "string",
+              "description": "Any exceptions, relief clauses, or references to force majeure that modify this term."
+            },
+            "remedies_or_consequences": {
+              "type": "string",
+              "description": "Any described consequences, penalties, interest, or remedies for non-compliance with this term."
+            },
+            "source_text": {
+              "type": "string",
+              "description": "Exact or near-exact text from the contract that this term is based on."
+            },
+            "source_location": {
+              "type": "string",
+              "description": "Location in the document (e.g. \"Section 5.2\", \"Page 14, paragraph 3\")."
+            },
+            "confidence": {
+              "type": "number",
+              "description": "Model confidence in this extraction between 0 and 1."
+            },
+            "comments": {
+              "type": "string",
+              "description": "Any notes about ambiguity, interpretation choices, or alternative readings."
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
