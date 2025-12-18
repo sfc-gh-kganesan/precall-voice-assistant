@@ -7,13 +7,6 @@ vi.mock('snowflake-sdk', () => ({
   },
 }));
 
-// Mock dotenv
-vi.mock('dotenv', () => ({
-  default: {
-    config: vi.fn(),
-  },
-}));
-
 import {
   AgentSDK,
   version,
@@ -21,31 +14,36 @@ import {
   type CortexAgentResponse,
   type AgentStreamEvent,
   type CortexAgentOptions,
+  type P67ConfigValue,
 } from './index.js';
 
-const originalEnv = process.env;
+// Helper to create valid config Map
+const createValidConfig = (overrides?: Partial<P67ConfigValue>) => {
+  const configMap = new Map<string, P67ConfigValue>();
+  configMap.set('default', {
+    account: 'test_account',
+    username: 'test_user',
+    authenticator: 'PROGRAMMATIC_ACCESS_TOKEN',
+    accessUrl: 'https://test-account.snowflakecomputing.com',
+    token: 'test_token',
+    warehouse: 'test_warehouse',
+    database: 'test_database',
+    schema: 'test_schema',
+    ...overrides,
+  });
+  return configMap;
+};
 
 describe('agent-sdk', () => {
   let sdk: AgentSDK;
 
   beforeEach(() => {
     vi.resetModules();
-    process.env = {
-      ...originalEnv,
-      SNOWFLAKE_ACCOUNT: 'test_account',
-      SNOWFLAKE_USER: 'test_user',
-      SNOWFLAKE_TOKEN: 'test_token',
-      SNOWFLAKE_PASSWORD: 'test_password',
-      SNOWFLAKE_WAREHOUSE: 'test_warehouse',
-      SNOWFLAKE_DATABASE: 'test_database',
-      SNOWFLAKE_SCHEMA: 'test_schema',
-    };
-    sdk = new AgentSDK();
+    sdk = new AgentSDK({ snowflakeConfig: createValidConfig() });
   });
 
   afterEach(async () => {
     await sdk.close();
-    process.env = originalEnv;
     vi.clearAllMocks();
   });
 
@@ -58,6 +56,91 @@ describe('agent-sdk', () => {
   describe('AgentSDK class', () => {
     it('should create an instance', () => {
       expect(sdk).toBeInstanceOf(AgentSDK);
+    });
+
+    it('should throw error for empty config', () => {
+      expect(() => new AgentSDK({ snowflakeConfig: new Map() })).toThrow(
+        'No Snowflake configurations provided',
+      );
+    });
+
+    it('should throw error for invalid config schema', () => {
+      const configMap = new Map<string, P67ConfigValue>();
+      configMap.set('default', { invalid: 'schema' } as any);
+      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow('Invalid config format');
+    });
+
+    it('should throw error when account is missing', () => {
+      const configMap = new Map<string, P67ConfigValue>();
+      configMap.set('default', {
+        username: 'user',
+        authenticator: 'PASSWORD',
+        accessUrl: 'https://test.snowflakecomputing.com',
+        password: 'pass',
+      } as any);
+      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow('Invalid config format');
+    });
+
+    it('should throw error when both token and password are set', () => {
+      const configMap = new Map<string, P67ConfigValue>();
+      configMap.set('default', {
+        account: 'test',
+        username: 'user',
+        authenticator: 'PASSWORD',
+        accessUrl: 'https://test.snowflakecomputing.com',
+        token: 'token',
+        password: 'pass',
+      });
+      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow(
+        'Both "token" and "password" are set in config',
+      );
+    });
+
+    it('should auto-set authenticator to PROGRAMMATIC_ACCESS_TOKEN when token is provided', () => {
+      const configMap = new Map<string, P67ConfigValue>();
+      configMap.set('default', {
+        account: 'test',
+        username: 'user',
+        accessUrl: 'https://test.snowflakecomputing.com',
+        token: 'token',
+      });
+      const testSdk = new AgentSDK({ snowflakeConfig: configMap });
+      expect(testSdk).toBeInstanceOf(AgentSDK);
+    });
+
+    it('should auto-set authenticator to PASSWORD when password is provided', () => {
+      const configMap = new Map<string, P67ConfigValue>();
+      configMap.set('default', {
+        account: 'test',
+        username: 'user',
+        accessUrl: 'https://test.snowflakecomputing.com',
+        password: 'pass',
+      });
+      const testSdk = new AgentSDK({ snowflakeConfig: configMap });
+      expect(testSdk).toBeInstanceOf(AgentSDK);
+    });
+
+    it('should auto-generate accessUrl from account if missing', () => {
+      const configMap = new Map<string, P67ConfigValue>();
+      configMap.set('default', {
+        account: 'TEST_ACCOUNT',
+        username: 'user',
+        token: 'token',
+      });
+      const testSdk = new AgentSDK({ snowflakeConfig: configMap });
+      expect(testSdk).toBeInstanceOf(AgentSDK);
+    });
+
+    it('should throw error when neither token nor password is provided', () => {
+      const configMap = new Map<string, P67ConfigValue>();
+      configMap.set('default', {
+        account: 'test',
+        username: 'user',
+        accessUrl: 'https://test.snowflakecomputing.com',
+      } as any);
+      expect(() => new AgentSDK({ snowflakeConfig: configMap })).toThrow(
+        'Missing authenticator: config requires either token or password',
+      );
     });
   });
 
@@ -172,23 +255,13 @@ describe('agent-sdk', () => {
   });
 
   describe('queryCortexAnalyst', () => {
-    it('should throw error when semantic model is missing', async () => {
+    it('should return error when semantic model is missing', async () => {
       delete process.env.CORTEX_ANALYST_SEMANTIC_MODEL;
 
       const result = await sdk.queryCortexAnalyst('test question');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('CORTEX_ANALYST_SEMANTIC_MODEL');
-    });
-
-    it('should throw error when SNOWFLAKE_ACCOUNT is missing', async () => {
-      process.env.CORTEX_ANALYST_SEMANTIC_MODEL = '@stage/model.yaml';
-      delete process.env.SNOWFLAKE_ACCOUNT;
-
-      const result = await sdk.queryCortexAnalyst('test question');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('SNOWFLAKE_ACCOUNT');
     });
 
     /*

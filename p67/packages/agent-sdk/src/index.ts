@@ -9,22 +9,33 @@
 export const version = '0.1.0';
 
 import snowflake from 'snowflake-sdk';
-import dotenv from 'dotenv';
+import { z } from 'zod';
+
+const P67ConfigValueSchema = z.object({
+  account: z.string().optional(),
+  username: z.string().optional(),
+  authenticator: z.string().optional(),
+  accessUrl: z.string().optional(),
+  token: z.string().optional(),
+  password: z.string().optional(),
+  warehouse: z.string().optional(),
+  database: z.string().optional(),
+  schema: z.string().optional(),
+});
+
+export type P67ConfigValue = z.infer<typeof P67ConfigValueSchema>;
+
 
 /**
- * Snowflake connection configuration
+ * P67 configuration schema
+ * 
+ * The core configuration mechanism of the P67 platform.
  */
-export interface SnowflakeConfig {
-  account: string;
-  username: string;
-  authenticator: string;
-  accessUrl: string;
-  token?: string;
-  password?: string;
-  warehouse?: string;
-  database?: string;
-  schema?: string;
-}
+const P67ConfigSchema = z.object({
+  snowflakeConfig: z.map(z.string(), P67ConfigValueSchema),
+});
+
+export type P67Config = z.infer<typeof P67ConfigSchema>;
 
 /**
  * Query execution result
@@ -85,11 +96,29 @@ export interface CortexAgentOptions {
  * P67 Agent SDK Client
  * Encapsulates all API functions for interacting with Snowflake and Cortex services
  *
- * @example
- * // Load environment variables
- * dotenv.config();
+ * Configuration is loaded from /tmp/config as JSON with the following structure:
+ * {
+ *   "snowflakeConfig": {
+ *     "account": "string (required)",
+ *     "username": "string (required)",
+ *     "authenticator": "string (optional - auto-set based on token/password)",
+ *     "accessUrl": "string (optional - auto-generated from account)",
+ *     "token": "string (optional - required for token auth)",
+ *     "password": "string (optional - required for password auth)",
+ *     "warehouse": "string (optional)",
+ *     "database": "string (optional)",
+ *     "schema": "string (optional)"
+ *   }
+ * }
  *
- * // Create client instance
+ * Note: Either token or password must be provided (but not both).
+ *       If authenticator is not provided, it will be auto-set to:
+ *       - "PROGRAMMATIC_ACCESS_TOKEN" if token is provided
+ *       - "PASSWORD" if password is provided
+ *       If accessUrl is not provided, it will be generated from the account.
+ *
+ * @example
+ * // Create client instance (reads config from /tmp/config)
  * const sdk = new AgentSDK();
  *
  * // Execute queries
@@ -112,67 +141,91 @@ export class AgentSDK {
   private cachedConnection: snowflake.Connection | null = null;
   private isConnecting = false;
   private connectionPromise: Promise<snowflake.Connection> | null = null;
+  private config: z.infer<typeof P67ConfigSchema>;
 
-  constructor() {
-    dotenv.config();
+  constructor(config: P67Config) {
+    // Validate that at least one config exists
+    if (config.snowflakeConfig.size === 0) {
+      throw new Error('No Snowflake configurations provided');
+    }
+
+    // Validate and process each config entry
+    const validatedConfig = new Map<string, P67ConfigValue>();
+
+    for (const [name, cfg] of config.snowflakeConfig.entries()) {
+      // Validate schema
+      const parseResult = P67ConfigValueSchema.safeParse(cfg);
+      if (!parseResult.success) {
+        throw new Error('Invalid config format: config does not match expected schema');
+      }
+
+      const validatedCfg = parseResult.data;
+
+      // Validate required fields
+      if (!validatedCfg.account) {
+        throw new Error('Invalid config format: account is required');
+      }
+
+      // Check that both token and password are not set
+      if (validatedCfg.token && validatedCfg.password) {
+        throw new Error('Both "token" and "password" are set in config');
+      }
+
+      // Check that at least one of token or password is set
+      if (!validatedCfg.token && !validatedCfg.password) {
+        throw new Error('Missing authenticator: config requires either token or password');
+      }
+
+      // Auto-set authenticator based on token/password if not provided
+      if (!validatedCfg.authenticator) {
+        if (validatedCfg.token) {
+          validatedCfg.authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
+        } else if (validatedCfg.password) {
+          validatedCfg.authenticator = 'PASSWORD';
+        }
+      }
+
+      // Auto-generate accessUrl from account if not provided
+      if (!validatedCfg.accessUrl) {
+        const accountLower = validatedCfg.account.toLowerCase();
+        validatedCfg.accessUrl = `https://${accountLower}.snowflakecomputing.com`;
+      }
+
+      validatedConfig.set(name, validatedCfg);
+    }
+
+    this.config = { snowflakeConfig: validatedConfig };
   }
 
-  /**
-   * Gets Snowflake connection configuration from environment variables
-   * @throws {Error} If required environment variables are missing
-   * @returns {SnowflakeConfig} Connection configuration
-   */
-  private getConnectionConfig(): SnowflakeConfig {
-    const account = process.env.SNOWFLAKE_ACCOUNT;
-    const username = process.env.SNOWFLAKE_USER;
-
-    if (!account) {
-      throw new Error('SNOWFLAKE_ACCOUNT environment variable is required');
-    }
-
-    if (!username) {
-      throw new Error('SNOWFLAKE_USER environment variable is required');
-    }
-
-    let accessUrl = process.env.SNOWFLAKE_ACCESS_URL;
-    if (!accessUrl) {
-      const accountLocator = account.replaceAll('_', '-').toLowerCase();
-      accessUrl = `https://${accountLocator}.snowflakecomputing.com`;
-    }
-
-    let authenticator = process.env.SNOWFLAKE_AUTHENTICATOR;
-    const token = process.env.SNOWFLAKE_TOKEN;
-    const password = process.env.SNOWFLAKE_PASSWORD;
-    if (!authenticator) {
-      if (token) {
-        authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
-      } else if (password) {
-        authenticator = 'PASSWORD';
-      } else {
-        throw new Error('SNOWFLAKE_AUTHENTICATOR environment variable is required');
-      }
-    }
-    if (authenticator === 'PROGRAMMATIC_ACCESS_TOKEN' && !token) {
-      throw new Error('SNOWFLAKE_TOKEN environment variable is required');
-    }
-    if (authenticator === 'PASSWORD' && !password) {
-      throw new Error('SNOWFLAKE_PASSWORD environment variable is required');
-    }
-    if (token && password) {
-      throw new Error('SNOWFLAKE_TOKEN and SNOWFLAKE_PASSWORD cannot be used together');
-    }
-
+  private getSnowflakeConnectionOptions(cfg: P67ConfigValue): snowflake.ConnectionOptions {
     return {
-      account,
-      username,
-      authenticator,
-      accessUrl,
-      token,
-      password,
-      warehouse: process.env.SNOWFLAKE_WAREHOUSE,
-      database: process.env.SNOWFLAKE_DATABASE,
-      schema: process.env.SNOWFLAKE_SCHEMA,
+      account: cfg.account,
+      username: cfg.username,
+      authenticator: cfg.authenticator,
+      accessUrl: cfg.accessUrl,
+      token: cfg.token,
+      password: cfg.password,
+      warehouse: cfg.warehouse,
+      database: cfg.database,
+      schema: cfg.schema,
     };
+  }
+
+  private cfg(config_name?: string): P67ConfigValue {
+    if (config_name) {
+      if (!this.config.snowflakeConfig.has(config_name)) {
+        throw new Error(`Config ${config_name} not found`);
+      }
+      return P67ConfigValueSchema.parse(this.config.snowflakeConfig.get(config_name));
+    }
+    // Get the only one if it exists
+    if (this.config.snowflakeConfig.size === 0) {
+      throw new Error('No Snowflake configurations available');
+    }
+    if (this.config.snowflakeConfig.size === 1) {
+      return P67ConfigValueSchema.parse(this.config.snowflakeConfig.values().next().value);
+    }
+    throw new Error('Multiple Snowflake configs found, but no config name provided');
   }
 
   /**
@@ -203,17 +256,12 @@ export class AgentSDK {
 
   /**
    * Establishes a connection to Snowflake with caching and connection reuse
-   * Uses environment variables for configuration:
-   * - SNOWFLAKE_ACCOUNT (required)
-   * - SNOWFLAKE_USER (required)
-   * - SNOWFLAKE_TOKEN or SNOWFLAKE_PASSWORD (exactly one of these is required)
-   * - SNOWFLAKE_WAREHOUSE (optional)
-   * - SNOWFLAKE_DATABASE (optional)
-   * - SNOWFLAKE_SCHEMA (optional)
+   * Uses configuration loaded from /tmp/config file
    * @returns {Promise<snowflake.Connection>} Connected Snowflake connection
-   * @throws {Error} If required environment variables are missing or connection fails
+   * @throws {Error} If required configuration values are missing or connection fails
    */
-  private async getSnowflakeConnection(): Promise<snowflake.Connection> {
+  private async getSnowflakeConnection(config_name?: string): Promise<snowflake.Connection> {
+    const cfg = this.cfg(config_name);
     if (this.cachedConnection) {
       const healthy = await this.isConnectionHealthy();
       if (healthy) {
@@ -225,11 +273,10 @@ export class AgentSDK {
       return this.connectionPromise;
     }
 
-    const config = this.getConnectionConfig();
 
     this.isConnecting = true;
     this.connectionPromise = new Promise((resolve, reject) => {
-      const connection = snowflake.createConnection(config);
+      const connection = snowflake.createConnection(this.getSnowflakeConnectionOptions(cfg));
 
       connection.connect((err, conn) => {
         this.isConnecting = false;
@@ -289,8 +336,8 @@ export class AgentSDK {
    * @returns {Promise<QueryResult>} Query results with statement and rows
    * @throws {Error} If query execution fails
    */
-  private async executeQuery(query: string): Promise<QueryResult> {
-    const conn = await this.getSnowflakeConnection();
+  private async executeQuery(query: string, config_name?: string): Promise<QueryResult> {
+    const conn = await this.getSnowflakeConnection(config_name);
 
     return new Promise((resolve, reject) => {
       conn.execute({
@@ -320,13 +367,13 @@ export class AgentSDK {
    * const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table LIMIT 10');
    * console.log(result.rows);
    */
-  async executeQueryReadOnly(query: string): Promise<QueryResult> {
+  async executeQueryReadOnly(query: string, config_name?: string): Promise<QueryResult> {
     if (!this.isSelectQuery(query)) {
       throw new Error(
         'Only SELECT queries are allowed. DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements are not permitted.',
       );
     }
-    return this.executeQuery(query);
+    return this.executeQuery(query, config_name);
   }
 
   /**
@@ -336,6 +383,7 @@ export class AgentSDK {
    * @param {string} question - Natural language question to ask
    * @param {string} [semanticModel] - Path to semantic model file (stage path or @stage/file.yaml)
    *                                   Defaults to CORTEX_ANALYST_SEMANTIC_MODEL env var
+   * @param {string} [config_name] - Name of the config to use, if null, the only one will be used
    * @returns {Promise<CortexAnalystResponse>} Response with success status and data or error
    * @throws Never throws - returns error in response object
    *
@@ -354,7 +402,9 @@ export class AgentSDK {
   async queryCortexAnalyst(
     question: string,
     semanticModel?: string,
+    config_name?: string,
   ): Promise<CortexAnalystResponse> {
+    const cfg = this.cfg(config_name);
     try {
       const model = semanticModel || process.env.CORTEX_ANALYST_SEMANTIC_MODEL;
 
@@ -364,14 +414,13 @@ export class AgentSDK {
         );
       }
 
-      const config = this.getConnectionConfig();
 
       const headers = {
-        Authorization: `Bearer ${config.token}`,
+        Authorization: `Bearer ${cfg.token}`,
         'Content-Type': 'application/json',
       };
 
-      const url = `${config.accessUrl}/api/v2/cortex/analyst/message`;
+      const url = `${cfg.accessUrl}/api/v2/cortex/analyst/message`;
 
       const payload = {
         messages: [
@@ -419,9 +468,9 @@ export class AgentSDK {
    *
    * @param {string} question - Question or message to send to the agent
    * @param {CortexAgentOptions} [options] - Configuration options
-   * @param {string} [options.agentDatabase] - Database containing the agent (defaults to AGENT_DATABASE env var)
-   * @param {string} [options.agentSchema] - Schema containing the agent (defaults to AGENT_SCHEMA env var)
-   * @param {string} [options.agentName] - Name of the agent (defaults to AGENT_NAME env var)
+   * @param {string} [options.agentDatabase] - Database containing the agent (defaults to config database)
+   * @param {string} [options.agentSchema] - Schema containing the agent (defaults to config schema)
+   * @param {string} [options.agentName] - Name of the agent (required)
    * @param {string} [options.parentMessageId] - Parent message ID for conversation continuity (defaults to '0')
    * @param {Function} [options.onStream] - Callback for streaming events
    * @returns {Promise<CortexAgentResponse>} Response with success status, data, and debugging info
@@ -448,35 +497,31 @@ export class AgentSDK {
   async callCortexAgent(
     question: string,
     options?: CortexAgentOptions,
+    config_name?: string,
   ): Promise<CortexAgentResponse> {
+    const cfg = this.cfg(config_name);
     try {
-      const config = this.getConnectionConfig();
-      const database = options?.agentDatabase || config.database;
-      const schema = options?.agentSchema || config.schema;
+      const database = options?.agentDatabase || cfg.database;
+      const schema = options?.agentSchema || cfg.schema;
       const name = options?.agentName;
       const parentMessageId = options?.parentMessageId || '0';
       const onStream = options?.onStream;
 
       if (!database) {
-        throw new Error('AGENT_DATABASE is required via environment variable or options');
+        throw new Error('AGENT_DATABASE is required via configuration or options');
       }
 
       if (!schema) {
-        throw new Error('AGENT_SCHEMA is required via environment variable or options');
+        throw new Error('AGENT_SCHEMA is required via configuration or options');
       }
 
       if (!name) {
-        throw new Error('AGENT_NAME is required via environment variable or options');
+        throw new Error('AGENT_NAME is required via options');
       }
 
-      const account = process.env.SNOWFLAKE_ACCOUNT;
-      if (!account) {
-        throw new Error('SNOWFLAKE_ACCOUNT environment variable is required');
-      }
-
-      const token = process.env.SNOWFLAKE_TOKEN;
+      const token = cfg.token;
       if (!token) {
-        throw new Error('SNOWFLAKE_TOKEN environment variable is required');
+        throw new Error('SNOWFLAKE_TOKEN is required in configuration');
       }
 
       if (token === 'undefined' || !token.trim()) {
@@ -489,7 +534,7 @@ export class AgentSDK {
         Accept: 'application/json',
       };
 
-      const url = `${config.accessUrl}/api/v2/databases/${database}/schemas/${schema}/agents/${name}:run`;
+      const url = `${cfg.accessUrl}/api/v2/databases/${database}/schemas/${schema}/agents/${name}:run`;
 
       const payload = {
         parent_message_id: parentMessageId,
