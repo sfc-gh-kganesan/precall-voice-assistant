@@ -1,6 +1,16 @@
 import yaml from 'yaml';
 import { z } from 'zod';
 
+// ValueSchema is a sum-type. It can be one of a value, a valueRef, or a
+// secretRef.
+const ValueSchema = z.object({
+  value: z.string().optional(),
+  valueRef: z.string().optional(),
+  secretRef: z.string().optional(),
+});
+
+export type Value = z.infer<typeof ValueSchema>;
+
 /**
  * Manifest schema
  * Example:
@@ -15,15 +25,15 @@ const ManifestSchema = z.object({
   config: z.array(
     z.object({
       config_name: z.string(),
-      account: z.string().optional(),
-      username: z.string().optional(),
-      authenticator: z.string().optional(),
-      accessUrl: z.string().optional(),
-      token: z.string().optional(),
-      password: z.string().optional(),
-      warehouse: z.string().optional(),
-      database: z.string().optional(),
-      schema: z.string().optional(),
+      account: ValueSchema.optional(),
+      username: ValueSchema.optional(),
+      authenticator: ValueSchema.optional(),
+      accessUrl: ValueSchema.optional(),
+      token: ValueSchema.optional(),
+      password: ValueSchema.optional(),
+      warehouse: ValueSchema.optional(),
+      database: ValueSchema.optional(),
+      schema: ValueSchema.optional(),
     }),
   ),
 });

@@ -10,6 +10,8 @@ export const version = '0.1.0';
 
 import snowflake from 'snowflake-sdk';
 import { z } from 'zod';
+import { Manifest } from './manifest';
+import { ValueManager } from './value-manager';
 
 const P67ConfigValueSchema = z.object({
   account: z.string().optional(),
@@ -651,4 +653,68 @@ export class AgentSDK {
       });
     }
   }
+}
+
+function validateConfig(config: P67ConfigValue): P67ConfigValue {
+  // Patch config and fix accessURL if it's missing
+  if (!config.accessUrl) {
+    if (config.account) {
+      const accountLocator = config.account.replaceAll('_', '-').toLowerCase();
+      config.accessUrl = `https://${accountLocator}.snowflakecomputing.com`;
+    }
+  }
+
+  // Determine and set authenticator as appropriate
+  if (!config.authenticator) {
+    if (config.token) {
+      config.authenticator = 'PROGRAMMATIC_ACCESS_TOKEN';
+    } else if (config.password) {
+      config.authenticator = 'PASSWORD';
+    }
+  }
+
+  if (config.authenticator === 'PROGRAMMATIC_ACCESS_TOKEN' && !config.token) {
+    throw new Error('SNOWFLAKE_TOKEN is required for PROGRAMMATIC_ACCESS_TOKEN authenticator');
+  }
+  if (config.authenticator === 'PASSWORD' && !config.password) {
+    throw new Error('SNOWFLAKE_PASSWORD is required for PASSWORD authenticator');
+  }
+  if (config.token && config.password) {
+    throw new Error(
+      'Both "token" and "password" are set in config; only one authentication method can be used.',
+    );
+  }
+
+  return config;
+}
+
+/*
+ * Hydrates the config from the manifest
+ * @param manifest - The manifest to hydrate the config from
+ * @returns The hydrated config
+ *
+ * TODO(nwiegand): Take in the secrets manager here and resolve the secrets here.
+ */
+export async function hydrateConfig(
+  manifest: Manifest,
+  valueManager: ValueManager,
+): Promise<P67Config> {
+  const config = new Map<string, P67ConfigValue>();
+
+  for (const c of manifest.config) {
+    const validated = validateConfig({
+      account: await valueManager.get(c.account),
+      username: await valueManager.get(c.username),
+      authenticator: await valueManager.get(c.authenticator),
+      accessUrl: await valueManager.get(c.accessUrl),
+      token: await valueManager.get(c.token),
+      password: await valueManager.get(c.password),
+      warehouse: await valueManager.get(c.warehouse),
+      database: await valueManager.get(c.database),
+      schema: await valueManager.get(c.schema),
+    });
+    config.set(c.config_name, validated);
+  }
+
+  return { snowflakeConfig: config };
 }
