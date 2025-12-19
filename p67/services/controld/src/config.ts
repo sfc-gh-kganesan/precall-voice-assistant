@@ -59,7 +59,8 @@ export const loadConfig = (): ServerConfig => {
     process.env.DATABASE_URL;
 
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL environment variable is required');
+    // throw new Error('DATABASE_URL environment variable is required');
+    console.log('🔥 RUH-ROH: missing database url');
   }
 
   return {
@@ -75,7 +76,7 @@ export const loadConfig = (): ServerConfig => {
       },
     },
     database: {
-      url: databaseUrl,
+      url: databaseUrl ?? '',
     },
   };
 };

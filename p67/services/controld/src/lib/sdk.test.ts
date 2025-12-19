@@ -15,7 +15,7 @@ import {
   type AgentStreamEvent,
   type CortexAgentOptions,
   type P67ConfigValue,
-} from './index.js';
+} from './sdk';
 
 // Helper to create valid config Map
 const createValidConfig = (overrides?: Partial<P67ConfigValue>) => {

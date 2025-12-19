@@ -2,7 +2,7 @@ import { ExecuteMessage } from './runner.js';
 import { z } from 'zod';
 import * as path from 'path';
 import * as fs from 'fs';
-import { AgentSDK, P67Config, P67ConfigValue } from '@p67/agent-sdk';
+import { AgentSDK, P67Config, P67ConfigValue } from './sdk';
 import yaml from 'yaml';
 import { parseManifest, Manifest } from './manifest';
 

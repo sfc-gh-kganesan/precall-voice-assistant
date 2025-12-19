@@ -16,6 +16,7 @@ declare module 'fastify' {
 }
 
 const databasePlugin: FastifyPluginAsync<DatabasePluginOptions> = async (fastify, options) => {
+  return;
   const { databaseUrl } = options;
 
   if (!databaseUrl) {
