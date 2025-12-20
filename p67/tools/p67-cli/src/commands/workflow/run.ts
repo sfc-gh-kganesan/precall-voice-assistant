@@ -1,87 +1,90 @@
-import { Command } from 'commander';
 import { select } from '@inquirer/prompts';
-import { ProjectConfig } from '@p67-cli/config/ProjectConfig.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
-import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
+import { ProjectConfig } from '@p67-cli/config/ProjectConfig.ts';
 import type { SnowflakePat1p } from '@p67-cli/secrets/1password.ts';
+import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
+import { Command } from 'commander';
 
 export const runCommand = new Command('run')
-  .description('Run a workflow')
-  .argument('[workflowId]', 'Workflow ID to run')
-  .action(async (workflowId?: string) => {
-    try {
-      const options = runCommand.optsWithGlobals();
-      const config = new ProjectConfig(options.cwd as string);
+	.description('Run a workflow')
+	.argument('[workflowId]', 'Workflow ID to run')
+	.action(async (workflowId?: string) => {
+		try {
+			const options = runCommand.optsWithGlobals();
+			const config = new ProjectConfig(options.cwd as string);
 
-      if (!config.exists()) {
-        console.error('✗ Error: p67.yml configuration file not found');
-        console.error('  Run "p67 init" to create a configuration file');
-        process.exit(1);
-      }
-      // If we're running on localhost, we don't need a PAT.
-      let pat: SnowflakePat1p | null = null;
-      if (config.getRuntimeEndpoint().includes('localhost')) {
-        pat = null;
-      } else {
-        pat = getSnowflakePat();
-        if (!pat.value) {
-          console.error('Unable to load Snowflake PAT from 1password.');
-          process.exit(1);
-        }
-      }
+			if (!config.exists()) {
+				console.error('✗ Error: p67.yml configuration file not found');
+				console.error('  Run "p67 init" to create a configuration file');
+				process.exit(1);
+			}
+			// If we're running on localhost, we don't need a PAT.
+			let pat: SnowflakePat1p | null = null;
+			if (config.getRuntimeEndpoint().includes('localhost')) {
+				pat = null;
+			} else {
+				pat = getSnowflakePat();
+				if (!pat.value) {
+					console.error('Unable to load Snowflake PAT from 1password.');
+					process.exit(1);
+				}
+			}
 
-      const endpoint = config.getRuntimeEndpoint();
-      const client = new ControldClient({ baseUrl: endpoint, pat: pat?.value || '' });
+			const endpoint = config.getRuntimeEndpoint();
+			const client = new ControldClient({
+				baseUrl: endpoint,
+				pat: pat?.value || '',
+			});
 
-      let selectedWorkflowId = workflowId;
+			let selectedWorkflowId = workflowId;
 
-      // If no workflow ID provided, prompt user to select one
-      if (!selectedWorkflowId) {
-        console.log('Fetching available workflows...\n');
-        const result = await client.listWorkflows();
+			// If no workflow ID provided, prompt user to select one
+			if (!selectedWorkflowId) {
+				console.log('Fetching available workflows...\n');
+				const result = await client.listWorkflows();
 
-        if (result.workflows.length === 0) {
-          console.error('✗ Error: No workflows found');
-          process.exit(1);
-        }
+				if (result.workflows.length === 0) {
+					console.error('✗ Error: No workflows found');
+					process.exit(1);
+				}
 
-        selectedWorkflowId = await select({
-          message: 'Select a workflow to run:',
-          choices: result.workflows.map((wf) => ({
-            value: wf,
-            name: wf,
-          })),
-        });
-      }
+				selectedWorkflowId = await select({
+					message: 'Select a workflow to run:',
+					choices: result.workflows.map((wf) => ({
+						value: wf,
+						name: wf,
+					})),
+				});
+			}
 
-      console.log(`\nRunning workflow: ${selectedWorkflowId}\n`);
+			console.log(`\nRunning workflow: ${selectedWorkflowId}\n`);
 
-      const runResult = await client.runWorkflow(selectedWorkflowId);
+			const runResult = await client.runWorkflow(selectedWorkflowId);
 
-      // Display results
-      console.log('─'.repeat(50));
-      console.log(`Exit Code: ${runResult.exitCode}`);
-      console.log(`Success: ${runResult.success}`);
-      console.log('─'.repeat(50));
+			// Display results
+			console.log('─'.repeat(50));
+			console.log(`Exit Code: ${runResult.exitCode}`);
+			console.log(`Success: ${runResult.success}`);
+			console.log('─'.repeat(50));
 
-      if (runResult.stdout) {
-        console.log('\nStdout:');
-        console.log(runResult.stdout);
-      }
+			if (runResult.stdout) {
+				console.log('\nStdout:');
+				console.log(runResult.stdout);
+			}
 
-      if (runResult.stderr) {
-        console.log('\nStderr:');
-        console.error(runResult.stderr);
-      }
+			if (runResult.stderr) {
+				console.log('\nStderr:');
+				console.error(runResult.stderr);
+			}
 
-      // Exit with the workflow's exit code
-      process.exit(runResult.exitCode);
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error('✗ Error:', error.message);
-      } else {
-        console.error('✗ Unexpected error:', error);
-      }
-      process.exit(1);
-    }
-  });
+			// Exit with the workflow's exit code
+			process.exit(runResult.exitCode);
+		} catch (error) {
+			if (error instanceof Error) {
+				console.error('✗ Error:', error.message);
+			} else {
+				console.error('✗ Unexpected error:', error);
+			}
+			process.exit(1);
+		}
+	});

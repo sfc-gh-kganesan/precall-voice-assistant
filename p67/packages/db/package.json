@@ -1,58 +1,52 @@
 {
-  "name": "@p67/db",
-  "version": "0.1.0",
-  "description": "Database client and utilities for P67",
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "scripts": {
-    "dev": "tsc --watch",
-    "build": "tsc && tsc-alias -p tsconfig.json",
-    "db:generate": "prisma generate --no-hints",
-    "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:migrate:reset": "prisma migrate reset",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\"",
-    "type:check": "tsc --noEmit",
-    "postinstall": "pnpm db:generate && pnpm build"
-  },
-  "tscAlias": {
-    "resolveFullPaths": false,
-    "fileExtensions": ["js"],
-    "replacers": {}
-  },
-  "dependencies": {
-    "@prisma/adapter-pg": "^7.1.0",
-    "@prisma/client": "^7.1.0",
-    "fastify-plugin": "^5.1.0",
-    "pg": "^8.13.1"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "@types/node": "^24.10.1",
-    "@types/pg": "^8.11.10",
-    "eslint": "^9.0.0",
-    "fastify": "^5.2.0",
-    "globals": "^15.0.0",
-    "prettier": "^3.3.0",
-    "prisma": "^7.1.0",
-    "tsc-alias": "^1.8.16",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.0.0"
-  },
-  "files": [
-    "dist",
-    "prisma"
-  ]
+	"name": "@p67/db",
+	"version": "0.1.0",
+	"description": "Database client and utilities for P67",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"dev": "tsc --watch",
+		"build": "tsc && tsc-alias -p tsconfig.json",
+		"db:generate": "prisma generate --no-hints",
+		"db:migrate": "prisma migrate dev",
+		"db:migrate:deploy": "prisma migrate deploy",
+		"db:migrate:reset": "prisma migrate reset",
+		"db:push": "prisma db push",
+		"db:studio": "prisma studio",
+		"check": "pnpm exec biome check --max-diagnostics=0",
+		"fix": "pnpm exec biome check --write",
+		"type:check": "tsc --noEmit",
+		"ci": "run-p check type:check build"
+	},
+	"tscAlias": {
+		"resolveFullPaths": false,
+		"fileExtensions": [
+			"js"
+		],
+		"replacers": {}
+	},
+	"dependencies": {
+		"@prisma/adapter-pg": "^7.1.0",
+		"@prisma/client": "^7.1.0",
+		"fastify-plugin": "^5.1.0",
+		"pg": "^8.13.1"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"@types/pg": "^8.11.10",
+		"fastify": "^5.2.0",
+		"prisma": "^7.1.0",
+		"tsc-alias": "^1.8.16"
+	},
+	"files": [
+		"dist",
+		"prisma"
+	]
 }

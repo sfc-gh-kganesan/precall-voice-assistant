@@ -38,7 +38,7 @@ Experimental platform for building, testing, and deploying agentic workflows.
   - TypeScript
   - Vite
   - Mantine UI (Component Library)
-  - ESLint
+  - Biome (Linting & Formatting)
 
 ## Getting Started
 

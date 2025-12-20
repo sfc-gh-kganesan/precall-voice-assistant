@@ -331,12 +331,12 @@
         let workflowData = { nodes: [], edges: [] };
         let editingNodeId = null;
         let selectedEdgeId = null;
-        let openWorkflows = [];
+        const openWorkflows = [];
         let activeWorkflow = null;
         
         // Generate UUID
         function generateUUID() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
                 const r = Math.random() * 16 | 0;
                 const v = c === 'x' ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
@@ -637,7 +637,7 @@
             hitPath.style.cursor = 'pointer';
             
             // Click handler for edge
-            const handleEdgeClick = function(e) {
+            const handleEdgeClick = (e) => {
                 e.stopPropagation();
                 selectEdge(edge.id);
             };
@@ -706,12 +706,12 @@
             
             let isDragging = false;
             
-            controlPoint.addEventListener('mousedown', function(e) {
+            controlPoint.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 isDragging = true;
             });
             
-            document.addEventListener('mousemove', function(e) {
+            document.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
                 
                 const canvas = document.getElementById('workflow-canvas');
@@ -733,7 +733,7 @@
                 }
             });
             
-            document.addEventListener('mouseup', function() {
+            document.addEventListener('mouseup', () => {
                 if (isDragging) {
                     isDragging = false;
                     
@@ -773,7 +773,7 @@
             deleteBtn.appendChild(deleteCircle);
             deleteBtn.appendChild(deleteX);
             
-            deleteBtn.addEventListener('click', function(e) {
+            deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 deleteEdge(edge.id);
             });
@@ -981,26 +981,26 @@
                     });
                     
                     // Prevent drag when clicking connector
-                    connector.addEventListener('mousedown', function(e) {
+                    connector.addEventListener('mousedown', (e) => {
                         e.stopPropagation();
                     });
                 });
             });
 
             const canvas = document.getElementById('workflow-canvas');
-            canvas.addEventListener('dragover', function(e) {
+            canvas.addEventListener('dragover', (e) => {
                 e.preventDefault();
             });
             
             // Canvas mouse move for temporary edge
-            canvas.addEventListener('mousemove', function(e) {
+            canvas.addEventListener('mousemove', (e) => {
                 if (isCreatingEdge) {
                     updateTempEdge(e);
                 }
             });
             
             // Canvas click to cancel edge creation
-            canvas.addEventListener('click', function(e) {
+            canvas.addEventListener('click', (e) => {
                 if (isCreatingEdge && e.target === canvas) {
                     cancelEdgeCreation();
                 }
@@ -1008,7 +1008,7 @@
         }
 
         // Handle drag and drop for nodes
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', () => {
             // Initialize workflow list
             refreshWorkflowList();
             
@@ -1028,7 +1028,7 @@
             
             // Click on canvas to deselect edge
             const canvas = document.getElementById('workflow-canvas');
-            canvas.addEventListener('click', function(e) {
+            canvas.addEventListener('click', (e) => {
                 if (e.target === canvas || e.target.id === 'connections-svg') {
                     deselectEdge();
                 }
@@ -1051,7 +1051,7 @@
             });
 
             // Chat form handling
-            document.body.addEventListener('htmx:afterRequest', function(event) {
+            document.body.addEventListener('htmx:afterRequest', (event) => {
                 if (event.detail.pathInfo.requestPath === '/api/chat') {
                     const response = JSON.parse(event.detail.xhr.response);
                     const chatMessages = document.getElementById('chat-messages');
@@ -1124,7 +1124,7 @@
                 });
             });
             
-            document.addEventListener('mousemove', function(e) {
+            document.addEventListener('mousemove', (e) => {
                 if (!isResizing) return;
                 
                 console.log('Mouse move, isResizing:', isResizing);
@@ -1169,7 +1169,7 @@
                 }
             });
             
-            document.addEventListener('mouseup', function() {
+            document.addEventListener('mouseup', () => {
                 if (isResizing) {
                     isResizing = false;
                     if (currentHandle) {
@@ -1193,7 +1193,7 @@
             const dialogTitle = document.querySelector('.dialog-header h3');
             
             // Open dialog for creating new node
-            addStepBtn.addEventListener('click', function() {
+            addStepBtn.addEventListener('click', () => {
                 editingNodeId = null;
                 dialogTitle.textContent = 'Add New Step';
                 submitStepBtn.textContent = 'Add Step';
@@ -1211,7 +1211,7 @@
             });
             
             // Open dialog for editing existing node
-            window.openEditDialog = function(nodeId) {
+            window.openEditDialog = (nodeId) => {
                 const node = workflowData.nodes.find(n => n.id === nodeId);
                 if (!node) return;
                 
@@ -1258,14 +1258,14 @@
             cancelDialogBtn.addEventListener('click', closeDialog);
             
             // Close on overlay click
-            addStepDialog.addEventListener('click', function(e) {
+            addStepDialog.addEventListener('click', (e) => {
                 if (e.target === addStepDialog) {
                     closeDialog();
                 }
             });
             
             // Submit form
-            submitStepBtn.addEventListener('click', async function() {
+            submitStepBtn.addEventListener('click', async () => {
                 const titleInput = document.getElementById('step-title');
                 const descriptionInput = document.getElementById('step-description');
                 const colorInput = document.querySelector('input[name="color"]:checked');
@@ -1310,7 +1310,7 @@
             });
             
             // Delete node handler
-            deleteStepBtn.addEventListener('click', async function() {
+            deleteStepBtn.addEventListener('click', async () => {
                 if (!editingNodeId) return;
                 
                 // Confirm deletion

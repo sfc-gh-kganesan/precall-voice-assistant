@@ -18,6 +18,8 @@ jobs:
         working-directory: ./p67
 
     steps:
+      - uses: oven-sh/setup-bun@v2
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -37,11 +39,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Check types (tsc)
-        run: pnpm type:check
+      - name: Run CI checks
+        run: pnpm run ci

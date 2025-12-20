@@ -51,8 +51,7 @@ P67 enables users to:
 - **Native Apps**: Snowflake Native Application framework
 
 ### Development Tools
-- **Linting**: ESLint 9 with TypeScript support
-- **Formatting**: Prettier 3.3.0
+- **Linting & Formatting**: Biome (replaces ESLint and Prettier)
 - **Type Checking**: TypeScript strict mode
 - **Testing**: Vitest 4.0.9 (web package)
 - **Version Control**: Git
@@ -198,8 +197,8 @@ p67/
 - `pnpm dev` - Start dev server with hot reload (tsx watch)
 - `pnpm build` - Compile TypeScript to JavaScript
 - `pnpm start` - Run production build
-- `pnpm lint` / `pnpm lint:fix` - ESLint
-- `pnpm format` / `pnpm format:check` - Prettier
+- `pnpm check` - Run Biome linting and formatting checks
+- `pnpm fix` - Auto-fix Biome linting and formatting issues
 - `pnpm type:check` - TypeScript validation
 
 #### @p67/web - Frontend Application
@@ -220,8 +219,8 @@ p67/
 - `pnpm dev` - Start Vite dev server
 - `pnpm build` - Build for production
 - `pnpm preview` - Preview production build
-- `pnpm lint` / `pnpm lint:fix` - ESLint
-- `pnpm format` / `pnpm format:check` - Prettier
+- `pnpm check` - Run Biome linting and formatting checks
+- `pnpm fix` - Auto-fix Biome linting and formatting issues
 - `pnpm type:check` - TypeScript validation
 
 ### 2. Services (@p67/controld)
@@ -270,8 +269,8 @@ p67/
 - `pnpm dev` - Development server with tsx watch
 - `pnpm build` - Compile TypeScript
 - `pnpm start` - Production server
-- `pnpm lint` / `pnpm lint:fix` - ESLint
-- `pnpm format` / `pnpm format:check` - Prettier
+- `pnpm check` - Run Biome linting and formatting checks
+- `pnpm fix` - Auto-fix Biome linting and formatting issues
 - `pnpm type:check` - TypeScript validation
 
 ### 3. Tools (@p67/cli)
@@ -315,8 +314,8 @@ runtime:
 - `pnpm start` - Run CLI with Bun
 - `pnpm build` - Compile to binary
 - `pnpm test` - Run Bun tests
-- `pnpm lint` / `pnpm lint:fix` - ESLint
-- `pnpm format` / `pnpm format:check` - Prettier
+- `pnpm check` - Run Biome linting and formatting checks
+- `pnpm fix` - Auto-fix Biome linting and formatting issues
 - `pnpm type:check` - TypeScript validation
 
 **Documentation**: See `tools/p67-cli/CLAUDE.md` for detailed CLI documentation
@@ -538,12 +537,10 @@ start();
 - `pnpm build` - Build all packages
 - `pnpm build:api` - Build API package
 - `pnpm build:web` - Build web package
-- `pnpm lint` - Lint all packages
-- `pnpm lint:fix` - Auto-fix linting issues across all packages
-- `pnpm format` - Format code across all packages
-- `pnpm format:check` - Check code formatting
+- `pnpm check` - Run Biome checks (linting and formatting) across all packages
+- `pnpm fix` - Auto-fix Biome issues across all packages
 - `pnpm type:check` - Type-check all packages
-- `pnpm ci` - Run all CI checks in parallel (lint, format, type-check)
+- `pnpm ci` - Run all CI checks in parallel (check, type-check)
 
 ### Individual Packages
 
@@ -551,8 +548,8 @@ Each package (api, web, controld, p67-cli) has similar scripts:
 - `pnpm dev` - Development mode
 - `pnpm build` - Production build
 - `pnpm start` - Run production build (where applicable)
-- `pnpm lint` / `pnpm lint:fix` - ESLint
-- `pnpm format` / `pnpm format:check` - Prettier
+- `pnpm check` - Run Biome checks (linting and formatting)
+- `pnpm fix` - Auto-fix Biome issues
 - `pnpm type:check` - TypeScript validation
 
 Use `pnpm --filter <package-name>` to run scripts for specific packages:
@@ -600,8 +597,8 @@ pnpm start -- <command>
 ```
 
 ### Code Quality Workflow
-1. Before committing, run: `pnpm lint:fix` to auto-fix ESLint issues
-2. Run `pnpm format` to ensure consistent Prettier formatting
+1. Before committing, run: `pnpm fix` to auto-fix linting and formatting issues with Biome
+2. Run `pnpm check` to verify all code quality checks pass
 3. Run `pnpm type:check` to validate TypeScript
 4. Or run all checks at once: `pnpm ci`
 
@@ -620,7 +617,7 @@ To develop and test a workflow:
 **To a Package**:
 1. Determine which package needs changes
 2. Make changes following code style guidelines
-3. Run `pnpm --filter <package> lint:fix`
+3. Run `pnpm --filter <package> fix`
 4. Test locally with `pnpm --filter <package> dev`
 5. Run `pnpm build` to ensure production build works
 
@@ -654,48 +651,43 @@ pnpm up -r
 pnpm up <package-name>
 ```
 
-## ESLint and Prettier Configuration
+## Biome Configuration
 
-### ESLint Configuration
+### Biome Setup
 
-Each package has its own `eslint.config.js` using the new flat config format.
+The project uses Biome as a unified toolchain for linting and formatting, replacing ESLint and Prettier.
 
-**Common Configuration**:
-- Extends recommended configs from ESLint and TypeScript ESLint
-- TypeScript support via @typescript-eslint
+**Configuration File**: `biome.json` at the root level
 
-**Web Package (@p67/web)**:
-- React-specific plugins: `react`, `react-hooks`, `react-refresh`
-- Browser globals enabled
-- JSX support enabled
-- React hooks rules enforced
-
-**Backend Packages (@p67/api, @p67/controld)**:
-- Node.js globals enabled
-- Relaxed rules for backend development
-- Allows unused parameters with `_` prefix
-
-**CLI Package (@p67/cli)**:
-- Node.js globals enabled
-- Bun runtime consideration
-
-### Prettier Configuration (`.prettierrc`)
-
-Shared configuration at the root level:
-- **Semicolons**: Always required
+**Key Configuration**:
+- **Indentation**: Tabs (2-space width)
 - **Quotes**: Single quotes
+- **Semicolons**: Always required
 - **Trailing commas**: All (arrays, objects, parameters)
+- **Line width**: 100 characters
+- **JSX quotes**: Double quotes
 - **Arrow parens**: Always use parentheses
-- **Tab width**: 2 spaces
-- **Print width**: 100 characters
-- **Use tabs**: false (spaces only)
 
-### Ignored Patterns (`.prettierignore`)
+**Linting**:
+- Enabled for TypeScript, JavaScript, and JSX/TSX
+- Suspicious code detection
+- Complexity checks
+- Correctness validation
+- Performance optimizations
+- Style consistency
+- TypeScript-specific rules
+
+**Formatting**:
+- Consistent code style across all packages
+- Automatic import sorting (node: prefix first)
+- JSX formatting with proper indentation
+
+**Ignored Patterns**:
 - `node_modules/`
-- `dist/`, `build/`, `.next/`, `bin/`
-- `coverage/`
-- Lock files (`pnpm-lock.yaml`, `package-lock.json`)
-- Minified files (`*.min.js`, `*.min.css`)
+- `dist/`, `build/`, `bin/`
+- Generated files and build artifacts
+- Lock files
+- Hidden files and directories
 
 ## TypeScript Configuration
 
@@ -765,8 +757,8 @@ make describe
 ## Best Practices for Claude Code
 
 ### When Making Changes
-1. **Always run formatting**: Use `pnpm lint:fix` and `pnpm format`
-2. **Maintain semicolons**: Enforced by Prettier
+1. **Always run formatting**: Use `pnpm fix` to auto-fix all issues (powered by Biome)
+2. **Maintain semicolons**: Enforced by Biome
 3. **Type safety**: Avoid `any` types, use proper TypeScript types
 4. **Test locally**: Run appropriate dev script to verify
 5. **Run CI checks**: `pnpm ci` before committing
@@ -867,8 +859,7 @@ zip -r ../my-workflow.zip .
 ## Git Integration
 
 - Use `.gitignore` to exclude generated files
-- ESLint respects ignore patterns in `eslint.config.js`
-- Prettier respects patterns in `.prettierignore`
+- Biome respects ignore patterns in `biome.json`
 - Consider using git hooks (husky) for pre-commit checks
 
 ## Important Notes
@@ -898,9 +889,7 @@ zip -r ../my-workflow.zip .
 - Zod Documentation: https://zod.dev
 
 ### Development Tools
-- ESLint Documentation: https://eslint.org
-- TypeScript ESLint: https://typescript-eslint.io
-- Prettier Documentation: https://prettier.io
+- Biome Documentation: https://biomejs.dev
 - TypeScript Documentation: https://www.typescriptlang.org
 - pnpm Documentation: https://pnpm.io
 - Bun Documentation: https://bun.sh
