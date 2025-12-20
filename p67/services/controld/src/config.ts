@@ -4,7 +4,9 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { config as dotenvConfig } from 'dotenv';
 
-dotenvConfig();
+if (process.env.NODE_ENV != 'prod') {
+  dotenvConfig();
+}
 
 function createTempDir() {
   return mkdtempSync(join(tmpdir(), 'p67-controld-'));
@@ -25,6 +27,10 @@ export type ServerConfig = {
   oauth: OAuthConfig;
   database: {
     url: string;
+  };
+  debug: {
+    enableDefaultUser: boolean;
+    defaultUser?: string;
   };
 };
 
@@ -77,6 +83,10 @@ export const loadConfig = (): ServerConfig => {
     },
     database: {
       url: databaseUrl ?? '',
+    },
+    debug: {
+      enableDefaultUser: process.env.DEBUG_ENABLE_DEFAULT_USER == 'true',
+      defaultUser: process.env.DEBUG_DEFAULT_USER,
     },
   };
 };

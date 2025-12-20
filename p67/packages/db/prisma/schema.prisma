@@ -1,17 +1,21 @@
 // This is your Prisma schema file
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  provider                  = "prisma-client"
+  output                    = "../src/generated/prisma"
+  runtime                   = "nodejs"
+  moduleFormat              = "esm"
+  generatedFileExtension    = "ts"
+  importFileExtension       = "js"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-// Example model - user will add actual models later
-// model Example {
-//   id        String   @id @default(uuid())
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
+model User {
+  id            String   @unique @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  snowflakeUser String   @id @unique
+}

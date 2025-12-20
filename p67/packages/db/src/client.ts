@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@p67/db/generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 
-export const createPrismaClient = (databaseUrl: string) => {
+export const createPrismaClient = (databaseUrl: string): PrismaClient => {
   if (!databaseUrl) {
     throw new Error('Database URL is required');
   }

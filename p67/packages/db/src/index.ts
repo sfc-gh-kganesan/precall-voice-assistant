@@ -1,4 +1,3 @@
-export { createPrismaClient } from './client.js';
-export { default as databasePlugin } from './fastify-plugin.js';
-export type { DatabasePluginOptions } from './fastify-plugin.js';
-export type { PrismaClient } from '@prisma/client';
+export { databasePlugin } from '@p67/db/plugin.js';
+export type { DatabasePluginOptions } from '@p67/db/plugin.js';
+export { UserModel } from '@p67/db/generated/prisma/models/User.js';

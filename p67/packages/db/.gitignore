@@ -5,3 +5,4 @@ node_modules
 # Prisma
 .prisma/
 prisma/migrations/.migration_lock
+.env

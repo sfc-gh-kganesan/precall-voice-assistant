@@ -112,6 +112,9 @@ importers:
       prisma:
         specifier: ^7.1.0
         version: 7.1.0(@types/react@19.2.4)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      tsc-alias:
+        specifier: ^1.8.16
+        version: 1.8.16
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -224,6 +227,9 @@ importers:
       fastify:
         specifier: ^5.2.0
         version: 5.6.2
+      fastify-plugin:
+        specifier: ^5.1.0
+        version: 5.1.0
       fastify-type-provider-zod:
         specifier: ^4.0.2
         version: 4.0.2(fastify@5.6.2)(zod@3.25.76)

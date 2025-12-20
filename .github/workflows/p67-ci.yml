@@ -11,6 +11,8 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://dummy:dummy@localhost
     defaults:
       run:
         working-directory: ./p67

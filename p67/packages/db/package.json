@@ -13,8 +13,8 @@
   },
   "scripts": {
     "dev": "tsc --watch",
-    "build": "tsc",
-    "db:generate": "prisma generate",
+    "build": "tsc && tsc-alias -p tsconfig.json",
+    "db:generate": "prisma generate --no-hints",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:reset": "prisma migrate reset",
@@ -26,6 +26,11 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "type:check": "tsc --noEmit",
     "postinstall": "pnpm db:generate && pnpm build"
+  },
+  "tscAlias": {
+    "resolveFullPaths": false,
+    "fileExtensions": ["js"],
+    "replacers": {}
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
@@ -42,6 +47,7 @@
     "globals": "^15.0.0",
     "prettier": "^3.3.0",
     "prisma": "^7.1.0",
+    "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.0.0"
   },

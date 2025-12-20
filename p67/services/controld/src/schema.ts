@@ -66,3 +66,11 @@ export const GoogleUserInfoSchema = z.object({
 export type OAuthCallbackQuery = z.infer<typeof OAuthCallbackQuerySchema>;
 export type GoogleTokenResponse = z.infer<typeof GoogleTokenResponseSchema>;
 export type GoogleUserInfo = z.infer<typeof GoogleUserInfoSchema>;
+
+// Whoami Schema
+export const WhoamiResponseSchema = z.object({
+  id: z.string(),
+  snowflakeUser: z.string(),
+});
+
+export type WhoamiResponse = z.infer<typeof WhoamiResponseSchema>;

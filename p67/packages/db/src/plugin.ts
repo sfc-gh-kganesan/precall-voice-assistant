@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@p67/db/generated/prisma/client.js';
 import { createPrismaClient } from './client.js';
 
 // Plugin options interface
@@ -11,12 +11,11 @@ export interface DatabasePluginOptions {
 // Extend Fastify types to include prisma
 declare module 'fastify' {
   interface FastifyInstance {
-    prisma: PrismaClient;
+    db: PrismaClient;
   }
 }
 
-const databasePlugin: FastifyPluginAsync<DatabasePluginOptions> = async (fastify, options) => {
-  return;
+const plugin: FastifyPluginAsync<DatabasePluginOptions> = async (fastify, options) => {
   const { databaseUrl } = options;
 
   if (!databaseUrl) {
@@ -24,11 +23,11 @@ const databasePlugin: FastifyPluginAsync<DatabasePluginOptions> = async (fastify
   }
 
   // Create Prisma client with provided URL
-  const prisma = createPrismaClient(databaseUrl);
+  const db = createPrismaClient(databaseUrl);
 
   // Test database connection on startup
   try {
-    await prisma.$connect();
+    await db.$connect();
     fastify.log.info('Database connected successfully');
   } catch (error) {
     fastify.log.error({ error }, 'Failed to connect to database');
@@ -36,16 +35,16 @@ const databasePlugin: FastifyPluginAsync<DatabasePluginOptions> = async (fastify
   }
 
   // Decorate Fastify instance with Prisma client
-  fastify.decorate('prisma', prisma);
+  fastify.decorate('db', db);
 
   // Graceful shutdown: disconnect from database when Fastify closes
   fastify.addHook('onClose', async (instance) => {
     instance.log.info('Disconnecting from database');
-    await instance.prisma.$disconnect();
+    await instance.db.$disconnect();
   });
 };
 
 // Use fastify-plugin to ensure plugin is registered at root level
-export default fp(databasePlugin, {
+export const databasePlugin = fp(plugin, {
   name: 'database',
 });

@@ -10,6 +10,7 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { databasePlugin } from '@p67/db';
+import userPlugin from '@controld/lib/plugins/user';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -66,6 +67,11 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   await server.register(swaggerUi, {
     routePrefix: '/docs',
+  });
+
+  await server.register(userPlugin, {
+    setDefaultUser: config.debug.enableDefaultUser,
+    defaultUser: config.debug.defaultUser,
   });
 
   return server;
