@@ -1,0 +1,9 @@
+---
+login_name: vraghunathan
+display_name: vraghunathan
+first_name: Vivek
+last_name: Raghunathan
+email: vivek.raghunathan@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
