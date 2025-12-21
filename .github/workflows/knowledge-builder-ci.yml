@@ -4,14 +4,29 @@ on:
   push:
     branches:
       - "**"
-    paths:
-      - "knowledge-builder/**/*"
-      - ".github/workflows/knowledge-builder-ci.yml"
-      - ".github/actions/setup-rust/**"
 
 jobs:
-  test:
+  changes:
+    name: Check diff for relevant changes
     runs-on: ubuntu-latest
+    outputs:
+      src: ${{ steps.filter.outputs.src }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            src:
+              - "knowledge-builder/**/*"
+              - ".github/workflows/knowledge-builder-ci.yml"
+              - ".github/actions/setup-rust/**"
+
+  test:
+    name: Check code quality
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.src == 'true'
     defaults:
       run:
         working-directory: ./knowledge-builder
@@ -47,3 +62,14 @@ jobs:
       - name: ruff check
         run: uv run ruff check
 
+  check:
+    name: Result
+    runs-on: ubuntu-latest
+    needs: [changes, test]
+    if: always()
+    steps:
+      - name: Check status
+        if: needs.test.result == 'failure' || needs.test.result == 'cancelled'
+        run: exit 1
+      - name: Success
+        run: echo "All checks passed."

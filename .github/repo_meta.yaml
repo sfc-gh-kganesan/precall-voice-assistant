@@ -1,5 +1,5 @@
 # point_of_contact: the owner of this repository, can be a GitHub user or GitHub team. Do NOT use the '@' symbol
-point_of_contact: sfc-gh-nwiegand
+point_of_contact: ai-fde
 
 # production: whether this repository meets the criteria for being "production", see
 # go/production-repository-criteria for criteria
@@ -16,7 +16,7 @@ distributed: false
 modified: false
 
 # legal_exception: whether Legal has granted an exception to the open source policy (go/opensource) for this repo
-# (only set as true if you have been given express permission by Legal) 
+# (only set as true if you have been given express permission by Legal)
 legal_exception: false
 
 # release_branches: list of release branch patterns, exact matches or regex is acceptable
