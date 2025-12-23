@@ -7,6 +7,8 @@ import streamlit as st
 from snowflake.snowpark.context import get_active_session
 from ydata_profiling import ProfileReport
 
+from services import taxonomy
+
 HREF_PATTERN = re.compile(r'href=["\']?([^"\'>\s]+)', flags=re.IGNORECASE)
 URL_PATTERN = re.compile(r'https?://[^\s"\'>]+', flags=re.IGNORECASE)
 
@@ -106,8 +108,8 @@ cat_df = kb_knowledge.select_dtypes(include=["object"])
 report_html = profile_data(numeric_df)
 
 st.title("Snowflake AI FDE - Luma EDA")
-numeric_tab, cat_tab, links_tab, image_links_tab = st.tabs(
-    ["numeric", "categorical", "outbound links", "image links"]
+numeric_tab, cat_tab, links_tab, ticket_taxonomy_tab, image_links_tab = st.tabs(
+    ["numeric", "categorical", "outbound links", "ticket taxonomies", "image links"]
 )
 with numeric_tab:
     st.dataframe(describe_df)
@@ -143,6 +145,9 @@ with links_tab:
         st.caption(
             "Domains such as Confluence, Atlassian, or SharePoint often indicate knowledge stored outside official systems."
         )
+
+with ticket_taxonomy_tab:
+    taxonomy.render_ticket_taxonomy_tab()
 
 with image_links_tab:
     st.subheader("Image Link Analysis")
