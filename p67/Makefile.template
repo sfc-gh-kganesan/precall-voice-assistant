@@ -33,7 +33,7 @@ deploy: login build push ## Deploy to Snowflake (login, build, push, and run app
 	snow app run -c $(SNOW_CONNECTION)
 
 describe: ## Describe the p67.app.controld service
-	snow spcs service describe p67.app.controld --format json
+	snow spcs service describe p67.app.controld --format json -c $(SNOW_CONNECTION)
 
 dev: ## Start local development environment with Docker Compose
 	docker compose up --build
@@ -51,13 +51,13 @@ install-cli: ## Install the P67 CLI tool
 	make clean install -C ./tools/p67-cli
 
 list: ## List all services in p67 database
-	snow spcs service list --format json --in database p67
+	snow spcs service list --format json --in database p67 -c $(SNOW_CONNECTION)
 
 login: ## Log in to Snowflake image registry
 	snow spcs image-registry login -c $(SNOW_CONNECTION)
 
 logs: ## show spcs service logs
-	snow spcs service logs p67.app.controld --container-name controld --instance-id 0
+	snow spcs service logs p67.app.controld --container-name controld --instance-id 0 -c $(SNOW_CONNECTION)
 
 push: push-controld ## Push Docker images to Snowflake registry
 
