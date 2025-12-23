@@ -1,4 +1,5 @@
 import { mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import sdkBundle from '@agent-sdk/dist/bundle.src' with { type: 'file' };
 import buildjs from '@p67-cli/workspace/boiler-plate/build.js.src' with {
 	type: 'file',
@@ -19,7 +20,6 @@ import tsconfigjson from '@p67-cli/workspace/boiler-plate/tsconfig.json.src' wit
 	type: 'file',
 };
 import { file } from 'bun';
-import { dirname, join } from 'path';
 
 const files: Record<string, string> = {
 	[sdkBundle]: 'src/sdk.js',

@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "pnpm --parallel -r dev",
 		"build": "pnpm -r build",
-		"check": "pnpm exec biome check --diagnostic-level=error",
+		"check": "pnpm exec biome check",
 		"fix": "pnpm exec biome check --write",
 		"type:check": "pnpm -r type:check",
 		"ci": "run-p check type:check build"

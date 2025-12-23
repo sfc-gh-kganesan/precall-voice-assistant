@@ -1,4 +1,5 @@
 import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import defineWorkflowCommand from '@coco/commands/define-workflow.md' with {
 	type: 'file',
 };
@@ -6,7 +7,6 @@ import generateWorkflowCommand from '@coco/commands/generate-workflow.md' with {
 	type: 'file',
 };
 import { file } from 'bun';
-import { join } from 'path';
 
 enum Command {
 	DefineWorkflow = 'DefineWorkflow',

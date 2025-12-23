@@ -20,7 +20,7 @@
 		"db:migrate:reset": "prisma migrate reset",
 		"db:push": "prisma db push",
 		"db:studio": "prisma studio",
-		"check": "pnpm exec biome check --max-diagnostics=0",
+		"check": "pnpm exec biome check --error-on-warnings",
 		"fix": "pnpm exec biome check --write",
 		"type:check": "tsc --noEmit",
 		"ci": "run-p check type:check build"

@@ -199,7 +199,7 @@ export class AgentSDK {
 
 		try {
 			await new Promise((resolve, reject) => {
-				this.cachedConnection!.execute({
+				this.cachedConnection?.execute({
 					sqlText: 'SELECT 1',
 					complete: (err, _stmt, _rows) => {
 						if (err) reject(err);
@@ -663,7 +663,7 @@ export class AgentSDK {
 	async close(): Promise<void> {
 		if (this.cachedConnection) {
 			return new Promise((resolve) => {
-				this.cachedConnection!.destroy((err) => {
+				this.cachedConnection?.destroy((err) => {
 					if (err) {
 						console.error('Error closing connection:', err.message);
 					}

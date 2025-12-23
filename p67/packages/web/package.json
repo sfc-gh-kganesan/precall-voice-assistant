@@ -7,7 +7,7 @@
 		"dev": "vite",
 		"build": "tsc -b && vite build",
 		"preview": "vite preview",
-		"check": "pnpm exec biome check --max-diagnostics=0",
+		"check": "pnpm exec biome check --error-on-warnings",
 		"fix": "pnpm exec biome check --write",
 		"type:check": "tsc --noEmit",
 		"ci": "run-p check type:check build"

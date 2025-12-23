@@ -11,7 +11,7 @@
 		"start": "bun src/index.ts",
 		"test": "bun test",
 		"build": "bun build ./src/index.ts --compile --outfile ./bin/p67",
-		"check": "pnpm exec biome check --max-diagnostics=0",
+		"check": "pnpm exec biome check --error-on-warnings",
 		"fix": "pnpm exec biome check --write",
 		"type:check": "tsc --noEmit",
 		"ci": "run-p check type:check build"
