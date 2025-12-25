@@ -1,0 +1,5 @@
+# directory containing deployment package
+deploy
+
+# build dir
+dist

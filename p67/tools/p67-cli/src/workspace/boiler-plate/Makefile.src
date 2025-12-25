@@ -1,14 +1,14 @@
 .PHONY: clean zip
 
-all: dist zip
+all: deploy zip
 
 clean:
-	rm -rf ./dist
+	rm -rf ./deploy
 
-dist: src/* manifest.yaml
+deploy:
 	npm install
-	npm run build
-	cp manifest.yaml dist/
+	p67 build
+	cp manifest.yaml deploy/
 
 zip:
-	cd dist && rm -f workflow.zip && zip -r -X ./workflow.zip .
+	cd deploy && rm -f workflow.zip && zip -r -X ./workflow.zip .

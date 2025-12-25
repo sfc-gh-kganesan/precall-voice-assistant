@@ -20,8 +20,6 @@ export const deployCommand = new Command('deploy')
 				process.exit(1);
 			}
 
-			console.log(config);
-
 			// If we're running on localhost, we don't need a PAT.
 			let pat: SnowflakePat1p | null = null;
 			if (config.getRuntimeEndpoint().includes('localhost')) {

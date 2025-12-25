@@ -1,5 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import gitignore from '@p67-cli/workspace/boiler-plate/.gitignore.src' with {
+	type: 'file',
+};
 import makefile from '@p67-cli/workspace/boiler-plate/Makefile.src' with {
 	type: 'file',
 };
@@ -18,6 +21,7 @@ import tsconfigjson from '@p67-cli/workspace/boiler-plate/tsconfig.json.src' wit
 import { file } from 'bun';
 
 const files: Record<string, string> = {
+	[gitignore]: '.gitignore',
 	[indexts]: 'src/index.ts',
 	[packagejson]: 'package.json',
 	[tsconfigjson]: 'tsconfig.json',
