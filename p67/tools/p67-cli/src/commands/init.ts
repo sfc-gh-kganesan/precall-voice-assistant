@@ -3,18 +3,9 @@ import { mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
 import { confirm, input } from '@inquirer/prompts';
 import { CocoCommands } from '@p67-cli/coco/CocoCommands';
+import { ProjectConfig } from '@p67-cli/config/ProjectConfig';
 import { Workspace } from '@p67-cli/workspace/Workspace';
 import { Command } from 'commander';
-import * as yaml from 'js-yaml';
-
-interface P67Config {
-	runtime: {
-		endpoint: string;
-	};
-	workflow: {
-		entrypoint: string;
-	};
-}
 
 export const initCommand = new Command('init')
 	.description('Initialize a new p67 configuration file')
@@ -64,25 +55,18 @@ export const initCommand = new Command('init')
 			process.exit(1);
 		}
 
-		// Create configuration object
-		const config: P67Config = {
+		const config = new ProjectConfig(targetDir, {
 			runtime: {
 				endpoint: endpoint.trim(),
 			},
 			workflow: {
-				entrypoint: './dist/index.js',
+				entrypoint: './src/index.ts',
+				buildTarget: './deploy/index.js',
 			},
-		};
+		});
 
 		try {
-			// Write configuration to YAML file
-			const yamlContent = yaml.dump(config, {
-				indent: 2,
-				lineWidth: -1,
-			});
-
-			fs.writeFileSync(configPath, yamlContent, 'utf8');
-
+			config.write();
 			console.log('\n✓ Configuration file created successfully!');
 			console.log(`  Location: ${configPath}\n`);
 		} catch (error) {

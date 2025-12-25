@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { buildCommand } from '@p67-cli/commands/build';
 import { cocoCommand } from '@p67-cli/commands/coco/index';
 import { envCommand } from '@p67-cli/commands/env.ts';
 import { initCommand } from '@p67-cli/commands/init.ts';
@@ -19,5 +20,6 @@ program.addCommand(initCommand);
 program.addCommand(envCommand);
 program.addCommand(workflowCommand);
 program.addCommand(cocoCommand);
+program.addCommand(buildCommand);
 
 program.parse(process.argv);

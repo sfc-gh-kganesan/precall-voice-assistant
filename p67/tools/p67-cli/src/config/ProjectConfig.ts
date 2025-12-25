@@ -7,6 +7,10 @@ const ProjectConfigSchema = z.object({
 	runtime: z.object({
 		endpoint: z.string().url('Runtime endpoint must be a valid URL'),
 	}),
+	workflow: z.object({
+		entrypoint: z.string().describe('Path to workflow entrypoint file'),
+		buildTarget: z.string().describe('Path to built js file'),
+	}),
 });
 
 export type ProjectConfigData = z.infer<typeof ProjectConfigSchema>;
@@ -15,8 +19,12 @@ export class ProjectConfig {
 	private configPath: string;
 	private data: ProjectConfigData | null = null;
 
-	constructor(directory: string = process.cwd()) {
+	constructor(
+		directory: string = process.cwd(),
+		data: ProjectConfigData | null = null,
+	) {
 		this.configPath = path.join(directory, 'p67.yml');
+		this.data = data;
 	}
 
 	/**
@@ -70,6 +78,22 @@ export class ProjectConfig {
 		}
 	}
 
+	write(): void {
+		if (this.data === null) {
+			throw new Error('Configuration data is null');
+		}
+
+		try {
+			const yamlContent = yaml.dump(this.data, {
+				indent: 2,
+				lineWidth: -1,
+			});
+			fs.writeFileSync(this.configPath, yamlContent, 'utf8');
+		} catch (error) {
+			throw new Error(`Error writing configuration file: ${error}`);
+		}
+	}
+
 	/**
 	 * Get the configuration data (loads if not already loaded)
 	 */
@@ -88,6 +112,20 @@ export class ProjectConfig {
 	 */
 	getRuntimeEndpoint(): string {
 		return this.get().runtime.endpoint;
+	}
+
+	/**
+	 * Get the entrypoint file path
+	 */
+	get entrypoint(): string {
+		return this.get().workflow.entrypoint;
+	}
+
+	/**
+	 * Get the entrypoint build target path
+	 */
+	get buildTarget(): string {
+		return this.get().workflow.buildTarget;
 	}
 
 	/**
