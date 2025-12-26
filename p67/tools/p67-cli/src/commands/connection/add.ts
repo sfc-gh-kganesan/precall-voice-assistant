@@ -1,6 +1,6 @@
 import { input } from '@inquirer/prompts';
+import { Command } from '@p67-cli/Command';
 import { ConnectionConfig } from '@p67-cli/config/ConnectionConfig';
-import { Command } from 'commander';
 
 export const addCommand = new Command('add')
 	.description('Add a new P67 connection')
@@ -89,12 +89,8 @@ export const addCommand = new Command('add')
 				}
 				console.log(`\nConfiguration saved to: ${config.getConfigPath()}`);
 			} catch (error) {
-				if (error instanceof Error) {
-					console.error('✗ Error:', error.message);
-				} else {
-					console.error('✗ Unexpected error:', error);
-				}
-				process.exit(1);
+				console.error('Failed to add connection');
+				throw error;
 			}
 		},
 	);

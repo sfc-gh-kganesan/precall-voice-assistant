@@ -1,19 +1,18 @@
 import { select } from '@inquirer/prompts';
+import { Command } from '@p67-cli/Command.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
-import type { ConnectionEnabledCommand } from '@p67-cli/middleware/connection';
-import { Command } from 'commander';
+import { ctx } from '@p67-cli/context';
 
 export const runCommand = new Command('run')
 	.description('Run a workflow')
 	.argument('[workflowId]', 'Workflow ID to run')
 	.action(async (workflowId?: string) => {
 		try {
-			const connection = (runCommand.parent as ConnectionEnabledCommand)
-				?.connection;
+			const { connection } = ctx();
 
 			const client = new ControldClient({
-				baseUrl: connection?.endpoint ?? '',
-				pat: connection?.pat ?? '',
+				baseUrl: connection.endpoint,
+				pat: connection.pat,
 			});
 
 			let selectedWorkflowId = workflowId;
@@ -24,8 +23,7 @@ export const runCommand = new Command('run')
 				const result = await client.listWorkflows();
 
 				if (result.workflows.length === 0) {
-					console.error('✗ Error: No workflows found');
-					process.exit(1);
+					throw new Error('No workflows found');
 				}
 
 				selectedWorkflowId = await select({
@@ -60,11 +58,7 @@ export const runCommand = new Command('run')
 			// Exit with the workflow's exit code
 			process.exit(runResult.exitCode);
 		} catch (error) {
-			if (error instanceof Error) {
-				console.error('✗ Error:', error.message);
-			} else {
-				console.error('✗ Unexpected error:', error);
-			}
-			process.exit(1);
+			console.error('Failed to run workflow');
+			throw error;
 		}
 	});

@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { confirm } from '@inquirer/prompts';
 import { CocoCommands } from '@p67-cli/coco/CocoCommands';
 import { ProjectConfig } from '@p67-cli/config/ProjectConfig';
-import type { GlobalOptions } from '@p67-cli/global-options.ts';
+import type { ProjectOptions } from '@p67-cli/middleware/project-config';
 import { Workspace } from '@p67-cli/workspace/Workspace';
 import { Command } from 'commander';
 
@@ -12,7 +12,7 @@ export const initCommand = new Command('init')
 	.description('Initialize a new p67 configuration file')
 	.argument('[name]', 'Optional project name')
 	.action(async (name?: string) => {
-		const options = initCommand.optsWithGlobals<GlobalOptions>();
+		const options = initCommand.optsWithGlobals<ProjectOptions>();
 		const targetDir = path.resolve(options.project as string, name || '');
 		const configPath = path.join(targetDir, 'p67.yml');
 

@@ -1,9 +1,9 @@
 import { confirm } from '@inquirer/prompts';
+import { Command } from '@p67-cli/Command';
 import { ConnectionConfig } from '@p67-cli/config/ConnectionConfig';
-import { Command } from 'commander';
 
 export const removeCommand = new Command('remove')
-	.description('Remove a P67 connection')
+	.description('Remove a connection')
 	.argument('<name>', 'Connection name to remove')
 	.option('-y, --yes', 'Skip confirmation prompt')
 	.action(async (name: string, options?: { yes?: boolean }) => {
@@ -45,11 +45,7 @@ export const removeCommand = new Command('remove')
 				}
 			}
 		} catch (error) {
-			if (error instanceof Error) {
-				console.error('✗ Error:', error.message);
-			} else {
-				console.error('✗ Unexpected error:', error);
-			}
-			process.exit(1);
+			console.error(`Failed to remove connection ${name}`);
+			throw error;
 		}
 	});

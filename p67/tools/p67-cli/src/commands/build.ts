@@ -1,17 +1,14 @@
 import * as fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import * as path from 'node:path';
-import { ProjectConfig } from '@p67-cli/config/ProjectConfig';
-import type { GlobalOptions } from '@p67-cli/global-options.ts';
-import { Command } from 'commander';
+import { Command } from '@p67-cli/Command.ts';
+import { ctx } from '@p67-cli/context';
+import { projectConfig } from '@p67-cli/middleware/project-config';
 
 export const buildCommand = new Command('build')
 	.description('Build the project')
+	.use(projectConfig)
 	.action(async () => {
-		const options = buildCommand.optsWithGlobals<GlobalOptions>();
-		const config = new ProjectConfig(options.project);
-		const entrypoint = path.resolve(options.project, config.entrypoint);
-		const buildDir = path.resolve(options.project, config.buildDir);
+		const { entrypoint, buildDir } = ctx().projectConfig;
 
 		// Check if directory exists
 		if (!fs.existsSync(buildDir)) {
@@ -34,6 +31,6 @@ export const buildCommand = new Command('build')
 			}
 		} catch (error) {
 			console.error('Build failed:', error);
-			process.exit(1);
+			throw error;
 		}
 	});

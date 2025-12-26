@@ -1,49 +1,44 @@
-import type { Connection } from '@p67-cli/config/ConnectionConfig';
+import type { Command } from '@p67-cli/Command';
 import { ConnectionConfig } from '@p67-cli/config/ConnectionConfig';
-import { Command } from 'commander';
+import { ctx } from '@p67-cli/context';
 
 export interface ConnectionOptions {
 	connection: string;
 }
 
-export class ConnectionEnabledCommand extends Command {
-	connection?: Connection;
-}
-
-export function connectionMiddleware(command: ConnectionEnabledCommand): void {
-	const defaultConnection = new ConnectionConfig().getDefault();
-	command
+export function connection(command: Command): Command {
+	const connectionConfig = new ConnectionConfig();
+	const defaultConnection = connectionConfig.getDefault();
+	return command
 		.option(
 			'-c, --connection <connection>',
-			`P67 connection (default: ${defaultConnection})`,
+			'P67 connection',
 			defaultConnection,
 		)
 		.hook('preAction', (action) => {
 			const options = action.optsWithGlobals<ConnectionOptions>();
-			const config = new ConnectionConfig();
 
-			if (!config.exists()) {
-				console.error('✗ Error: No connections are configured.');
-				console.error('  Run "p67 connection add"');
-				process.exit(1);
+			if (!connectionConfig.exists()) {
+				throw new Error(
+					'No connections are configured. Run "p67 connection add"',
+				);
 			}
 
-			const connection = config.getConnection(options.connection);
+			const connection = connectionConfig.getConnection(options.connection);
 
 			if (!connection) {
-				console.error(
+				throw new Error(
 					`Connection ${options.connection} does not specify an endpoint value.`,
 				);
-				process.exit(1);
 			}
 
 			if (!connection.pat) {
-				console.error(
+				throw new Error(
 					`Connection ${options.connection} does not specify a pat value.`,
 				);
-				process.exit(1);
 			}
 
-			command.connection = connection;
+			ctx().connectionConfig = connectionConfig;
+			ctx().connection = connection;
 		});
 }

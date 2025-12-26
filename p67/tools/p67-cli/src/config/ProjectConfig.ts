@@ -14,7 +14,8 @@ const ProjectConfigSchema = z.object({
 export type ProjectConfigData = z.infer<typeof ProjectConfigSchema>;
 
 export class ProjectConfig {
-	private configPath: string;
+	private _configPath: string;
+	private _projectDir: string;
 	private data: ProjectConfigData | null = null;
 
 	public static default(directory: string = process.cwd()): ProjectConfig {
@@ -25,7 +26,8 @@ export class ProjectConfig {
 		directory: string = process.cwd(),
 		data: ProjectConfigData | null = null,
 	) {
-		this.configPath = path.join(directory, 'p67.yml');
+		this._configPath = path.join(directory, 'p67.yml');
+		this._projectDir = directory;
 		this.data = data;
 	}
 
@@ -109,24 +111,32 @@ export class ProjectConfig {
 		return this.data;
 	}
 
+	resolveProjectPath(p: string): string {
+		return path.resolve(this.configPath, p);
+	}
+
 	/**
 	 * Get the entrypoint file path
 	 */
 	get entrypoint(): string {
-		return this.get().entrypoint;
+		return this.resolveProjectPath(this.get().entrypoint);
 	}
 
 	/**
 	 * Get the build dir
 	 */
 	get buildDir(): string {
-		return this.get().buildDir;
+		return this.resolveProjectPath(this.get().buildDir);
 	}
 
 	/**
 	 * Get the configuration file path
 	 */
-	getConfigPath(): string {
-		return this.configPath;
+	get configPath(): string {
+		return this._configPath;
+	}
+
+	get projectDir(): string {
+		return this._projectDir;
 	}
 }

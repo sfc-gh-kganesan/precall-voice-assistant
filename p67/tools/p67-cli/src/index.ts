@@ -1,27 +1,20 @@
 #!/usr/bin/env bun
-import { buildCommand } from '@p67-cli/commands/build';
-import { cocoCommand } from '@p67-cli/commands/coco/index';
-import { connectionCommand } from '@p67-cli/commands/connection';
-import { initCommand } from '@p67-cli/commands/init.ts';
-import { workflowCommand } from '@p67-cli/commands/workflow';
-import { options } from '@p67-cli/global-options';
-import { Command } from 'commander';
+import { program } from '@p67-cli/program';
 
-const VERSION = '0.1.0';
+(async () => {
+	try {
+		await program.parseAsync(process.argv);
+	} catch (err: unknown) {
+		const error = err as Error;
+		console.error(`Error: ${error.message}`);
+		if (process.env.DEBUG) {
+			console.error(error.stack);
+		}
+		process.exit(1);
+	}
+})();
 
-const program = new Command('p67');
-
-program
-	.name('p67')
-	.version(VERSION)
-	.description('Project 67 Agentic Workflow Builder commands');
-
-options(program);
-
-program.addCommand(initCommand);
-program.addCommand(workflowCommand);
-program.addCommand(cocoCommand);
-program.addCommand(buildCommand);
-program.addCommand(connectionCommand);
-
-program.parse(process.argv);
+process.on('unhandledRejection', (err) => {
+	console.error('Unhandled rejection:', err);
+	process.exit(1);
+});
