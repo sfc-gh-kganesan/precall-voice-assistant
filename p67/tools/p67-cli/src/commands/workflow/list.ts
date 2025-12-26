@@ -1,41 +1,16 @@
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
-import { ProjectConfig } from '@p67-cli/config/ProjectConfig.ts';
-import type { SnowflakePat1p } from '@p67-cli/secrets/1password.ts';
-import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
+import type { ConnectionEnabledCommand } from '@p67-cli/middleware/connection';
 import { Command } from 'commander';
 
 export const listCommand = new Command('list')
 	.description('List all available workflows')
 	.action(async () => {
 		try {
-			const options = listCommand.optsWithGlobals();
-			const config = new ProjectConfig(options.cwd as string);
-
-			if (!config.exists()) {
-				console.error('✗ Error: p67.yml configuration file not found');
-				console.error('  Run "p67 init" to create a configuration file');
-				process.exit(1);
-			}
-
-			console.log(config);
-			console.log(config.getRuntimeEndpoint());
-
-			// If we're running on localhost, we don't need a PAT.
-			let pat: SnowflakePat1p | null = null;
-			if (config.getRuntimeEndpoint().includes('localhost')) {
-				pat = null;
-			} else {
-				pat = getSnowflakePat();
-				if (!pat.value) {
-					console.error('Unable to load Snowflake PAT from 1password.');
-					process.exit(1);
-				}
-			}
-
-			const endpoint = config.getRuntimeEndpoint();
+			const connection = (listCommand.parent as ConnectionEnabledCommand)
+				?.connection;
 			const client = new ControldClient({
-				baseUrl: endpoint,
-				pat: pat?.value || '',
+				baseUrl: connection?.endpoint ?? '',
+				pat: connection?.pat ?? '',
 			});
 			const result = await client.listWorkflows();
 

@@ -1,9 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
-import { ProjectConfig } from '@p67-cli/config/ProjectConfig.ts';
-import type { SnowflakePat1p } from '@p67-cli/secrets/1password.ts';
-import { getSnowflakePat } from '@p67-cli/secrets/1password.ts';
+import type { ConnectionEnabledCommand } from '@p67-cli/middleware/connection';
 import { Command } from 'commander';
 
 export const deployCommand = new Command('deploy')
@@ -11,27 +9,8 @@ export const deployCommand = new Command('deploy')
 	.argument('<filePath>', 'Path to the workflow zip file')
 	.action(async (filePath: string) => {
 		try {
-			const options = deployCommand.optsWithGlobals();
-			const config = new ProjectConfig(options.cwd as string);
-
-			if (!config.exists()) {
-				console.error('✗ Error: p67.yml configuration file not found');
-				console.error('  Run "p67 init" to create a configuration file');
-				process.exit(1);
-			}
-
-			// If we're running on localhost, we don't need a PAT.
-			let pat: SnowflakePat1p | null = null;
-			if (config.getRuntimeEndpoint().includes('localhost')) {
-				pat = null;
-			} else {
-				pat = getSnowflakePat();
-				if (!pat.value) {
-					console.error('Unable to load Snowflake PAT from 1password.');
-					process.exit(1);
-				}
-			}
-
+			const connection = (deployCommand.parent as ConnectionEnabledCommand)
+				?.connection;
 			// Resolve the file path
 			const resolvedPath = path.resolve(filePath);
 
@@ -55,10 +34,9 @@ export const deployCommand = new Command('deploy')
 			const blob = new Blob([fileBuffer], { type: 'application/zip' });
 			const filename = path.basename(resolvedPath);
 
-			const endpoint = config.getRuntimeEndpoint();
 			const client = new ControldClient({
-				baseUrl: endpoint,
-				pat: pat?.value || '',
+				baseUrl: connection?.endpoint ?? '',
+				pat: connection?.pat ?? '',
 			});
 
 			const result = await client.createWorkflow(blob, filename);

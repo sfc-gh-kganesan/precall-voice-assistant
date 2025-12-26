@@ -1,21 +1,21 @@
 import * as fs from 'node:fs';
-import { mkdir, rename } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
 import { ProjectConfig } from '@p67-cli/config/ProjectConfig';
+import type { GlobalOptions } from '@p67-cli/global-options.ts';
 import { Command } from 'commander';
 
 export const buildCommand = new Command('build')
 	.description('Build the project')
 	.action(async () => {
-		const options = buildCommand.optsWithGlobals();
-		const config = new ProjectConfig(options.cwd as string);
-		const entrypoint = path.resolve(options.cwd, config.entrypoint);
-		const outFile = path.resolve(options.cwd, config.buildTarget);
-		const outDir = path.dirname(outFile);
+		const options = buildCommand.optsWithGlobals<GlobalOptions>();
+		const config = new ProjectConfig(options.project);
+		const entrypoint = path.resolve(options.project, config.entrypoint);
+		const buildDir = path.resolve(options.project, config.buildDir);
 
 		// Check if directory exists
-		if (!fs.existsSync(outDir)) {
-			await mkdir(outDir, { recursive: true });
+		if (!fs.existsSync(buildDir)) {
+			await mkdir(buildDir, { recursive: true });
 		}
 
 		try {
@@ -23,41 +23,14 @@ export const buildCommand = new Command('build')
 				entrypoints: [entrypoint],
 				target: 'node',
 				format: 'esm',
-				outdir: outDir,
+				outdir: buildDir,
 				sourcemap: true,
 			});
 
-			if (result.success) {
-				// Ensure the output file was created and rename it, if needed,
-				// to match the filename specified in the project config.
-				//
-				// Note: Bun.build() does not appear to support an outfile configuration
-				// value. If it did, this step would not be needed.
-				if (result.outputs.length) {
-					console.log('Build completed successfully!');
-					for (const output of result.outputs) {
-						if (output.kind === 'entry-point') {
-							if (output.path !== outFile) {
-								try {
-									console.log(`rename ${output.path} to ${outFile}`);
-									await rename(output.path, outFile);
-									break;
-								} catch (err) {
-									throw new Error(
-										`Failed to rename built artifact ${output.path} to ${outFile}: ${err}`,
-									);
-								}
-							}
-						}
-					}
-				} else {
-					throw new Error('No artifacts built');
+			if (result.success && result.outputs.length) {
+				for (const output of result.outputs) {
+					console.log(`✔︎ Created ${output.path}`);
 				}
-			} else {
-				for (const log of result.logs) {
-					console.log(log);
-				}
-				throw new Error();
 			}
 		} catch (error) {
 			console.error('Build failed:', error);

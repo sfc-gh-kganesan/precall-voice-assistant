@@ -4,13 +4,11 @@ import * as yaml from 'js-yaml';
 import { z } from 'zod';
 
 const ProjectConfigSchema = z.object({
-	runtime: z.object({
-		endpoint: z.string().url('Runtime endpoint must be a valid URL'),
-	}),
-	workflow: z.object({
-		entrypoint: z.string().describe('Path to workflow entrypoint file'),
-		buildTarget: z.string().describe('Path to built js file'),
-	}),
+	entrypoint: z
+		.string()
+		.describe('Workflow entrypoint path')
+		.default('./src/index.ts'),
+	buildDir: z.string().describe('Build output directory').default('.bundle'),
 });
 
 export type ProjectConfigData = z.infer<typeof ProjectConfigSchema>;
@@ -18,6 +16,10 @@ export type ProjectConfigData = z.infer<typeof ProjectConfigSchema>;
 export class ProjectConfig {
 	private configPath: string;
 	private data: ProjectConfigData | null = null;
+
+	public static default(directory: string = process.cwd()): ProjectConfig {
+		return new ProjectConfig(directory, ProjectConfigSchema.parse({}));
+	}
 
 	constructor(
 		directory: string = process.cwd(),
@@ -108,24 +110,17 @@ export class ProjectConfig {
 	}
 
 	/**
-	 * Get the runtime endpoint
-	 */
-	getRuntimeEndpoint(): string {
-		return this.get().runtime.endpoint;
-	}
-
-	/**
 	 * Get the entrypoint file path
 	 */
 	get entrypoint(): string {
-		return this.get().workflow.entrypoint;
+		return this.get().entrypoint;
 	}
 
 	/**
-	 * Get the entrypoint build target path
+	 * Get the build dir
 	 */
-	get buildTarget(): string {
-		return this.get().workflow.buildTarget;
+	get buildDir(): string {
+		return this.get().buildDir;
 	}
 
 	/**

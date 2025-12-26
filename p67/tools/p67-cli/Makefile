@@ -20,8 +20,7 @@ clean: ## Remove built files
 	rm -rf bin/p67
 
 fix: ## Fix lint / formatting issues
-	pnpm lint:fix
-	pnpm format
+	pnpm fix
 
 install: build ## Install the p67 command in your path
 	./install.sh

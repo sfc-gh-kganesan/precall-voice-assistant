@@ -1,9 +1,10 @@
 import * as fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
-import { confirm, input } from '@inquirer/prompts';
+import { confirm } from '@inquirer/prompts';
 import { CocoCommands } from '@p67-cli/coco/CocoCommands';
 import { ProjectConfig } from '@p67-cli/config/ProjectConfig';
+import type { GlobalOptions } from '@p67-cli/global-options.ts';
 import { Workspace } from '@p67-cli/workspace/Workspace';
 import { Command } from 'commander';
 
@@ -11,8 +12,8 @@ export const initCommand = new Command('init')
 	.description('Initialize a new p67 configuration file')
 	.argument('[name]', 'Optional project name')
 	.action(async (name?: string) => {
-		const options = initCommand.optsWithGlobals();
-		const targetDir = path.resolve(options.cwd as string, name || '');
+		const options = initCommand.optsWithGlobals<GlobalOptions>();
+		const targetDir = path.resolve(options.project as string, name || '');
 		const configPath = path.join(targetDir, 'p67.yml');
 
 		// Check if directory exists
@@ -44,26 +45,7 @@ export const initCommand = new Command('init')
 			}
 		}
 
-		// Prompt for runtime service endpoint
-		const endpoint = await input({
-			message: 'Enter the runtime service endpoint URL',
-			default: 'https://jnb46h6e-sfengineering-aifde.snowflakecomputing.app',
-		});
-
-		if (!endpoint || endpoint.trim() === '') {
-			console.error('✗ Error: Runtime endpoint is required');
-			process.exit(1);
-		}
-
-		const config = new ProjectConfig(targetDir, {
-			runtime: {
-				endpoint: endpoint.trim(),
-			},
-			workflow: {
-				entrypoint: './src/index.ts',
-				buildTarget: './deploy/index.js',
-			},
-		});
+		const config = ProjectConfig.default(targetDir);
 
 		try {
 			config.write();
