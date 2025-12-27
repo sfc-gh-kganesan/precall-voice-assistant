@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import { createPrismaClient } from './client';
-import type { PrismaClient } from './generated/prisma/client';
+import { createPrismaClient } from './client.js';
+import type { PrismaClient } from './generated/prisma/client.js';
 
 // Plugin options interface
 export interface DatabasePluginOptions {

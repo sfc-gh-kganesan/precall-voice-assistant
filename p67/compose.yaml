@@ -35,7 +35,7 @@ services:
         depends_on:
             postgres:
                 condition: service_healthy
-        command: sh -c "cd /app/services/controld && pnpm prisma migrate deploy && node dist/index.js"
+        command: sh -c "cd /app/services/controld && node dist/index.js"
 
 volumes:
     postgres_data:

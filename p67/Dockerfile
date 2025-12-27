@@ -9,7 +9,7 @@ WORKDIR /app
 
 # Install all dependencies
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY packages ./packages
 COPY services ./services
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
@@ -27,7 +27,7 @@ ARG SERVICE_NAME
 ARG SERVICE_PORT=3000
 
 # Copy workspace config
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 
 # Copy package manifests for workspace resolution
 COPY packages ./packages

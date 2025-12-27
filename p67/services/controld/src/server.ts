@@ -1,5 +1,5 @@
 import { loadConfig, type ServerConfig } from '@controld/config.js';
-import userPlugin from '@controld/lib/plugins/user';
+import userPlugin from '@controld/lib/plugins/user.js';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
