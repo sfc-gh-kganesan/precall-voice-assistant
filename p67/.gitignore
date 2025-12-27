@@ -5,4 +5,4 @@ dist
 *.log
 .pnpm-debug.log
 output
-Makefile
+/Makefile
