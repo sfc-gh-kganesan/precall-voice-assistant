@@ -118,21 +118,21 @@ export class ProjectConfig {
 	/**
 	 * Get the entrypoint file path
 	 */
-	get entrypoint(): string {
+	public get entrypoint(): string {
 		return this.resolveProjectPath(this.get().entrypoint);
 	}
 
 	/**
 	 * Get the build dir
 	 */
-	get buildDir(): string {
+	public get buildDir(): string {
 		return this.resolveProjectPath(this.get().buildDir);
 	}
 
 	/**
 	 * Get the configuration file path
 	 */
-	get configPath(): string {
+	public get configPath(): string {
 		return this._configPath;
 	}
 

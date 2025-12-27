@@ -2,15 +2,22 @@ import * as fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
 import { confirm } from '@inquirer/prompts';
+import { Command } from '@p67-cli/Command';
 import { CocoCommands } from '@p67-cli/coco/CocoCommands';
 import { ProjectConfig } from '@p67-cli/config/ProjectConfig';
-import type { ProjectOptions } from '@p67-cli/middleware/project-config';
+import {
+	type ProjectConfigOptions,
+	type ProjectOptions,
+	projectConfig,
+} from '@p67-cli/middleware/project-config';
 import { Workspace } from '@p67-cli/workspace/Workspace';
-import { Command } from 'commander';
 
 export const initCommand = new Command('init')
 	.description('Initialize a new p67 configuration file')
 	.argument('[name]', 'Optional project name')
+	.use<ProjectConfigOptions>(projectConfig, {
+		requireConfigFileToExist: false,
+	})
 	.action(async (name?: string) => {
 		const options = initCommand.optsWithGlobals<ProjectOptions>();
 		const targetDir = path.resolve(options.project as string, name || '');
