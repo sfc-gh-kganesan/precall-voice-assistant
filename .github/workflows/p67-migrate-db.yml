@@ -1,9 +1,9 @@
-name: Deploy database schema changes
+name: p67-migrate-db
 on:
   workflow_dispatch:
     inputs:
       dry-run:
-        description: "False = apply changes in prod; True = print SQL changes only"
+        description: "Dry run mode"
         required: true
         type: boolean
         default: true
