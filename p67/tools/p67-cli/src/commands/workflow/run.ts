@@ -4,61 +4,61 @@ import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { ctx } from '@p67-cli/context';
 
 export const runCommand = new Command('run')
-	.description('Run a workflow')
-	.argument('[workflowId]', 'Workflow ID to run')
-	.action(async (workflowId?: string) => {
-		try {
-			const { connection } = ctx();
+    .description('Run a workflow')
+    .argument('[workflowId]', 'Workflow ID to run')
+    .action(async (workflowId?: string) => {
+        try {
+            const { connection } = ctx();
 
-			const client = new ControldClient({
-				baseUrl: connection.endpoint,
-				pat: connection.pat,
-			});
+            const client = new ControldClient({
+                baseUrl: connection.endpoint,
+                pat: connection.pat,
+            });
 
-			let selectedWorkflowId = workflowId;
+            let selectedWorkflowId = workflowId;
 
-			// If no workflow ID provided, prompt user to select one
-			if (!selectedWorkflowId) {
-				console.log('Fetching available workflows...\n');
-				const result = await client.listWorkflows();
+            // If no workflow ID provided, prompt user to select one
+            if (!selectedWorkflowId) {
+                console.log('Fetching available workflows...\n');
+                const result = await client.listWorkflows();
 
-				if (result.workflows.length === 0) {
-					throw new Error('No workflows found');
-				}
+                if (result.workflows.length === 0) {
+                    throw new Error('No workflows found');
+                }
 
-				selectedWorkflowId = await select({
-					message: 'Select a workflow to run:',
-					choices: result.workflows.map((wf) => ({
-						value: wf,
-						name: wf,
-					})),
-				});
-			}
+                selectedWorkflowId = await select({
+                    message: 'Select a workflow to run:',
+                    choices: result.workflows.map((wf) => ({
+                        value: wf,
+                        name: wf,
+                    })),
+                });
+            }
 
-			console.log(`\nRunning workflow: ${selectedWorkflowId}\n`);
+            console.log(`\nRunning workflow: ${selectedWorkflowId}\n`);
 
-			const runResult = await client.runWorkflow(selectedWorkflowId);
+            const runResult = await client.runWorkflow(selectedWorkflowId);
 
-			// Display results
-			console.log('─'.repeat(50));
-			console.log(`Exit Code: ${runResult.exitCode}`);
-			console.log(`Success: ${runResult.success}`);
-			console.log('─'.repeat(50));
+            // Display results
+            console.log('─'.repeat(50));
+            console.log(`Exit Code: ${runResult.exitCode}`);
+            console.log(`Success: ${runResult.success}`);
+            console.log('─'.repeat(50));
 
-			if (runResult.stdout) {
-				console.log('\nStdout:');
-				console.log(runResult.stdout);
-			}
+            if (runResult.stdout) {
+                console.log('\nStdout:');
+                console.log(runResult.stdout);
+            }
 
-			if (runResult.stderr) {
-				console.log('\nStderr:');
-				console.error(runResult.stderr);
-			}
+            if (runResult.stderr) {
+                console.log('\nStderr:');
+                console.error(runResult.stderr);
+            }
 
-			// Exit with the workflow's exit code
-			process.exit(runResult.exitCode);
-		} catch (error) {
-			console.error('Failed to run workflow');
-			throw error;
-		}
-	});
+            // Exit with the workflow's exit code
+            process.exit(runResult.exitCode);
+        } catch (error) {
+            console.error('Failed to run workflow');
+            throw error;
+        }
+    });

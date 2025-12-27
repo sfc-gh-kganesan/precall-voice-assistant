@@ -5,8 +5,8 @@ import { removeCommand } from '@p67-cli/commands/connection/remove';
 import { setDefaultCommand } from '@p67-cli/commands/connection/set-default';
 
 export const connectionCommand = new Command('connection')
-	.description('Manage connections')
-	.addCommand(listCommand)
-	.addCommand(addCommand)
-	.addCommand(removeCommand)
-	.addCommand(setDefaultCommand);
+    .description('Manage connections')
+    .addCommand(listCommand)
+    .addCommand(addCommand)
+    .addCommand(removeCommand)
+    .addCommand(setDefaultCommand);

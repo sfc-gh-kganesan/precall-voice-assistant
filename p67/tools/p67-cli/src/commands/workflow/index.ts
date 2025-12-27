@@ -6,9 +6,9 @@ import { connection } from '@p67-cli/middleware/connection';
 import { projectConfig } from '@p67-cli/middleware/project-config';
 
 export const workflowCommand = new Command('workflow')
-	.description('Operate on workflows')
-	.use(connection)
-	.use(projectConfig)
-	.addCommand(listCommand)
-	.addCommand(runCommand)
-	.addCommand(deployCommand);
+    .description('Operate on workflows')
+    .use(connection)
+    .use(projectConfig)
+    .addCommand(listCommand)
+    .addCommand(runCommand)
+    .addCommand(deployCommand);

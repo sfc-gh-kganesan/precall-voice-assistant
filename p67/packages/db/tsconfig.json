@@ -1,15 +1,15 @@
 {
-	"extends": "../../tsconfig.json",
-	"compilerOptions": {
-		"outDir": "./dist",
-		"rootDir": "./src",
-		"paths": {
-			"@p67/agent-sdk/*": ["./packages/agent-sdk"],
-			"@p67/cli/*": ["./tools/p67-cli"],
-			"@p67/controld/*": ["./services/controld"],
-			"@p67/db/*": ["./packages/db/src"]
-		}
-	},
-	"include": ["src/**/*"],
-	"exclude": ["node_modules", "dist/**/*"]
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "paths": {
+            "@p67/agent-sdk/*": ["./packages/agent-sdk"],
+            "@p67/cli/*": ["./tools/p67-cli"],
+            "@p67/controld/*": ["./services/controld"],
+            "@p67/db/*": ["./packages/db/src"]
+        }
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "dist/**/*"]
 }

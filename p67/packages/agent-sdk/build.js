@@ -9,26 +9,26 @@ const __dirname = dirname(__filename);
 const distDir = join(__dirname, 'dist');
 
 if (!existsSync(distDir)) {
-	mkdirSync(distDir, { recursive: true });
+    mkdirSync(distDir, { recursive: true });
 }
 
 try {
-	await esbuild.build({
-		entryPoints: ['src/index.ts'],
-		bundle: true,
-		platform: 'node',
-		target: 'node20',
-		format: 'esm',
-		outfile: 'dist/bundle.src',
-		sourcemap: true,
-		minify: false,
-		packages: 'external',
-		legalComments: 'inline',
-	});
+    await esbuild.build({
+        entryPoints: ['src/index.ts'],
+        bundle: true,
+        platform: 'node',
+        target: 'node20',
+        format: 'esm',
+        outfile: 'dist/bundle.src',
+        sourcemap: true,
+        minify: false,
+        packages: 'external',
+        legalComments: 'inline',
+    });
 
-	console.log('Bundle completed successfully!');
-	console.log('Output: dist/bundle.src');
+    console.log('Bundle completed successfully!');
+    console.log('Output: dist/bundle.src');
 } catch (error) {
-	console.error('Bundle failed:', error);
-	process.exit(1);
+    console.error('Bundle failed:', error);
+    process.exit(1);
 }

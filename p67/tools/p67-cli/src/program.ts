@@ -8,11 +8,11 @@ import { workflowCommand } from '@p67-cli/commands/workflow';
 const VERSION = '0.1.0';
 
 export const program = new Command()
-	.name('p67')
-	.version(VERSION)
-	.description('Project 67 -- Workflow Builder')
-	.addCommand(initCommand)
-	.addCommand(workflowCommand)
-	.addCommand(cocoCommand)
-	.addCommand(buildCommand)
-	.addCommand(connectionCommand);
+    .name('p67')
+    .version(VERSION)
+    .description('Project 67 -- Workflow Builder')
+    .addCommand(initCommand)
+    .addCommand(workflowCommand)
+    .addCommand(cocoCommand)
+    .addCommand(buildCommand)
+    .addCommand(connectionCommand);

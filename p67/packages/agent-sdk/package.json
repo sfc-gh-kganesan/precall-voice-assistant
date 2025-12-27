@@ -1,42 +1,42 @@
 {
-	"name": "@p67/agent-sdk",
-	"version": "0.1.0",
-	"description": "Agent SDK for P67",
-	"type": "module",
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
-		}
-	},
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"dev": "tsc --watch",
-		"build": "tsc",
-		"bundle": "node build.js",
-		"test": "vitest run",
-		"test:watch": "vitest",
-		"test:ui": "vitest --ui",
-		"postinstall": "pnpm build && pnpm bundle",
-		"check": "pnpm exec biome check --error-on-warnings",
-		"fix": "pnpm exec biome check --write",
-		"type:check": "tsc --noEmit",
-		"ci": "run-p check type:check build"
-	},
-	"dependencies": {
-		"dotenv": "^16.4.7",
-		"snowflake-sdk": "^2.3.3",
-		"zod": "^3.23.8"
-	},
-	"devDependencies": {
-		"@types/node": "^24.10.1",
-		"@types/snowflake-sdk": "^1.6.24",
-		"@vitest/ui": "^4.0.9",
-		"esbuild": "^0.27.1",
-		"vitest": "^4.0.9"
-	}
+    "name": "@p67/agent-sdk",
+    "version": "0.1.0",
+    "description": "Agent SDK for P67",
+    "type": "module",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "dev": "tsc --watch",
+        "build": "tsc",
+        "bundle": "node build.js",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:ui": "vitest --ui",
+        "postinstall": "pnpm build && pnpm bundle",
+        "check": "pnpm exec biome check --error-on-warnings",
+        "fix": "pnpm exec biome check --write",
+        "type:check": "tsc --noEmit",
+        "ci": "run-p check type:check build"
+    },
+    "dependencies": {
+        "dotenv": "^16.4.7",
+        "snowflake-sdk": "^2.3.3",
+        "zod": "^3.23.8"
+    },
+    "devDependencies": {
+        "@types/node": "^24.10.1",
+        "@types/snowflake-sdk": "^1.6.24",
+        "@vitest/ui": "^4.0.9",
+        "esbuild": "^0.27.1",
+        "vitest": "^4.0.9"
+    }
 }

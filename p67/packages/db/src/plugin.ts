@@ -5,49 +5,49 @@ import type { PrismaClient } from './generated/prisma/client';
 
 // Plugin options interface
 export interface DatabasePluginOptions {
-	databaseUrl: string;
+    databaseUrl: string;
 }
 
 // Extend Fastify types to include prisma
 declare module 'fastify' {
-	interface FastifyInstance {
-		db: PrismaClient;
-	}
+    interface FastifyInstance {
+        db: PrismaClient;
+    }
 }
 
 const plugin: FastifyPluginAsync<DatabasePluginOptions> = async (
-	fastify,
-	options,
+    fastify,
+    options,
 ) => {
-	const { databaseUrl } = options;
+    const { databaseUrl } = options;
 
-	if (!databaseUrl) {
-		throw new Error('databaseUrl is required for database plugin');
-	}
+    if (!databaseUrl) {
+        throw new Error('databaseUrl is required for database plugin');
+    }
 
-	// Create Prisma client with provided URL
-	const db = createPrismaClient(databaseUrl);
+    // Create Prisma client with provided URL
+    const db = createPrismaClient(databaseUrl);
 
-	// Test database connection on startup
-	try {
-		await db.$connect();
-		fastify.log.info('Database connected successfully');
-	} catch (error) {
-		fastify.log.error({ error }, 'Failed to connect to database');
-		throw error;
-	}
+    // Test database connection on startup
+    try {
+        await db.$connect();
+        fastify.log.info('Database connected successfully');
+    } catch (error) {
+        fastify.log.error({ error }, 'Failed to connect to database');
+        throw error;
+    }
 
-	// Decorate Fastify instance with Prisma client
-	fastify.decorate('db', db);
+    // Decorate Fastify instance with Prisma client
+    fastify.decorate('db', db);
 
-	// Graceful shutdown: disconnect from database when Fastify closes
-	fastify.addHook('onClose', async (instance) => {
-		instance.log.info('Disconnecting from database');
-		await instance.db.$disconnect();
-	});
+    // Graceful shutdown: disconnect from database when Fastify closes
+    fastify.addHook('onClose', async (instance) => {
+        instance.log.info('Disconnecting from database');
+        await instance.db.$disconnect();
+    });
 };
 
 // Use fastify-plugin to ensure plugin is registered at root level
 export const databasePlugin = fp(plugin, {
-	name: 'database',
+    name: 'database',
 });

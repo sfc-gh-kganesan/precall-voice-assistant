@@ -22,15 +22,15 @@ export type * from './prismaNamespace.js';
 export const Decimal = runtime.Decimal;
 
 export const NullTypes = {
-	DbNull: runtime.NullTypes.DbNull as new (
-		secret: never,
-	) => typeof runtime.DbNull,
-	JsonNull: runtime.NullTypes.JsonNull as new (
-		secret: never,
-	) => typeof runtime.JsonNull,
-	AnyNull: runtime.NullTypes.AnyNull as new (
-		secret: never,
-	) => typeof runtime.AnyNull,
+    DbNull: runtime.NullTypes.DbNull as new (
+        secret: never,
+    ) => typeof runtime.DbNull,
+    JsonNull: runtime.NullTypes.JsonNull as new (
+        secret: never,
+    ) => typeof runtime.JsonNull,
+    AnyNull: runtime.NullTypes.AnyNull as new (
+        secret: never,
+    ) => typeof runtime.AnyNull,
 };
 /**
  * Helper for filtering JSON entries that have `null` on the database (empty on the db)
@@ -54,7 +54,7 @@ export const JsonNull = runtime.JsonNull;
 export const AnyNull = runtime.AnyNull;
 
 export const ModelName = {
-	User: 'User',
+    User: 'User',
 } as const;
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName];
@@ -64,35 +64,35 @@ export type ModelName = (typeof ModelName)[keyof typeof ModelName];
  */
 
 export const TransactionIsolationLevel = {
-	ReadUncommitted: 'ReadUncommitted',
-	ReadCommitted: 'ReadCommitted',
-	RepeatableRead: 'RepeatableRead',
-	Serializable: 'Serializable',
+    ReadUncommitted: 'ReadUncommitted',
+    ReadCommitted: 'ReadCommitted',
+    RepeatableRead: 'RepeatableRead',
+    Serializable: 'Serializable',
 } as const;
 
 export type TransactionIsolationLevel =
-	(typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel];
+    (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel];
 
 export const UserScalarFieldEnum = {
-	id: 'id',
-	createdAt: 'createdAt',
-	updatedAt: 'updatedAt',
-	snowflakeUser: 'snowflakeUser',
+    id: 'id',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt',
+    snowflakeUser: 'snowflakeUser',
 } as const;
 
 export type UserScalarFieldEnum =
-	(typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum];
+    (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum];
 
 export const SortOrder = {
-	asc: 'asc',
-	desc: 'desc',
+    asc: 'asc',
+    desc: 'desc',
 } as const;
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder];
 
 export const QueryMode = {
-	default: 'default',
-	insensitive: 'insensitive',
+    default: 'default',
+    insensitive: 'insensitive',
 } as const;
 
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode];

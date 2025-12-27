@@ -29,22 +29,22 @@ export type PrismaPromise<T> = runtime.Types.Public.PrismaPromise<T>;
  */
 
 export const PrismaClientKnownRequestError =
-	runtime.PrismaClientKnownRequestError;
+    runtime.PrismaClientKnownRequestError;
 export type PrismaClientKnownRequestError =
-	runtime.PrismaClientKnownRequestError;
+    runtime.PrismaClientKnownRequestError;
 
 export const PrismaClientUnknownRequestError =
-	runtime.PrismaClientUnknownRequestError;
+    runtime.PrismaClientUnknownRequestError;
 export type PrismaClientUnknownRequestError =
-	runtime.PrismaClientUnknownRequestError;
+    runtime.PrismaClientUnknownRequestError;
 
 export const PrismaClientRustPanicError = runtime.PrismaClientRustPanicError;
 export type PrismaClientRustPanicError = runtime.PrismaClientRustPanicError;
 
 export const PrismaClientInitializationError =
-	runtime.PrismaClientInitializationError;
+    runtime.PrismaClientInitializationError;
 export type PrismaClientInitializationError =
-	runtime.PrismaClientInitializationError;
+    runtime.PrismaClientInitializationError;
 
 export const PrismaClientValidationError = runtime.PrismaClientValidationError;
 export type PrismaClientValidationError = runtime.PrismaClientValidationError;
@@ -73,23 +73,23 @@ export type DecimalJsLike = runtime.DecimalJsLike;
 export type Extension = runtime.Types.Extensions.UserArgs;
 export const getExtensionContext = runtime.Extensions.getExtensionContext;
 export type Args<T, F extends runtime.Operation> = runtime.Types.Public.Args<
-	T,
-	F
+    T,
+    F
 >;
 export type Payload<
-	T,
-	F extends runtime.Operation = never,
+    T,
+    F extends runtime.Operation = never,
 > = runtime.Types.Public.Payload<T, F>;
 export type Result<
-	T,
-	A,
-	F extends runtime.Operation,
+    T,
+    A,
+    F extends runtime.Operation,
 > = runtime.Types.Public.Result<T, A, F>;
 export type Exact<A, W> = runtime.Types.Public.Exact<A, W>;
 
 export type PrismaVersion = {
-	client: string;
-	engine: string;
+    client: string;
+    engine: string;
 };
 
 /**
@@ -97,8 +97,8 @@ export type PrismaVersion = {
  * Query Engine version: ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba
  */
 export const prismaVersion: PrismaVersion = {
-	client: '7.1.0',
-	engine: 'ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba',
+    client: '7.1.0',
+    engine: 'ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba',
 };
 
 /**
@@ -114,15 +114,15 @@ export type InputJsonArray = runtime.InputJsonArray;
 export type InputJsonValue = runtime.InputJsonValue;
 
 export const NullTypes = {
-	DbNull: runtime.NullTypes.DbNull as new (
-		secret: never,
-	) => typeof runtime.DbNull,
-	JsonNull: runtime.NullTypes.JsonNull as new (
-		secret: never,
-	) => typeof runtime.JsonNull,
-	AnyNull: runtime.NullTypes.AnyNull as new (
-		secret: never,
-	) => typeof runtime.AnyNull,
+    DbNull: runtime.NullTypes.DbNull as new (
+        secret: never,
+    ) => typeof runtime.DbNull,
+    JsonNull: runtime.NullTypes.JsonNull as new (
+        secret: never,
+    ) => typeof runtime.JsonNull,
+    AnyNull: runtime.NullTypes.AnyNull as new (
+        secret: never,
+    ) => typeof runtime.AnyNull,
 };
 /**
  * Helper for filtering JSON entries that have `null` on the database (empty on the db)
@@ -146,20 +146,20 @@ export const JsonNull = runtime.JsonNull;
 export const AnyNull = runtime.AnyNull;
 
 type SelectAndInclude = {
-	select: any;
-	include: any;
+    select: any;
+    include: any;
 };
 
 type SelectAndOmit = {
-	select: any;
-	omit: any;
+    select: any;
+    omit: any;
 };
 
 /**
  * From T, pick a set of properties whose keys are in the union K
  */
 type Prisma__Pick<T, K extends keyof T> = {
-	[P in K]: T[P];
+    [P in K]: T[P];
 };
 
 export type Enumerable<T> = T | Array<T>;
@@ -169,7 +169,7 @@ export type Enumerable<T> = T | Array<T>;
  * @desc From `T` pick properties that exist in `U`. Simple version of Intersection
  */
 export type Subset<T, U> = {
-	[key in keyof T]: key extends keyof U ? T[key] : never;
+    [key in keyof T]: key extends keyof U ? T[key] : never;
 };
 
 /**
@@ -178,19 +178,19 @@ export type Subset<T, U> = {
  * Additionally, it validates, if both select and include are present. If the case, it errors.
  */
 export type SelectSubset<T, U> = {
-	[key in keyof T]: key extends keyof U ? T[key] : never;
+    [key in keyof T]: key extends keyof U ? T[key] : never;
 } & (T extends SelectAndInclude
-	? 'Please either choose `select` or `include`.'
-	: T extends SelectAndOmit
-		? 'Please either choose `select` or `omit`.'
-		: {});
+    ? 'Please either choose `select` or `include`.'
+    : T extends SelectAndOmit
+      ? 'Please either choose `select` or `omit`.'
+      : {});
 
 /**
  * Subset + Intersection
  * @desc From `T` pick properties that exist in `U` and intersect `K`
  */
 export type SubsetIntersection<T, U, K> = {
-	[key in keyof T]: key extends keyof U ? T[key] : never;
+    [key in keyof T]: key extends keyof U ? T[key] : never;
 } & K;
 
 type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never };
@@ -200,26 +200,26 @@ type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never };
  * https://stackoverflow.com/questions/42123407/does-typescript-support-mutually-exclusive-types
  */
 export type XOR<T, U> = T extends object
-	? U extends object
-		? (Without<T, U> & U) | (Without<U, T> & T)
-		: U
-	: T;
+    ? U extends object
+        ? (Without<T, U> & U) | (Without<U, T> & T)
+        : U
+    : T;
 
 /**
  * Is T a Record?
  */
 type IsObject<T extends any> =
-	T extends Array<any>
-		? False
-		: T extends Date
-			? False
-			: T extends Uint8Array
-				? False
-				: T extends BigInt
-					? False
-					: T extends object
-						? True
-						: False;
+    T extends Array<any>
+        ? False
+        : T extends Date
+          ? False
+          : T extends Uint8Array
+            ? False
+            : T extends BigInt
+              ? False
+              : T extends object
+                ? True
+                : False;
 
 /**
  * If it's T[], return T
@@ -231,76 +231,76 @@ export type UnEnumerate<T extends unknown> = T extends Array<infer U> ? U : T;
  */
 
 type __Either<O extends object, K extends Key> = Omit<O, K> &
-	{
-		// Merge all but K
-		[P in K]: Prisma__Pick<O, P & keyof O>; // With K possibilities
-	}[K];
+    {
+        // Merge all but K
+        [P in K]: Prisma__Pick<O, P & keyof O>; // With K possibilities
+    }[K];
 
 type EitherStrict<O extends object, K extends Key> = Strict<__Either<O, K>>;
 
 type EitherLoose<O extends object, K extends Key> = ComputeRaw<__Either<O, K>>;
 
 type _Either<O extends object, K extends Key, strict extends Boolean> = {
-	1: EitherStrict<O, K>;
-	0: EitherLoose<O, K>;
+    1: EitherStrict<O, K>;
+    0: EitherLoose<O, K>;
 }[strict];
 
 export type Either<
-	O extends object,
-	K extends Key,
-	strict extends Boolean = 1,
+    O extends object,
+    K extends Key,
+    strict extends Boolean = 1,
 > = O extends unknown ? _Either<O, K, strict> : never;
 
 export type Union = any;
 
 export type PatchUndefined<O extends object, O1 extends object> = {
-	[K in keyof O]: O[K] extends undefined ? At<O1, K> : O[K];
+    [K in keyof O]: O[K] extends undefined ? At<O1, K> : O[K];
 } & {};
 
 /** Helper Types for "Merge" **/
 export type IntersectOf<U extends Union> = (
-	U extends unknown
-		? (k: U) => void
-		: never
+    U extends unknown
+        ? (k: U) => void
+        : never
 ) extends (k: infer I) => void
-	? I
-	: never;
+    ? I
+    : never;
 
 export type Overwrite<O extends object, O1 extends object> = {
-	[K in keyof O]: K extends keyof O1 ? O1[K] : O[K];
+    [K in keyof O]: K extends keyof O1 ? O1[K] : O[K];
 } & {};
 
 type _Merge<U extends object> = IntersectOf<
-	Overwrite<
-		U,
-		{
-			[K in keyof U]-?: At<U, K>;
-		}
-	>
+    Overwrite<
+        U,
+        {
+            [K in keyof U]-?: At<U, K>;
+        }
+    >
 >;
 
 type Key = string | number | symbol;
 type AtStrict<O extends object, K extends Key> = O[K & keyof O];
 type AtLoose<O extends object, K extends Key> = O extends unknown
-	? AtStrict<O, K>
-	: never;
+    ? AtStrict<O, K>
+    : never;
 export type At<O extends object, K extends Key, strict extends Boolean = 1> = {
-	1: AtStrict<O, K>;
-	0: AtLoose<O, K>;
+    1: AtStrict<O, K>;
+    0: AtLoose<O, K>;
 }[strict];
 
 export type ComputeRaw<A extends any> = A extends Function
-	? A
-	: {
-			[K in keyof A]: A[K];
-		} & {};
+    ? A
+    : {
+          [K in keyof A]: A[K];
+      } & {};
 
 export type OptionalFlat<O> = {
-	[K in keyof O]?: O[K];
+    [K in keyof O]?: O[K];
 } & {};
 
 type _Record<K extends keyof any, T> = {
-	[P in K]: T;
+    [P in K]: T;
 };
 
 // cause typescript not to expand types and preserve names
@@ -308,16 +308,16 @@ type NoExpand<T> = T extends unknown ? T : never;
 
 // this type assumes the passed object is entirely optional
 export type AtLeast<O extends object, K extends string> = NoExpand<
-	O extends unknown
-		?
-				| (K extends keyof O ? { [P in K]: O[P] } & O : O)
-				| ({ [P in keyof O as P extends K ? P : never]-?: O[P] } & O)
-		: never
+    O extends unknown
+        ?
+              | (K extends keyof O ? { [P in K]: O[P] } & O : O)
+              | ({ [P in keyof O as P extends K ? P : never]-?: O[P] } & O)
+        : never
 >;
 
 type _Strict<U, _U = U> = U extends unknown
-	? U & OptionalFlat<_Record<Exclude<Keys<_U>, keyof U>, never>>
-	: never;
+    ? U & OptionalFlat<_Record<Exclude<Keys<_U>, keyof U>, never>>
+    : never;
 
 export type Strict<U extends object> = ComputeRaw<_Strict<U>>;
 /** End Helper Types for "Merge" **/
@@ -331,60 +331,62 @@ export type True = 1;
 export type False = 0;
 
 export type Not<B extends Boolean> = {
-	0: 1;
-	1: 0;
+    0: 1;
+    1: 0;
 }[B];
 
 export type Extends<A1 extends any, A2 extends any> = [A1] extends [never]
-	? 0 // anything `never` is false
-	: A1 extends A2
-		? 1
-		: 0;
+    ? 0 // anything `never` is false
+    : A1 extends A2
+      ? 1
+      : 0;
 
 export type Has<U extends Union, U1 extends Union> = Not<
-	Extends<Exclude<U1, U>, U1>
+    Extends<Exclude<U1, U>, U1>
 >;
 
 export type Or<B1 extends Boolean, B2 extends Boolean> = {
-	0: {
-		0: 0;
-		1: 1;
-	};
-	1: {
-		0: 1;
-		1: 1;
-	};
+    0: {
+        0: 0;
+        1: 1;
+    };
+    1: {
+        0: 1;
+        1: 1;
+    };
 }[B1][B2];
 
 export type Keys<U extends Union> = U extends unknown ? keyof U : never;
 
 export type GetScalarType<T, O> = O extends object
-	? {
-			[P in keyof T]: P extends keyof O ? O[P] : never;
-		}
-	: never;
+    ? {
+          [P in keyof T]: P extends keyof O ? O[P] : never;
+      }
+    : never;
 
 type FieldPaths<
-	T,
-	U = Omit<T, '_avg' | '_sum' | '_count' | '_min' | '_max'>,
+    T,
+    U = Omit<T, '_avg' | '_sum' | '_count' | '_min' | '_max'>,
 > = IsObject<T> extends True ? U : T;
 
 export type GetHavingFields<T> = {
-	[K in keyof T]: Or<
-		Or<Extends<'OR', K>, Extends<'AND', K>>,
-		Extends<'NOT', K>
-	> extends True
-		? // infer is only needed to not hit TS limit
-			// based on the brilliant idea of Pierre-Antoine Mills
-			// https://github.com/microsoft/TypeScript/issues/30188#issuecomment-478938437
-			T[K] extends infer TK
-			? GetHavingFields<
-					UnEnumerate<TK> extends object ? Merge<UnEnumerate<TK>> : never
-				>
-			: never
-		: {} extends FieldPaths<T[K]>
-			? never
-			: K;
+    [K in keyof T]: Or<
+        Or<Extends<'OR', K>, Extends<'AND', K>>,
+        Extends<'NOT', K>
+    > extends True
+        ? // infer is only needed to not hit TS limit
+          // based on the brilliant idea of Pierre-Antoine Mills
+          // https://github.com/microsoft/TypeScript/issues/30188#issuecomment-478938437
+          T[K] extends infer TK
+            ? GetHavingFields<
+                  UnEnumerate<TK> extends object
+                      ? Merge<UnEnumerate<TK>>
+                      : never
+              >
+            : never
+        : {} extends FieldPaths<T[K]>
+          ? never
+          : K;
 }[keyof T];
 
 /**
@@ -398,149 +400,149 @@ export type MaybeTupleToUnion<T> = T extends any[] ? TupleToUnion<T> : T;
  * Like `Pick`, but additionally can also accept an array of keys
  */
 export type PickEnumerable<
-	T,
-	K extends Enumerable<keyof T> | keyof T,
+    T,
+    K extends Enumerable<keyof T> | keyof T,
 > = Prisma__Pick<T, MaybeTupleToUnion<K>>;
 
 /**
  * Exclude all keys with underscores
  */
 export type ExcludeUnderscoreKeys<T extends string> = T extends `_${string}`
-	? never
-	: T;
+    ? never
+    : T;
 
 export type FieldRef<Model, FieldType> = runtime.FieldRef<Model, FieldType>;
 
 type FieldRefInputType<Model, FieldType> = Model extends never
-	? never
-	: FieldRef<Model, FieldType>;
+    ? never
+    : FieldRef<Model, FieldType>;
 
 export const ModelName = {
-	User: 'User',
+    User: 'User',
 } as const;
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName];
 
 export interface TypeMapCb<GlobalOmitOptions = {}>
-	extends runtime.Types.Utils.Fn<
-		{ extArgs: runtime.Types.Extensions.InternalArgs },
-		runtime.Types.Utils.Record<string, any>
-	> {
-	returns: TypeMap<this['params']['extArgs'], GlobalOmitOptions>;
+    extends runtime.Types.Utils.Fn<
+        { extArgs: runtime.Types.Extensions.InternalArgs },
+        runtime.Types.Utils.Record<string, any>
+    > {
+    returns: TypeMap<this['params']['extArgs'], GlobalOmitOptions>;
 }
 
 export type TypeMap<
-	ExtArgs extends
-		runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs,
-	GlobalOmitOptions = {},
+    ExtArgs extends
+        runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs,
+    GlobalOmitOptions = {},
 > = {
-	globalOmitOptions: {
-		omit: GlobalOmitOptions;
-	};
-	meta: {
-		modelProps: 'user';
-		txIsolationLevel: TransactionIsolationLevel;
-	};
-	model: {
-		User: {
-			payload: Prisma.$UserPayload<ExtArgs>;
-			fields: Prisma.UserFieldRefs;
-			operations: {
-				findUnique: {
-					args: Prisma.UserFindUniqueArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload> | null;
-				};
-				findUniqueOrThrow: {
-					args: Prisma.UserFindUniqueOrThrowArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
-				};
-				findFirst: {
-					args: Prisma.UserFindFirstArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload> | null;
-				};
-				findFirstOrThrow: {
-					args: Prisma.UserFindFirstOrThrowArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
-				};
-				findMany: {
-					args: Prisma.UserFindManyArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[];
-				};
-				create: {
-					args: Prisma.UserCreateArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
-				};
-				createMany: {
-					args: Prisma.UserCreateManyArgs<ExtArgs>;
-					result: BatchPayload;
-				};
-				createManyAndReturn: {
-					args: Prisma.UserCreateManyAndReturnArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[];
-				};
-				delete: {
-					args: Prisma.UserDeleteArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
-				};
-				update: {
-					args: Prisma.UserUpdateArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
-				};
-				deleteMany: {
-					args: Prisma.UserDeleteManyArgs<ExtArgs>;
-					result: BatchPayload;
-				};
-				updateMany: {
-					args: Prisma.UserUpdateManyArgs<ExtArgs>;
-					result: BatchPayload;
-				};
-				updateManyAndReturn: {
-					args: Prisma.UserUpdateManyAndReturnArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[];
-				};
-				upsert: {
-					args: Prisma.UserUpsertArgs<ExtArgs>;
-					result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
-				};
-				aggregate: {
-					args: Prisma.UserAggregateArgs<ExtArgs>;
-					result: runtime.Types.Utils.Optional<Prisma.AggregateUser>;
-				};
-				groupBy: {
-					args: Prisma.UserGroupByArgs<ExtArgs>;
-					result: runtime.Types.Utils.Optional<Prisma.UserGroupByOutputType>[];
-				};
-				count: {
-					args: Prisma.UserCountArgs<ExtArgs>;
-					result:
-						| runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType>
-						| number;
-				};
-			};
-		};
-	};
+    globalOmitOptions: {
+        omit: GlobalOmitOptions;
+    };
+    meta: {
+        modelProps: 'user';
+        txIsolationLevel: TransactionIsolationLevel;
+    };
+    model: {
+        User: {
+            payload: Prisma.$UserPayload<ExtArgs>;
+            fields: Prisma.UserFieldRefs;
+            operations: {
+                findUnique: {
+                    args: Prisma.UserFindUniqueArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload> | null;
+                };
+                findUniqueOrThrow: {
+                    args: Prisma.UserFindUniqueOrThrowArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
+                };
+                findFirst: {
+                    args: Prisma.UserFindFirstArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload> | null;
+                };
+                findFirstOrThrow: {
+                    args: Prisma.UserFindFirstOrThrowArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
+                };
+                findMany: {
+                    args: Prisma.UserFindManyArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[];
+                };
+                create: {
+                    args: Prisma.UserCreateArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
+                };
+                createMany: {
+                    args: Prisma.UserCreateManyArgs<ExtArgs>;
+                    result: BatchPayload;
+                };
+                createManyAndReturn: {
+                    args: Prisma.UserCreateManyAndReturnArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[];
+                };
+                delete: {
+                    args: Prisma.UserDeleteArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
+                };
+                update: {
+                    args: Prisma.UserUpdateArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
+                };
+                deleteMany: {
+                    args: Prisma.UserDeleteManyArgs<ExtArgs>;
+                    result: BatchPayload;
+                };
+                updateMany: {
+                    args: Prisma.UserUpdateManyArgs<ExtArgs>;
+                    result: BatchPayload;
+                };
+                updateManyAndReturn: {
+                    args: Prisma.UserUpdateManyAndReturnArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[];
+                };
+                upsert: {
+                    args: Prisma.UserUpsertArgs<ExtArgs>;
+                    result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>;
+                };
+                aggregate: {
+                    args: Prisma.UserAggregateArgs<ExtArgs>;
+                    result: runtime.Types.Utils.Optional<Prisma.AggregateUser>;
+                };
+                groupBy: {
+                    args: Prisma.UserGroupByArgs<ExtArgs>;
+                    result: runtime.Types.Utils.Optional<Prisma.UserGroupByOutputType>[];
+                };
+                count: {
+                    args: Prisma.UserCountArgs<ExtArgs>;
+                    result:
+                        | runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType>
+                        | number;
+                };
+            };
+        };
+    };
 } & {
-	other: {
-		payload: any;
-		operations: {
-			$executeRaw: {
-				args: [query: TemplateStringsArray | Sql, ...values: any[]];
-				result: any;
-			};
-			$executeRawUnsafe: {
-				args: [query: string, ...values: any[]];
-				result: any;
-			};
-			$queryRaw: {
-				args: [query: TemplateStringsArray | Sql, ...values: any[]];
-				result: any;
-			};
-			$queryRawUnsafe: {
-				args: [query: string, ...values: any[]];
-				result: any;
-			};
-		};
-	};
+    other: {
+        payload: any;
+        operations: {
+            $executeRaw: {
+                args: [query: TemplateStringsArray | Sql, ...values: any[]];
+                result: any;
+            };
+            $executeRawUnsafe: {
+                args: [query: string, ...values: any[]];
+                result: any;
+            };
+            $queryRaw: {
+                args: [query: TemplateStringsArray | Sql, ...values: any[]];
+                result: any;
+            };
+            $queryRawUnsafe: {
+                args: [query: string, ...values: any[]];
+                result: any;
+            };
+        };
+    };
 };
 
 /**
@@ -548,35 +550,35 @@ export type TypeMap<
  */
 
 export const TransactionIsolationLevel = runtime.makeStrictEnum({
-	ReadUncommitted: 'ReadUncommitted',
-	ReadCommitted: 'ReadCommitted',
-	RepeatableRead: 'RepeatableRead',
-	Serializable: 'Serializable',
+    ReadUncommitted: 'ReadUncommitted',
+    ReadCommitted: 'ReadCommitted',
+    RepeatableRead: 'RepeatableRead',
+    Serializable: 'Serializable',
 } as const);
 
 export type TransactionIsolationLevel =
-	(typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel];
+    (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel];
 
 export const UserScalarFieldEnum = {
-	id: 'id',
-	createdAt: 'createdAt',
-	updatedAt: 'updatedAt',
-	snowflakeUser: 'snowflakeUser',
+    id: 'id',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt',
+    snowflakeUser: 'snowflakeUser',
 } as const;
 
 export type UserScalarFieldEnum =
-	(typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum];
+    (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum];
 
 export const SortOrder = {
-	asc: 'asc',
-	desc: 'desc',
+    asc: 'asc',
+    desc: 'desc',
 } as const;
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder];
 
 export const QueryMode = {
-	default: 'default',
-	insensitive: 'insensitive',
+    default: 'default',
+    insensitive: 'insensitive',
 } as const;
 
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode];
@@ -589,214 +591,214 @@ export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode];
  * Reference to a field of type 'String'
  */
 export type StringFieldRefInput<$PrismaModel> = FieldRefInputType<
-	$PrismaModel,
-	'String'
+    $PrismaModel,
+    'String'
 >;
 
 /**
  * Reference to a field of type 'String[]'
  */
 export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<
-	$PrismaModel,
-	'String[]'
+    $PrismaModel,
+    'String[]'
 >;
 
 /**
  * Reference to a field of type 'DateTime'
  */
 export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<
-	$PrismaModel,
-	'DateTime'
+    $PrismaModel,
+    'DateTime'
 >;
 
 /**
  * Reference to a field of type 'DateTime[]'
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<
-	$PrismaModel,
-	'DateTime[]'
+    $PrismaModel,
+    'DateTime[]'
 >;
 
 /**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<
-	$PrismaModel,
-	'Int'
+    $PrismaModel,
+    'Int'
 >;
 
 /**
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<
-	$PrismaModel,
-	'Int[]'
+    $PrismaModel,
+    'Int[]'
 >;
 
 /**
  * Batch Payload for updateMany & deleteMany & createMany
  */
 export type BatchPayload = {
-	count: number;
+    count: number;
 };
 
 export const defineExtension = runtime.Extensions
-	.defineExtension as unknown as runtime.Types.Extensions.ExtendsHook<
-	'define',
-	TypeMapCb,
-	runtime.Types.Extensions.DefaultArgs
+    .defineExtension as unknown as runtime.Types.Extensions.ExtendsHook<
+    'define',
+    TypeMapCb,
+    runtime.Types.Extensions.DefaultArgs
 >;
 export type DefaultPrismaClient = PrismaClient;
 export type ErrorFormat = 'pretty' | 'colorless' | 'minimal';
 export type PrismaClientOptions = (
-	| {
-			/**
-			 * Instance of a Driver Adapter, e.g., like one provided by `@prisma/adapter-pg`.
-			 */
-			adapter: runtime.SqlDriverAdapterFactory;
-			accelerateUrl?: never;
-	  }
-	| {
-			/**
-			 * Prisma Accelerate URL allowing the client to connect through Accelerate instead of a direct database.
-			 */
-			accelerateUrl: string;
-			adapter?: never;
-	  }
+    | {
+          /**
+           * Instance of a Driver Adapter, e.g., like one provided by `@prisma/adapter-pg`.
+           */
+          adapter: runtime.SqlDriverAdapterFactory;
+          accelerateUrl?: never;
+      }
+    | {
+          /**
+           * Prisma Accelerate URL allowing the client to connect through Accelerate instead of a direct database.
+           */
+          accelerateUrl: string;
+          adapter?: never;
+      }
 ) & {
-	/**
-	 * @default "colorless"
-	 */
-	errorFormat?: ErrorFormat;
-	/**
-	 * @example
-	 * ```
-	 * // Shorthand for `emit: 'stdout'`
-	 * log: ['query', 'info', 'warn', 'error']
-	 *
-	 * // Emit as events only
-	 * log: [
-	 *   { emit: 'event', level: 'query' },
-	 *   { emit: 'event', level: 'info' },
-	 *   { emit: 'event', level: 'warn' }
-	 *   { emit: 'event', level: 'error' }
-	 * ]
-	 *
-	 * / Emit as events and log to stdout
-	 * og: [
-	 *  { emit: 'stdout', level: 'query' },
-	 *  { emit: 'stdout', level: 'info' },
-	 *  { emit: 'stdout', level: 'warn' }
-	 *  { emit: 'stdout', level: 'error' }
-	 *
-	 * ```
-	 * Read more in our [docs](https://pris.ly/d/logging).
-	 */
-	log?: (LogLevel | LogDefinition)[];
-	/**
-	 * The default values for transactionOptions
-	 * maxWait ?= 2000
-	 * timeout ?= 5000
-	 */
-	transactionOptions?: {
-		maxWait?: number;
-		timeout?: number;
-		isolationLevel?: TransactionIsolationLevel;
-	};
-	/**
-	 * Global configuration for omitting model fields by default.
-	 *
-	 * @example
-	 * ```
-	 * const prisma = new PrismaClient({
-	 *   omit: {
-	 *     user: {
-	 *       password: true
-	 *     }
-	 *   }
-	 * })
-	 * ```
-	 */
-	omit?: GlobalOmitConfig;
-	/**
-	 * SQL commenter plugins that add metadata to SQL queries as comments.
-	 * Comments follow the sqlcommenter format: https://google.github.io/sqlcommenter/
-	 *
-	 * @example
-	 * ```
-	 * const prisma = new PrismaClient({
-	 *   adapter,
-	 *   comments: [
-	 *     traceContext(),
-	 *     queryInsights(),
-	 *   ],
-	 * })
-	 * ```
-	 */
-	comments?: runtime.SqlCommenterPlugin[];
+    /**
+     * @default "colorless"
+     */
+    errorFormat?: ErrorFormat;
+    /**
+     * @example
+     * ```
+     * // Shorthand for `emit: 'stdout'`
+     * log: ['query', 'info', 'warn', 'error']
+     *
+     * // Emit as events only
+     * log: [
+     *   { emit: 'event', level: 'query' },
+     *   { emit: 'event', level: 'info' },
+     *   { emit: 'event', level: 'warn' }
+     *   { emit: 'event', level: 'error' }
+     * ]
+     *
+     * / Emit as events and log to stdout
+     * og: [
+     *  { emit: 'stdout', level: 'query' },
+     *  { emit: 'stdout', level: 'info' },
+     *  { emit: 'stdout', level: 'warn' }
+     *  { emit: 'stdout', level: 'error' }
+     *
+     * ```
+     * Read more in our [docs](https://pris.ly/d/logging).
+     */
+    log?: (LogLevel | LogDefinition)[];
+    /**
+     * The default values for transactionOptions
+     * maxWait ?= 2000
+     * timeout ?= 5000
+     */
+    transactionOptions?: {
+        maxWait?: number;
+        timeout?: number;
+        isolationLevel?: TransactionIsolationLevel;
+    };
+    /**
+     * Global configuration for omitting model fields by default.
+     *
+     * @example
+     * ```
+     * const prisma = new PrismaClient({
+     *   omit: {
+     *     user: {
+     *       password: true
+     *     }
+     *   }
+     * })
+     * ```
+     */
+    omit?: GlobalOmitConfig;
+    /**
+     * SQL commenter plugins that add metadata to SQL queries as comments.
+     * Comments follow the sqlcommenter format: https://google.github.io/sqlcommenter/
+     *
+     * @example
+     * ```
+     * const prisma = new PrismaClient({
+     *   adapter,
+     *   comments: [
+     *     traceContext(),
+     *     queryInsights(),
+     *   ],
+     * })
+     * ```
+     */
+    comments?: runtime.SqlCommenterPlugin[];
 };
 export type GlobalOmitConfig = {
-	user?: Prisma.UserOmit;
+    user?: Prisma.UserOmit;
 };
 
 /* Types for Logging */
 export type LogLevel = 'info' | 'query' | 'warn' | 'error';
 export type LogDefinition = {
-	level: LogLevel;
-	emit: 'stdout' | 'event';
+    level: LogLevel;
+    emit: 'stdout' | 'event';
 };
 
 export type CheckIsLogLevel<T> = T extends LogLevel ? T : never;
 
 export type GetLogType<T> = CheckIsLogLevel<
-	T extends LogDefinition ? T['level'] : T
+    T extends LogDefinition ? T['level'] : T
 >;
 
 export type GetEvents<T extends any[]> =
-	T extends Array<LogLevel | LogDefinition> ? GetLogType<T[number]> : never;
+    T extends Array<LogLevel | LogDefinition> ? GetLogType<T[number]> : never;
 
 export type QueryEvent = {
-	timestamp: Date;
-	query: string;
-	params: string;
-	duration: number;
-	target: string;
+    timestamp: Date;
+    query: string;
+    params: string;
+    duration: number;
+    target: string;
 };
 
 export type LogEvent = {
-	timestamp: Date;
-	message: string;
-	target: string;
+    timestamp: Date;
+    message: string;
+    target: string;
 };
 /* End Types for Logging */
 
 export type PrismaAction =
-	| 'findUnique'
-	| 'findUniqueOrThrow'
-	| 'findMany'
-	| 'findFirst'
-	| 'findFirstOrThrow'
-	| 'create'
-	| 'createMany'
-	| 'createManyAndReturn'
-	| 'update'
-	| 'updateMany'
-	| 'updateManyAndReturn'
-	| 'upsert'
-	| 'delete'
-	| 'deleteMany'
-	| 'executeRaw'
-	| 'queryRaw'
-	| 'aggregate'
-	| 'count'
-	| 'runCommandRaw'
-	| 'findRaw'
-	| 'groupBy';
+    | 'findUnique'
+    | 'findUniqueOrThrow'
+    | 'findMany'
+    | 'findFirst'
+    | 'findFirstOrThrow'
+    | 'create'
+    | 'createMany'
+    | 'createManyAndReturn'
+    | 'update'
+    | 'updateMany'
+    | 'updateManyAndReturn'
+    | 'upsert'
+    | 'delete'
+    | 'deleteMany'
+    | 'executeRaw'
+    | 'queryRaw'
+    | 'aggregate'
+    | 'count'
+    | 'runCommandRaw'
+    | 'findRaw'
+    | 'groupBy';
 
 /**
  * `PrismaClient` proxy available in interactive transactions.
  */
 export type TransactionClient = Omit<
-	DefaultPrismaClient,
-	runtime.ITXClientDenyList
+    DefaultPrismaClient,
+    runtime.ITXClientDenyList
 >;

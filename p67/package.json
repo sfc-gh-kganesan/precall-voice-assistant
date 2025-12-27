@@ -1,24 +1,24 @@
 {
-	"name": "p67",
-	"version": "1.0.0",
-	"description": "P67 monorepo",
-	"private": true,
-	"scripts": {
-		"dev": "pnpm --parallel -r dev",
-		"build": "pnpm -r build",
-		"check": "pnpm exec biome check",
-		"fix": "pnpm exec biome check --write",
-		"type:check": "pnpm -r type:check",
-		"ci": "run-p check type:check build"
-	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
-	"packageManager": "pnpm@10.22.0",
-	"devDependencies": {
-		"@biomejs/biome": "catalog:",
-		"@types/node": "catalog:",
-		"npm-run-all": "catalog:",
-		"typescript": "catalog:"
-	}
+    "name": "p67",
+    "version": "1.0.0",
+    "description": "P67 monorepo",
+    "private": true,
+    "scripts": {
+        "dev": "pnpm --parallel -r dev",
+        "build": "pnpm -r build",
+        "check": "pnpm exec biome check",
+        "fix": "pnpm exec biome check --write",
+        "type:check": "pnpm -r type:check",
+        "ci": "run-p check type:check build"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "packageManager": "pnpm@10.22.0",
+    "devDependencies": {
+        "@biomejs/biome": "catalog:",
+        "@types/node": "catalog:",
+        "npm-run-all": "catalog:",
+        "typescript": "catalog:"
+    }
 }

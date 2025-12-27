@@ -9,11 +9,11 @@ import './index.css';
 
 const root = document.getElementById('root');
 if (root) {
-	createRoot(root).render(
-		<StrictMode>
-			<MantineProvider>
-				<App />
-			</MantineProvider>
-		</StrictMode>,
-	);
+    createRoot(root).render(
+        <StrictMode>
+            <MantineProvider>
+                <App />
+            </MantineProvider>
+        </StrictMode>,
+    );
 }
