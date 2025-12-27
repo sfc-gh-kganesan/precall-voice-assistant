@@ -1,0 +1,39 @@
+name: Deploy database schema changes
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "False = apply changes in prod; True = print SQL changes only"
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  deploy:
+    defaults:
+      run:
+        working-directory: ./p67/packages/db
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node-js
+        with:
+          node-version: 20
+          pnpm-version: 10.22.0
+          cache-dependency-path: ./p67/pnpm-lock.yaml
+          working-directory: ./p67
+
+      - name: Apply all pending migrations to the database
+        if: ${{ inputs.dry-run == false }}
+        run: make deploy
+        env:
+          DATABASE_URL: ${{ secrets.P67_POSTGRES_URL_SFENGINEERING_AIFDE }}
+
+      - name: Print SQL diff
+        if: ${{ inputs.dry-run == true }}
+        run: make diff
+        env:
+          DATABASE_URL: ${{ secrets.P67_POSTGRES_URL_SFENGINEERING_AIFDE }}
