@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Code Browser</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #ffffff;
+            color: #333333;
+        }
+
+        #directory-selector {
+            padding: 15px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #directory-selector label {
+            font-weight: 500;
+            color: #333333;
+        }
+
+        #directory-input {
+            flex: 1;
+            padding: 8px 12px;
+            background: #ffffff;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            color: #333333;
+            font-size: 14px;
+            cursor: not-allowed;
+        }
+
+        #browse-btn {
+            padding: 8px 16px;
+            background: #e0e0e0;
+            color: #333333;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        #browse-btn:hover {
+            background: #d0d0d0;
+        }
+
+        #load-btn {
+            padding: 8px 20px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        #load-btn:hover {
+            background: #1177bb;
+        }
+
+        #directory-picker {
+            display: none;
+        }
+
+        #main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        #left-pane, #right-pane {
+            width: 50%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #left-pane {
+            border-right: 1px solid #e0e0e0;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #diagram-controls {
+            padding: 10px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .control-btn {
+            padding: 6px 12px;
+            background: #e0e0e0;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            color: #333333;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .control-btn:hover {
+            background: #d0d0d0;
+        }
+
+        #diagram-container {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            cursor: grab;
+            background: #ffffff;
+        }
+
+        #diagram-container.grabbing {
+            cursor: grabbing;
+        }
+
+        #mermaid-wrapper {
+            transform-origin: 0 0;
+            transition: transform 0.1s ease-out;
+            padding: 20px;
+            display: inline-block;
+            min-width: 100%;
+            min-height: 100%;
+        }
+
+        #mermaid-diagram {
+            display: inline-block;
+        }
+
+        .mermaid-node {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .mermaid-node:hover {
+            opacity: 0.8;
+        }
+
+        #tooltip {
+            position: absolute;
+            background: #ffffff;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            padding: 10px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+            color: #333333;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        #right-pane {
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+        }
+
+        #editor-header {
+            padding: 10px 15px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #file-path {
+            font-size: 14px;
+            color: #333333;
+            font-family: 'Courier New', monospace;
+        }
+
+        #save-btn {
+            padding: 6px 16px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        #save-btn:hover {
+            background: #1177bb;
+        }
+
+        #save-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #editor {
+            flex: 1;
+        }
+
+        #status-bar {
+            padding: 5px 15px;
+            background: #007acc;
+            color: white;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        #status-bar.hidden {
+            display: none;
+        }
+
+        #status-bar.error {
+            background: #e74856;
+        }
+
+        #status-bar.success {
+            background: #16825d;
+        }
+
+        /* Highlighted line effect for Monaco Editor */
+        .highlighted-line {
+            background-color: rgba(255, 255, 0, 0.15);
+        }
+
+        .highlighted-glyph {
+            background-color: rgba(255, 255, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="directory-selector">
+        <label for="directory-input">Workflow Directory:</label>
+        <input type="text" id="directory-input" placeholder="Loading..." value="" readonly>
+    </div>
+
+    <div id="main-container">
+        <div id="left-pane">
+            <div id="diagram-controls">
+                <button class="control-btn" id="zoom-in">Zoom In (+)</button>
+                <button class="control-btn" id="zoom-out">Zoom Out (-)</button>
+                <button class="control-btn" id="reset-view">Reset View</button>
+                <span style="margin-left: auto; color: #888; font-size: 13px;">Drag to pan • Scroll to zoom</span>
+            </div>
+            <div id="diagram-container">
+                <div id="mermaid-wrapper">
+                    <div id="mermaid-diagram" class="mermaid">
+                        graph TD
+                        A[Select a workflow directory to begin]
+                    </div>
+                </div>
+            </div>
+            <div id="tooltip"></div>
+        </div>
+
+        <div id="right-pane">
+            <div id="editor-header">
+                <span id="file-path">No file selected</span>
+                <button id="save-btn" disabled>Save</button>
+            </div>
+            <div id="editor"></div>
+            <div id="status-bar" class="hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // CONFIGURATION
+        // ============================================================================
+        const CONFIG = {
+            zoom: { min: 0.5, max: 3, step: 0.2, wheelStep: 0.1 },
+            timing: { nodeInteractionDelay: 100, highlightDuration: 2000, statusDuration: 2000 },
+            ui: { tooltipOffset: 15 }
+        };
+
+        // ============================================================================
+        // STATE MANAGEMENT
+        // ============================================================================
+        const state = {
+            editor: null,
+            currentFilePath: null,
+            workflowData: {},
+            edgesData: [],
+            diagram: {
+                scale: 1,
+                isPanning: false,
+                startX: 0,
+                startY: 0,
+                translateX: 0,
+                translateY: 0,
+                container: null,
+                wrapper: null
+            }
+        };
+
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#0e639c',
+                primaryTextColor: '#000',
+                primaryBorderColor: '#1177bb',
+                lineColor: '#555',
+                secondaryColor: '#f5f5f5',
+                tertiaryColor: '#ffffff'
+            }
+        });
+
+        // ============================================================================
+        // UTILITY FUNCTIONS
+        // ============================================================================
+
+        async function fetchFileContent(filePath) {
+            const response = await fetch(filePath);
+            if (!response.ok) {
+                throw new Error(`Failed to load ${filePath}: ${response.status} ${response.statusText}`);
+            }
+            return await response.text();
+        }
+
+        function scrollEditorToLine(lineNumber, highlight = false) {
+            // Set cursor position
+            state.editor.setPosition({ lineNumber, column: 1 });
+
+            // Calculate scroll position to show the line at the top
+            // Get the actual line height from the editor configuration
+            const lineHeight = state.editor.getOption(monaco.editor.EditorOption.lineHeight);
+            const scrollTop = Math.max(0, (lineNumber - 1) * lineHeight);
+
+            // Set scroll position directly
+            state.editor.setScrollPosition({ scrollTop });
+
+            if (highlight) {
+                const decorations = state.editor.deltaDecorations([], [{
+                    range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+                    options: {
+                        isWholeLine: true,
+                        className: 'highlighted-line',
+                        glyphMarginClassName: 'highlighted-glyph'
+                    }
+                }]);
+
+                setTimeout(() => state.editor.deltaDecorations(decorations, []), CONFIG.timing.highlightDuration);
+            }
+        }
+
+        function showStatusWithTimeout(message, type, duration = CONFIG.timing.statusDuration) {
+            showStatus(message, type);
+            if (duration > 0) {
+                setTimeout(hideStatus, duration);
+            }
+        }
+
+        function updateDiagramTransform() {
+            if (state.diagram.wrapper) {
+                const { translateX, translateY, scale } = state.diagram;
+                state.diagram.wrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+            }
+        }
+
+        function parseLineNumber(workflowCode, matchIndex) {
+            return workflowCode.substring(0, matchIndex).split('\n').length;
+        }
+
+        // ============================================================================
+        // WORKFLOW PARSING
+        // ============================================================================
+
+        function findBuildWorkflowLine(workflowCode) {
+            // Look for runWorkflow function (new pattern)
+            let match = workflowCode.match(/export\s+async\s+function\s+runWorkflow\s*\(/);
+            if (match) return parseLineNumber(workflowCode, match.index);
+
+            // Fallback to old pattern
+            match = workflowCode.match(/export function buildWorkflow\(\)/);
+            return match ? parseLineNumber(workflowCode, match.index) : 1;
+        }
+
+        function extractRouters(workflowCode) {
+            const routers = {};
+            const regex = /function\s+(\w+_router)\s*\([^)]*\)\s*:\s*string\s*\{/g;
+            let match;
+
+            while ((match = regex.exec(workflowCode)) !== null) {
+                routers[match[1]] = {
+                    name: match[1],
+                    line: parseLineNumber(workflowCode, match.index)
+                };
+            }
+
+            return routers;
+        }
+
+        function extractNodes(workflowCode) {
+            const nodes = [];
+            const regex = /workflow\.addNode\s*\(\s*['"](\w+)['"]/g;
+            let match;
+
+            while ((match = regex.exec(workflowCode)) !== null) {
+                nodes.push(match[1]);
+            }
+
+            return nodes;
+        }
+
+        function extractEntryPoint(workflowCode) {
+            const match = workflowCode.match(/workflow\.setEntryPoint\s*\(\s*['"](\w+)['"]/);
+            return match ? match[1] : null;
+        }
+
+        function extractSimpleEdges(workflowCode) {
+            const edges = [];
+            const regex = /workflow\.addEdge\s*\(\s*['"](\w+)['"]\s*,\s*['"](\w+)['"]/g;
+            let match;
+
+            while ((match = regex.exec(workflowCode)) !== null) {
+                edges.push({ from: match[1], to: match[2] });
+            }
+
+            return edges;
+        }
+
+        function extractConditionalEdges(workflowCode, routers, buildWorkflowLine) {
+            const edges = [];
+            const regex = /workflow\.addConditionalEdges\s*\(\s*['"](\w+)['"]\s*,\s*(\w+)\s*,\s*\{([^}]+)\}/g;
+            let match;
+
+            while ((match = regex.exec(workflowCode)) !== null) {
+                const sourceNode = match[1];
+                const routerFunc = match[2];
+                const branchesStr = match[3];
+                const conditionalEdgeStartIndex = match.index;
+
+                // Line number of the addConditionalEdges call itself
+                const addConditionalEdgesLine = parseLineNumber(workflowCode, conditionalEdgeStartIndex);
+
+                const branchRegex = /['"](\w+)['"]\s*:\s*['"](\w+)['"]/g;
+                let branchMatch;
+                const branches = [];
+
+                while ((branchMatch = branchRegex.exec(branchesStr)) !== null) {
+                    const condition = branchMatch[1];
+                    const target = branchMatch[2];
+                    const branchLine = parseLineNumber(workflowCode, conditionalEdgeStartIndex + branchMatch.index);
+
+                    branches.push({ condition, target, line: branchLine });
+                    edges.push({
+                        from: sourceNode,
+                        to: target,
+                        label: condition,
+                        line: addConditionalEdgesLine,  // Line of the addConditionalEdges call
+                        sourceNode: sourceNode,  // Store source for disambiguation
+                        routerFunction: routerFunc
+                    });
+                }
+
+                const routerInfo = routers[routerFunc];
+                state.workflowData[`${sourceNode}_router`] = {
+                    file: 'src/workflow.ts',
+                    description: `Router: ${routerFunc} - decides routing based on state`,
+                    type: 'router',
+                    scrollToLine: routerInfo ? routerInfo.line : buildWorkflowLine,
+                    routerFunction: routerFunc,
+                    branches
+                };
+            }
+
+            return edges;
+        }
+
+        function extractEndNodes(workflowCode) {
+            const endNodes = [];
+            const regex = /workflow\.addEdge\s*\(\s*['"](\w+)['"]\s*,\s*END\s*\)/g;
+            let match;
+
+            while ((match = regex.exec(workflowCode)) !== null) {
+                endNodes.push(match[1]);
+            }
+
+            return endNodes;
+        }
+
+        function buildWorkflowDataEntries(nodes, endNodes, buildWorkflowLine) {
+            // Add node entries
+            nodes.forEach(nodeName => {
+                state.workflowData[nodeName] = {
+                    file: `src/steps/${nodeName}.ts`,
+                    description: `Node: ${nodeName}`,
+                    type: 'action'
+                };
+            });
+
+            // Add start node
+            state.workflowData.start = {
+                file: 'src/workflow.ts',
+                description: 'Workflow entry point',
+                type: 'terminal',
+                scrollToLine: buildWorkflowLine
+            };
+
+            // Add end nodes
+            endNodes.forEach(endNode => {
+                state.workflowData[`end_${endNode}`] = {
+                    file: 'src/workflow.ts',
+                    description: `Workflow end from ${endNode}`,
+                    type: 'terminal',
+                    scrollToLine: buildWorkflowLine
+                };
+            });
+        }
+
+        function parseWorkflowAndGenerateDiagram(workflowCode) {
+            state.workflowData = {};
+            state.edgesData = [];
+
+            const buildWorkflowLine = findBuildWorkflowLine(workflowCode);
+            const routers = extractRouters(workflowCode);
+            const nodes = extractNodes(workflowCode);
+            const entryPoint = extractEntryPoint(workflowCode);
+            const edges = extractSimpleEdges(workflowCode);
+            const conditionalEdges = extractConditionalEdges(workflowCode, routers, buildWorkflowLine);
+            const endNodes = extractEndNodes(workflowCode);
+
+            buildWorkflowDataEntries(nodes, endNodes, buildWorkflowLine);
+
+            edges.push(...conditionalEdges);
+            edges.push(...endNodes.map(endNode => ({ from: endNode, to: `end_${endNode}` })));
+
+            state.edgesData = edges;
+
+            const mermaidCode = generateMermaidFromParsedData(nodes, edges, entryPoint, endNodes);
+            renderMermaidDiagram(mermaidCode);
+        }
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+
+        async function initializeWorkingDirectory() {
+            try {
+                const response = await fetch('/api/workdir');
+                const data = response.ok ? await response.json() : null;
+                const value = data?.workdir || (response.ok ? 'Failed to load directory' : 'Error loading directory');
+                document.getElementById('directory-input').value = value;
+            } catch (error) {
+                console.error('Error fetching workdir:', error);
+                document.getElementById('directory-input').value = 'Error loading directory';
+            }
+        }
+
+        function initializeDOMReferences() {
+            state.diagram.container = document.getElementById('diagram-container');
+            state.diagram.wrapper = document.getElementById('mermaid-wrapper');
+        }
+
+        function initializeMonacoEditor() {
+            require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+            require(['vs/editor/editor.main'], () => {
+                state.editor = monaco.editor.create(document.getElementById('editor'), {
+                    value: '// Select a node from the diagram to view and edit code',
+                    language: 'typescript',
+                    theme: 'vs',
+                    automaticLayout: true,
+                    minimap: { enabled: true },
+                    fontSize: 14,
+                    scrollBeyondLastLine: false
+                });
+
+                state.editor.onDidChangeModelContent(() => {
+                    document.getElementById('save-btn').disabled = false;
+                });
+            });
+        }
+
+        function initializeZoomControls() {
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                state.diagram.scale = Math.min(state.diagram.scale + CONFIG.zoom.step, CONFIG.zoom.max);
+                updateDiagramTransform();
+            });
+
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                state.diagram.scale = Math.max(state.diagram.scale - CONFIG.zoom.step, CONFIG.zoom.min);
+                updateDiagramTransform();
+            });
+
+            document.getElementById('reset-view').addEventListener('click', () => {
+                state.diagram.scale = 1;
+                state.diagram.translateX = 0;
+                state.diagram.translateY = 0;
+                updateDiagramTransform();
+            });
+
+            state.diagram.container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -CONFIG.zoom.wheelStep : CONFIG.zoom.wheelStep;
+                state.diagram.scale = Math.max(CONFIG.zoom.min, Math.min(CONFIG.zoom.max, state.diagram.scale + delta));
+                updateDiagramTransform();
+            });
+        }
+
+        function initializePanControls() {
+            state.diagram.container.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.mermaid-node')) return;
+                state.diagram.isPanning = true;
+                state.diagram.startX = e.clientX - state.diagram.translateX;
+                state.diagram.startY = e.clientY - state.diagram.translateY;
+                state.diagram.container.classList.add('grabbing');
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!state.diagram.isPanning) return;
+                state.diagram.translateX = e.clientX - state.diagram.startX;
+                state.diagram.translateY = e.clientY - state.diagram.startY;
+                updateDiagramTransform();
+            });
+
+            document.addEventListener('mouseup', () => {
+                state.diagram.isPanning = false;
+                state.diagram.container.classList.remove('grabbing');
+            });
+        }
+
+        async function initializeApp() {
+            console.log('DOM Content Loaded - initializing');
+
+            await initializeWorkingDirectory();
+            initializeDOMReferences();
+            initializeMonacoEditor();
+            initializeZoomControls();
+            initializePanControls();
+
+            document.getElementById('save-btn').addEventListener('click', saveFile);
+
+            loadWorkflow();
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+        // ============================================================================
+        // WORKFLOW LOADING
+        // ============================================================================
+
+        async function loadWorkflow() {
+            showStatus('Loading workflow...', 'info');
+
+            try {
+                const workflowCode = await fetchFileContent('src/workflow.ts');
+                parseWorkflowAndGenerateDiagram(workflowCode);
+                showStatusWithTimeout('Workflow loaded successfully!', 'success');
+            } catch (error) {
+                console.error('Error loading workflow:', error);
+                showStatus(`Error: ${error.message}. Make sure the server is running.`, 'error');
+            }
+        }
+
+        // ============================================================================
+        // MERMAID DIAGRAM GENERATION
+        // ============================================================================
+
+        function formatNodeLabel(nodeName) {
+            return nodeName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function generateMermaidFromParsedData(nodes, edges, entryPoint, endNodes) {
+            const lines = ['graph TD'];
+
+            // Add start node
+            lines.push('    start([Start])');
+
+            // Add all nodes
+            nodes.forEach(node => {
+                const hasRouter = state.workflowData[`${node}_router`];
+                const label = formatNodeLabel(node);
+                lines.push(hasRouter ? `    ${node}{${label}}` : `    ${node}[${label}]`);
+            });
+
+            // Add end nodes
+            endNodes.forEach(endNode => lines.push(`    end_${endNode}([End])`));
+
+            // Add start edge
+            if (entryPoint) {
+                lines.push(`    start --> ${entryPoint}`);
+            }
+
+            // Add all edges
+            edges.forEach(edge => {
+                if (edge.label) {
+                    // Make label unique by prefixing with source node
+                    const uniqueLabel = `${formatNodeLabel(edge.from)}:${edge.label}`;
+                    const edgeStr = `    ${edge.from} -->|${uniqueLabel}| ${edge.to}`;
+                    lines.push(edgeStr);
+                } else {
+                    lines.push(`    ${edge.from} --> ${edge.to}`);
+                }
+            });
+
+            // Add styling
+            lines.push('');
+            lines.push('    classDef terminalNode fill:#16825d,stroke:#1a9b6a,color:#fff;');
+            lines.push('    classDef decisionNode fill:#c5a102,stroke:#deb002,color:#000;');
+            lines.push('    classDef actionNode fill:#0e639c,stroke:#1177bb,color:#fff;');
+
+            return lines.join('\n');
+        }
+
+        async function renderMermaidDiagram(mermaidCode) {
+            const diagramDiv = document.getElementById('mermaid-diagram');
+            diagramDiv.textContent = mermaidCode;
+            diagramDiv.removeAttribute('data-processed');
+
+            await mermaid.run({ nodes: [diagramDiv] });
+
+            setupNodeInteractions();
+        }
+
+        // ============================================================================
+        // NODE INTERACTIONS
+        // ============================================================================
+
+        function buildTooltipText(nodeData) {
+            let text = nodeData.description;
+
+            if (nodeData.branches?.length > 0) {
+                text += '\n\nBranches:';
+                nodeData.branches.forEach(branch => {
+                    text += `\n  • ${branch.condition} → ${branch.target}`;
+                });
+            }
+
+            return text;
+        }
+
+        function attachNodeEventHandlers(node, nodeId) {
+            node.classList.add('mermaid-node');
+
+            node.addEventListener('mouseenter', (e) => {
+                const tooltipText = buildTooltipText(state.workflowData[nodeId]);
+                showTooltip(e, tooltipText);
+            });
+
+            node.addEventListener('mousemove', (e) => {
+                tooltip.style.left = `${e.pageX + CONFIG.ui.tooltipOffset}px`;
+                tooltip.style.top = `${e.pageY + CONFIG.ui.tooltipOffset}px`;
+            });
+
+            node.addEventListener('mouseleave', hideTooltip);
+            node.addEventListener('click', () => loadCodeForNode(nodeId));
+        }
+
+        function setupNodeInteractions() {
+            setTimeout(() => {
+                const nodes = document.querySelectorAll('#mermaid-diagram .node');
+
+                nodes.forEach(node => {
+                    const nodeId = extractNodeId(node);
+                    if (nodeId && state.workflowData[nodeId]) {
+                        attachNodeEventHandlers(node, nodeId);
+                    }
+                });
+
+                setupEdgeLabelInteractions();
+            }, CONFIG.timing.nodeInteractionDelay);
+        }
+
+        function extractNodeId(node) {
+            // Try to extract from flowchart ID
+            const nodeElement = node.closest('[id^="flowchart-"]');
+            if (nodeElement) {
+                const id = nodeElement.id.replace('flowchart-', '').replace(/-\d+$/, '');
+
+                if (state.workflowData[id]) return id;
+                if (state.workflowData[`${id}_router`]) return `${id}_router`;
+            }
+
+            // Fallback: match by text content
+            const textContent = node.textContent.trim().toLowerCase();
+
+            if (textContent === 'start') return 'start';
+
+            if (textContent.startsWith('end')) {
+                for (const key in state.workflowData) {
+                    if (key.startsWith('end_')) return key;
+                }
+            }
+
+            // Try to match node names
+            for (const key in state.workflowData) {
+                const formattedKey = formatNodeLabel(key.replace('_router', '')).toLowerCase();
+                if (textContent === formattedKey) return key;
+            }
+
+            return null;
+        }
+
+        // ============================================================================
+        // EDGE LABEL INTERACTIONS
+        // ============================================================================
+
+        async function handleEdgeLabelClick(edge) {
+            state.currentFilePath = 'src/workflow.ts';
+            document.getElementById('file-path').textContent = 'src/workflow.ts';
+
+            try {
+                const code = await fetchFileContent('src/workflow.ts');
+                state.editor.setValue(code);
+                scrollEditorToLine(edge.line, true);
+                document.getElementById('save-btn').disabled = true;
+            } catch (error) {
+                console.error('Error loading workflow.ts:', error);
+                showStatus('Error loading workflow.ts', 'error');
+            }
+        }
+
+        function setupEdgeLabelInteractions() {
+            const edgeLabels = document.querySelectorAll('#mermaid-diagram .edgeLabel');
+
+            edgeLabels.forEach((label) => {
+                const labelText = label.textContent.trim();
+
+                // Parse the unique label format: "Source Node:label"
+                const colonIndex = labelText.indexOf(':');
+                if (colonIndex === -1) return; // Not a conditional edge
+
+                const sourceNodeFormatted = labelText.substring(0, colonIndex);
+                const actualLabel = labelText.substring(colonIndex + 1);
+
+                // Convert formatted node name back to snake_case
+                const sourceNode = sourceNodeFormatted.toLowerCase().replace(/\s+/g, '_');
+
+                // Find the edge that matches both source node and label
+                const edge = state.edgesData.find(e =>
+                    e.from === sourceNode && e.label === actualLabel
+                );
+
+                if (edge?.line) {
+                    label.style.cursor = 'pointer';
+                    label.style.userSelect = 'none';
+
+                    label.addEventListener('mouseenter', () => label.style.opacity = '0.7');
+                    label.addEventListener('mouseleave', () => label.style.opacity = '1');
+                    label.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleEdgeLabelClick(edge);
+                    });
+                }
+            });
+        }
+
+        // ============================================================================
+        // CODE LOADING
+        // ============================================================================
+
+        function findFunctionLine(code, nodeData) {
+            const lines = code.split('\n');
+
+            // For terminal nodes (start/end), look for runWorkflow or buildWorkflow
+            if (nodeData.type === 'terminal') {
+                // Look for: export async function runWorkflow()
+                const functionLine = lines.findIndex(line =>
+                    line.match(/export\s+async\s+function\s+runWorkflow\s*\(/)
+                );
+                if (functionLine >= 0) return functionLine + 1;
+
+                // Fallback: use scrollToLine if provided
+                if (nodeData.scrollToLine) return nodeData.scrollToLine;
+
+                return 1;
+            }
+
+            // For router nodes, find the router function
+            if (nodeData.type === 'router' && nodeData.routerFunction) {
+                const routerLine = lines.findIndex(line => line.includes(`function ${nodeData.routerFunction}`));
+                if (routerLine >= 0) return routerLine + 1;
+            }
+
+            // For action nodes, find the exported function
+            if (nodeData.type === 'action') {
+                // Extract the node name from the file path (e.g., "query_po" from "src/steps/query_po.ts")
+                const nodeName = nodeData.file.match(/\/(\w+)\.ts$/)?.[1];
+
+                if (nodeName) {
+                    // Look for: export async function query_po(
+                    const functionLine = lines.findIndex(line =>
+                        line.match(new RegExp(`export\\s+(async\\s+)?function\\s+${nodeName}\\s*\\(`))
+                    );
+                    if (functionLine >= 0) return functionLine + 1;
+                }
+
+                // Fallback: first non-import line
+                const firstCodeLine = lines.findIndex((line, idx) =>
+                    idx > 0 && line.trim() && !line.trim().startsWith('import') && !line.trim().startsWith('//')
+                );
+                if (firstCodeLine >= 0) return firstCodeLine + 1;
+            }
+
+            return 1;
+        }
+
+        async function loadCodeForNode(nodeId) {
+            if (!state.workflowData[nodeId]) return;
+
+            const nodeData = state.workflowData[nodeId];
+            state.currentFilePath = nodeData.file;
+
+            document.getElementById('file-path').textContent = nodeData.file;
+
+            try {
+                const code = await fetchFileContent(nodeData.file);
+                state.editor.setValue(code);
+
+                const lineNumber = findFunctionLine(code, nodeData);
+                scrollEditorToLine(lineNumber);
+
+                document.getElementById('save-btn').disabled = true;
+            } catch (error) {
+                console.error('Error loading file:', error);
+                const fallbackCode = `// Could not load file: ${nodeData.file}\n// ${error.message}\n\n` +
+                                   `// File: ${nodeData.file}\n// Type: ${nodeData.type}\n// ${nodeData.description}`;
+                state.editor.setValue(fallbackCode);
+            }
+        }
+
+        // ============================================================================
+        // STATUS AND TOOLTIP HELPERS
+        // ============================================================================
+
+        function showStatus(message, type) {
+            const statusBar = document.getElementById('status-bar');
+            statusBar.textContent = message;
+            statusBar.className = type;
+            statusBar.classList.remove('hidden');
+        }
+
+        function hideStatus() {
+            document.getElementById('status-bar').classList.add('hidden');
+        }
+
+        const tooltip = document.getElementById('tooltip');
+
+        function showTooltip(e, description) {
+            tooltip.textContent = description;
+            tooltip.style.display = 'block';
+            const offsetX = 15;
+            const offsetY = 15;
+            tooltip.style.left = `${e.pageX + offsetX}px`;
+            tooltip.style.top = `${e.pageY + offsetY}px`;
+        }
+
+        function hideTooltip() {
+            tooltip.style.display = 'none';
+        }
+
+        // ============================================================================
+        // FILE SAVE
+        // ============================================================================
+
+        async function saveFile() {
+            if (!state.currentFilePath) {
+                showStatus('No file selected', 'error');
+                return;
+            }
+
+            const content = state.editor.getValue();
+
+            try {
+                console.log('Saving to:', state.currentFilePath);
+                console.log('Content:', content);
+
+                showStatusWithTimeout('File saved successfully (demo mode)', 'success');
+                document.getElementById('save-btn').disabled = true;
+            } catch (error) {
+                console.error('Error saving file:', error);
+                showStatus(`Error saving file: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
