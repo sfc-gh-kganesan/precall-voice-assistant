@@ -114,7 +114,7 @@ export class ProjectConfig {
     }
 
     resolveProjectPath(p: string): string {
-        return path.resolve(this.configPath, p);
+        return path.resolve(this.projectDir, p);
     }
 
     /**
