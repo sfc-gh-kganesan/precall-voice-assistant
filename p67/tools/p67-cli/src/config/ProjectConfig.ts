@@ -8,7 +8,7 @@ const ProjectConfigSchema = z.object({
         .string()
         .describe('Workflow entrypoint path')
         .default('./src/index.ts'),
-    buildDir: z.string().describe('Build output directory').default('.bundle'),
+    buildDir: z.string().describe('Build output directory').default('build'),
 });
 
 export type ProjectConfigData = z.infer<typeof ProjectConfigSchema>;

@@ -3,9 +3,6 @@ import { dirname, join } from 'node:path';
 import gitignore from '@p67-cli/workspace/boiler-plate/.gitignore.src' with {
     type: 'file',
 };
-import makefile from '@p67-cli/workspace/boiler-plate/Makefile.src' with {
-    type: 'file',
-};
 import manifestyaml from '@p67-cli/workspace/boiler-plate/manifest.yaml.src' with {
     type: 'file',
 };
@@ -25,7 +22,6 @@ const files: Record<string, string> = {
     [indexts]: 'src/index.ts',
     [packagejson]: 'package.json',
     [tsconfigjson]: 'tsconfig.json',
-    [makefile]: 'Makefile',
     [manifestyaml]: 'manifest.yaml',
 };
 

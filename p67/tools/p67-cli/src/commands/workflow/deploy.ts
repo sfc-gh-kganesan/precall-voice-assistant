@@ -6,12 +6,23 @@ import { ctx } from '@p67-cli/context';
 
 export const deployCommand = new Command('deploy')
     .description('Deploy a workflow from a zip file')
-    .argument('<filePath>', 'Path to the workflow zip file')
-    .action(async (filePath: string) => {
+    .argument(
+        '[filePath]',
+        'Path to the workflow zip file (defaults to <buildDir>/workflow.zip)',
+    )
+    .action(async (filePath?: string) => {
         try {
-            const { connection } = ctx();
+            const { connection, projectConfig } = ctx();
+
+            // Default to buildDir/workflow.zip if no path provided
+            const defaultPath = path.join(
+                projectConfig.buildDir,
+                'workflow.zip',
+            );
+            const targetPath = filePath || defaultPath;
+
             // Resolve the file path
-            const resolvedPath = path.resolve(filePath);
+            const resolvedPath = path.resolve(targetPath);
 
             // Check if file exists
             if (!fs.existsSync(resolvedPath)) {
@@ -41,7 +52,9 @@ export const deployCommand = new Command('deploy')
             console.log('✓ Workflow deployed successfully!');
             console.log(`  Workflow ID: ${result.workflowId}`);
         } catch (error) {
-            console.error(`Failed to deploy workflow from ${filePath}`);
+            console.error(
+                `Failed to deploy workflow from ${filePath || 'default location'}`,
+            );
             throw error;
         }
     });

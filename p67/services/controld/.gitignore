@@ -4,6 +4,7 @@ node_modules
 .env
 .env.local
 .local-storage
+.data_root
 
 # Prisma
 .prisma/

@@ -36,6 +36,8 @@ describe: ## Describe the p67.app.controld service
 	snow spcs service describe p67.app.controld --format json -c $(SNOW_CONNECTION)
 
 dev: ## Start local development environment with Docker Compose
+	$(MAKE) -C packages/db init
+	$(MAKE) -C services/controld init
 	docker compose up --build
 
 fix: ## Fix linting and formatting issues

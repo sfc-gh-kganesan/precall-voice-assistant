@@ -30,6 +30,8 @@ services:
             DATA_ROOT: /app/services/controld/.local-storage
             DATABASE_URL: postgresql://postgres:password@postgres:5432/controld_dev?schema=public
             NODE_ENV: development
+            DEBUG_ENABLE_DEFAULT_USER: true
+            DEBUG_DEFAULT_USER: bobthebuilder
         volumes:
             - ./services/controld/.data_root:/app/services/controld/.local-storage
         depends_on:

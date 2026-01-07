@@ -74,4 +74,45 @@ export const initCommand = new Command('init')
         // bootstrap workspace files
         const workspc = new Workspace(targetDir);
         await workspc.bootstrap();
+
+        // Check if npm is available
+        try {
+            const { exitCode } = Bun.spawnSync(['which', 'npm'], {
+                stdout: 'ignore',
+                stderr: 'ignore',
+            });
+
+            if (exitCode !== 0) {
+                console.log(
+                    '\n⚠ npm not found in PATH. Skipping dependency installation.',
+                );
+                console.log(
+                    '  Please install Node.js and npm, then run "npm install" in the project directory.',
+                );
+                return;
+            }
+        } catch {
+            console.log(
+                '\n⚠ Could not check for npm. Skipping dependency installation.',
+            );
+            return;
+        }
+
+        // Install dependencies
+        console.log('\nInstalling dependencies...');
+        const installProc = Bun.spawn(['npm', 'install'], {
+            cwd: targetDir,
+            stdout: 'inherit',
+            stderr: 'inherit',
+        });
+
+        const installExitCode = await installProc.exited;
+
+        if (installExitCode === 0) {
+            console.log('\n✓ Dependencies installed successfully!');
+        } else {
+            console.error(
+                '\n✗ Failed to install dependencies. Please run "npm install" manually.',
+            );
+        }
     });

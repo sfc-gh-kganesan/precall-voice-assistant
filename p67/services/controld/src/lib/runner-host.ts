@@ -1,10 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
-import { parseManifest } from './manifest';
+import { parseManifest } from './manifest.js';
 import type { ExecuteMessage } from './runner.js';
-import { AgentSDK, hydrateConfig } from './sdk';
-import { ValueManager } from './value-manager';
+import { AgentSDK, hydrateConfig } from './sdk.js';
+import { ValueManager } from './value-manager.js';
 
 const ExecuteMessageSchema = z.object({
     dir: z.string(),
