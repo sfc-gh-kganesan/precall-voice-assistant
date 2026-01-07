@@ -1,61 +1,58 @@
 # Project 67
 
-Experimental platform for building, testing, and deploying agentic workflows.
+Experimental platform for building, testing, and deploying agentic workflows on Snowflake.
 
 ## Project Structure
 
 ```
 .
 ├── packages/
-│   ├── api/          # Fastify backend API
+│   ├── agent-sdk/    # Agent SDK for P67 workflows
+│   ├── db/           # Database client with Prisma integration
 │   └── web/          # React 19 + Vite frontend
 ├── services/
 │   └── controld/     # Control plane service (Fastify-based)
 ├── tools/
-│   └── p67-cli/      # P67 CLI tool
+│   └── p67-cli/      # P67 CLI tool for workflow management
+├── coco/             # Cortex Code custom commands and demos
+├── example_workflows/
+│   ├── number_one/   # Example LangGraph workflow
+│   └── template/     # Workflow template
 ├── native-app/       # Snowflake Native Application
-├── scripts/          # Operational scripts
-├── package.json
+├── ops/              # Operational SQL scripts (Postgres setup/teardown)
+├── scripts/          # Utility scripts
+├── Dockerfile        # Multi-service Docker build
+├── compose.yaml      # Docker Compose orchestration
 └── pnpm-workspace.yaml
 ```
 
 ## Tech Stack
 
-- **Backend (packages/api):**
-  - TypeScript
-  - Fastify
-  - Node.js
+**Packages:**
+- **agent-sdk:** TypeScript SDK for building P67 workflows with Snowflake integration
+- **db:** Prisma + PostgreSQL adapter for database operations
+- **web:** React 19, TypeScript, Vite, Mantine UI
 
-- **Control Plane (services/controld):**
-  - TypeScript
-  - Fastify 5.2.0
-  - Zod validation with fastify-type-provider-zod
-  - OpenAPI/Swagger UI
-  - Node.js
+**Services:**
+- **controld:** Fastify 5.2.0, Zod validation, OpenAPI/Swagger, workflow runtime
 
-- **Frontend (packages/web):**
-  - React 19
-  - TypeScript
-  - Vite
-  - Mantine UI (Component Library)
-  - Biome (Linting & Formatting)
+**Tools:**
+- **p67-cli:** Bun-based CLI for workflow lifecycle management
+- **Biome:** Code linting and formatting
+- **pnpm:** Package management (v10.22.0)
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18 or higher recommended)
-- pnpm v10.22.0 or higher
+- Node.js v20 or higher
+- pnpm v10.22.0
+- Bun runtime (for p67-cli)
+- Docker & Docker Compose (for local services)
 
 ### Installation
 
-Setup artifactory auth (needed for accessing internal Snowflake node modules):
-
-```bash
-sf artifact npm setup-auth -r internal-production-npm-snowflake-virtual
-```
-
-Install all dependencies:
+Install dependencies across all packages:
 
 ```bash
 pnpm install
@@ -63,23 +60,24 @@ pnpm install
 
 ### Development
 
-Run both frontend and backend in parallel:
+Run all services in development mode:
 
 ```bash
 pnpm dev
 ```
 
-Or run them individually:
+This starts:
+- **Web:** http://localhost:5173
+- **Controld:** http://localhost:3002
+
+Or run services individually:
 
 ```bash
-# Backend only (runs on port 3001)
-pnpm dev:api
-
-# Frontend only (runs on port 5173)
-pnpm dev:web
-
-# Controld service (runs on port 3002)
+# Control plane service
 cd services/controld && pnpm dev
+
+# Web frontend
+cd packages/web && pnpm dev
 ```
 
 ### Building
@@ -90,59 +88,230 @@ Build all packages:
 pnpm build
 ```
 
-Or build individually:
+Or build specific packages:
 
 ```bash
-pnpm build:api
-pnpm build:web
+cd packages/agent-sdk && pnpm build
+cd packages/db && pnpm build
+cd packages/web && pnpm build
 ```
 
-### Type Checking
-
-Run type checking across all packages:
+### Code Quality
 
 ```bash
-pnpm type-check
+# Lint and format check
+pnpm check
+
+# Auto-fix issues
+pnpm fix
+
+# Type checking
+pnpm type:check
+
+# Run all CI checks
+pnpm ci
 ```
 
-## API Endpoints
+## CLI Tool (p67-cli)
 
-### API Service (port 3001)
+The `p67` CLI manages workflow lifecycle, connections, and project initialization.
 
-The backend API runs on `http://localhost:3001` and includes:
+### Installation
 
-- `GET /api/health` - Health check endpoint
-- `GET /api/hello` - Sample API endpoint
+```bash
+cd tools/p67-cli
+make clean install
+```
 
-### Controld Service (port 3002)
+### Usage
 
-The control plane service runs on `http://localhost:3002` and includes:
+```bash
+# Initialize new project
+p67 init my-workflow
 
-- `GET /api/health` - Health check endpoint
-- `POST /api/workflow/create` - Create workflow
-- `GET /api/workflow/list` - List workflows
-- `POST /api/workflow/:workflowId/run` - Run workflow
-- `GET /docs` - Swagger UI documentation
-- `GET /docs/json` - OpenAPI schema
+# Manage connections
+p67 connection add
+p67 connection list
+p67 connection set-default <name>
 
-## Frontend
+# Build workflow
+p67 build
 
-The frontend runs on `http://localhost:5173` during development.
+# Deploy workflow
+p67 workflow deploy <zip-file>
+
+# Run workflow
+p67 workflow run [workflow-id]
+
+# List workflows
+p67 workflow list
+```
+
+See [tools/p67-cli/README.md](tools/p67-cli/README.md) for detailed CLI documentation.
 
 ## Services
 
 ### Controld - Control Plane Service
 
-Located in `services/controld/`, the control plane service is built with Fastify and provides API functionality for managing P67 platform operations including workflow execution.
+Located in `services/controld/`, provides workflow execution and management APIs.
 
 **Features:**
-- Fastify 5.2.0 framework
-- Type-safe validation with Zod
-- Automatic OpenAPI schema generation
-- Swagger UI at `/docs`
-- Built-in logging with Pino
 - Workflow deployment via ZIP upload
-- Workflow execution runtime
+- Workflow execution runtime using Bun
+- LangGraph workflow support
 - File-based storage
+- OpenAPI documentation at `/docs`
 
-**Documentation:** See [services/controld/README.md](services/controld/README.md)
+**API Endpoints:**
+- `GET /api/health` - Health check
+- `POST /api/workflow/create` - Upload workflow
+- `GET /api/workflow/list` - List workflows
+- `POST /api/workflow/:workflowId/run` - Execute workflow
+- `GET /docs` - Swagger UI
+- `GET /docs/json` - OpenAPI schema
+
+**Local Development:**
+```bash
+cd services/controld
+pnpm dev  # Runs on http://localhost:3002
+```
+
+## Packages
+
+### agent-sdk
+
+TypeScript SDK for building workflows with Snowflake Cortex features:
+- Execute read-only SQL queries
+- Query Cortex Analyst with natural language
+- Call Cortex Agent with streaming support
+
+### db
+
+Database utilities with Prisma client and PostgreSQL adapter:
+- Fastify plugin integration
+- Connection management
+- Type-safe database operations
+
+### web
+
+React frontend application with Mantine UI components (currently experimental).
+
+## Docker Deployment
+
+### Local Development with Docker Compose
+
+```bash
+# Start all services
+docker compose up
+
+# Rebuild and start
+docker compose up --build
+
+# Stop services
+docker compose down
+```
+
+Services:
+- **Postgres:** localhost:5432
+- **Controld:** http://localhost:3002
+
+### Build Docker Image
+
+```bash
+# Build controld service
+docker build --build-arg SERVICE_NAME=controld -t p67-controld .
+
+# Run controld
+docker run -p 3002:3000 p67-controld
+```
+
+## CoCo (Cortex Code) Integration
+
+The `coco/` directory contains custom commands and demos for Snowflake Cortex Code:
+
+```bash
+cd coco
+make  # Initialize and launch CoCo environment
+```
+
+Includes:
+- Custom commands for P67 workflows
+- Demo projects showcasing workflow patterns
+- Skills for Cortex Code
+
+## Example Workflows
+
+### number_one
+
+LangGraph-based workflow demonstrating:
+- Multi-node state management
+- Sequential workflow execution
+- Graph compilation and execution
+
+### template
+
+Starter template for new workflow projects.
+
+## Database Operations
+
+### Postgres Setup
+
+```bash
+# Set up Postgres service in Snowflake
+snowsql -f ops/postgres_setup.sql
+
+# Tear down Postgres service
+snowsql -f ops/postgres_teardown.sql
+```
+
+### Database Migrations
+
+```bash
+cd packages/db
+
+# Run migrations locally
+make deploy
+
+# View pending migrations
+make diff
+
+# Generate Prisma client
+pnpm db:generate
+```
+
+## CI/CD
+
+GitHub Actions workflows:
+- **p67-ci.yml:** Runs linting, type checking, and builds on PR
+- **p67-migrate-db.yml:** Database migration deployment (manual trigger)
+
+## Configuration Files
+
+- **biome.json:** Biome linter/formatter config (4-space indentation)
+- **tsconfig.json:** Root TypeScript configuration
+- **pnpm-workspace.yaml:** pnpm workspace definition
+- **.editorconfig:** Editor configuration
+- **Makefile:** Common development tasks
+
+## Project Configuration
+
+Each workflow project uses `p67.yml` for configuration:
+
+```yaml
+entrypoint: ./src/index.ts
+buildDir: .bundle
+```
+
+Connection configuration stored in `~/.snowflake/p67/config.toml`:
+
+```toml
+default_connection_name = "dev"
+
+[connections.dev]
+endpoint = "https://your-endpoint.snowflakecomputing.app"
+pat = "your_pat_token"
+```
+
+## License
+
+ISC
