@@ -38,7 +38,14 @@ describe: ## Describe the p67.app.controld service
 dev: ## Start local development environment with Docker Compose
 	$(MAKE) -C packages/db init
 	$(MAKE) -C services/controld init
-	docker compose up --build
+	docker compose up --build -d
+	@echo "Waiting for postgres to be ready..."
+	@until docker compose exec -T postgres pg_isready -U postgres > /dev/null 2>&1; do \
+		sleep 1; \
+	done
+	@echo "Postgres is ready!"
+	$(MAKE) -C packages/db deploy
+	docker compose logs -f
 
 fix: ## Fix linting and formatting issues
 	pnpm lint:fix
