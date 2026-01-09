@@ -42,8 +42,8 @@ export class AgentSDKImpl implements AgentSDK {
             username: cfg.username ?? '',
             authenticator: cfg.authenticator ?? '',
             accessUrl: cfg.accessUrl,
-            token: cfg.token ?? '',
-            password: cfg.password ?? '',
+            token: cfg.token ?? undefined,
+            password: cfg.password ?? undefined,
             warehouse: cfg.warehouse ?? '',
             database: cfg.database ?? '',
             schema: cfg.schema ?? '',
@@ -563,7 +563,10 @@ export class AgentSDKImpl implements AgentSDK {
             return new Promise((resolve) => {
                 this.cachedConnection?.destroy((err) => {
                     if (err) {
-                        console.error('Error closing connection:', err.message);
+                        // Log error but still resolve - connection is being destroyed anyway
+                        console.error(
+                            `Error closing connection: ${err.message}`,
+                        );
                     }
                     this.cachedConnection = null;
                     this.connectionPromise = null;

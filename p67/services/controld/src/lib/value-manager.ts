@@ -15,9 +15,9 @@ export class ValueManager {
         // TODO: populate.
     }
 
-    async get(value?: Value): Promise<string> {
+    async get(value?: Value): Promise<string | undefined> {
         if (!value) {
-            return '';
+            return undefined;
         }
         if (value.value) {
             return value.value;
