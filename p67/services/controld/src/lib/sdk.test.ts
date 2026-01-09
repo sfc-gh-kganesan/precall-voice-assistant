@@ -8,7 +8,7 @@ vi.mock('snowflake-sdk', () => ({
 }));
 
 import {
-    AgentSDK,
+    type AgentSDK,
     type AgentStreamEvent,
     type CortexAgentOptions,
     type CortexAgentResponse,
@@ -16,6 +16,7 @@ import {
     type P67ConfigValue,
     version,
 } from './sdk';
+import { AgentSDKImpl } from './sdk-impl';
 
 // Helper to create valid config Map
 const createValidConfig = (overrides?: Partial<P67ConfigValue>) => {
@@ -39,7 +40,7 @@ describe('agent-sdk', () => {
 
     beforeEach(() => {
         vi.resetModules();
-        sdk = new AgentSDK({ snowflakeConfig: createValidConfig() });
+        sdk = new AgentSDKImpl({ snowflakeConfig: createValidConfig() });
     });
 
     afterEach(async () => {
@@ -55,7 +56,7 @@ describe('agent-sdk', () => {
 
     describe('AgentSDK class', () => {
         it('should create an instance', () => {
-            expect(sdk).toBeInstanceOf(AgentSDK);
+            expect(sdk).toBeInstanceOf(AgentSDKImpl);
         });
 
         it('should create instance with minimal config', () => {
@@ -65,8 +66,8 @@ describe('agent-sdk', () => {
                 username: 'user',
                 token: 'token',
             });
-            const testSdk = new AgentSDK({ snowflakeConfig: configMap });
-            expect(testSdk).toBeInstanceOf(AgentSDK);
+            const testSdk = new AgentSDKImpl({ snowflakeConfig: configMap });
+            expect(testSdk).toBeInstanceOf(AgentSDKImpl);
         });
 
         it('should create instance with password auth', () => {
@@ -77,8 +78,8 @@ describe('agent-sdk', () => {
                 accessUrl: 'https://test.snowflakecomputing.com',
                 password: 'pass',
             });
-            const testSdk = new AgentSDK({ snowflakeConfig: configMap });
-            expect(testSdk).toBeInstanceOf(AgentSDK);
+            const testSdk = new AgentSDKImpl({ snowflakeConfig: configMap });
+            expect(testSdk).toBeInstanceOf(AgentSDKImpl);
         });
 
         it('should create instance with explicit authenticator', () => {
@@ -90,8 +91,8 @@ describe('agent-sdk', () => {
                 accessUrl: 'https://test.snowflakecomputing.com',
                 token: 'token',
             });
-            const testSdk = new AgentSDK({ snowflakeConfig: configMap });
-            expect(testSdk).toBeInstanceOf(AgentSDK);
+            const testSdk = new AgentSDKImpl({ snowflakeConfig: configMap });
+            expect(testSdk).toBeInstanceOf(AgentSDKImpl);
         });
     });
 

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { parseManifest } from './manifest.js';
 import type { ExecuteMessage } from './runner.js';
-import { AgentSDK, hydrateConfig } from './sdk.js';
+import { AgentSDKImpl, hydrateConfig } from './sdk-impl.js';
 import { ValueManager } from './value-manager.js';
 
 const ExecuteMessageSchema = z.object({
@@ -52,7 +52,7 @@ process.on('message', async (message: ExecuteMessage) => {
         const valueManager = new ValueManager();
 
         const config = await hydrateConfig(manifest, valueManager);
-        const sdk = new AgentSDK(config);
+        const sdk = new AgentSDKImpl(config);
 
         const result = await script.main(sdk);
 
