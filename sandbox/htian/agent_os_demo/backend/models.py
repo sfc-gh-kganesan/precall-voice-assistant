@@ -1,6 +1,7 @@
 import hashlib
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
+
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -103,3 +104,20 @@ def row_to_agent_manifest(row: dict) -> AgentManifest:
         input_schema=json.loads(row["INPUT_SCHEMA"]),
         output_schema=json.loads(row["OUTPUT_SCHEMA"]),
     )
+
+
+class Message(BaseModel):
+    """Message model for chatting with the Brain."""
+    role: Literal["user", "assistant", "System"] = Field(..., description="The role of the message.")
+    content: str = Field(..., description="The content of the message.")
+
+
+class ChatRequest(BaseModel):
+    """Request model for chatting with the Brain."""
+    messages: List[Message] = Field(..., description="The message to chat with the Brain.")
+
+
+class ChatResponse(BaseModel):
+    """Response model for chatting with the Brain."""
+
+    reply: str = Field(..., description="The reply from the Brain.")

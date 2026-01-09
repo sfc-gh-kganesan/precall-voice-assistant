@@ -4,13 +4,16 @@ from contextlib import asynccontextmanager
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.models import (
     AddAgentRequest,
+    ChatRequest,
     ListAgentsRequest,
     build_agent_manifest_from_add_agent_request,
 )
 from backend.registry import add_agent, list_agents, search_agents
+from backend.brain import chat
 from backend.utils import _create_snowflake_session
 
 load_dotenv()
@@ -42,6 +45,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 v1_router = APIRouter(prefix="/v1", tags=["v1"])
 
 
@@ -60,6 +71,15 @@ async def index():
 async def health():
     """Health check endpoint for monitoring and load balancers."""
     return {"status": "healthy", "version": VERSION}
+
+# ============================================================================
+# Brain Endpoints
+# ============================================================================
+
+@v1_router.post("/brain/chat", tags=["Brain"], summary="Chat with the Brain")
+async def chat_endpoint(request: ChatRequest):
+    """Chat with the Brain endpoint."""
+    return await chat(request)
 
 
 # ============================================================================

@@ -2,3 +2,4 @@ streamlit
 snowflake-snowpark-python
 pandas
 fastapi
+openai
