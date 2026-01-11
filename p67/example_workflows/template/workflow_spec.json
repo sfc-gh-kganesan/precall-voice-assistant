@@ -1,0 +1,234 @@
+{
+  "workflows": [
+    {
+      "name": "invoice_processing",
+      "description": "Process incoming invoices by validating against purchase orders and paying legitimate invoices",
+      "variables": [
+        {
+          "name": "invoice_id",
+          "data_type": "string",
+          "description": "Unique identifier of the incoming invoice"
+        },
+        {
+          "name": "vendor_name",
+          "data_type": "string",
+          "description": "Name of the vendor on the invoice"
+        },
+        {
+          "name": "amount",
+          "data_type": "number",
+          "description": "Invoice amount to be paid"
+        },
+        {
+          "name": "po_reference",
+          "data_type": "string",
+          "description": "Purchase order reference from the invoice"
+        },
+        {
+          "name": "due_date",
+          "data_type": "string",
+          "description": "Payment due date of the invoice"
+        },
+        {
+          "name": "po_exists",
+          "data_type": "boolean",
+          "description": "Whether a matching PO record exists"
+        },
+        {
+          "name": "po_status",
+          "data_type": "string",
+          "description": "Status of the matching PO record"
+        },
+        {
+          "name": "po_vendor",
+          "data_type": "string",
+          "description": "Vendor name from the matching PO record"
+        },
+        {
+          "name": "po_remaining_amount",
+          "data_type": "number",
+          "description": "Remaining amount on the matching PO record"
+        },
+        {
+          "name": "review_decision",
+          "data_type": "string",
+          "description": "Human reviewer's decision: approved or rejected"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "start",
+          "type": "start_node",
+          "name": "Start",
+          "description": "Entry point for invoice processing"
+        },
+        {
+          "id": "lookup_po",
+          "type": "query_node",
+          "name": "Lookup Purchase Order",
+          "description": "Query the PO table to retrieve details for the referenced purchase order",
+          "question": "For PO reference {po_reference}, does a PO record exist? If so, what is its status, vendor name, and remaining amount?",
+          "output_mappings": [
+            {
+              "variable_name": "po_exists",
+              "out_param_expression": "exists"
+            },
+            {
+              "variable_name": "po_status",
+              "out_param_expression": "status"
+            },
+            {
+              "variable_name": "po_vendor",
+              "out_param_expression": "vendor_name"
+            },
+            {
+              "variable_name": "po_remaining_amount",
+              "out_param_expression": "remaining_amount"
+            }
+          ]
+        },
+        {
+          "id": "check_legitimacy",
+          "type": "decision_node",
+          "name": "Check Invoice Legitimacy",
+          "description": "Validate invoice against PO criteria",
+          "branches": [
+            {
+              "label": "legitimate",
+              "condition": "PO exists, PO status is unpaid, PO vendor matches invoice vendor_name, and PO remaining amount is greater than or equal to invoice amount"
+            },
+            {
+              "label": "not_legitimate",
+              "condition": "Any of the legitimacy checks fail"
+            }
+          ]
+        },
+        {
+          "id": "human_review",
+          "type": "human_node",
+          "name": "Human Review",
+          "description": "Finance manager reviews the invoice that failed automatic legitimacy check",
+          "human_role": "finance_manager",
+          "human_task": "Review invoice {invoice_id} from vendor {vendor_name} for amount {amount}. PO reference: {po_reference}. PO exists: {po_exists}, PO status: {po_status}, PO vendor: {po_vendor}, PO remaining amount: {po_remaining_amount}. Please approve or reject this invoice.",
+          "output_mappings": [
+            {
+              "variable_name": "review_decision",
+              "out_param_expression": "decision"
+            }
+          ]
+        },
+        {
+          "id": "check_review_decision",
+          "type": "decision_node",
+          "name": "Check Review Decision",
+          "description": "Route based on human reviewer's decision",
+          "branches": [
+            {
+              "label": "approved",
+              "condition": "Review decision is approved"
+            },
+            {
+              "label": "rejected",
+              "condition": "human decision is \"rejected\""
+            }
+          ]
+        },
+        {
+          "id": "pay_invoice",
+          "type": "action_node",
+          "name": "Pay Invoice",
+          "description": "Call payment API to process the invoice payment",
+          "action_name": "payment_api",
+          "input_mappings": [
+            {
+              "param_name": "invoice_id",
+              "variable_expression": "invoice_id"
+            },
+            {
+              "param_name": "amount",
+              "variable_expression": "amount"
+            },
+            {
+              "param_name": "vendor_name",
+              "variable_expression": "vendor_name"
+            }
+          ]
+        },
+        {
+          "id": "end_success",
+          "type": "end_node",
+          "name": "End Success",
+          "description": "Invoice processed and paid successfully",
+          "end_type": "success"
+        },
+        {
+          "id": "end_rejected",
+          "type": "end_node",
+          "name": "End Rejected",
+          "description": "Invoice rejected after human review",
+          "end_type": "failure"
+        },
+        {
+          "id": "node_9",
+          "type": "action_node",
+          "name": "send rejection email",
+          "description": "action node - send rejection email",
+          "action_name": "send_email",
+          "input_mappings": [],
+          "output_mappings": []
+        }
+      ],
+      "edges": [
+        {
+          "id": "e1",
+          "from_node": "start",
+          "to_node": "lookup_po"
+        },
+        {
+          "id": "e2",
+          "from_node": "lookup_po",
+          "to_node": "check_legitimacy"
+        },
+        {
+          "id": "e3",
+          "from_node": "check_legitimacy",
+          "to_node": "pay_invoice",
+          "label": "legitimate"
+        },
+        {
+          "id": "e4",
+          "from_node": "check_legitimacy",
+          "to_node": "human_review",
+          "label": "not_legitimate"
+        },
+        {
+          "id": "e5",
+          "from_node": "human_review",
+          "to_node": "check_review_decision"
+        },
+        {
+          "id": "e6",
+          "from_node": "check_review_decision",
+          "to_node": "pay_invoice",
+          "label": "approved"
+        },
+        {
+          "id": "e8",
+          "from_node": "pay_invoice",
+          "to_node": "end_success"
+        },
+        {
+          "id": "e9",
+          "from_node": "check_review_decision",
+          "to_node": "node_9",
+          "label": "rejected"
+        },
+        {
+          "id": "e10",
+          "from_node": "node_9",
+          "to_node": "end_rejected"
+        }
+      ]
+    }
+  ]
+}

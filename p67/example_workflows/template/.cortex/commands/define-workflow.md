@@ -134,7 +134,7 @@ Your task is to engage in a multi-turn conversation with the user to understand 
    - How does each node connect to other nodes ?
    - For query_node, think carefully what external data will be useful to populate the workflow variables, and what question to ask the semantic view?
    - For decision_node, what are the subsequent nodes it can route to ?  For each route, what are the corresponding condition (expressed in terms of workflow variables) ?
-   - **For decision_node, CRITICAL**:
+   **For decision_node, CRITICAL**:
      - First check if the decision can be made using existing workflow variables (Option 1 - PREFERRED)
      - If Option 1 works, describe the condition in plain text (e.g., "vendor names match and amounts match")
      - Only use Option 2 (query_node before decision) if the decision requires external data access or complex calculations
@@ -159,28 +159,41 @@ Once you have gathered sufficient requirements, create the workflow specificatio
 
 **Generate a json representation of the workflow spec** based on json schema `./conf/workflow_graph_schema.json`, save the workflow spec json file in `./workflow_spec.json`
 
-**Step 2.2: Return to User**
-
-**Return the JSON representation** to the user. The response should contain:
-   - The complete workflow specification in JSON format from `./workflow_spec.json`
-   - Ask the user to confirm the specification or suggest changes
 
 ### Stage 3: Review & Refine
 
-1. Presenting the specification:
-  - Use Bash tool to run: `cat ./workflow_spec.json`
-  - **CRITICAL FORMATTING REQUIREMENT**: Present the output in a markdown JSON code block
-    - Start with text: "Here's your existing workflow specification:"
-    - Then add a blank line
-    - Then add exactly these 7 characters: ` ` ` j s o n (three backticks followed by the word json, no spaces between them)
-    - Then paste the complete JSON content from the cat command
-    - Then on a new line add exactly these 3 characters: ` ` ` (three backticks)
-    - The JSON content MUST be surrounded by these code fence markers
+**Step 3.1: Return the Mermaid diagram representation of the workflow** to the user.
 
+**CRITICAL FORMATTING REQUIREMENT**: The Mermaid diagram MUST be properly formatted with markdown code fences:
+  - Start with text: "Here's the Mermaid diagram for your workflow:"
+  - Then add a blank line
+  - Then add exactly these 10 characters: ` ` ` m e r m a i d (three backticks followed by the word mermaid, no spaces between them)
+  - Then paste the complete Mermaid diagram code
+  - Then on a new line add exactly these 3 characters: ` ` ` (three backticks)
+  - The Mermaid code MUST be surrounded by these code fence markers
 
-2. **Listen to user feedback and iterate until user confirm the latest workflow spec**
-  - If user suggest changes, make corresponding adjustment and update the workflow spec and save to `./workflow_spec.json`, then repeat stage 3.
-  - If user confirms the workflow is correct, then we are done.
+**CRITICAL MERMAID SYNTAX RULES**:
+  - **NEVER use "end" as a node ID** - it's a reserved keyword in Mermaid
+  - For end nodes, use IDs like: `workflow_end`, `end_success`, `end_failure`, etc.
+  - Node display text can still say "End" using syntax: `workflow_end([End])`
+  - Other reserved words to avoid as node IDs: `graph`, `subgraph`, `style`, `class`, `click`
+
+**Example of correct formatting:**
+```
+Here's the Mermaid diagram for your workflow:
+
+` ` `mermaid
+graph TD
+    start([Start]) --> node1[Process]
+    node1 --> workflow_end([End])
+` ` `
+```
+
+**Step 3.2: Listen to user feedback and iterate until user confirm the workflow diagram is correct**
+  - If user suggests changes, make corresponding adjustment and update the workflow spec and save to `./workflow_spec.json`
+  - Generate the mermaid diagram with proper markdown code fencing and return back to the user
+
+Repeat step 3.2 until user confirms the workflow is correct, then respond to the user saying the workflow has been created.
 
 
 ## Important Guidelines

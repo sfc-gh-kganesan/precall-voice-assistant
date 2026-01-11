@@ -1,14 +1,10 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "WorkflowCollection",
-    "description": "Schema for a collection of workflow graphs with optional READY_TO_SAVE marker",
+    "description": "Schema for a collection of workflow graphs",
     "type": "object",
     "required": ["workflows"],
     "properties": {
-        "READY_TO_SAVE": {
-            "type": "boolean",
-            "description": "Marker to indicate the workflow is ready to be saved to disk"
-        },
         "workflows": {
             "type": "array",
             "description": "List of workflow graphs (main workflow and subgraphs)",
@@ -44,6 +40,7 @@
                                 },
                                 "data_type": {
                                     "type": "string",
+                                    "enum": ["string", "number", "integer", "boolean", "object", "array"],
                                     "description": "The data type of the state variable (e.g., string, number, integer, boolean, object, array)"
                                 },
                                 "description": {
@@ -92,44 +89,44 @@
                                     "type": "string",
                                     "description": "For action_node: the name of the action to call"
                                 },
-                                "input_parameters": {
+                                "input_mappings": {
                                     "type": "array",
-                                    "description": "For action_node and query_node: list of input parameter mappings from workflow variables",
+                                    "description": "For action_node, query_node, and human_node: list of input parameter mappings from workflow variables",
                                     "items": {
                                         "type": "object",
                                         "required": [
-                                            "param_name",
-                                            "variable_name"
+                                            "in_param_name",
+                                            "variable_expression"
                                         ],
                                         "properties": {
                                             "param_name": {
                                                 "type": "string",
-                                                "description": "Name of the function parameter"
+                                                "description": "Name of the function input parameter"
                                             },
-                                            "variable_name": {
+                                            "variable_expression": {
                                                 "type": "string",
-                                                "description": "Name of the workflow variable to map to this parameter"
+                                                "description": "Expression to evaluate the workflow variable to map to this parameter"
                                             }
                                         }
                                     }
                                 },
-                                "output_parameters": {
+                                "output_mappings": {
                                     "type": "array",
-                                    "description": "For action_node and query_node: list of output parameter mappings to workflow variables",
+                                    "description": "For action_node, query_node, and human_node: list of workflow variables to map to function output/return fields",
                                     "items": {
                                         "type": "object",
                                         "required": [
-                                            "param_name",
-                                            "variable_name"
+                                            "variable_name",
+                                            "out_param_expression"
                                         ],
                                         "properties": {
-                                            "param_name": {
-                                                "type": "string",
-                                                "description": "Name of the function output/return field"
-                                            },
                                             "variable_name": {
                                                 "type": "string",
                                                 "description": "Name of the workflow variable to store this output"
+                                            },
+                                            "out_param_expression": {
+                                                "type": "string",
+                                                "description": "Expression to evaluate the function output/return field to map to this workflow variable"
                                             }
                                         }
                                     }
@@ -147,7 +144,7 @@
                                             },
                                             "condition": {
                                                 "type": "string",
-                                                "description": "The condition that must be met for this branch"
+                                                "description": "Natural language expression specifying the condition in workflow variables that must be met to take this branch"
                                             }
                                         }
                                     }
@@ -158,15 +155,15 @@
                                 },
                                 "question": {
                                     "type": "string",
-                                    "description": "For query_node: the question to ask the QueryEngine"
+                                    "description": "For query_node: the question to ask the QueryEngine.  The question should be in terms of workflow variables."
                                 },
                                 "human_role": {
                                     "type": "string",
-                                    "description": "For human_node: the role of the human to assign the task to"
+                                    "description": "For human_node: the role of the human to assign the task to.  The role can be expressed in terms of workflow variables."
                                 },
                                 "human_task": {
                                     "type": "string",
-                                    "description": "For human_node: description of the task to be completed by the human"
+                                    "description": "For human_node: description of the task to be completed by the human.  The task description can be expressed in terms of workflow variables."
                                 },
                                 "end_type": {
                                     "type": "string",
@@ -197,7 +194,7 @@
                                 },
                                 "label": {
                                     "type": "string",
-                                    "description": "Optional label for the edge when from_node is a decision_node"
+                                    "description": "Optional label for the edge only when from_node is a decision_node"
                                 }
                             }
                         }

@@ -119,18 +119,18 @@ semantic_views:
 ```yaml
 # List of semantic views (both existing and new)
 semantic_views:
-  - name: "purchase_order_validation_view"
+  - name: "customer_order_analysis_view"
     status: "new"
-    database: "TEMP"
-    schema: "PUBLIC"
+    database: "EGS"
+    schema: "TEMP"
     information: |
-      Purchase order validation semantic view for invoice processing.
-      Built on FINANCE.FPA.PURCHASE_ORDER_LINE table.
-      Supports PO existence checks, vendor lookup, and amount validation.
+      Customer order analysis semantic view for workflow processing.
+      Built on SALES.ANALYTICS.ORDER_DETAILS table.
+      Supports order lookup, customer information retrieval, and order amount validation.
     query_examples:
-      - "Does purchase order PO-2024-001 exist?"
-      - "What is the vendor for purchase order PO-2024-001?"
-      - "Show me the total amount for purchase order PO-2024-001"
+      - "Does order ORD-2024-001 exist?"
+      - "What is the customer name for order ORD-2024-001?"
+      - "Show me the total amount for order ORD-2024-001"
 ```
 
 Write the complete semantic views catalog to `./semantic_views.yaml` following this EXACT format.
@@ -141,9 +141,16 @@ For each semantic view with `status: "new"` in the catalog, suggest a name of th
 
 **File:** `./new_semantic_views/[view_name].yaml`
 
+**CRITICAL**: The correct Snowflake semantic model structure requires:
+1. ✅ Use `description` field (NOT `label` - that field is invalid)
+2. ✅ Nest `dimensions`, `time_dimensions`, `facts` inside each table definition (NOT at model level)
+3. ✅ Only `verifiedQueries` (NOT `verified_queries`) is valid for example queries
+
+**✅ CORRECT Structure:**
+
 ```yaml
 name: "[view_name]"
-label: "[Human Readable Name]"
+
 description: |
   [Detailed description of what this semantic view represents
   and what business questions it can answer]
@@ -159,6 +166,33 @@ tables:
       columns:
         - "[primary_key_column]"
 
+    # ✅ IMPORTANT: dimensions, time_dimensions, facts are INSIDE the table definition
+    dimensions:
+      - name: "[dimension_name]"
+        synonyms:
+          - "[alternative_name_1]"
+          - "[alternative_name_2]"
+        description: "[What this dimension represents]"
+        expr: "[table_name].[column_name]"
+        data_type: "VARCHAR(100)"  # or "NUMBER(10,2)", "DATE", etc.
+        unique: false  # true if this is a unique identifier
+
+    time_dimensions:
+      - name: "[time_dimension_name]"
+        synonyms:
+          - "[alternative_name]"
+        description: "[What this time dimension represents]"
+        expr: "[table_name].[column_name]"
+        data_type: "TIMESTAMP"  # or "DATE"
+
+    facts:
+      - name: "[fact_name]"
+        synonyms:
+          - "[alternative_name]"
+        description: "[What this fact represents - unaggregated numeric value]"
+        expr: "[table_name].[column_name]"
+        data_type: "NUMBER(10,2)"
+
   - name: "[joined_table_name]"
     base_table:
       database: "[DATABASE_NAME]"
@@ -169,6 +203,13 @@ tables:
       columns:
         - "[primary_key_column]"
 
+    dimensions:
+      - name: "[another_dimension]"
+        description: "[Description]"
+        expr: "[joined_table_name].[column_name]"
+        data_type: "VARCHAR(100)"
+
+# Relationships are defined at the model level (not inside tables)
 relationships:
   - name: "[relationship_name]"
     left_table: "[base_table_name]"
@@ -177,67 +218,99 @@ relationships:
       - left_column: "[join_key_left]"
         right_column: "[join_key_right]"
 
-dimensions:
-  - name: "[dimension_name]"
-    synonyms:
-      - "[alternative_name_1]"
-      - "[alternative_name_2]"
-    description: "[What this dimension represents]"
-    expr: "[table_name].[column_name]"
-    data_type: "VARCHAR(100)"  # or "NUMBER(10,2)", "DATE", etc.
-    unique: false  # true if this is a unique identifier
-
-time_dimensions:
-  - name: "[time_dimension_name]"
-    synonyms:
-      - "[alternative_name]"
-    description: "[What this time dimension represents]"
-    expr: "[table_name].[column_name]"
-    data_type: "TIMESTAMP"  # or "DATE"
-
-facts:
-  - name: "[fact_name]"
-    synonyms:
-      - "[alternative_name]"
-    description: "[What this fact represents - unaggregated numeric value]"
-    expr: "[table_name].[column_name]"
-    data_type: "NUMBER(10,2)"
-
+# Metrics are defined at the model level (OPTIONAL - see warning below)
 metrics:
   - name: "[metric_name]"
     synonyms:
       - "[alternative_name]"
     description: "[What this metric calculates]"
-    expr: "SUM([table_name].[column_name])"  # or AVG, COUNT, etc.
+    expr: "COUNT(*)"  # Only COUNT(*) is guaranteed to work. SUM/AVG may fail validation.
 
-  - name: "[computed_metric_name]"
-    synonyms:
-      - "[alternative_name]"
-    description: "[What this computed metric represents]"
-    expr: "SUM([table_name].[column_1]) / COUNT([table_name].[column_2])"
+# Optional: Verified queries for testing (use camelCase: verifiedQueries)
+verifiedQueries:
+  - name: "[query_name]"
+    question: "[Example natural language question]"
+    sql: |
+      SELECT [columns]
+      FROM [database].[schema].[table] as [table_alias]
+      WHERE [conditions]
 
-filters:
-  - name: "[filter_name]"
-    synonyms:
-      - "[alternative_name]"
-    description: "[What this filter does]"
-    expr: "[table_name].[column_name] = '[value]'"
-
-# Optional: Default time dimension for time-based queries
-default_time_dimension: "[time_dimension_name]"
-
-# Optional: Row access policies
-# row_access_policies:
-#   - policy_name: "[policy_name]"
-#     description: "[description]"
+# Optional: Custom instructions for Cortex Analyst
+# customInstructions: |
+#   [Instructions for how to interpret this semantic model]
 ```
+
+**❌ COMMON MISTAKES TO AVOID:**
+
+1. **❌ Using `label` field:**
+```yaml
+name: "my_view"
+label: "My View"  # ❌ WRONG - this field doesn't exist
+```
+Use `description` instead.
+
+2. **❌ Dimensions/facts at model level:**
+```yaml
+tables:
+  - name: "orders"
+    base_table: ...
+
+dimensions:  # ❌ WRONG - dimensions at model level
+  - name: "order_id"
+```
+Dimensions must be nested inside their table.
+
+3. **❌ Using `verified_queries` (snake_case):**
+```yaml
+verified_queries:  # ❌ WRONG - should be camelCase
+  - name: "test"
+```
+Use `verifiedQueries` (camelCase).
+
+4. **❌ Metrics without aggregation:**
+```yaml
+metrics:
+  - name: "amount"
+    expr: "orders.AMOUNT"  # ❌ WRONG - no aggregation
+```
+Metrics MUST have aggregation functions like `SUM(orders.AMOUNT)`.
 
 Create one YAML file for each new semantic view under `./new_semantic_views/`
 
 ### Step 7: Validate YAML Syntax
 
-- Before using the YAML files to create semantic views in Snowflake, make sure its syntax is correct based on Snowflake semantic view yaml structure.
-- Perform thorough syntax validation:
+**CRITICAL**: Before deploying to Snowflake, validate each YAML file to catch errors early. Use the semantic view reflection/validation tool available in your environment.
+
+#### 7.0 Validate Using Reflection Tool
+
+For each YAML file, run validation to check if it conforms to Snowflake's semantic model schema:
+
+**Common validation errors and fixes:**
+
+1. **Error: "has no field named 'label'"**
+   - ❌ Remove the `label` field
+   - ✅ Use `description` instead
+
+2. **Error: "has no field named 'dimensions'"** (at model level)
+   - ❌ Dimensions are at the wrong level
+   - ✅ Move dimensions, time_dimensions, facts inside the `tables` section
+
+3. **Error: "has no field named 'verified_queries'"**
+   - ❌ Wrong case format
+   - ✅ Use `verifiedQueries` (camelCase)
+
+4. **Error: "Unsupported expression in the definition of derived metric [METRIC_NAME]"**
+   - Caused by: `COUNT(DISTINCT ...)`, `SUM(table.column)`, or complex expressions
+   - **Fix**: Remove the metric entirely or use only `COUNT(*)`
+   - Define numeric values as facts instead - Cortex Analyst will aggregate them at query time
+
+**Validation workflow:**
+1. Read the YAML file
+2. Run validation/reflection
+3. If errors occur, read the error message carefully - it will list valid fields
+4. Fix the YAML file based on the error
+5. Re-validate until successful
+6. Only proceed to Step 8 after ALL files validate successfully
 
 #### 7.1 Check YAML Structure
 
@@ -245,9 +318,9 @@ For each YAML file in `./new_semantic_views/`, verify:
 
 1. **Valid YAML syntax** - The file can be parsed without errors
 2. **Required fields are present**:
-   - `name`, `label`, `description`
+   - `name`, `description` (NOT `label`)
    - At least one table in `tables` section
-   - At least one dimension or measure
+   - At least one dimension or fact (nested inside tables)
 
 #### 7.2 Validate Relationships Syntax
 
@@ -293,62 +366,40 @@ All metrics must include aggregation functions in their `expr` field:
 **❌ INCORRECT**:
 ```yaml
 metrics:
-  - name: "purchase_amount"
-    expr: "orders.PURCHASE_AMOUNT"
+  - name: "order_amount"
+    expr: "orders.AMOUNT"  # ❌ Missing aggregation
 ```
 
 **✅ CORRECT**:
 ```yaml
 metrics:
-  - name: "total_purchase_amount"
-    expr: "SUM(orders.PURCHASE_AMOUNT)"
+  - name: "total_order_amount"
+    expr: "SUM(orders.AMOUNT)"  # ✅ Uses aggregation
 ```
 
-Common aggregation functions: `SUM()`, `AVG()`, `COUNT()`, `MIN()`, `MAX()`, `COUNT(DISTINCT ...)`
+**⚠️ METRICS WARNING**: Many metric expressions fail with "Unsupported expression" errors.
 
-**Metric Counting Best Practices**:
-- For row counts: Use `COUNT(*)` 
-- For distinct counts on primary keys: Use `COUNT(DISTINCT table.PRIMARY_KEY_COL)`
-- For distinct counts on non-primary keys: Use `COUNT(DISTINCT table.UNIQUE_COL)` only if the column is truly unique
-- Avoid `COUNT(DISTINCT ...)` on non-unique columns as it may not be supported
+**What works**:
+- ✅ `COUNT(*)` - Always safe
 
-**Examples**:
-```yaml
-metrics:
-  - name: "total_rows"
-    expr: "COUNT(*)"  # ✅ Count all rows
-  
-  - name: "distinct_customers"
-    expr: "COUNT(DISTINCT orders.CUSTOMER_ID)"  # ✅ Count unique customers
-```
+**What often fails**:
+- ❌ `COUNT(DISTINCT column)` - Not supported
+- ❌ `SUM(table.column)` - Often causes errors
+- ❌ `AVG()`, complex expressions - Limited support
 
-**CRITICAL**: Metrics should aggregate **base table columns directly**, NOT fact names:
-
-**❌ INCORRECT** (referencing fact name):
+**Recommended approach**:
 ```yaml
 facts:
-  - name: "line_amount"
-    expr: "orders.ORDER_LINE_AMOUNT"
+  - name: "order_amount"
+    expr: "orders.AMOUNT"
     data_type: "NUMBER(10,2)"
 
 metrics:
-  - name: "total_line_value"
-    expr: "SUM(orders.line_amount)"  # ❌ WRONG - referencing fact name
+  - name: "row_count"
+    expr: "COUNT(*)"  # Use COUNT(*) only, or omit metrics entirely
 ```
 
-**✅ CORRECT** (referencing base column):
-```yaml
-facts:
-  - name: "line_amount"
-    expr: "orders.ORDER_LINE_AMOUNT"
-    data_type: "NUMBER(10,2)"
-
-metrics:
-  - name: "total_line_value"
-    expr: "SUM(orders.ORDER_LINE_AMOUNT)"  # ✅ CORRECT - referencing base column
-```
-
-**NOTE**: If you need unaggregated numeric values, use `facts:` instead of `metrics:`.
+Cortex Analyst automatically aggregates facts at query time, making metrics optional.
 
 #### 7.4 Validate Data Types
 
@@ -392,14 +443,17 @@ Ensure all `expr` fields reference tables that are defined in the `tables` secti
 For each YAML file, verify:
 
 - [ ] YAML syntax is valid (no parsing errors)
+- [ ] ✅ Uses `description` field (NOT `label` - that field is invalid)
+- [ ] ✅ Dimensions, time_dimensions, facts are nested INSIDE each table (NOT at model level)
+- [ ] ✅ Uses `verifiedQueries` (camelCase, NOT `verified_queries` snake_case)
 - [ ] Tables use `base_table:` with `database:`, `schema:`, `table:` fields
 - [ ] Relationships are in separate `relationships:` section (not inline joins)
-- [ ] All metrics have aggregation functions in `expr` (use `facts:` for unaggregated values)
+- [ ] Metrics use only `COUNT(*)` or are omitted entirely (SUM/AVG/COUNT DISTINCT often fail)
+- [ ] Numeric values are defined as **facts**, not metrics
 - [ ] All data types use Snowflake-specific format (VARCHAR(n), NUMBER(p,s), DATE, TIMESTAMP)
 - [ ] Boolean values use correct SQL syntax (TRUE/FALSE not true/false)
 - [ ] String literals in filters use single quotes
 - [ ] All table references in `expr` exist in `tables` section
-- [ ] `default_time_dimension` references a valid time dimension with TIMESTAMP or DATE data type
 - [ ] Using `metrics:` not `measures:` for aggregated calculations
 
 #### 7.8 Fix Any Issues
@@ -413,15 +467,135 @@ If validation finds errors:
 
 **IMPORTANT**: Do not attempt to create semantic views in Snowflake until all YAML files pass validation.
 
-### Step 8: Create semantic views
-- Under `./new_semantic_views`, upload all YAML files to Snowflake stage
-1. Create stage to upload the YAML file
-- `CREATE STAGE IF NOT EXISTS EGS.TEMP.SEMANTIC_VIEWS`
+### Step 8: Create Semantic Views in Snowflake
 
-2. Upload all the YAML files to the stage using SQL PUT command:
-- `PUT file:[yaml_file_path] @EGS.TEMP.SEMANTIC_VIEWS AUTO_COMPRESS=FALSE OVERWRITE=TRUE`
+**IMPORTANT**: Use the `SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML` stored procedure with inline YAML content. Do NOT use stages or PUT commands.
 
-3. Create the semantic views 
-- Using the SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML stored procedure, create a separated semantic view for each yaml file under database "EGS" and schema "TEMP"
+#### 8.1 Read Each YAML File
+
+For each validated YAML file in `./new_semantic_views/`, read the complete file content.
+
+#### 8.2 Create Semantic View Using Stored Procedure
+
+Use the following SQL pattern to create each semantic view:
+
+```sql
+CALL SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML(
+  'EGS.TEMP',  -- Target database.schema
+  $$
+[PASTE FULL YAML CONTENT HERE]
+  $$
+);
+```
+
+**Example:**
+
+```sql
+CALL SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML(
+  'EGS.TEMP',
+  $$
+name: "customer_order_view"
+description: |
+  Customer order semantic view for workflow processing.
+  Built on SALES.ANALYTICS.ORDERS table.
+
+tables:
+  - name: "orders"
+    base_table:
+      database: "SALES"
+      schema: "ANALYTICS"
+      table: "ORDERS"
+    description: "Customer orders with details"
+    primary_key:
+      columns:
+        - "ORDER_ID"
+
+    dimensions:
+      - name: "order_id"
+        synonyms:
+          - "order_number"
+          - "order_ref"
+        description: "The unique order identifier"
+        expr: "orders.ORDER_ID"
+        data_type: "VARCHAR(16777216)"
+        unique: true
+
+    facts:
+      - name: "order_amount"
+        synonyms:
+          - "total_amount"
+        description: "Order total amount"
+        expr: "orders.AMOUNT"
+        data_type: "NUMBER(38,2)"
+
+verifiedQueries:
+  - name: "check_order_exists"
+    question: "Does order ORD-12345 exist?"
+    sql: |
+      SELECT
+        CASE WHEN COUNT(*) > 0 THEN TRUE ELSE FALSE END as order_exists,
+        orders.ORDER_ID as order_id
+      FROM SALES.ANALYTICS.ORDERS as orders
+      WHERE orders.ORDER_ID = 'ORD-12345'
+      GROUP BY orders.ORDER_ID
+  $$
+);
+```
+
+**Expected Output:**
+```
+Semantic view was successfully created.
+```
+
+#### 8.3 Verify Creation
+
+After creating each semantic view, verify it was created successfully:
+
+```sql
+-- List all semantic views in the schema
+SHOW SEMANTIC VIEWS IN SCHEMA EGS.TEMP;
+
+-- Describe the specific semantic view to see all components
+DESCRIBE SEMANTIC VIEW EGS.TEMP.[VIEW_NAME];
+```
+
+#### 8.4 Repeat for All YAML Files
+
+Create one semantic view for each YAML file in `./new_semantic_views/` directory.
+
+#### 8.5 Summary Report
+
+After all semantic views are created, provide a summary:
+
+```
+✅ Semantic Views Created Successfully
+
+Created the following semantic views:
+
+1. EGS.TEMP.CUSTOMER_ORDER_VIEW
+   - Tables: 1 (orders based on SALES.ANALYTICS.ORDERS)
+   - Dimensions: 7
+   - Facts: 4
+   - Metrics: 3
+   - Verified Queries: 5
+
+2. EGS.TEMP.[ANOTHER_VIEW_NAME]
+   - Tables: [count]
+   - Dimensions: [count]
+   - Facts: [count]
+   - Metrics: [count]
+   - Verified Queries: [count]
+
+All semantic views are now available in Snowflake for use with Cortex Analyst.
+```
+
+**Troubleshooting:**
+
+If you encounter errors during creation:
+1. **"Field not found" error**: Check that you're not using invalid fields like `label`, and that dimensions/facts are nested inside tables
+2. **"Unable to parse yaml to protobuf"**: Validate the YAML structure matches the schema (Step 7)
+3. **"Base table not found"**: Verify the database, schema, and table names are correct and accessible
+4. **"SQL compilation error" in verified queries**: Test the SQL separately to ensure it's valid
+5. **"Unsupported expression in the definition of derived metric"**: Remove the failing metric. Use only `COUNT(*)` or omit metrics entirely. Define numeric values as facts instead.
 
 Summarize what you have done so far.
