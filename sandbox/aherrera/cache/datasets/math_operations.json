@@ -1,0 +1,124 @@
+{
+  "test_cases": [
+    {
+      "id": "math_001",
+      "query": "What is 15 multiplied by 4?",
+      "reference_output": "60",
+      "similar_queries": [
+        "Calculate 15 times 4",
+        "15 * 4 = ?",
+        "Multiply fifteen by four",
+        "What's the product of 15 and 4?"
+      ],
+      "tools_needed": ["multiply"]
+    },
+    {
+      "id": "math_002",
+      "query": "Add 25 and 37",
+      "reference_output": "62",
+      "similar_queries": [
+        "What is 25 plus 37?",
+        "25 + 37 equals what?",
+        "Sum of 25 and 37",
+        "Calculate twenty-five plus thirty-seven"
+      ],
+      "tools_needed": ["add"]
+    },
+    {
+      "id": "math_003",
+      "query": "Divide 100 by 5",
+      "reference_output": "20",
+      "similar_queries": [
+        "What is 100 divided by 5?",
+        "100 / 5 = ?",
+        "How many times does 5 go into 100?",
+        "Calculate one hundred divided by five"
+      ],
+      "tools_needed": ["divide"]
+    },
+    {
+      "id": "math_004",
+      "query": "Subtract 18 from 50",
+      "reference_output": "32",
+      "similar_queries": [
+        "What is 50 minus 18?",
+        "50 - 18 equals?",
+        "Take away 18 from 50",
+        "Calculate fifty minus eighteen"
+      ],
+      "tools_needed": ["subtract"]
+    },
+    {
+      "id": "math_005",
+      "query": "Calculate the average of 10, 20, and 30",
+      "reference_output": "20",
+      "similar_queries": [
+        "What's the mean of 10, 20, and 30?",
+        "Find the average: 10, 20, 30",
+        "Calculate mean value of ten, twenty, thirty",
+        "Average these numbers: 10, 20, 30"
+      ],
+      "tools_needed": ["calculate_average"]
+    },
+    {
+      "id": "math_006",
+      "query": "What is 7 times 8?",
+      "reference_output": "56",
+      "similar_queries": [
+        "Multiply 7 by 8",
+        "7 * 8 = ?",
+        "Product of 7 and 8",
+        "Seven times eight equals?"
+      ],
+      "tools_needed": ["multiply"]
+    },
+    {
+      "id": "math_007",
+      "query": "Add 100 and 250",
+      "reference_output": "350",
+      "similar_queries": [
+        "What is 100 plus 250?",
+        "100 + 250 = ?",
+        "Sum 100 and 250",
+        "Calculate one hundred plus two hundred fifty"
+      ],
+      "tools_needed": ["add"]
+    },
+    {
+      "id": "math_008",
+      "query": "Calculate the average of 5 and 15, then multiply by 3",
+      "reference_output": "30",
+      "similar_queries": [
+        "Find mean of 5 and 15, then times 3",
+        "Average 5 and 15, multiply result by 3",
+        "What's (5+15)/2 * 3?",
+        "Take average of five and fifteen, multiply by three"
+      ],
+      "tools_needed": ["calculate_average", "multiply"]
+    },
+    {
+      "id": "math_009",
+      "query": "Subtract 45 from 100, then divide by 5",
+      "reference_output": "11",
+      "similar_queries": [
+        "100 minus 45, divided by 5",
+        "(100 - 45) / 5 = ?",
+        "Take 45 from 100 and divide result by 5",
+        "Calculate (one hundred minus forty-five) divided by five"
+      ],
+      "tools_needed": ["subtract", "divide"]
+    },
+    {
+      "id": "math_010",
+      "query": "Add 12 and 18, then multiply by 2",
+      "reference_output": "60",
+      "similar_queries": [
+        "Sum of 12 and 18, times 2",
+        "(12 + 18) * 2 = ?",
+        "Add twelve and eighteen, then double it",
+        "Calculate the sum of 12 and 18, multiply by two"
+      ],
+      "tools_needed": ["add", "multiply"]
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+# Caching Experiment Configuration
+
+# Cache Configuration
+cache_config:
+  semantic:
+    similarity_threshold: 0.85
+    ttl_days: 30
+    embedding_model: "snowflake-arctic-embed-m"
+
+  plan_cache:
+    include_history: true
+    history_depth: 5
+    ttl_days: 30
+
+  tool_cache:
+    per_tool_threshold: true
+    default_threshold: 0.85
+    ttl_days: 30
+
+# Experiment Configuration
+experiment_config:
+  thresholds_to_test: [0.80, 0.85, 0.90]
+  datasets:
+    - math_operations
+  repetitions: 3
+
+  models:
+    llm:
+      name: "claude-3-5-sonnet"
+      temperature: 0
+    agent:
+      model: "auto"
+    analyst:
+      semantic_model: "@stage/example_model.yaml"
+
+# TruLens Configuration
+trulens_config:
+  app_name: "cortex-cache-experiments"
+  app_version: "0.1.0"
+  metrics:
+    - "correctness"
+    - "Correctness with COT Reasons"
+    - "Custom Correctness Metric"
+  run_config:
+    dataset_name: "cache-experiments"
+    llm_judge_name: "llama3.1-70b"
+    label: "v1.0.0"
+
+# Snowflake Configuration
+snowflake_config:
+  cache_tables:
+    semantic_full: "cache.experiments.semantic_full_cache"
+    plan_cache: "cache.experiments.plan_cache"
+    tool_cache_prefix: "cache.experiments.tool_cache"
+  cortex_search_services:
+    semantic_full: "cache.experiments.semantic_search_service"
+    tool_search_prefix: "cache.experiments.tool_search"
+
+# Analysis Configuration
+analysis_config:
+  metrics:
+    - cache_hit_rate
+    - latency_p50
+    - latency_p95
+    - latency_p99
+    - token_usage
+    - cost_savings
+    - correctness_score
+  output_formats:
+    - json
+    - csv
+    - markdown
+  generate_plots: true
+  plot_types:
+    - hit_rate_by_threshold
+    - latency_distribution
+    - cost_savings_comparison
+    - correctness_vs_hit_rate
