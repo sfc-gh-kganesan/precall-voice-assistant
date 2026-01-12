@@ -1,6 +1,80 @@
-# Workflow Editor Demo - Quick Start Guide
+# Creating a Workflow Using CLI (Cortex)
 
-This guide will help you run the workflow editor demo with full functionality.
+If you prefer to create workflows using the command line instead of the web interface:
+
+### Prerequisites
+- Have the Cortex CLI (`cortex`) installed and configured
+
+### Steps
+
+1. **Navigate to your project folder**
+   ```bash
+   cd /Users/rho/code/aura/p67/example_workflows/[project_folder]
+   ```
+
+2. **Copy template files** (if creating a new project manually)
+
+   Copy the following files from the template folder:
+   ```bash
+   # Copy Cortex commands
+   mkdir -p .cortex/commands
+   cp -r ../template/.cortex/commands/* .cortex/commands/
+
+   # Copy configuration
+   mkdir -p conf
+   cp -r ../template/conf/* conf/
+
+   # Copy documentation
+   cp ../template/AGENTS.md .
+   cp ../template/LEARN_WORKFLOW.md .
+   ```
+
+3. **Start Cortex CLI**
+   ```bash
+   cortex
+   ```
+
+4. **Create the workflow specification**
+
+   In the Cortex prompt:
+   ```
+   /create-workflow
+   ```
+   - Follow the interactive dialog to define your workflow
+   - This creates the `workflow_spec.json` file
+
+5. **Generate TypeScript implementation code**
+
+   In the Cortex prompt:
+   ```
+   /generate-workflow-code
+   ```
+   - Follow the dialog to generate TypeScript implementation files
+   - This creates the `src/steps/` directory with node implementations
+
+### What Gets Created
+
+After following these steps, your project will have:
+```
+project_folder/
+├── .cortex/
+│   └── commands/          # AI agent commands
+├── conf/
+│   └── workflow_graph_schema.json
+├── src/
+│   └── steps/            # TypeScript node implementations
+├── workflow_spec.json    # Workflow definition
+├── AGENTS.md             # Documentation
+└── LEARN_WORKFLOW.md     # Workflow guide
+```
+
+# Creating a Workflow Using Workflow Editor UI
+
+You can use the workflow editor UI to create the initial workflow graph.  But you need to go back to CLI mode to generate the code using
+- cortex
+- /generate-workflow-code
+
+After the code is generated, you can go back to workflow editor UI to edit the code.
 
 ## Prerequisites
 
@@ -89,16 +163,6 @@ http://localhost:8000/workflow_editor.html
 - **Get Help**: Ask for help with workflow design, node configuration, etc.
 - **Modify Workflow**: Request changes via natural language
 
-## Project Structure
-
-Each project contains:
-```
-project_name/
-├── .cortex/
-│   └── commands/          # AI agent command definitions
-└── conf/
-    └── workflow_graph_schema.json  # Workflow schema definition
-```
 
 ## Troubleshooting
 
@@ -161,3 +225,4 @@ Try this simple workflow creation:
 ---
 
 **Happy workflow building!** 🚀
+

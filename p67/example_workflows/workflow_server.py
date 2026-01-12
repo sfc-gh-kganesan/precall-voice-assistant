@@ -133,6 +133,20 @@ class WorkflowServerHandler(http.server.SimpleHTTPRequestHandler):
                     shutil.copytree(template_conf_dir, new_conf_dir)
                     print(f"[Server] Copied conf to {new_conf_dir}")
 
+                # Copy AGENTS.md
+                template_agents_md = os.path.join(template_dir, 'AGENTS.md')
+                new_agents_md = os.path.join(new_project_dir, 'AGENTS.md')
+                if os.path.exists(template_agents_md):
+                    shutil.copy2(template_agents_md, new_agents_md)
+                    print(f"[Server] Copied AGENTS.md to {new_agents_md}")
+
+                # Copy LEARN_WORKFLOW.md
+                template_learn_md = os.path.join(template_dir, 'LEARN_WORKFLOW.md')
+                new_learn_md = os.path.join(new_project_dir, 'LEARN_WORKFLOW.md')
+                if os.path.exists(template_learn_md):
+                    shutil.copy2(template_learn_md, new_learn_md)
+                    print(f"[Server] Copied LEARN_WORKFLOW.md to {new_learn_md}")
+
                 print(f"[Server] Created new project: {project_name}")
 
                 self.send_response(200)

@@ -24,6 +24,8 @@
         #main-container {
             display: flex;
             height: 100vh;
+            padding: 8px;
+            gap: 8px;
         }
 
         /* Left Panel - Folders */
@@ -33,6 +35,8 @@
             border-right: 1px solid #e0e0e0;
             display: flex;
             flex-direction: column;
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         #left-panel-header {
@@ -95,6 +99,9 @@
             display: flex;
             flex-direction: column;
             background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
         }
 
         #diagram-section {
@@ -195,10 +202,19 @@
         }
 
         #properties-section {
-            height: 300px;
+            height: 380px;
+            display: flex;
+            flex-direction: row;
+            background: #fafafa;
+        }
+
+        #properties-pane {
+            flex: 1;
             display: flex;
             flex-direction: column;
             background: #fafafa;
+            border-right: 1px solid #e0e0e0;
+            min-width: 0;
         }
 
         .properties-header {
@@ -238,11 +254,75 @@
             font-weight: 600;
         }
 
-        .properties-content-wrapper {
+        #properties-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            min-width: 0;
+        }
+
+        #code-editor-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            min-width: 0;
+        }
+
+        #code-editor-header {
+            padding: 10px 15px;
+            background: #f5f5f5;
+            color: #333333;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        #code-editor-filename {
+            color: #666666;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        #save-code-btn {
+            padding: 5px 12px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        #save-code-btn:hover {
+            background: #1177bb;
+        }
+
+        #save-code-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        #code-editor {
             flex: 1;
             overflow: auto;
-            padding: 20px;
-            background: #fafafa;
+            padding: 15px 15px 15px 20px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #333333;
+            background: #ffffff;
+            border: none;
+            resize: none;
+            white-space: pre;
+            tab-size: 4;
+        }
+
+        #code-editor:focus {
+            outline: none;
         }
 
         .properties-tab-content {
@@ -506,6 +586,8 @@
             border-left: 1px solid #e0e0e0;
             display: flex;
             flex-direction: column;
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         #chat-header {
@@ -787,18 +869,27 @@
                 </div>
             </div>
 
-            <!-- Node Properties -->
+            <!-- Node Properties and Code Editor -->
             <div id="properties-section">
-                <div class="properties-header">
-                    <div class="pane-header">Node Properties</div>
-                </div>
-                <div class="properties-tabs" id="properties-tabs" style="display: none;">
-                    <!-- Tabs will be dynamically generated -->
-                </div>
-                <div class="properties-content-wrapper">
+                <!-- Left: Properties Pane -->
+                <div id="properties-pane">
+                    <div class="properties-header">
+                        <div class="pane-header">Node Properties</div>
+                    </div>
+                    <div class="properties-tabs" id="properties-tabs" style="display: none;">
+                        <!-- Tabs will be dynamically generated -->
+                    </div>
                     <div id="properties-content">
                         <div class="empty-state">Click on a node in the diagram to view its properties</div>
                     </div>
+                </div>
+                <!-- Right: Code Editor Pane -->
+                <div id="code-editor-pane">
+                    <div id="code-editor-header">
+                        <span id="code-editor-filename">No file selected</span>
+                        <button id="save-code-btn" disabled>Save Code</button>
+                    </div>
+                    <textarea id="code-editor" placeholder="// Select a node to view its code"></textarea>
                 </div>
             </div>
         </div>
@@ -859,7 +950,6 @@
                     secondaryColor: '#f0f0f0',
                     tertiaryColor: '#f0f0f0'
                 },
-                look: 'handDrawn',
                 securityLevel: 'loose',
                 flowchart: {
                     useMaxWidth: true,
@@ -924,6 +1014,7 @@
             initializeChatHandlers();
             initializeWorkflowHandlers();
             initializeProjectHandlers();
+            initializeCodeEditorHandlers();
 
             await loadFolders();
         }
@@ -1156,6 +1247,9 @@
 
                 state.currentFolder = folder;
 
+                // Clear node properties and code editor when switching projects
+                clearNodePropertiesAndEditor();
+
                 // Create new chat session for this folder
                 await createNewSession();
 
@@ -1169,6 +1263,32 @@
                 console.error('Error selecting folder:', error);
                 showStatus(`Error: ${error.message}`, 'error');
             }
+        }
+
+        function clearNodePropertiesAndEditor() {
+            // Clear selected node state
+            state.selectedNode = null;
+
+            // Reset node properties pane
+            const propertiesContent = document.getElementById('properties-content');
+            propertiesContent.innerHTML = '<div class="empty-state">Click on a node in the diagram to view its properties</div>';
+
+            // Hide properties tabs
+            const tabsContainer = document.getElementById('properties-tabs');
+            tabsContainer.style.display = 'none';
+            tabsContainer.innerHTML = '';
+
+            // Clear code editor
+            const codeEditor = document.getElementById('code-editor');
+            codeEditor.value = '';
+            codeEditor.placeholder = '// Select a node to view its code';
+
+            // Reset code editor header
+            document.getElementById('code-editor-filename').textContent = 'No file selected';
+            document.getElementById('save-code-btn').disabled = true;
+
+            // Clear current code file
+            currentCodeFile = null;
         }
 
         // ============================================================================
@@ -1203,6 +1323,133 @@
                 const diagramDiv = document.getElementById('mermaid-diagram');
                 diagramDiv.innerHTML = '<div class="empty-state">No workflow is defined</div>';
             }
+        }
+
+        // ============================================================================
+        // MERMAID DIAGRAM GENERATION
+        // ============================================================================
+
+        // ============================================================================
+        // CODE EDITOR MANAGEMENT
+        // ============================================================================
+
+        let currentCodeFile = null;
+
+        async function loadNodeCode(nodeId) {
+            if (!state.currentFolder) {
+                document.getElementById('code-editor').value = '// No project selected';
+                document.getElementById('code-editor-filename').textContent = 'No project selected';
+                document.getElementById('save-code-btn').disabled = true;
+                return;
+            }
+
+            try {
+                const folderPath = state.currentFolder.path;
+                const fileName = `${nodeId}.ts`;
+                const filePath = `${folderPath}/src/steps/${fileName}`;
+
+                const response = await fetch(filePath);
+
+                if (!response.ok) {
+                    document.getElementById('code-editor').value = `// File not found: src/steps/${fileName}\n// Create this file to implement the node logic`;
+                    document.getElementById('code-editor-filename').textContent = `src/steps/${fileName} (not found)`;
+                    document.getElementById('save-code-btn').disabled = false;
+                    currentCodeFile = filePath;
+                    return;
+                }
+
+                const code = await response.text();
+                const editorElement = document.getElementById('code-editor');
+                editorElement.value = code;
+                document.getElementById('code-editor-filename').textContent = `src/steps/${fileName}`;
+                document.getElementById('save-code-btn').disabled = false;
+                currentCodeFile = filePath;
+
+                // Auto-scroll to the function corresponding to the node
+                scrollToNodeFunction(editorElement, nodeId);
+
+            } catch (error) {
+                console.error('Error loading node code:', error);
+                document.getElementById('code-editor').value = `// Error loading code: ${error.message}`;
+                document.getElementById('code-editor-filename').textContent = 'Error';
+                document.getElementById('save-code-btn').disabled = true;
+            }
+        }
+
+        function scrollToNodeFunction(editorElement, nodeId) {
+            const code = editorElement.value;
+            const lines = code.split('\n');
+
+            // Look for function patterns: [nodeId]_node() or export async function [nodeId]_node()
+            const functionPatterns = [
+                new RegExp(`^\\s*export\\s+async\\s+function\\s+${nodeId}_node\\s*\\(`),
+                new RegExp(`^\\s*async\\s+function\\s+${nodeId}_node\\s*\\(`),
+                new RegExp(`^\\s*function\\s+${nodeId}_node\\s*\\(`),
+                new RegExp(`^\\s*export\\s+function\\s+${nodeId}_node\\s*\\(`)
+            ];
+
+            let targetLine = -1;
+            for (let i = 0; i < lines.length; i++) {
+                for (const pattern of functionPatterns) {
+                    if (pattern.test(lines[i])) {
+                        targetLine = i;
+                        break;
+                    }
+                }
+                if (targetLine !== -1) break;
+            }
+
+            if (targetLine !== -1) {
+                // Calculate approximate scroll position
+                const lineHeight = parseFloat(getComputedStyle(editorElement).lineHeight);
+                const scrollTop = targetLine * lineHeight;
+
+                // Scroll to the function with a small offset to show a few lines above
+                setTimeout(() => {
+                    editorElement.scrollTop = Math.max(0, scrollTop - lineHeight * 2);
+                }, 50);
+            } else {
+                // If function not found, scroll to top
+                editorElement.scrollTop = 0;
+            }
+        }
+
+        async function saveNodeCode() {
+            if (!currentCodeFile) {
+                showStatus('No file to save', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Saving code...', 'info');
+
+                const code = document.getElementById('code-editor').value;
+
+                const response = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filePath: currentCodeFile,
+                        content: code
+                    })
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to save code');
+                }
+
+                showStatus('Code saved successfully!', 'success');
+                setTimeout(hideStatus, 2000);
+
+            } catch (error) {
+                console.error('Error saving code:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function initializeCodeEditorHandlers() {
+            document.getElementById('save-code-btn').addEventListener('click', saveNodeCode);
         }
 
         // ============================================================================
@@ -1785,6 +2032,9 @@
             state.selectedNode = node.id;
             const propertiesDiv = document.getElementById('properties-content');
             const tabsContainer = document.getElementById('properties-tabs');
+
+            // Load the node code in the code editor
+            loadNodeCode(node.id);
 
             // Show tabs
             tabsContainer.style.display = 'flex';
