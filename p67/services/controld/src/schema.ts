@@ -21,9 +21,16 @@ export const WorkflowListResponseSchema = z.object({
 
 export const WorkflowRunResponseSchema = z.object({
     exitCode: z.number(),
-    stdout: z.string(),
-    stderr: z.string(),
+    stdout: z.array(z.string()),
+    stderr: z.array(z.string()),
+    log: z.array(z.string()),
     success: z.boolean(),
+    errors: z.array(
+        z.object({
+            error: z.string(),
+            message: z.string(),
+        }),
+    ),
 });
 
 export const WorkflowRunParamsSchema = z.object({

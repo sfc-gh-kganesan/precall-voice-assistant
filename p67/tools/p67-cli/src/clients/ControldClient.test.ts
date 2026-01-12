@@ -301,9 +301,11 @@ describe('ControldClient', () => {
         test('should execute workflow successfully', async () => {
             const mockResponse: WorkflowRunResponse = {
                 exitCode: 0,
-                stdout: 'Task completed successfully',
-                stderr: '',
+                stdout: ['Task completed successfully'],
+                stderr: [],
                 success: true,
+                errors: [],
+                log: [],
             };
 
             const workflowId = 'wf-123e4567-e89b-12d3-a456-426614174000';
@@ -331,9 +333,11 @@ describe('ControldClient', () => {
         test('should return failure response when workflow fails', async () => {
             const mockResponse: WorkflowRunResponse = {
                 exitCode: 1,
-                stdout: 'Some output',
-                stderr: 'Error occurred',
+                stdout: ['Some output'],
+                stderr: ['Error occurred'],
                 success: false,
+                errors: [],
+                log: [],
             };
 
             const workflowId = 'wf-123e4567-e89b-12d3-a456-426614174000';
@@ -350,7 +354,7 @@ describe('ControldClient', () => {
             expect(result).toEqual(mockResponse);
             expect(result.success).toBe(false);
             expect(result.exitCode).toBe(1);
-            expect(result.stderr).toBe('Error occurred');
+            expect(result.stderr).toEqual(['Error occurred']);
 
             globalThis.fetch = originalFetch;
         });
@@ -378,9 +382,11 @@ describe('ControldClient', () => {
         test('should call correct endpoint with workflow ID in path', async () => {
             const mockResponse: WorkflowRunResponse = {
                 exitCode: 0,
-                stdout: 'Success',
-                stderr: '',
+                stdout: ['Success'],
+                stderr: [],
                 success: true,
+                errors: [],
+                log: [],
             };
 
             const workflowId = 'wf-custom-id-123';

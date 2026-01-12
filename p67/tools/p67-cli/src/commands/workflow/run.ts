@@ -44,16 +44,7 @@ export const runCommand = new Command('run')
             console.log(`Exit Code: ${runResult.exitCode}`);
             console.log(`Success: ${runResult.success}`);
             console.log('─'.repeat(50));
-
-            if (runResult.stdout) {
-                console.log('\nStdout:');
-                console.log(runResult.stdout);
-            }
-
-            if (runResult.stderr) {
-                console.log('\nStderr:');
-                console.error(runResult.stderr);
-            }
+            console.log(runResult.log.join('\n'));
 
             // Exit with the workflow's exit code
             process.exit(runResult.exitCode);

@@ -14,9 +14,11 @@ export interface WorkflowListResponse {
 
 export interface WorkflowRunResponse {
     exitCode: number;
-    stdout: string;
-    stderr: string;
+    stdout: string[];
+    stderr: string[];
     success: boolean;
+    errors: Array<{ error: string; message: string }>;
+    log: string[];
 }
 
 export interface ErrorResponse {

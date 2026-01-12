@@ -131,13 +131,15 @@ const workflowRoutes = async (server: FastifyInstance) => {
                 }
 
                 const runnerInstance = new Runner(wfdir);
-                const { stdout, stderr, exitCode } =
+                const { stdout, stderr, exitCode, errors, log } =
                     await runnerInstance.start();
 
                 return reply.code(200).send({
                     exitCode,
                     stdout,
                     stderr,
+                    errors,
+                    log,
                     success: exitCode === 0,
                 });
             } catch (error) {
