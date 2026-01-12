@@ -61,9 +61,7 @@ app.include_router(v1_router)
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=500, content={"error": "Internal server error", "detail": str(exc)}
-    )
+    return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(exc)})
 
 
 if __name__ == "__main__":

@@ -41,11 +41,7 @@ CREATE TABLE IF NOT EXISTS DMT_FCT_KB_CHUNKS (
 )
 """)
 
-clean_html = F.trim(
-    F.regexp_replace(
-        F.regexp_replace(F.col("TEXT"), r"<[^>]+>|&nbsp;", " "), r"\s+", " "
-    )
-)
+clean_html = F.trim(F.regexp_replace(F.regexp_replace(F.col("TEXT"), r"<[^>]+>|&nbsp;", " "), r"\s+", " "))
 
 result = (
     t.with_column("CLEAN_HTML", clean_html)
@@ -88,9 +84,7 @@ AS (
 
 table_service = schema_ctx.cortex_search_services["SEARCH_ON_TABLE"]
 
-search_args = dict(
-    query="I need to upgrade my computer!", columns=["CHUNK_TEXT"], filter={}, limit=5
-)
+search_args = {"query": "I need to upgrade my computer!", "columns": ["CHUNK_TEXT"], "filter": {}, "limit": 5}
 
 resp = table_service.search(**search_args)
 print(resp.results)

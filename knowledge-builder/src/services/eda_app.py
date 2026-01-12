@@ -71,10 +71,7 @@ def analyze_outbound_links(df: pd.DataFrame, text_col: str = "TEXT") -> pd.DataF
     """Aggregate domains, counting total occurrences and distinct articles."""
     if df.empty:
         return pd.DataFrame(columns=["DOMAIN", "COUNT", "DISTINCT_ARTICLES"])
-    processed_data = [
-        (row_id, extract_domains_from_html(text))
-        for row_id, text in zip(df["SYS_ID"], df[text_col])
-    ]
+    processed_data = [(row_id, extract_domains_from_html(text)) for row_id, text in zip(df["SYS_ID"], df[text_col], strict=False)]
 
     temp_df = pd.DataFrame(processed_data, columns=["ARTICLE_ID", "DOMAIN"])
     exploded_df = temp_df.explode("DOMAIN")
@@ -108,9 +105,7 @@ cat_df = kb_knowledge.select_dtypes(include=["object"])
 report_html = profile_data(numeric_df)
 
 st.title("Snowflake AI FDE - Luma EDA")
-numeric_tab, cat_tab, links_tab, ticket_taxonomy_tab, image_links_tab = st.tabs(
-    ["numeric", "categorical", "outbound links", "ticket taxonomies", "image links"]
-)
+numeric_tab, cat_tab, links_tab, ticket_taxonomy_tab, image_links_tab = st.tabs(["numeric", "categorical", "outbound links", "ticket taxonomies", "image links"])
 with numeric_tab:
     st.dataframe(describe_df)
     st.components.v1.html(report_html, width=1000, height=550, scrolling=True)
@@ -142,18 +137,14 @@ with links_tab:
         )
         st.altair_chart(chart, use_container_width=True)
 
-        st.caption(
-            "Domains such as Confluence, Atlassian, or SharePoint often indicate knowledge stored outside official systems."
-        )
+        st.caption("Domains such as Confluence, Atlassian, or SharePoint often indicate knowledge stored outside official systems.")
 
 with ticket_taxonomy_tab:
     taxonomy.render_ticket_taxonomy_tab()
 
 with image_links_tab:
     st.subheader("Image Link Analysis")
-    st.caption(
-        "Categorized image sources from <img> tags (via ANALYZE_IMAGE_LINKS SPROC)."
-    )
+    st.caption("Categorized image sources from <img> tags (via ANALYZE_IMAGE_LINKS SPROC).")
 
     # Call the stored procedure - runs server-side in Snowflake
     image_summary = session.call("ANALYZE_IMAGE_LINKS").to_pandas()

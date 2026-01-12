@@ -18,6 +18,35 @@ help:
 install:
     uv sync
 
+# Download and setup NLTK tokenizers for Streamlit deployment
+setup-nltk:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📦 Downloading NLTK tokenizer data..."
+    
+    # Create temp dir and download there
+    TEMP_DIR=$(mktemp -d)
+    uv run python -c "import nltk; nltk.download('punkt', download_dir='$TEMP_DIR'); nltk.download('punkt_tab', download_dir='$TEMP_DIR')"
+    
+    echo "📂 Setting up nltk_data/tokenizers directory..."
+    rm -rf nltk_data
+    mkdir -p nltk_data/tokenizers
+    
+    # Copy zip files to current directory
+    cp "$TEMP_DIR/tokenizers/punkt.zip" .
+    cp "$TEMP_DIR/tokenizers/punkt_tab.zip" .
+    
+    echo "📦 Extracting punkt.zip..."
+    unzip -q -o punkt.zip -d nltk_data/tokenizers
+    
+    echo "📦 Extracting punkt_tab.zip..."
+    unzip -q -o punkt_tab.zip -d nltk_data/tokenizers
+    
+    # Cleanup temp dir
+    rm -rf "$TEMP_DIR"
+    
+    echo "✅ NLTK setup complete. nltk_data/ ready for deployment."
+
 # Start dev server with auto-reload (optionally specify port, default: 8000)
 kb_builder_svc port="8000": install
     uv run uvicorn --app-dir=./src/services kb_builder_svc:app --host 0.0.0.0 --port {{port}} --reload
@@ -109,6 +138,10 @@ deploy:
 
     echo "Waiting for service to initialize..."
     sleep 5
+
+    # Deploy Streamlit app
+    echo "🎨 Deploying Streamlit app..."
+    snow streamlit deploy $CONNECTION_FLAG --replace
 
     echo ""
     echo "✅ 🎉 Deployment complete!"

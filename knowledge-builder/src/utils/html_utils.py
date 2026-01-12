@@ -6,11 +6,10 @@ from HTML content, useful for identifying knowledge leakage to external systems.
 """
 
 import re
-from typing import List
 from urllib.parse import unquote, urlparse
 
 
-def extract_domains_from_html(html_text: str) -> List[str]:
+def extract_domains_from_html(html_text: str) -> list[str]:
     """
     Extract unique domains from hrefs or https links in HTML, skipping malformed ones.
 

@@ -25,4 +25,28 @@ eda = [
     "streamlit>=1.28.0",
     "altair>=5.0.0",
     "ydata-profiling>=4.6.0",
+    "trulens>=2.5.2",
+    "trulens-providers-cortex>=2.5.2",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 320
+
+[tool.ruff.lint]
+select = [
+     "E",  # pycodestyle errors
+     "W",  # pycodestyle warnings
+     "F",  # pyflakes
+     "I",  # isort
+     "B",  # flake8-bugbear
+     "C4", # flake8-comprehensions
+     "UP", # pyupgrade
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

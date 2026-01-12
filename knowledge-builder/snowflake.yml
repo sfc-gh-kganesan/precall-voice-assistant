@@ -1,0 +1,13 @@
+definition_version: "2"
+entities:
+  feedback_app:
+    type: streamlit
+    title: "Knowledge Builder Feedback"
+    query_warehouse: COMPUTE_WH
+    main_file: streamlit_app.py
+    artifacts:
+      - streamlit_app.py
+      - config.py
+      - app/
+      - nltk_data/
+      - environment.yml

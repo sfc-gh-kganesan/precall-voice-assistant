@@ -295,3 +295,6 @@ support-data-agent/.claude/
 
 # Ensure global user settings aren't retained
 .claude/
+
+knowledge-builder/nltk_data/
+/knowledge-builder/output

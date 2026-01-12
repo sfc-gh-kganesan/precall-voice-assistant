@@ -1,10 +1,15 @@
-# Jupyter Notebooks
+# Jupyter notebooks
 
 This directory contains analysis and development notebooks.
 
 ## Files
 
-- `knowledge_processing_chunking.ipynb` - Knowledge processing, HTML chunking, and batch processing workflow
+- `setup.ipynb` - Complete knowledge base setup workflow:
+  - Database table creation (SEARCH_QUERIES, SEARCH_FEEDBACK)
+  - Knowledge article ingestion from CSV
+  - HTML text cleaning and document chunking
+  - Cortex Search Service creation and configuration
+  - Search testing and feedback collection examples
 
 ## Setup
 

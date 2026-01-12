@@ -1,5 +1,5 @@
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 import pandas as pd
 import streamlit as st
@@ -19,9 +19,7 @@ def validate_ident_or_error(value: str, label: str) -> bool:
         st.error(f"{label} must be a non-empty string.")
         return False
     if not VALID_SNOWFLAKE_IDENT.match(value.strip()):
-        st.error(
-            f"{label} contains invalid characters. Use only letters, numbers, `_`, `.`, `$`, or quotes."
-        )
+        st.error(f"{label} contains invalid characters. Use only letters, numbers, `_`, `.`, `$`, or quotes.")
         return False
     return True
 
@@ -31,9 +29,7 @@ def validate_col_or_error(value: str, label: str) -> bool:
         st.error(f"{label} must be a non-empty string.")
         return False
     if not VALID_SNOWFLAKE_COL.match(value.strip()):
-        st.error(
-            f"{label} contains invalid characters. Use only letters, numbers, `_`, `$`, or quotes."
-        )
+        st.error(f"{label} contains invalid characters. Use only letters, numbers, `_`, `$`, or quotes.")
         return False
     return True
 
@@ -98,19 +94,14 @@ def validate_cols_exist_or_error(relation_name: str, cols: Iterable[str]) -> boo
     try:
         available = snowflake_relation_columns(relation_name)
     except SnowparkSQLException as e:
-        st.error(
-            f"Failed to read columns for `{relation_name}`. Is the view/table name correct?"
-        )
+        st.error(f"Failed to read columns for `{relation_name}`. Is the view/table name correct?")
         st.exception(e)
         return False
 
     available_set = {c.upper() for c in available}
     missing = [c for c in cols if c.upper() not in available_set]
     if missing:
-        st.error(
-            "One or more selected columns do not exist on the provided view/table.\n\n"
-            f"Missing: {', '.join(missing)}"
-        )
+        st.error(f"One or more selected columns do not exist on the provided view/table.\n\nMissing: {', '.join(missing)}")
         with st.expander("Show available columns"):
             st.code(", ".join(sorted(available_set)))
         return False
@@ -118,9 +109,7 @@ def validate_cols_exist_or_error(relation_name: str, cols: Iterable[str]) -> boo
 
 
 @st.cache_data(show_spinner=False)
-def get_available_attrs_keys(
-    view_name: str, source_table: str, limit: int = 100
-) -> list[str]:
+def get_available_attrs_keys(view_name: str, source_table: str, limit: int = 100) -> list[str]:
     """
     Discover attribute keys available in the ATTRS JSON for a given source_table.
     Returns a list of key names found in the nested object.
@@ -277,9 +266,7 @@ ORDER BY candidate_score DESC;
 
 
 @st.cache_data(show_spinner=False)
-def get_assignment_group_distribution(
-    view_name: str, source_table: str, limit: int = 25
-) -> pd.DataFrame:
+def get_assignment_group_distribution(view_name: str, source_table: str, limit: int = 25) -> pd.DataFrame:
     """
     Show top assignment groups by frequency.
     """
@@ -303,11 +290,7 @@ def render_ticket_taxonomy_tab() -> None:
     Works with TICKET_CANDIDATES view (ATTRS as nested JSON).
     """
     st.subheader("Ticket Candidate Taxonomies")
-    st.caption(
-        "Analyze category/subcategory distributions from the TICKET_CANDIDATES view. "
-        "This view stores ticket attributes as nested JSON in the ATTRS column, "
-        "keyed by source_table (e.g., 'dmt_fct_incident')."
-    )
+    st.caption("Analyze category/subcategory distributions from the TICKET_CANDIDATES view. This view stores ticket attributes as nested JSON in the ATTRS column, keyed by source_table (e.g., 'dmt_fct_incident').")
 
     view_name = st.text_input(
         "Candidates view",
@@ -320,14 +303,8 @@ def render_ticket_taxonomy_tab() -> None:
 
     # Check what source tables are available
     try:
-        source_tables_df = snowflake_sql_df(
-            f"SELECT DISTINCT source_table FROM {view_name} ORDER BY 1"
-        )
-        available_sources = (
-            source_tables_df["SOURCE_TABLE"].tolist()
-            if not source_tables_df.empty
-            else []
-        )
+        source_tables_df = snowflake_sql_df(f"SELECT DISTINCT source_table FROM {view_name} ORDER BY 1")
+        available_sources = source_tables_df["SOURCE_TABLE"].tolist() if not source_tables_df.empty else []
     except SnowparkSQLException as e:
         st.error("Failed to query the view. Check the view name.")
         st.exception(e)
@@ -368,16 +345,10 @@ def render_ticket_taxonomy_tab() -> None:
                 else:
                     st.warning("Could not retrieve attribute keys.")
 
-        if st.button(
-            "Run Incident Taxonomy Analysis", type="primary", key="run_incident"
-        ):
-            if not validate_col_or_error(
-                incident_category_col, "Incident category attribute"
-            ):
+        if st.button("Run Incident Taxonomy Analysis", type="primary", key="run_incident"):
+            if not validate_col_or_error(incident_category_col, "Incident category attribute"):
                 return
-            if not validate_col_or_error(
-                incident_subcategory_col, "Incident subcategory attribute"
-            ):
+            if not validate_col_or_error(incident_subcategory_col, "Incident subcategory attribute"):
                 return
 
             try:
@@ -404,9 +375,7 @@ def render_ticket_taxonomy_tab() -> None:
                 with c1:
                     st.markdown(f"**{incident_category_col}**")
                     st.dataframe(
-                        ticket_taxonomy_top_values(
-                            view_name, SOURCE_INCIDENT, incident_category_col, limit=25
-                        ),
+                        ticket_taxonomy_top_values(view_name, SOURCE_INCIDENT, incident_category_col, limit=25),
                         use_container_width=True,
                     )
                 with c2:
@@ -441,17 +410,12 @@ def render_ticket_taxonomy_tab() -> None:
 
                 st.markdown("#### Top Assignment Groups")
                 st.dataframe(
-                    get_assignment_group_distribution(
-                        view_name, SOURCE_INCIDENT, limit=25
-                    ),
+                    get_assignment_group_distribution(view_name, SOURCE_INCIDENT, limit=25),
                     use_container_width=True,
                 )
 
             except SnowparkSQLException as e:
-                st.error(
-                    "Snowflake query failed. This may be due to an invalid attribute name. "
-                    "Use 'Show available ATTRS keys' to see valid options."
-                )
+                st.error("Snowflake query failed. This may be due to an invalid attribute name. Use 'Show available ATTRS keys' to see valid options.")
                 st.exception(e)
                 st.stop()
 
@@ -489,9 +453,7 @@ def render_ticket_taxonomy_tab() -> None:
         if st.button("Run RITM Taxonomy Analysis", type="primary", key="run_ritm"):
             if not validate_col_or_error(ritm_category_col, "RITM category attribute"):
                 return
-            if not validate_col_or_error(
-                ritm_subcategory_col, "RITM subcategory attribute"
-            ):
+            if not validate_col_or_error(ritm_subcategory_col, "RITM subcategory attribute"):
                 return
 
             try:
@@ -518,17 +480,13 @@ def render_ticket_taxonomy_tab() -> None:
                 with c1:
                     st.markdown(f"**{ritm_category_col}**")
                     st.dataframe(
-                        ticket_taxonomy_top_values(
-                            view_name, SOURCE_RITM, ritm_category_col, limit=25
-                        ),
+                        ticket_taxonomy_top_values(view_name, SOURCE_RITM, ritm_category_col, limit=25),
                         use_container_width=True,
                     )
                 with c2:
                     st.markdown(f"**{ritm_subcategory_col}**")
                     st.dataframe(
-                        ticket_taxonomy_top_values(
-                            view_name, SOURCE_RITM, ritm_subcategory_col, limit=25
-                        ),
+                        ticket_taxonomy_top_values(view_name, SOURCE_RITM, ritm_subcategory_col, limit=25),
                         use_container_width=True,
                     )
 
@@ -545,14 +503,8 @@ def render_ticket_taxonomy_tab() -> None:
                 )
 
             except SnowparkSQLException as e:
-                st.error(
-                    "Snowflake query failed. This may be due to an invalid attribute name. "
-                    "Use 'Show available ATTRS keys' to see valid options."
-                )
+                st.error("Snowflake query failed. This may be due to an invalid attribute name. Use 'Show available ATTRS keys' to see valid options.")
                 st.exception(e)
                 st.stop()
     else:
-        st.info(
-            f"Source table '{SOURCE_RITM}' not yet available in view. "
-            "The RITM source is commented out in the TICKET_CANDIDATES definition."
-        )
+        st.info(f"Source table '{SOURCE_RITM}' not yet available in view. The RITM source is commented out in the TICKET_CANDIDATES definition.")
