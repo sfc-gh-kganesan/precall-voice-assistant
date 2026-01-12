@@ -121,8 +121,7 @@ knowledge-builder/
 │   ├── functions/             # SQL UDFs (analyze_image_links, html_utils)
 │   ├── infrastructure/        # Compute pools, network rules, services
 │   └── jobs/                  # SQL job definitions
-├── notebooks/                 # Jupyter notebooks for analysis and setup
-│   └── KNOWLEDGE_BUILDER_SETUP.ipynb  # Complete knowledge base setup workflow
+├── notebooks/                 # Jupyter notebooks for analysis and setup (see [notebooks/README.md](notebooks/README.md))
 ├── docs/                      # Additional documentation
 ├── pyproject.toml             # Python dependencies and project metadata
 ├── Cargo.toml                 # Rust dependencies for job services

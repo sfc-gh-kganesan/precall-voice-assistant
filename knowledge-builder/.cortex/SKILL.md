@@ -244,7 +244,7 @@ VERSION: <version>
 
 📋 ENVIRONMENTS:
 - DEV: <connection> → <target_location>
-- STAGING: <connection> → <target_location>  
+- STAGING: <connection> → <target_location>
 - PROD: <connection> → <target_location>
 
 ✅ PRE-DEPLOYMENT CHECKS:
@@ -259,13 +259,13 @@ VERSION: <version>
    Status: ✅ SUCCESS / ❌ FAILED
    Location: <db>.<schema>.<object>
    Tests: ✅ PASSED
-   
+
 2. STAGING Environment
    Status: ✅ SUCCESS / ❌ FAILED
    Location: <db>.<schema>.<object>
    Tests: ✅ PASSED
 
-3. PROD Environment  
+3. PROD Environment
    Status: ✅ SUCCESS / ❌ FAILED
    Location: <db>.<schema>.<object>
    Tests: ✅ PASSED
@@ -305,7 +305,7 @@ VERDICT: ✅ DEPLOYED / ⚠️  PARTIAL / ❌ FAILED
 
 **MUST CHECK before PROD deployment:**
 - [ ] Successfully deployed to DEV
-- [ ] Successfully deployed to STAGING  
+- [ ] Successfully deployed to STAGING
 - [ ] All tests passing in DEV and STAGING
 - [ ] No secrets/credentials exposed
 - [ ] Rollback plan documented
@@ -357,4 +357,3 @@ snow stage copy @source @destination --connection <env>
 git tag -a v1.0.0-prod -m "Production release"
 git push origin v1.0.0-prod
 ```
-

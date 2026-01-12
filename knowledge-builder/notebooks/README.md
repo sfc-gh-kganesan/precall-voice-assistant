@@ -1,19 +1,14 @@
-# Jupyter notebooks
+# Jupyter Notebooks
 
-This directory contains analysis and development notebooks.
+This directory contains analysis and development notebooks for the Knowledge Builder project.
 
-## Files
+## Notebooks
 
-- `setup.ipynb` - Complete knowledge base setup workflow:
-  - Database table creation (SEARCH_QUERIES, SEARCH_FEEDBACK)
-  - Knowledge article ingestion from CSV
-  - HTML text cleaning and document chunking
-  - Cortex Search Service creation and configuration
-  - Search testing and feedback collection examples
+| Notebook | Description |
+|----------|-------------|
+| `KNOWLEDGE_BUILDER_SETUP.ipynb` | Complete knowledge base setup workflow: database table creation, knowledge article ingestion, HTML text cleaning, document chunking, Cortex Search Service creation, and search testing examples |
 
-## Setup
-
-To run the notebooks:
+## Running Notebooks
 
 ```bash
 # Install development dependencies including Jupyter
@@ -22,7 +17,5 @@ uv sync --group dev
 # Start Jupyter
 uv run jupyter notebook notebooks/
 ```
-
-## Dependencies
 
 Notebooks use the main project dependencies plus Jupyter from the `dev` dependency group.

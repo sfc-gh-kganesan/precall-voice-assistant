@@ -2,7 +2,7 @@ name: streamlit_app
 channels:
   - snowflake
 dependencies:
-  - snowflake 
+  - snowflake
   - snowflake-snowpark-python
   - pandas
   - streamlit
