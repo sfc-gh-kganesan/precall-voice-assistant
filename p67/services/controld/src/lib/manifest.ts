@@ -34,6 +34,7 @@ const ManifestSchema = z.object({
             warehouse: ValueSchema.optional(),
             database: ValueSchema.optional(),
             schema: ValueSchema.optional(),
+            email_integration: ValueSchema.optional(),
         }),
     ),
 });

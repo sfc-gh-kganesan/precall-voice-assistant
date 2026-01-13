@@ -20,6 +20,7 @@ export const P67ConfigValueSchema = z.object({
     warehouse: z.string().optional(),
     database: z.string().optional(),
     schema: z.string().optional(),
+    email_integration: z.string().optional(),
 });
 
 export type P67ConfigValue = z.infer<typeof P67ConfigValueSchema>;
@@ -91,6 +92,28 @@ export interface CortexAgentOptions {
 }
 
 /**
+ * Snowflake statement binds
+ */
+export type Bind = string | number | boolean | null;
+export type Binds = Bind[];
+
+/**
+ * Snowflake statement
+ */
+export interface SnowflakeStatement {
+    sqlText: string;
+    binds?: Binds;
+}
+
+export interface EmailOptions {
+    email_addresses: [string];
+    subject: string;
+    body: string;
+    content_type?: string;
+    integration_name?: string;
+}
+
+/**
  * Interface for the P67 Agent SDK
  * Defines the public API for interacting with Snowflake and Cortex services
  */
@@ -120,7 +143,7 @@ export interface AgentSDK {
      * );
      */
     executeQueryReadOnly(
-        query: string,
+        stmt: SnowflakeStatement,
         config_name?: string,
     ): Promise<QueryResult>;
 
@@ -205,6 +228,18 @@ export interface AgentSDK {
         options?: CortexAgentOptions,
         config_name?: string,
     ): Promise<CortexAgentResponse>;
+
+    /**
+     * Sends an email using the Snowflake Email Integration
+     *
+     * @param email_addresses - Array of email addresses to send the email to
+     * @param subject - Subject of the email
+     * @param body - Body of the email
+     * @param content_type - Content type of the email
+     * @param integration_name - Name of the email integration to use. If not provided, the default email integration will be used.
+     * @returns Promise that resolves to true if the email is sent successfully, false otherwise
+     */
+    email(options: EmailOptions, config_name?: string): Promise<boolean>;
 
     /**
      * Closes the cached Snowflake connection

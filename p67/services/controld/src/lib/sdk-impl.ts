@@ -9,14 +9,17 @@ import snowflake from 'snowflake-sdk';
 import type { Manifest } from './manifest';
 import {
     type AgentSDK,
+    type Binds,
     type CortexAgentOptions,
     type CortexAgentResponse,
     type CortexAnalystResponse,
+    type EmailOptions,
     type P67Config,
     P67ConfigSchema,
     type P67ConfigValue,
     P67ConfigValueSchema,
     type QueryResult,
+    type SnowflakeStatement,
 } from './sdk.js';
 import type { ValueManager } from './value-manager';
 
@@ -189,14 +192,14 @@ export class AgentSDKImpl implements AgentSDK {
      * @throws {Error} If query execution fails
      */
     private async executeQuery(
-        query: string,
+        stmt: SnowflakeStatement,
         config_name?: string,
     ): Promise<QueryResult> {
         const conn = await this.getSnowflakeConnection(config_name);
-
         return new Promise((resolve, reject) => {
             conn.execute({
-                sqlText: query,
+                sqlText: stmt.sqlText,
+                binds: stmt.binds || undefined,
                 complete: (err, stmt, rows) => {
                     if (err) {
                         reject(
@@ -224,15 +227,15 @@ export class AgentSDKImpl implements AgentSDK {
      * console.log(result.rows);
      */
     async executeQueryReadOnly(
-        query: string,
+        stmt: SnowflakeStatement,
         config_name?: string,
     ): Promise<QueryResult> {
-        if (!this.isSelectQuery(query)) {
+        if (!this.isSelectQuery(stmt.sqlText)) {
             throw new Error(
                 'Only SELECT queries are allowed. DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements are not permitted.',
             );
         }
-        return this.executeQuery(query, config_name);
+        return this.executeQuery(stmt, config_name);
     }
 
     /**
@@ -548,6 +551,36 @@ export class AgentSDKImpl implements AgentSDK {
         }
     }
 
+    async email(options: EmailOptions, config_name?: string): Promise<boolean> {
+        var cfg = this.cfg(config_name);
+        var integration_name = options.integration_name;
+        if (!integration_name) {
+            if (cfg.email_integration) {
+                integration_name = cfg.email_integration;
+            } else {
+                throw new Error(
+                    `'integration_name' is required in options or config`,
+                );
+            }
+        }
+        const binds: Binds = [
+            integration_name,
+            options.email_addresses.join(','),
+            options.subject,
+            options.body,
+            options.content_type || 'text/plain',
+        ];
+        return this.executeQuery(
+            {
+                sqlText: `CALL SYSTEM$SEND_EMAIL(?, ?, ?, ?, ?)`,
+                binds: binds,
+            },
+            config_name,
+        ).then((result) => {
+            return result.rows.length > 0;
+        });
+    }
+
     /**
      * Closes the cached Snowflake connection
      * Call this when shutting down to properly cleanup resources
@@ -641,6 +674,7 @@ export async function hydrateConfig(
             warehouse: await valueManager.get(c.warehouse),
             database: await valueManager.get(c.database),
             schema: await valueManager.get(c.schema),
+            email_integration: await valueManager.get(c.email_integration),
         });
         config.set(c.config_name, validated);
     }
