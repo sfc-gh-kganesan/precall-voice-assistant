@@ -39,7 +39,7 @@ export class ControldClient {
 
     constructor(config: ControldClientConfig) {
         this._baseUrl = config.baseUrl.replace(/\/$/, '');
-        this._timeout = config.timeout || 30000;
+        this._timeout = config.timeout || 600000;
         this._pat = config.pat;
     }
 
