@@ -14,8 +14,24 @@ datasource db {
 }
 
 model User {
-  id            String   @unique @default(uuid())
+  id            String   @id @default(uuid())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  snowflakeUser String   @id @unique
+  snowflakeUser String   @unique
+  workflows Workflow[]
+}
+
+enum WorkflowVisibility {
+    Private
+    Public
+}
+
+model Workflow {
+    id String @id @default(uuid())
+    storagePath String // the directory on disk (block storage volume) where workflow artifacts are stored
+    ownerId String
+    owner User @relation(fields: [ownerId], references: [id])
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    visibility WorkflowVisibility @default(Private)
 }
