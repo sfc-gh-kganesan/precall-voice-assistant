@@ -187,7 +187,10 @@ export class AgentSDKImpl implements AgentSDK {
      * Executes a SQL query against Snowflake
      * Internal function - use executeQueryReadOnly for read-only queries
      *
-     * @param {string} query - SQL query to execute
+     * @param {SnowflakeStatement} stmt - Snowflake statement to execute
+     *   - `sqlText`: SQL text to execute
+     *   - `binds`: Binds to use for the statement
+     * @param {string} [config_name] - Name of the config to use, if null, the only one will be used
      * @returns {Promise<QueryResult>} Query results with statement and rows
      * @throws {Error} If query execution fails
      */
@@ -213,19 +216,6 @@ export class AgentSDKImpl implements AgentSDK {
         });
     }
 
-    /**
-     * Executes a read-only SELECT query against Snowflake
-     * Validates that the query is read-only before execution
-     * Rejects DML and DDL statements for safety
-     *
-     * @param {string} query - SQL SELECT query to execute
-     * @returns {Promise<QueryResult>} Query results with statement and rows
-     * @throws {Error} If query is not read-only or execution fails
-     *
-     * @example
-     * const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table LIMIT 10');
-     * console.log(result.rows);
-     */
     async executeQueryReadOnly(
         stmt: SnowflakeStatement,
         config_name?: string,

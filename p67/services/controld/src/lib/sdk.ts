@@ -125,20 +125,28 @@ export interface AgentSDK {
      * Allows SELECT, WITH (CTE), SHOW, and DESCRIBE statements.
      * Rejects DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements for safety.
      *
-     * @param query - SQL SELECT query to execute
+     * @param stmt - Snowflake statement to execute
+     *   - `sqlText`: SQL text to execute
+     *   - `binds`: Binds to use for the statement
      * @param config_name - Optional name of the Snowflake config to use. If not provided and only
      *                      one config exists, that config will be used automatically.
      * @returns Query results containing the statement metadata and result rows
      * @throws Error if the query is not read-only, contains multiple statements, or execution fails
      *
      * @example
-     * const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table LIMIT 10');
+     * const result = await sdk.executeQueryReadOnly({
+     *   sqlText: 'SELECT * FROM my_table LIMIT 10',
+     *   binds: []
+     * });
      * console.log(result.rows);
      *
      * @example
      * // Using a specific config
      * const result = await sdk.executeQueryReadOnly(
-     *   'SELECT COUNT(*) FROM orders',
+     *   {
+     *     sqlText: 'SELECT COUNT(*) FROM orders',
+     *     binds: []
+     *   },
      *   'production_config'
      * );
      */
@@ -232,12 +240,23 @@ export interface AgentSDK {
     /**
      * Sends an email using the Snowflake Email Integration
      *
-     * @param email_addresses - Array of email addresses to send the email to
-     * @param subject - Subject of the email
-     * @param body - Body of the email
-     * @param content_type - Content type of the email
-     * @param integration_name - Name of the email integration to use. If not provided, the default email integration will be used.
+     * @param options - Options for the email:
+     *   - `email_addresses`: Array of email addresses to send the email to
+     *   - `subject`: Subject of the email
+     *   - `body`: Body of the email
+     *   - `content_type`: Content type of the email
+     *   - `integration_name`: Name of the email integration to use. If not provided, the default email integration will be used.
+     * @param config_name - Optional name of the Snowflake config to use. If not provided and only
+     *                      one config exists, that config will be used automatically.
      * @returns Promise that resolves to true if the email is sent successfully, false otherwise
+     *
+     * @example
+     * const response = await sdk.email({
+     *   email_addresses: ['test@example.com'],
+     *   subject: 'Test Subject',
+     *   body: 'Test Body',
+     *   integration_name: 'test_integration'
+     * });
      */
     email(options: EmailOptions, config_name?: string): Promise<boolean>;
 
