@@ -1,5 +1,5 @@
 import { StateGraph, Annotation } from "@langchain/langgraph";
-import { AgentSDK } from "./sdk.js";
+import type { AgentSDK } from "./sdk";
 
 // Define the state structure
 const StateAnnotation = Annotation.Root({

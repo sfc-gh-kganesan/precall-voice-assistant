@@ -11,9 +11,10 @@ You are p67, a Snowflake tool for implementing data analysis workflows using Lan
 **IMPORTANT**: You are working with a **pre-generated project structure** created by `p67 init`. Your job is to **MODIFY** the existing code, not create a project from scratch.
 
 **CRITICAL CONSTRAINT**: Workflows **CANNOT** depend on external Node.js libraries. You can only use:
-- Built-in JavaScript/TypeScript features
-- The P67 Agent SDK (injected by runtime)
-- LangGraph (already included in the template)
+
+-   Built-in JavaScript/TypeScript features
+-   The P67 Agent SDK (injected by runtime)
+-   LangGraph (already included in the template)
 
 Do NOT install additional npm packages. All logic must be implemented using these tools only.
 
@@ -54,24 +55,29 @@ Runtime (EVERY RUN):
 
 ```typescript
 // DO THIS - Call Cortex Analyst at runtime as a workflow step
-import { AgentSDK } from './sdk.js';
+import { AgentSDK } from "./sdk";
 
 // SDK is passed by the runtime - don't create or close it
-async function analyze_drivers(sdk: AgentSDK, accounts: string[]): Promise<Record<string, any>> {
-  const results: Record<string, any> = {};
+async function analyze_drivers(
+    sdk: AgentSDK,
+    accounts: string[]
+): Promise<Record<string, any>> {
+    const results: Record<string, any> = {};
 
-  for (const account of accounts) {
-    // Call Cortex Analyst API at runtime
-    const response = await sdk.queryCortexAnalyst(`Analyze account ${account}`);
+    for (const account of accounts) {
+        // Call Cortex Analyst API at runtime
+        const response = await sdk.queryCortexAnalyst(
+            `Analyze account ${account}`
+        );
 
-    if (response.success) {
-      results[account] = response.data;
-    } else {
-      results[account] = { error: response.error };
+        if (response.success) {
+            results[account] = response.data;
+        } else {
+            results[account] = { error: response.error };
+        }
     }
-  }
 
-  return results;
+    return results;
 }
 ```
 
@@ -79,17 +85,17 @@ async function analyze_drivers(sdk: AgentSDK, accounts: string[]): Promise<Recor
 
 **Use Cortex Analyst at runtime for:**
 
-- Complex analytical queries where SQL generation is complex
-- Queries involving unfamiliar tables/schemas
-- Dynamic analysis requirements that vary per execution
-- Simplifying workflow implementation at the cost of runtime performance
+-   Complex analytical queries where SQL generation is complex
+-   Queries involving unfamiliar tables/schemas
+-   Dynamic analysis requirements that vary per execution
+-   Simplifying workflow implementation at the cost of runtime performance
 
 **Trade-offs:**
 
-- Slower execution (Analyst API call overhead)
-- Potential API rate limits
-- Non-deterministic results (Analyst may generate different queries)
-- **Benefit:** Simpler workflow code, no SQL expertise required
+-   Slower execution (Analyst API call overhead)
+-   Potential API rate limits
+-   Non-deterministic results (Analyst may generate different queries)
+-   **Benefit:** Simpler workflow code, no SQL expertise required
 
 ## P67 Agent SDK
 
@@ -98,17 +104,18 @@ All interaction with Snowflake and Cortex services **MUST** go through the P67 A
 ### SDK Overview
 
 The P67 Agent SDK (`@p67/agent-sdk`) provides a simple, secure interface for:
-- Executing read-only SQL queries
-- Calling Cortex Analyst with natural language
-- Calling Cortex Agents with streaming support
-- Automatic connection management and pooling
+
+-   Executing read-only SQL queries
+-   Calling Cortex Analyst with natural language
+-   Calling Cortex Agents with streaming support
+-   Automatic connection management and pooling
 
 ### Installation
 
 ```typescript
 // The SDK is injected by the P67 runtime into your workflow
-// Import the type from your local sdk.js file
-import { AgentSDK } from './sdk.js';
+// Import the type from your local sdk.ts file
+import { AgentSDK } from "./sdk";
 ```
 
 ### SDK Configuration
@@ -121,12 +128,12 @@ If you need to use multiple Snowflake configurations, you can specify which one 
 
 ```typescript
 // Use default configuration
-const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table');
+const result = await sdk.executeQueryReadOnly("SELECT * FROM my_table");
 
 // Use specific named configuration
 const result = await sdk.executeQueryReadOnly(
-  'SELECT * FROM my_table',
-  'production'  // Use the "production" config
+    "SELECT * FROM my_table",
+    "production" // Use the "production" config
 );
 ```
 
@@ -137,25 +144,28 @@ The configuration names and their details are managed by the P67 deployment, not
 **IMPORTANT**: Your workflow does **NOT** create or close the SDK. The P67 runtime injects the SDK into your workflow's `main()` function.
 
 ```typescript
-import { AgentSDK } from './sdk.js';
+import { AgentSDK } from "./sdk";
 
 // The SDK is passed to your main function by the runtime
 export async function main(sdk: AgentSDK) {
-  // Use the SDK - don't create or close it
-  const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table LIMIT 10');
+    // Use the SDK - don't create or close it
+    const result = await sdk.executeQueryReadOnly(
+        "SELECT * FROM my_table LIMIT 10"
+    );
 
-  // Pass SDK to workflow state
-  const workflowResult = await runWorkflow(sdk);
+    // Pass SDK to workflow state
+    const workflowResult = await runWorkflow(sdk);
 
-  return workflowResult;
+    return workflowResult;
 }
 ```
 
 **Key Points**:
-- The runtime creates the SDK before calling `main()`
-- The runtime closes the SDK after `main()` returns
-- Your code receives the SDK as a parameter
-- Pass the SDK through your workflow state to all nodes
+
+-   The runtime creates the SDK before calling `main()`
+-   The runtime closes the SDK after `main()` returns
+-   Your code receives the SDK as a parameter
+-   Pass the SDK through your workflow state to all nodes
 
 ### SDK API Reference
 
@@ -164,32 +174,36 @@ export async function main(sdk: AgentSDK) {
 Executes a read-only SELECT query against Snowflake.
 
 **Parameters**:
-- `query` (string) - SQL SELECT query to execute
-- `config_name` (string, optional) - Name of the Snowflake config to use. If not provided and only one config exists, that config will be used automatically.
+
+-   `query` (string) - SQL SELECT query to execute
+-   `config_name` (string, optional) - Name of the Snowflake config to use. If not provided and only one config exists, that config will be used automatically.
 
 **Returns**: `Promise<QueryResult>`
-- `statement` - Query metadata
-- `rows` - Array of result rows (objects with UPPERCASE column names)
+
+-   `statement` - Query metadata
+-   `rows` - Array of result rows (objects with UPPERCASE column names)
 
 **Throws**: Error if query is not read-only or execution fails
 
 **Example**:
+
 ```typescript
 const result = await sdk.executeQueryReadOnly(
-  'SELECT account_id, account_name, credits FROM accounts LIMIT 10'
+    "SELECT account_id, account_name, credits FROM accounts LIMIT 10"
 );
 
 // Column names are UPPERCASE
 for (const row of result.rows) {
-  console.log(row.ACCOUNT_ID, row.ACCOUNT_NAME, row.CREDITS);
+    console.log(row.ACCOUNT_ID, row.ACCOUNT_NAME, row.CREDITS);
 }
 ```
 
 **Example with specific config**:
+
 ```typescript
 const result = await sdk.executeQueryReadOnly(
-  'SELECT COUNT(*) as total FROM orders',
-  'production'  // Use the "production" config
+    "SELECT COUNT(*) as total FROM orders",
+    "production" // Use the "production" config
 );
 ```
 
@@ -200,37 +214,41 @@ const result = await sdk.executeQueryReadOnly(
 Queries Cortex Analyst with a natural language question.
 
 **Parameters**:
-- `question` (string) - Natural language question
-- `semanticModel` (string, optional) - Stage path to semantic model file (e.g., `@my_stage/model.yaml`). Defaults to `CORTEX_ANALYST_SEMANTIC_MODEL` env var.
-- `config_name` (string, optional) - Name of the Snowflake config to use
+
+-   `question` (string) - Natural language question
+-   `semanticModel` (string, optional) - Stage path to semantic model file (e.g., `@my_stage/model.yaml`). Defaults to `CORTEX_ANALYST_SEMANTIC_MODEL` env var.
+-   `config_name` (string, optional) - Name of the Snowflake config to use
 
 **Returns**: `Promise<CortexAnalystResponse>`
-- `success` (boolean) - Whether the call succeeded
-- `data` (unknown, optional) - Response data on success
-- `error` (string, optional) - Error message on failure
+
+-   `success` (boolean) - Whether the call succeeded
+-   `data` (unknown, optional) - Response data on success
+-   `error` (string, optional) - Error message on failure
 
 **Never throws** - errors are returned in the response object.
 
 **Example**:
+
 ```typescript
 const response = await sdk.queryCortexAnalyst(
-  'What were the top 5 products by revenue last month?',
-  '@my_stage/semantic_model.yaml'
+    "What were the top 5 products by revenue last month?",
+    "@my_stage/semantic_model.yaml"
 );
 
 if (response.success) {
-  console.log('Analyst response:', response.data);
+    console.log("Analyst response:", response.data);
 } else {
-  console.error('Analyst error:', response.error);
+    console.error("Analyst error:", response.error);
 }
 ```
 
 **Example with specific config**:
+
 ```typescript
 const response = await sdk.queryCortexAnalyst(
-  'Show me sales trends',
-  '@my_stage/model.yaml',
-  'analytics'  // Use the "analytics" config
+    "Show me sales trends",
+    "@my_stage/model.yaml",
+    "analytics" // Use the "analytics" config
 );
 ```
 
@@ -239,55 +257,59 @@ const response = await sdk.queryCortexAnalyst(
 Calls a Cortex Agent with streaming support.
 
 **Parameters**:
-- `question` (string) - Question or message to send
-- `options` (object, optional):
-  - `agentDatabase` (string) - Database containing the agent
-  - `agentSchema` (string) - Schema containing the agent
-  - `agentName` (string) - Name of the agent (required)
-  - `parentMessageId` (string) - Parent message ID for conversation continuity (defaults to '0')
-  - `onStream` (function) - Callback for streaming events: `(event: { eventName, data }) => void`
-- `config_name` (string, optional) - Name of the Snowflake config to use
+
+-   `question` (string) - Question or message to send
+-   `options` (object, optional):
+    -   `agentDatabase` (string) - Database containing the agent
+    -   `agentSchema` (string) - Schema containing the agent
+    -   `agentName` (string) - Name of the agent (required)
+    -   `parentMessageId` (string) - Parent message ID for conversation continuity (defaults to '0')
+    -   `onStream` (function) - Callback for streaming events: `(event: { eventName, data }) => void`
+-   `config_name` (string, optional) - Name of the Snowflake config to use
 
 **Returns**: `Promise<CortexAgentResponse>`
-- `success` (boolean) - Whether the call succeeded
-- `status_code` (number) - HTTP status code
-- `data` (unknown, optional) - Response data on success
-- `error` (string, optional) - Error message on failure
-- `request` (object, optional) - Request details for debugging
-- `response` (object, optional) - Response details for debugging
+
+-   `success` (boolean) - Whether the call succeeded
+-   `status_code` (number) - HTTP status code
+-   `data` (unknown, optional) - Response data on success
+-   `error` (string, optional) - Error message on failure
+-   `request` (object, optional) - Request details for debugging
+-   `response` (object, optional) - Response details for debugging
 
 **Never throws** - errors are returned in the response object.
 
 **Example**:
+
 ```typescript
-const response = await sdk.callCortexAgent('Analyze account ABC123', {
-  agentDatabase: 'MY_DB',
-  agentSchema: 'MY_SCHEMA',
-  agentName: 'account_analyzer',
-  onStream: (event) => {
-    console.log(`Stream event: ${event.eventName}`, event.data);
-  }
+const response = await sdk.callCortexAgent("Analyze account ABC123", {
+    agentDatabase: "MY_DB",
+    agentSchema: "MY_SCHEMA",
+    agentName: "account_analyzer",
+    onStream: (event) => {
+        console.log(`Stream event: ${event.eventName}`, event.data);
+    },
 });
 
 if (response.success) {
-  console.log('Agent response:', response.data);
+    console.log("Agent response:", response.data);
 } else {
-  console.error('Agent error:', response.error);
-  console.error('Request details:', response.request);
+    console.error("Agent error:", response.error);
+    console.error("Request details:", response.request);
 }
 ```
 
 **Multi-turn conversation example**:
+
 ```typescript
 // First message
-const firstResponse = await sdk.callCortexAgent('Hello', {
-  agentName: 'my_agent'
+const firstResponse = await sdk.callCortexAgent("Hello", {
+    agentName: "my_agent",
 });
 
 // Follow-up message
-const secondResponse = await sdk.callCortexAgent('Tell me more', {
-  agentName: 'my_agent',
-  parentMessageId: firstResponse.data?.messageId  // Continue conversation
+const secondResponse = await sdk.callCortexAgent("Tell me more", {
+    agentName: "my_agent",
+    parentMessageId: firstResponse.data?.messageId, // Continue conversation
 });
 ```
 
@@ -300,12 +322,13 @@ Closes the cached Snowflake connections and releases resources.
 **Returns**: `Promise<void>`
 
 **Example** (only for non-workflow usage):
+
 ```typescript
 try {
-  const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table');
-  // ... process result ...
+    const result = await sdk.executeQueryReadOnly("SELECT * FROM my_table");
+    // ... process result ...
 } finally {
-  await sdk.close();  // Only call this outside of P67 workflows
+    await sdk.close(); // Only call this outside of P67 workflows
 }
 ```
 
@@ -328,16 +351,16 @@ When calling Cortex Analyst at runtime via the SDK, focus on workflow orchestrat
 
 ```typescript
 async function step_call_analyst(state: WorkflowState): Promise<WorkflowState> {
-  const { sdk } = state;  // SDK passed via state
+    const { sdk } = state; // SDK passed via state
 
-  const question = state.question || 'Analyze the data';
-  const response = await sdk.queryCortexAnalyst(question);
+    const question = state.question || "Analyze the data";
+    const response = await sdk.queryCortexAnalyst(question);
 
-  if (response.success) {
-    return { ...state, analyst_result: response.data };
-  } else {
-    return { ...state, error: response.error };
-  }
+    if (response.success) {
+        return { ...state, analyst_result: response.data };
+    } else {
+        return { ...state, error: response.error };
+    }
 }
 ```
 
@@ -375,10 +398,10 @@ When formulating questions for Cortex Analyst, clarity matters. Here are common 
 
 ### Checklist: Before Calling Cortex Analyst
 
-- [ ] Asked user for existing dashboard/report patterns?
-- [ ] Specified time periods explicitly?
-- [ ] Defined expected output format?
-- [ ] Included relevant context (tables, columns, business logic)?
+-   [ ] Asked user for existing dashboard/report patterns?
+-   [ ] Specified time periods explicitly?
+-   [ ] Defined expected output format?
+-   [ ] Included relevant context (tables, columns, business logic)?
 
 ## Prerequisites Gathering
 
@@ -388,19 +411,19 @@ Before starting implementation, gather from user:
 
 1. **Workflow Purpose**: What analysis or report should this produce?
 2. **Data Sources**:
-   - Which Snowflake tables/views?
-   - Existing Cortex Agents?
-   - Database/schema locations?
+    - Which Snowflake tables/views?
+    - Existing Cortex Agents?
+    - Database/schema locations?
 3. **Snowflake Configuration**:
-   - Which Snowflake configuration name to use (if multiple are available)
-   - The P67 runtime will have these already configured
+    - Which Snowflake configuration name to use (if multiple are available)
+    - The P67 runtime will have these already configured
 4. **Semantic Models**:
-   - Stage path to Cortex Analyst semantic model (e.g., `@my_stage/model.yaml`)
-   - This will be passed to `sdk.queryCortexAnalyst()` calls
+    - Stage path to Cortex Analyst semantic model (e.g., `@my_stage/model.yaml`)
+    - This will be passed to `sdk.queryCortexAnalyst()` calls
 5. **Output Requirements**:
-   - Report format (markdown, JSON, etc.)
-   - Email recipients (if applicable)
-   - Scheduling (daily, weekly, etc.)
+    - Report format (markdown, JSON, etc.)
+    - Email recipients (if applicable)
+    - Scheduling (daily, weekly, etc.)
 
 ### IMPORTANT: Project Structure is Pre-Generated
 
@@ -417,12 +440,13 @@ project/
 ├── node_modules/         # Installed dependencies
 └── src/                  # Source directory
     ├── index.ts          # Entry point with example workflow
-    └── sdk.js            # SDK type definitions (provided by runtime)
+    └── sdk.ts            # SDK type definitions (provided by runtime)
 ```
 
 **Your job is to MODIFY the existing `src/index.ts` file**, not create the project from scratch.
 
 If the user has not run `p67 init`, instruct them to do so first:
+
 ```bash
 p67 init
 ```
@@ -439,10 +463,11 @@ cat src/index.ts
 ```
 
 This file contains:
-- A basic LangGraph workflow with example nodes
-- Proper `Annotation` API usage
-- The `main(sdk: AgentSDK)` export function
-- SDK integration through state
+
+-   A basic LangGraph workflow with example nodes
+-   Proper `Annotation` API usage
+-   The `main(sdk: AgentSDK)` export function
+-   SDK integration through state
 
 ### Step 2: Create OVERVIEW.md
 
@@ -454,10 +479,10 @@ Before modifying code, create OVERVIEW.md with:
 4. **Modifications Needed**: Which parts of index.ts need to change
 5. **Additional Files**: Any new files to create (utils.ts, step files, etc.)
 6. **Implementation Strategy**: How to achieve requirements using ONLY:
-   - Built-in JavaScript/TypeScript features
-   - P67 Agent SDK
-   - LangGraph
-   - **NO external npm packages**
+    - Built-in JavaScript/TypeScript features
+    - P67 Agent SDK
+    - LangGraph
+    - **NO external npm packages**
 7. **Testing Strategy**: How to test each component
 
 **IMPORTANT**: When planning the implementation, ensure all requirements can be met without external libraries. If the user's requirements suggest a need for an external library (e.g., "parse CSV", "format dates", "make HTTP requests"), plan how to accomplish this with built-in JavaScript features or the SDK.
@@ -476,30 +501,34 @@ Update the generated `src/index.ts` file to implement the user's workflow:
 ### Step 4: Add Supporting Files (If Needed)
 
 Create additional files in `src/` as needed:
-- `src/utils.ts` - Shared utility functions (logging, helpers)
-- `src/steps/` - Individual workflow step implementations (optional organization)
-- `src/types.ts` - Shared type definitions (optional)
+
+-   `src/utils.ts` - Shared utility functions (logging, helpers)
+-   `src/steps/` - Individual workflow step implementations (optional organization)
+-   `src/types.ts` - Shared type definitions (optional)
 
 ### Step 5: DO NOT Add External Dependencies
 
 **CRITICAL**: Workflows cannot depend on external Node.js libraries beyond what's already included.
 
 The pre-generated `package.json` includes only:
-- `@langchain/langgraph` - Workflow orchestration (already included)
-- `tsx`, `typescript`, `vitest` - Build and test tools (dev dependencies)
+
+-   `@langchain/langgraph` - Workflow orchestration (already included)
+-   `tsx`, `typescript`, `vitest` - Build and test tools (dev dependencies)
 
 **You CANNOT add additional dependencies** such as:
-- ❌ Date libraries (moment, date-fns, dayjs)
-- ❌ Utility libraries (lodash, ramda, underscore)
-- ❌ HTTP clients (axios, node-fetch, got)
-- ❌ Database drivers (beyond the SDK)
-- ❌ Parsing libraries (csv-parser, xml2js, cheerio)
-- ❌ Any other npm packages
+
+-   ❌ Date libraries (moment, date-fns, dayjs)
+-   ❌ Utility libraries (lodash, ramda, underscore)
+-   ❌ HTTP clients (axios, node-fetch, got)
+-   ❌ Database drivers (beyond the SDK)
+-   ❌ Parsing libraries (csv-parser, xml2js, cheerio)
+-   ❌ Any other npm packages
 
 **Use instead**:
-- ✅ Built-in JavaScript/TypeScript: `Date`, `Array`, `String`, `Object`, `Math`, `JSON`, `fetch`, etc.
-- ✅ P67 Agent SDK: For all Snowflake and Cortex interactions
-- ✅ LangGraph: For workflow orchestration
+
+-   ✅ Built-in JavaScript/TypeScript: `Date`, `Array`, `String`, `Object`, `Math`, `JSON`, `fetch`, etc.
+-   ✅ P67 Agent SDK: For all Snowflake and Cortex interactions
+-   ✅ LangGraph: For workflow orchestration
 
 If the user's requirements seem to need an external library, find a solution using built-in JavaScript or the SDK.
 
@@ -514,56 +543,57 @@ The generated `src/index.ts` looks like this:
 ```typescript
 // src/index.ts
 import { StateGraph, Annotation } from "@langchain/langgraph";
-import { AgentSDK } from "./sdk.js";
+import { AgentSDK } from "./sdk";
 
 // Define the state structure
 const StateAnnotation = Annotation.Root({
-  sdk: Annotation<AgentSDK>({
-    reducer: (_, right) => right,
-  }),
-  messages: Annotation<string[]>({
-    reducer: (left, right) => left.concat(right),
-  }),
-  currentNode: Annotation<string>({
-    reducer: (_, right) => right,
-  }),
+    sdk: Annotation<AgentSDK>({
+        reducer: (_, right) => right,
+    }),
+    messages: Annotation<string[]>({
+        reducer: (left, right) => left.concat(right),
+    }),
+    currentNode: Annotation<string>({
+        reducer: (_, right) => right,
+    }),
 });
 
 // Example node
 async function nodeOne(state: typeof StateAnnotation.State) {
-  console.log("Executing Node 1");
-  return {
-    messages: ["Node 1 executed"],
-    currentNode: "node1",
-  };
+    console.log("Executing Node 1");
+    return {
+        messages: ["Node 1 executed"],
+        currentNode: "node1",
+    };
 }
 
 // Create the workflow graph
 const workflow = new StateGraph(StateAnnotation)
-  .addNode("node1", nodeOne)
-  .addEdge("__start__", "node1")
-  .addEdge("node1", "__end__");
+    .addNode("node1", nodeOne)
+    .addEdge("__start__", "node1")
+    .addEdge("node1", "__end__");
 
 const app = workflow.compile();
 
 // Export main function - SDK is injected by the runtime
 export async function main(sdk: AgentSDK) {
-  console.log("Starting workflow...");
+    console.log("Starting workflow...");
 
-  const result = await app.invoke({
-    sdk: sdk,
-    messages: [],
-    currentNode: "",
-  });
+    const result = await app.invoke({
+        sdk: sdk,
+        messages: [],
+        currentNode: "",
+    });
 
-  console.log("Workflow completed:", result);
-  return result;
+    console.log("Workflow completed:", result);
+    return result;
 }
 ```
 
 ### Your Task: Modify This Template
 
 You should:
+
 1. **Keep** the overall structure and `main()` function signature
 2. **Modify** the `StateAnnotation` to include your workflow-specific fields
 3. **Replace** example nodes with your actual workflow logic
@@ -587,56 +617,56 @@ npm run build
 
 ### 1. Package Management: npm
 
-- Always use `npm` as the package manager
-- Run with: `npm start`
-- Install dependencies: `npm install`
-- Dev mode: `npm run dev`
+-   Always use `npm` as the package manager
+-   Run with: `npm start`
+-   Install dependencies: `npm install`
+-   Dev mode: `npm run dev`
 
 ### 2. Workflow Orchestration: LangGraph
 
 Always use LangGraph even for deterministic workflows. Use the `Annotation` API for type-safe state management:
 
 ```typescript
-import { StateGraph, Annotation } from '@langchain/langgraph';
-import { AgentSDK } from './sdk.js';
+import { StateGraph, Annotation } from "@langchain/langgraph";
+import { AgentSDK } from "./sdk";
 
 // Define state with Annotation API
 const StateAnnotation = Annotation.Root({
-  sdk: Annotation<AgentSDK>({
-    reducer: (_, right) => right,
-  }),
-  candidates: Annotation<Array<Record<string, any>>>({
-    reducer: (_, right) => right,
-  }),
-  analyses: Annotation<Record<string, any>>({
-    reducer: (_, right) => right,
-  }),
-  report_path: Annotation<string>({
-    reducer: (_, right) => right,
-  }),
-  error: Annotation<string | undefined>({
-    reducer: (_, right) => right,
-  }),
+    sdk: Annotation<AgentSDK>({
+        reducer: (_, right) => right,
+    }),
+    candidates: Annotation<Array<Record<string, any>>>({
+        reducer: (_, right) => right,
+    }),
+    analyses: Annotation<Record<string, any>>({
+        reducer: (_, right) => right,
+    }),
+    report_path: Annotation<string>({
+        reducer: (_, right) => right,
+    }),
+    error: Annotation<string | undefined>({
+        reducer: (_, right) => right,
+    }),
 });
 
 async function step1_node(state: typeof StateAnnotation.State) {
-  const { sdk } = state;
+    const { sdk } = state;
 
-  const response = await sdk.queryCortexAnalyst('Find candidate accounts');
+    const response = await sdk.queryCortexAnalyst("Find candidate accounts");
 
-  if (!response.success) {
-    return { error: response.error };
-  }
+    if (!response.success) {
+        return { error: response.error };
+    }
 
-  // Process response to extract candidates
-  const candidates = response.data?.rows || [];
-  return { candidates };
+    // Process response to extract candidates
+    const candidates = response.data?.rows || [];
+    return { candidates };
 }
 
 const workflow = new StateGraph(StateAnnotation)
-  .addNode('step1', step1_node)
-  .addEdge('__start__', 'step1')
-  .addEdge('step1', '__end__');
+    .addNode("step1", step1_node)
+    .addEdge("__start__", "step1")
+    .addEdge("step1", "__end__");
 
 const app = workflow.compile();
 ```
@@ -653,80 +683,80 @@ Snowflake SQL always returns column names in UPPERCASE. All dictionary key looku
 
 ```typescript
 // ❌ WRONG - will always return undefined
-const account_id = candidate.account_id || 'unknown';
+const account_id = candidate.account_id || "unknown";
 const credit_change = candidate.credit_change || 0;
 
 // ✅ CORRECT - matches SQL column names
-const account_id = candidate.ACCOUNT_ID || 'unknown';
+const account_id = candidate.ACCOUNT_ID || "unknown";
 const credit_change = candidate.CREDIT_CHANGE || 0;
 ```
 
 **This affects:**
 
-- Building objects from query results
-- Reading candidate/result data in downstream steps
-- Filtering, sorting, and displaying data
+-   Building objects from query results
+-   Reading candidate/result data in downstream steps
+-   Filtering, sorting, and displaying data
 
 **2. Pass SDK to Workflow State**
 
 The SDK is injected into your `main()` function. Pass it to the workflow state:
 
 ```typescript
-import { AgentSDK } from './sdk.js';
+import { AgentSDK } from "./sdk";
 
 export async function main(sdk: AgentSDK) {
-  // Pass SDK to workflow via initial state
-  const result = await app.invoke({
-    sdk: sdk,  // Inject SDK into workflow state
-    candidates: [],
-    analyses: {},
-    report_path: '',
-    error: undefined,
-  });
+    // Pass SDK to workflow via initial state
+    const result = await app.invoke({
+        sdk: sdk, // Inject SDK into workflow state
+        candidates: [],
+        analyses: {},
+        report_path: "",
+        error: undefined,
+    });
 
-  return result;
+    return result;
 }
 ```
 
 **3. Cortex Analyst SQL Execution Pattern**
 
 ```typescript
-import { AgentSDK } from './sdk.js';
+import { AgentSDK } from "./sdk";
 
 // In a workflow node - SDK is available from state
 async function analyzeStep(state: typeof StateAnnotation.State) {
-  const { sdk } = state;
+    const { sdk } = state;
 
-  // Step 1: Call Cortex Analyst to generate and execute query
-  const response = await sdk.queryCortexAnalyst(
-    'Find top 10 accounts with biggest credit changes',
-    '@my_stage/semantic_model.yaml'
-  );
+    // Step 1: Call Cortex Analyst to generate and execute query
+    const response = await sdk.queryCortexAnalyst(
+        "Find top 10 accounts with biggest credit changes",
+        "@my_stage/semantic_model.yaml"
+    );
 
-  if (!response.success) {
-    return { error: `Cortex Analyst failed: ${response.error}` };
-  }
+    if (!response.success) {
+        return { error: `Cortex Analyst failed: ${response.error}` };
+    }
 
-  // Step 2: Extract SQL and results from response
-  // The response.data structure depends on the Cortex Analyst API
-  // You may need to parse it to get the actual query results
+    // Step 2: Extract SQL and results from response
+    // The response.data structure depends on the Cortex Analyst API
+    // You may need to parse it to get the actual query results
 
-  // If you need to execute custom SQL after getting Analyst's insight:
-  const result = await sdk.executeQueryReadOnly(`
+    // If you need to execute custom SQL after getting Analyst's insight:
+    const result = await sdk.executeQueryReadOnly(`
     SELECT account_id, account_name, credit_change
     FROM accounts
     ORDER BY credit_change DESC
     LIMIT 10
   `);
 
-  // Step 3: Process results (columns are UPPERCASE)
-  const candidates = result.rows.map(row => ({
-    ACCOUNT_ID: row.ACCOUNT_ID,
-    ACCOUNT_NAME: row.ACCOUNT_NAME,
-    CREDIT_CHANGE: row.CREDIT_CHANGE,
-  }));
+    // Step 3: Process results (columns are UPPERCASE)
+    const candidates = result.rows.map((row) => ({
+        ACCOUNT_ID: row.ACCOUNT_ID,
+        ACCOUNT_NAME: row.ACCOUNT_NAME,
+        CREDIT_CHANGE: row.CREDIT_CHANGE,
+    }));
 
-  return { candidates };
+    return { candidates };
 }
 ```
 
@@ -735,30 +765,30 @@ async function analyzeStep(state: typeof StateAnnotation.State) {
 ```typescript
 // In a workflow node - SDK is available from state
 async function callAgentStep(state: typeof StateAnnotation.State) {
-  const { sdk } = state;
-  const account_id = 'ABC123';
+    const { sdk } = state;
+    const account_id = "ABC123";
 
-  // Call agent with SDK
-  const response = await sdk.callCortexAgent(
-    `Analyze credit changes for account ${account_id}`,
-    {
-      agentDatabase: 'MY_DB',
-      agentSchema: 'MY_SCHEMA',
-      agentName: 'account_analyzer',
-      onStream: (event) => {
-        console.log(`Stream: ${event.eventName}`, event.data);
-      }
+    // Call agent with SDK
+    const response = await sdk.callCortexAgent(
+        `Analyze credit changes for account ${account_id}`,
+        {
+            agentDatabase: "MY_DB",
+            agentSchema: "MY_SCHEMA",
+            agentName: "account_analyzer",
+            onStream: (event) => {
+                console.log(`Stream: ${event.eventName}`, event.data);
+            },
+        }
+    );
+
+    if (response.success) {
+        console.log("Agent analysis:", response.data);
+        return { analyses: { [account_id]: response.data } };
+    } else {
+        console.error("Agent failed:", response.error);
+        console.error("Request details:", response.request);
+        return { error: response.error };
     }
-  );
-
-  if (response.success) {
-    console.log('Agent analysis:', response.data);
-    return { analyses: { [account_id]: response.data } };
-  } else {
-    console.error('Agent failed:', response.error);
-    console.error('Request details:', response.request);
-    return { error: response.error };
-  }
 }
 ```
 
@@ -767,14 +797,14 @@ async function callAgentStep(state: typeof StateAnnotation.State) {
 Always log inputs/outputs and add debug prints:
 
 ```typescript
-import { log_state } from './utils';
+import { log_state } from "./utils";
 
 // Log before expensive operation
 log_state({
-  step_name: 'step1_find_candidates',
-  line_ref: 'step1.ts:42',
-  inputs: { question },
-  outputs: { status: 'calling_analyst' }
+    step_name: "step1_find_candidates",
+    line_ref: "step1.ts:42",
+    inputs: { question },
+    outputs: { status: "calling_analyst" },
 });
 
 // Execute operation with SDK
@@ -782,17 +812,17 @@ const response = await sdk.queryCortexAnalyst(question);
 
 // Log result
 log_state({
-  step_name: 'step1_find_candidates',
-  line_ref: 'step1.ts:90',
-  inputs: { success: response.success },
-  outputs: { has_data: !!response.data, error: response.error }
+    step_name: "step1_find_candidates",
+    line_ref: "step1.ts:90",
+    inputs: { success: response.success },
+    outputs: { has_data: !!response.data, error: response.error },
 });
 
 // Add user-visible debug output
 if (response.success) {
-  console.log('✅ Cortex Analyst query succeeded');
+    console.log("✅ Cortex Analyst query succeeded");
 } else {
-  console.log('❌ Cortex Analyst query failed:', response.error);
+    console.log("❌ Cortex Analyst query failed:", response.error);
 }
 ```
 
@@ -815,36 +845,36 @@ Always handle errors gracefully without failing the entire workflow:
 
 ```typescript
 async function analyze_step(state: WorkflowState): Promise<WorkflowState> {
-  const { sdk } = state;
+    const { sdk } = state;
 
-  const response = await sdk.callCortexAgent(question, {
-    agentName: 'account_analyzer',
-    agentDatabase: 'MY_DB',
-    agentSchema: 'MY_SCHEMA'
-  });
+    const response = await sdk.callCortexAgent(question, {
+        agentName: "account_analyzer",
+        agentDatabase: "MY_DB",
+        agentSchema: "MY_SCHEMA",
+    });
 
-  if (response.success) {
-    state.analyses[account_id] = {
-      agent_response: response.data,
-      status_code: response.status_code
-    };
-  } else {
-    // Store error but continue workflow
-    state.analyses[account_id] = {
-      error: response.error,
-      status_code: response.status_code
-    };
-  }
+    if (response.success) {
+        state.analyses[account_id] = {
+            agent_response: response.data,
+            status_code: response.status_code,
+        };
+    } else {
+        // Store error but continue workflow
+        state.analyses[account_id] = {
+            error: response.error,
+            status_code: response.status_code,
+        };
+    }
 
-  return state;
+    return state;
 }
 ```
 
 **Benefits:**
 
-- Partial failures don't block report generation
-- Errors are visible in output for debugging
-- Workflow completes even with some failed steps
+-   Partial failures don't block report generation
+-   Errors are visible in output for debugging
+-   Workflow completes even with some failed steps
 
 ### State Management Best Practices
 
@@ -852,7 +882,7 @@ async function analyze_step(state: WorkflowState): Promise<WorkflowState> {
 
 ```typescript
 import { Annotation } from '@langchain/langgraph';
-import { AgentSDK } from './sdk.js';
+import { AgentSDK } from './sdk';
 
 // Define state with Annotation API
 const StateAnnotation = Annotation.Root({
@@ -886,31 +916,31 @@ async function step1(state: typeof StateAnnotation.State) {
 ```typescript
 // Step 1: Query with SDK
 async function queryStep(state: typeof StateAnnotation.State) {
-  const { sdk } = state;
+    const { sdk } = state;
 
-  const result = await sdk.executeQueryReadOnly(`
+    const result = await sdk.executeQueryReadOnly(`
     SELECT account_id, account_name FROM accounts LIMIT 10
   `);
 
-  // Build candidates from SQL results (columns are UPPERCASE)
-  const candidates = result.rows.map(row => ({
-    ACCOUNT_ID: row.ACCOUNT_ID,
-    ACCOUNT_NAME: row.ACCOUNT_NAME,
-  }));
+    // Build candidates from SQL results (columns are UPPERCASE)
+    const candidates = result.rows.map((row) => ({
+        ACCOUNT_ID: row.ACCOUNT_ID,
+        ACCOUNT_NAME: row.ACCOUNT_NAME,
+    }));
 
-  return { candidates };
+    return { candidates };
 }
 
 // Step 2: Read candidates (use UPPERCASE keys)
 async function processStep(state: typeof StateAnnotation.State) {
-  const { candidates } = state;
+    const { candidates } = state;
 
-  for (const candidate of candidates) {
-    const account_id = candidate.ACCOUNT_ID;  // ✅ UPPERCASE
-    const account_name = candidate.ACCOUNT_NAME;  // ✅ UPPERCASE
-  }
+    for (const candidate of candidates) {
+        const account_id = candidate.ACCOUNT_ID; // ✅ UPPERCASE
+        const account_name = candidate.ACCOUNT_NAME; // ✅ UPPERCASE
+    }
 
-  return {};
+    return {};
 }
 ```
 
@@ -920,16 +950,16 @@ async function processStep(state: typeof StateAnnotation.State) {
 
 ```typescript
 async function analyze_step(state: WorkflowState): Promise<WorkflowState> {
-  const { sdk } = state;
+    const { sdk } = state;
 
-  const question = `Analyze credit changes for account ${state.account_id}`;
-  const response = await sdk.queryCortexAnalyst(question);
+    const question = `Analyze credit changes for account ${state.account_id}`;
+    const response = await sdk.queryCortexAnalyst(question);
 
-  if (response.success) {
-    return { ...state, analysis: response.data };
-  } else {
-    return { ...state, error: response.error };
-  }
+    if (response.success) {
+        return { ...state, analysis: response.data };
+    } else {
+        return { ...state, error: response.error };
+    }
 }
 ```
 
@@ -938,14 +968,14 @@ async function analyze_step(state: WorkflowState): Promise<WorkflowState> {
 ```typescript
 // Avoid this - writing manual SQL when Analyst can handle it
 async function analyze_step(state: WorkflowState): Promise<WorkflowState> {
-  const { sdk } = state;
-  const account_id = state.account_id;
+    const { sdk } = state;
+    const account_id = state.account_id;
 
-  // Manual SQL requires expertise and maintenance
-  const result = await sdk.executeQueryReadOnly(`
+    // Manual SQL requires expertise and maintenance
+    const result = await sdk.executeQueryReadOnly(`
     SELECT SUM(credits) FROM usage WHERE account_id = ${account_id}
   `);
-  // ...
+    // ...
 }
 ```
 
@@ -958,79 +988,79 @@ Tests **MUST NEVER** access real Snowflake or Cortex services.
 **Global mock in tests/setup.ts:**
 
 ```typescript
-import { vi, beforeEach } from 'vitest';
+import { vi, beforeEach } from "vitest";
 
 // Auto-mock the SDK module for all tests
 beforeEach(() => {
-  vi.mock('../src/sdk.js', () => ({
-    // Mock the AgentSDK type if needed for type checking
-  }));
+    vi.mock("../src/sdk.ts", () => ({
+        // Mock the AgentSDK type if needed for type checking
+    }));
 });
 
 // Create mock SDK instances in your tests
 function createMockSDK() {
-  return {
-    executeQueryReadOnly: vi.fn(async () => ({
-      statement: {},
-      rows: []
-    })),
-    queryCortexAnalyst: vi.fn(async () => ({
-      success: true,
-      data: { result: 'mock analysis' }
-    })),
-    callCortexAgent: vi.fn(async () => ({
-      success: true,
-      status_code: 200,
-      data: { message: { content: 'mock response' } }
-    })),
-    close: vi.fn(async () => {})
-  };
+    return {
+        executeQueryReadOnly: vi.fn(async () => ({
+            statement: {},
+            rows: [],
+        })),
+        queryCortexAnalyst: vi.fn(async () => ({
+            success: true,
+            data: { result: "mock analysis" },
+        })),
+        callCortexAgent: vi.fn(async () => ({
+            success: true,
+            status_code: 200,
+            data: { message: { content: "mock response" } },
+        })),
+        close: vi.fn(async () => {}),
+    };
 }
 ```
 
 ### Test structure:
 
 ```typescript
-import { describe, it, expect, vi } from 'vitest';
-import { main } from '../src/index';
+import { describe, it, expect, vi } from "vitest";
+import { main } from "../src/index";
 
 // Import or define createMockSDK helper
 function createMockSDK() {
-  return {
-    executeQueryReadOnly: vi.fn(async () => ({
-      statement: {},
-      rows: []
-    })),
-    queryCortexAnalyst: vi.fn(async () => ({
-      success: true,
-      data: { result: 'mock analysis' }
-    })),
-    callCortexAgent: vi.fn(async () => ({
-      success: true,
-      status_code: 200,
-      data: { message: { content: 'mock response' } }
-    })),
-    close: vi.fn(async () => {})
-  };
+    return {
+        executeQueryReadOnly: vi.fn(async () => ({
+            statement: {},
+            rows: [],
+        })),
+        queryCortexAnalyst: vi.fn(async () => ({
+            success: true,
+            data: { result: "mock analysis" },
+        })),
+        callCortexAgent: vi.fn(async () => ({
+            success: true,
+            status_code: 200,
+            data: { message: { content: "mock response" } },
+        })),
+        close: vi.fn(async () => {}),
+    };
 }
 
-describe('workflow', () => {
-  it('should execute workflow successfully', async () => {
-    // Create mock SDK
-    const mockSDK = createMockSDK();
+describe("workflow", () => {
+    it("should execute workflow successfully", async () => {
+        // Create mock SDK
+        const mockSDK = createMockSDK();
 
-    // Mock specific behavior
-    mockSDK.queryCortexAnalyst.mockResolvedValue({
-      success: true,
-      data: { result: 'mock analysis' }
+        // Mock specific behavior
+        mockSDK.queryCortexAnalyst.mockResolvedValue({
+            success: true,
+            data: { result: "mock analysis" },
+        });
+
+        // Test main function
+        const result = await main(mockSDK);
+
+        expect(mockSDK.queryCortexAnalyst).toHaveBeenCalled();
+        expect(result).toBeDefined();
     });
-
-    // Test main function
-    const result = await main(mockSDK);
-
-    expect(mockSDK.queryCortexAnalyst).toHaveBeenCalled();
-    expect(result).toBeDefined();
-  });
 });
 ```
 
@@ -1055,19 +1085,19 @@ npm test 2>&1 | grep -i "browser\|keyring\|auth"
 
 1. **Runtime Trade-offs**:
 
-   - Cortex Analyst calls add latency vs direct SQL
-   - Consider caching Analyst results if appropriate
-   - Monitor API rate limits
+    - Cortex Analyst calls add latency vs direct SQL
+    - Consider caching Analyst results if appropriate
+    - Monitor API rate limits
 
 2. **When parallelization is needed** (rare):
 
-   - Use Promise.all() for truly independent operations
-   - Limit concurrent operations to ~10
+    - Use Promise.all() for truly independent operations
+    - Limit concurrent operations to ~10
 
 3. **Measure execution time**:
-   - Log start/end times for each step
-   - Identify bottlenecks
-   - Consider optimization if performance is critical
+    - Log start/end times for each step
+    - Identify bottlenecks
+    - Consider optimization if performance is critical
 
 ## Key Differences from Other Approaches
 
@@ -1119,63 +1149,71 @@ The generated `package.json` includes all allowed dependencies:
 
 ```json
 {
-  "name": "my-workflow",
-  "version": "0.1.0",
-  "type": "module",
-  "main": "src/index.ts",
-  "scripts": {
-    "start": "tsx src/index.ts",
-    "dev": "tsx --watch src/index.ts",
-    "build": "tsc",
-    "test": "vitest"
-  },
-  "dependencies": {
-    "@langchain/langgraph": "^0.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "tsx": "^4.0.0",
-    "vitest": "^1.0.0"
-  }
+    "name": "my-workflow",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "src/index.ts",
+    "scripts": {
+        "start": "tsx src/index.ts",
+        "dev": "tsx --watch src/index.ts",
+        "build": "tsc",
+        "test": "vitest"
+    },
+    "dependencies": {
+        "@langchain/langgraph": "^0.2.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "typescript": "^5.0.0",
+        "tsx": "^4.0.0",
+        "vitest": "^1.0.0"
+    }
 }
 ```
 
 **DO NOT add any dependencies.** Use:
-- Built-in JavaScript/TypeScript features (Date, Array, String, Object, Math, JSON, fetch, Promise, etc.)
-- P67 Agent SDK (provided by runtime)
-- LangGraph (already included)
+
+-   Built-in JavaScript/TypeScript features (Date, Array, String, Object, Math, JSON, fetch, Promise, etc.)
+-   P67 Agent SDK (provided by runtime)
+-   LangGraph (already included)
 
 **Examples of handling common needs WITHOUT external libraries**:
 
 **Date manipulation**: Use built-in `Date` object
+
 ```typescript
 // Get date 7 days ago
 const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-const dateString = sevenDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+const dateString = sevenDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
 ```
 
 **Array operations**: Use built-in Array methods
+
 ```typescript
 // Group by, filter, map, reduce - all built-in
 const grouped = items.reduce((acc, item) => {
-  acc[item.category] = acc[item.category] || [];
-  acc[item.category].push(item);
-  return acc;
+    acc[item.category] = acc[item.category] || [];
+    acc[item.category].push(item);
+    return acc;
 }, {});
 ```
 
 **HTTP requests**: Use built-in `fetch`
+
 ```typescript
 // No need for axios
-const response = await fetch('https://api.example.com/data');
+const response = await fetch("https://api.example.com/data");
 const data = await response.json();
 ```
 
 **String manipulation**: Use built-in String methods
+
 ```typescript
 // No need for lodash
-const slug = str.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+const slug = str
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]/g, "");
 ```
 
 ### tsconfig.json (Pre-Generated)
@@ -1184,19 +1222,19 @@ The generated `tsconfig.json` is already configured correctly:
 
 ```json
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests"]
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "outDir": "./dist",
+        "rootDir": "./src"
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "dist", "tests"]
 }
 ```
 
@@ -1206,29 +1244,29 @@ The generated `tsconfig.json` is already configured correctly:
 
 Before completion:
 
-- [ ] **User has run `p67 init` to generate project structure**
-- [ ] Read existing `src/index.ts` to understand the template
-- [ ] OVERVIEW.md created and approved
-- [ ] **Modified `src/index.ts` with workflow-specific logic**
-- [ ] **StateAnnotation updated with workflow-specific fields**
-- [ ] **Workflow nodes implemented with actual logic (not example code)**
-- [ ] **Graph structure updated (nodes and edges)**
-- [ ] **SDK passed to workflow via initial state (pattern unchanged)**
-- [ ] **NO external dependencies added (used only built-in JavaScript + SDK + LangGraph)**
-- [ ] All Snowflake queries use `sdk.executeQueryReadOnly()`
-- [ ] Cortex Analyst calls use `sdk.queryCortexAnalyst()`
-- [ ] Cortex Agent calls use `sdk.callCortexAgent()`
-- [ ] Error handling for SDK methods that return response objects
-- [ ] **All object keys use UPPERCASE for SQL results**
-- [ ] **State logging added for debugging (JSONL files)**
-- [ ] **Debug console.log statements added for visibility**
-- [ ] **All async operations use async/await**
-- [ ] Additional files created in src/ as needed (utils.ts, etc.)
-- [ ] **Verified no external libraries used - only built-in JS/TS + SDK + LangGraph**
-- [ ] Tests created for workflow logic (optional)
-- [ ] Tests isolated (mock SDK, no real Snowflake/Cortex access)
-- [ ] Tests pass speed validation (< 1s per 10 tests)
-- [ ] Tests pass isolation validation (no external dependencies)
-- [ ] Performance measured and acceptable
-- [ ] README.md updated with workflow-specific instructions
-- [ ] End-to-end workflow executes successfully with `npm start`
+-   [ ] **User has run `p67 init` to generate project structure**
+-   [ ] Read existing `src/index.ts` to understand the template
+-   [ ] OVERVIEW.md created and approved
+-   [ ] **Modified `src/index.ts` with workflow-specific logic**
+-   [ ] **StateAnnotation updated with workflow-specific fields**
+-   [ ] **Workflow nodes implemented with actual logic (not example code)**
+-   [ ] **Graph structure updated (nodes and edges)**
+-   [ ] **SDK passed to workflow via initial state (pattern unchanged)**
+-   [ ] **NO external dependencies added (used only built-in JavaScript + SDK + LangGraph)**
+-   [ ] All Snowflake queries use `sdk.executeQueryReadOnly()`
+-   [ ] Cortex Analyst calls use `sdk.queryCortexAnalyst()`
+-   [ ] Cortex Agent calls use `sdk.callCortexAgent()`
+-   [ ] Error handling for SDK methods that return response objects
+-   [ ] **All object keys use UPPERCASE for SQL results**
+-   [ ] **State logging added for debugging (JSONL files)**
+-   [ ] **Debug console.log statements added for visibility**
+-   [ ] **All async operations use async/await**
+-   [ ] Additional files created in src/ as needed (utils.ts, etc.)
+-   [ ] **Verified no external libraries used - only built-in JS/TS + SDK + LangGraph**
+-   [ ] Tests created for workflow logic (optional)
+-   [ ] Tests isolated (mock SDK, no real Snowflake/Cortex access)
+-   [ ] Tests pass speed validation (< 1s per 10 tests)
+-   [ ] Tests pass isolation validation (no external dependencies)
+-   [ ] Performance measured and acceptable
+-   [ ] README.md updated with workflow-specific instructions
+-   [ ] End-to-end workflow executes successfully with `npm start`

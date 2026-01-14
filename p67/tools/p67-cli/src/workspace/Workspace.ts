@@ -1,5 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import sdksrc from '@agent-sdk/index.ts' with { type: 'file' };
 import gitignore from '@p67-cli/workspace/boiler-plate/.gitignore.src' with {
     type: 'file',
 };
@@ -20,6 +22,7 @@ import { file } from 'bun';
 const files: Record<string, string> = {
     [gitignore]: '.gitignore',
     [indexts]: 'src/index.ts',
+    [sdksrc]: 'src/sdk.ts',
     [packagejson]: 'package.json',
     [tsconfigjson]: 'tsconfig.json',
     [manifestyaml]: 'manifest.yaml',
@@ -49,10 +52,6 @@ export class Workspace {
 
     get srcDir(): string {
         return join(this.projectDir, 'src');
-    }
-
-    get sdkFilePath(): string {
-        return join(this.srcDir, 'sdk.js');
     }
 
     async ensureSrcDirExists() {

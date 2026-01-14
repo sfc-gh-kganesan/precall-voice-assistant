@@ -5,8 +5,6 @@
  * Agent SDK Implementation for P67 platform
  */
 
-import snowflake from 'snowflake-sdk';
-import type { Manifest } from './manifest';
 import {
     type AgentSDK,
     type Binds,
@@ -20,7 +18,9 @@ import {
     P67ConfigValueSchema,
     type QueryResult,
     type SnowflakeStatement,
-} from './sdk.js';
+} from '@p67/agent-sdk';
+import snowflake from 'snowflake-sdk';
+import type { Manifest } from './manifest';
 import type { ValueManager } from './value-manager';
 
 /**

@@ -19,7 +19,7 @@
         "paths": {
             "@p67-cli/*": ["./src/*"],
             "@coco/*": ["../../coco/*"],
-            "@agent-sdk/*": ["../../packages/agent-sdk/*"]
+            "@agent-sdk/*": ["../../packages/agent-sdk/src/*"]
         },
 
         // Best practices

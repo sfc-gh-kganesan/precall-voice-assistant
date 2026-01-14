@@ -16,7 +16,7 @@ import {
     type EmailOptions,
     type P67ConfigValue,
     version,
-} from './sdk';
+} from '@p67/agent-sdk';
 import { AgentSDKImpl } from './sdk-impl';
 
 // Helper to create valid config Map

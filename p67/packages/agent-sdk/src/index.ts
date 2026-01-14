@@ -6,7 +6,35 @@
  * Provides utilities for workflows to interact with the real world (namely, Snowflake and Cortex services)
  */
 
+import { z } from 'zod';
+
 export const version = '0.1.0';
+
+export const P67ConfigValueSchema = z.object({
+    account: z.string().optional(),
+    username: z.string().optional(),
+    authenticator: z.string().optional(),
+    accessUrl: z.string().optional(),
+    token: z.string().optional(),
+    password: z.string().optional(),
+    warehouse: z.string().optional(),
+    database: z.string().optional(),
+    schema: z.string().optional(),
+    email_integration: z.string().optional(),
+});
+
+export type P67ConfigValue = z.infer<typeof P67ConfigValueSchema>;
+
+/**
+ * P67 configuration schema
+ *
+ * The core configuration mechanism of the P67 platform.
+ */
+export const P67ConfigSchema = z.object({
+    snowflakeConfig: z.map(z.string(), P67ConfigValueSchema),
+});
+
+export type P67Config = z.infer<typeof P67ConfigSchema>;
 
 /**
  * Query execution result
@@ -64,87 +92,89 @@ export interface CortexAgentOptions {
 }
 
 /**
- * P67 Agent SDK Client
- * Encapsulates all API functions for interacting with Snowflake and Cortex services
- *
- * Configuration is loaded from /tmp/config as JSON with the following structure:
- * {
- *   "snowflakeConfig": {
- *     "account": "string (required)",
- *     "username": "string (required)",
- *     "authenticator": "string (optional - auto-set based on token/password)",
- *     "accessUrl": "string (optional - auto-generated from account)",
- *     "token": "string (optional - required for token auth)",
- *     "password": "string (optional - required for password auth)",
- *     "warehouse": "string (optional)",
- *     "database": "string (optional)",
- *     "schema": "string (optional)"
- *   }
- * }
- *
- * Note: Either token or password must be provided (but not both).
- *       If authenticator is not provided, it will be auto-set to:
- *       - "PROGRAMMATIC_ACCESS_TOKEN" if token is provided
- *       - "PASSWORD" if password is provided
- *       If accessUrl is not provided, it will be generated from the account.
- *
- * @example
- * // Create client instance (reads config from /tmp/config)
- * const sdk = new AgentSDK();
- *
- * // Execute queries
- * const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table');
- *
- * // Query Cortex Analyst
- * const analystResponse = await sdk.queryCortexAnalyst('What were sales last month?');
- *
- * // Call Cortex Agent
- * const agentResponse = await sdk.callCortexAgent('Hello', {
- *   agentDatabase: 'DB',
- *   agentSchema: 'SCHEMA',
- *   agentName: 'my_agent'
- * });
- *
- * // Cleanup when done
- * await sdk.close();
+ * Snowflake statement binds
+ */
+export type Bind = string | number | boolean | null;
+export type Binds = Bind[];
+
+/**
+ * Snowflake statement
+ */
+export interface SnowflakeStatement {
+    sqlText: string;
+    binds?: Binds;
+}
+
+export interface EmailOptions {
+    email_addresses: [string];
+    subject: string;
+    body: string;
+    content_type?: string;
+    integration_name?: string;
+}
+
+/**
+ * Interface for the P67 Agent SDK
+ * Defines the public API for interacting with Snowflake and Cortex services
  */
 export interface AgentSDK {
     /**
      * Executes a read-only SELECT query against Snowflake
-     * Validates that the query is read-only before execution
-     * Rejects DML and DDL statements for safety
      *
-     * @param {string} query - SQL SELECT query to execute
-     * @returns {Promise<QueryResult>} Query results with statement and rows
-     * @throws {Error} If query is not read-only or execution fails
+     * Validates that the query is read-only before execution.
+     * Allows SELECT, WITH (CTE), SHOW, and DESCRIBE statements.
+     * Rejects DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements for safety.
+     *
+     * @param stmt - Snowflake statement to execute
+     *   - `sqlText`: SQL text to execute
+     *   - `binds`: Binds to use for the statement
+     * @param config_name - Optional name of the Snowflake config to use. If not provided and only
+     *                      one config exists, that config will be used automatically.
+     * @returns Query results containing the statement metadata and result rows
+     * @throws Error if the query is not read-only, contains multiple statements, or execution fails
      *
      * @example
-     * const sdk = new AgentSDK();
-     * const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table LIMIT 10');
+     * const result = await sdk.executeQueryReadOnly({
+     *   sqlText: 'SELECT * FROM my_table LIMIT 10',
+     *   binds: []
+     * });
      * console.log(result.rows);
+     *
+     * @example
+     * // Using a specific config
+     * const result = await sdk.executeQueryReadOnly(
+     *   {
+     *     sqlText: 'SELECT COUNT(*) FROM orders',
+     *     binds: []
+     *   },
+     *   'production_config'
+     * );
      */
     executeQueryReadOnly(
-        query: string,
+        stmt: SnowflakeStatement,
         config_name?: string,
     ): Promise<QueryResult>;
 
     /**
      * Queries Cortex Analyst with a natural language question
-     * Uses the Snowflake Cortex Analyst API to convert questions to SQL and execute them
      *
-     * @param {string} question - Natural language question to ask
-     * @param {string} [semanticModel] - Path to semantic model file (stage path or @stage/file.yaml)
-     *                                   Defaults to CORTEX_ANALYST_SEMANTIC_MODEL env var
-     * @param {string} [config_name] - Name of the config to use, if null, the only one will be used
-     * @returns {Promise<CortexAnalystResponse>} Response with success status and data or error
-     * @throws Never throws - returns error in response object
+     * Uses the Snowflake Cortex Analyst API to convert natural language questions
+     * into SQL queries and execute them against your semantic model.
+     *
+     * @param question - Natural language question to ask (e.g., "What were sales last month?")
+     * @param semanticModel - Path to semantic model file (stage path like `@my_stage/model.yaml`).
+     *                        Defaults to `CORTEX_ANALYST_SEMANTIC_MODEL` environment variable if not provided.
+     * @param config_name - Optional name of the Snowflake config to use. If not provided and only
+     *                      one config exists, that config will be used automatically.
+     * @returns Response object with `success` boolean, `data` on success, or `error` message on failure.
+     *          Never throws - errors are returned in the response object.
      *
      * @example
-     * const sdk = new AgentSDK();
      * const response = await sdk.queryCortexAnalyst(
      *   'What were the top 5 products by revenue last month?',
      *   '@my_stage/semantic_model.yaml'
      * );
+     *
      * if (response.success) {
      *   console.log(response.data);
      * } else {
@@ -159,20 +189,24 @@ export interface AgentSDK {
 
     /**
      * Calls a Cortex Agent with a question and streams the response
-     * Supports conversational context via parentMessageId
      *
-     * @param {string} question - Question or message to send to the agent
-     * @param {CortexAgentOptions} [options] - Configuration options
-     * @param {string} [options.agentDatabase] - Database containing the agent (defaults to config database)
-     * @param {string} [options.agentSchema] - Schema containing the agent (defaults to config schema)
-     * @param {string} [options.agentName] - Name of the agent (required)
-     * @param {string} [options.parentMessageId] - Parent message ID for conversation continuity (defaults to '0')
-     * @param {Function} [options.onStream] - Callback for streaming events
-     * @returns {Promise<CortexAgentResponse>} Response with success status, data, and debugging info
-     * @throws Never throws - returns error in response object
+     * Sends a message to a Snowflake Cortex Agent and processes the streaming response.
+     * Supports conversational context via `parentMessageId` for multi-turn conversations.
+     *
+     * @param question - Question or message to send to the agent
+     * @param options - Configuration options for the agent call:
+     *   - `agentDatabase`: Database containing the agent (defaults to config database)
+     *   - `agentSchema`: Schema containing the agent (defaults to config schema)
+     *   - `agentName`: Name of the agent (required)
+     *   - `parentMessageId`: Parent message ID for conversation continuity (defaults to '0' for new conversations)
+     *   - `onStream`: Callback function invoked for each streaming event, receives `{ eventName, data }`
+     * @param config_name - Optional name of the Snowflake config to use. If not provided and only
+     *                      one config exists, that config will be used automatically.
+     * @returns Response object with `success` boolean, `status_code`, `data` on success,
+     *          `error` on failure, and `request` debugging info. Never throws - errors are
+     *          returned in the response object.
      *
      * @example
-     * const sdk = new AgentSDK();
      * const response = await sdk.callCortexAgent('What is the weather today?', {
      *   agentDatabase: 'MY_DB',
      *   agentSchema: 'MY_SCHEMA',
@@ -188,6 +222,14 @@ export interface AgentSDK {
      *   console.error(response.error);
      *   console.error('Request:', response.request);
      * }
+     *
+     * @example
+     * // Multi-turn conversation
+     * const firstResponse = await sdk.callCortexAgent('Hello', { agentName: 'my_agent' });
+     * const secondResponse = await sdk.callCortexAgent('Tell me more', {
+     *   agentName: 'my_agent',
+     *   parentMessageId: firstResponse.data?.messageId
+     * });
      */
     callCortexAgent(
         question: string,
@@ -196,15 +238,43 @@ export interface AgentSDK {
     ): Promise<CortexAgentResponse>;
 
     /**
-     * Closes the cached Snowflake connection
-     * Call this when shutting down to properly cleanup resources
+     * Sends an email using the Snowflake Email Integration
      *
-     * @returns {Promise<void>}
+     * @param options - Options for the email:
+     *   - `email_addresses`: Array of email addresses to send the email to
+     *   - `subject`: Subject of the email
+     *   - `body`: Body of the email
+     *   - `content_type`: Content type of the email
+     *   - `integration_name`: Name of the email integration to use. If not provided, the default email integration will be used.
+     * @param config_name - Optional name of the Snowflake config to use. If not provided and only
+     *                      one config exists, that config will be used automatically.
+     * @returns Promise that resolves to true if the email is sent successfully, false otherwise
      *
      * @example
-     * const sdk = new AgentSDK();
-     * // ... use sdk ...
-     * await sdk.close();
+     * const response = await sdk.email({
+     *   email_addresses: ['test@example.com'],
+     *   subject: 'Test Subject',
+     *   body: 'Test Body',
+     *   integration_name: 'test_integration'
+     * });
+     */
+    email(options: EmailOptions, config_name?: string): Promise<boolean>;
+
+    /**
+     * Closes the cached Snowflake connection
+     *
+     * Call this method when shutting down your application to properly cleanup resources
+     * and release the connection back to the pool. Safe to call multiple times.
+     *
+     * @returns Promise that resolves when the connection is closed
+     *
+     * @example
+     * try {
+     *   const result = await sdk.executeQueryReadOnly('SELECT * FROM my_table');
+     *   // ... process result ...
+     * } finally {
+     *   await sdk.close();
+     * }
      */
     close(): Promise<void>;
 }
