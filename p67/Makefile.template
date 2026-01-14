@@ -3,7 +3,7 @@ SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_r
 CONTROLD_IMAGE=controld
 .PHONY: help build build-controld ci deploy describe dev fix \
 init-provider-account install-cli list-services login logs push push-controld \
-url
+url dbmigrate
 
 .DEFAULT_GOAL := help
 
@@ -28,6 +28,9 @@ build-controld: ## Build controld Docker image for linux/amd64
 
 ci:
 	pnpm run ci
+
+dbmigrate:
+	$(MAKE) -C ./packages/db migrate
 
 deploy: login build push ## Deploy to Snowflake (login, build, push, and run app)
 	snow app run -c $(SNOW_CONNECTION)
