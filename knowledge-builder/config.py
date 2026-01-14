@@ -13,9 +13,19 @@ class DatabaseConfig:
     golden_pairs_table: str = "GOLDEN_PAIRS"
     synthetic_pairs_table: str = "SYNTHETIC_PAIRS"
     kb_knowledge_table: str = "KB_KNOWLEDGE"
+    kb_chunks_table: str = "KB_CHUNKS"
 
     def get_table_name(self, table: str) -> str:
         return f"{self.database}.{self.schema}.{table}"
+
+
+@dataclass(frozen=True)
+class ChunkingConfig:
+    chunk_size: int = 1800
+    chunk_overlap: int = 300
+    processing_version: str = "v1"
+    text_column: str = "TEXT"
+    id_column: str = "NUMBER"
 
 
 @dataclass(frozen=True)
@@ -55,3 +65,4 @@ db_config = DatabaseConfig()
 search_config = SearchConfig()
 ui_config = UIConfig()
 eda_config = EDAConfig()
+chunking_config = ChunkingConfig()
