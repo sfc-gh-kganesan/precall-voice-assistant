@@ -35,8 +35,8 @@ export const runCommand = new Command('run')
                     selectedWorkflowId = await select({
                         message: 'Select a workflow to run:',
                         choices: result.workflows.map((wf) => ({
-                            value: wf,
-                            name: wf,
+                            value: wf.workflowId,
+                            name: `${wf.workflowId} (${wf.updatedAt})`,
                         })),
                     });
                 }

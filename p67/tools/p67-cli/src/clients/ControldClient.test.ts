@@ -229,7 +229,29 @@ describe('ControldClient', () => {
     describe('listWorkflows()', () => {
         test('should return list of workflows', async () => {
             const mockResponse: WorkflowListResponse = {
-                workflows: ['wf-123', 'wf-456', 'wf-789'],
+                workflows: [
+                    {
+                        workflowId: 'wf-123',
+                        owner: 'user-1',
+                        createdAt: '2024-01-01T00:00:00Z',
+                        updatedAt: '2024-01-01T00:00:00Z',
+                        visibility: 'Private',
+                    },
+                    {
+                        workflowId: 'wf-456',
+                        owner: 'user-1',
+                        createdAt: '2024-01-02T00:00:00Z',
+                        updatedAt: '2024-01-02T00:00:00Z',
+                        visibility: 'Private',
+                    },
+                    {
+                        workflowId: 'wf-789',
+                        owner: 'user-1',
+                        createdAt: '2024-01-03T00:00:00Z',
+                        updatedAt: '2024-01-03T00:00:00Z',
+                        visibility: 'Public',
+                    },
+                ],
             };
 
             globalThis.fetch = mock(async () => {

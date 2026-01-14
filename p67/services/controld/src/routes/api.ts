@@ -1,7 +1,7 @@
 import auth from '@controld/routes/auth.js';
 import health from '@controld/routes/health.js';
 import whoami from '@controld/routes/whoami.js';
-import workflow from '@controld/routes/workflow.js';
+import workflow from '@controld/routes/workflow/index.js';
 import type { FastifyPluginAsync } from 'fastify';
 
 const api: FastifyPluginAsync = async (fastify) => {

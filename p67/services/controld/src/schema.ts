@@ -15,8 +15,16 @@ export const WorkflowCreateResponseSchema = z.object({
     workflowId: z.string(),
 });
 
+export const WorkflowSchema = z.object({
+    workflowId: z.string(),
+    owner: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    visibility: z.string(),
+});
+
 export const WorkflowListResponseSchema = z.object({
-    workflows: z.array(z.string()),
+    workflows: z.array(WorkflowSchema),
 });
 
 export const WorkflowRunResponseSchema = z.object({

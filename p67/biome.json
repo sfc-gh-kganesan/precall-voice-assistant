@@ -7,7 +7,12 @@
     },
     "files": {
         "ignoreUnknown": true,
-        "includes": ["**", "!experiments", "!example_workflows"]
+        "includes": [
+            "**",
+            "!experiments",
+            "!example_workflows",
+            "!**/generated"
+        ]
     },
     "formatter": {
         "enabled": true,

@@ -17,7 +17,9 @@ export const listCommand = new Command('list')
                 console.log('No workflows found.');
             } else {
                 result.workflows.forEach((workflow) => {
-                    console.log(workflow);
+                    console.log(
+                        `- ${workflow.workflowId} (${workflow.visibility})`,
+                    );
                 });
             }
         } catch (error) {

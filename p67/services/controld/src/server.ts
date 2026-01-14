@@ -1,5 +1,6 @@
 import { loadConfig, type ServerConfig } from '@controld/config.js';
 import userPlugin from '@controld/lib/plugins/user.js';
+import { WorkflowService } from '@controld/lib/WorkflowService.js';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
@@ -15,6 +16,7 @@ import {
 declare module 'fastify' {
     interface FastifyInstance {
         config: ServerConfig;
+        workflowService: WorkflowService;
     }
 }
 
@@ -42,6 +44,15 @@ export async function buildServer(): Promise<FastifyInstance> {
     await server.register(databasePlugin, {
         databaseUrl: config.database.url,
     });
+
+    // Register workflow service
+    server.decorate(
+        'workflowService',
+        new WorkflowService({
+            db: server.db,
+            localStoragePath: server.config.localStoragePath,
+        }),
+    );
 
     await server.register(multipart);
 

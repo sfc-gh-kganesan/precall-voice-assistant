@@ -8,8 +8,16 @@ export interface WorkflowCreateResponse {
     workflowId: string;
 }
 
+export interface Workflow {
+    workflowId: string;
+    owner: string;
+    createdAt: string;
+    updatedAt: string;
+    visibility: string;
+}
+
 export interface WorkflowListResponse {
-    workflows: string[];
+    workflows: Workflow[];
 }
 
 export interface WorkflowRunResponse {
