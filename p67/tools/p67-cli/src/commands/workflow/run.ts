@@ -36,7 +36,7 @@ export const runCommand = new Command('run')
                         message: 'Select a workflow to run:',
                         choices: result.workflows.map((wf) => ({
                             value: wf.workflowId,
-                            name: `${wf.workflowId} (${wf.updatedAt})`,
+                            name: `${wf.workflowId} (${wf.updatedAt}, owner: ${wf.owner})`,
                         })),
                     });
                 }

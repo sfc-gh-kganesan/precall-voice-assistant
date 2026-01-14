@@ -18,7 +18,7 @@ export const listCommand = new Command('list')
             } else {
                 result.workflows.forEach((workflow) => {
                     console.log(
-                        `- ${workflow.workflowId} (${workflow.visibility})`,
+                        `${workflow.workflowId} (${workflow.visibility}, owner: ${workflow.owner})`,
                     );
                 });
             }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { PrismaClient, Workflow } from '@p67/db';
+import type { PrismaClient, WorkflowWithOwner } from '@p67/db';
 import { unzip } from './zip.js';
 
 export interface WorkflowServiceConfig {
@@ -29,7 +29,10 @@ export class WorkflowService {
         this.localStoragePath = config.localStoragePath;
     }
 
-    async create(ownerId: string, zipFileBuffer: Buffer): Promise<Workflow> {
+    async create(
+        ownerId: string,
+        zipFileBuffer: Buffer,
+    ): Promise<WorkflowWithOwner> {
         const workflowId = `wf-${randomUUID()}`;
         const dest = join(this.localStoragePath, workflowId);
         const { dir } = await unzip(zipFileBuffer, dest);
@@ -41,11 +44,18 @@ export class WorkflowService {
                 ownerId: ownerId,
                 visibility: 'Private',
             },
+            include: {
+                owner: true,
+            },
         });
     }
 
-    async listAll(): Promise<Workflow[]> {
-        return this.db.workflow.findMany();
+    async listAll(): Promise<WorkflowWithOwner[]> {
+        return this.db.workflow.findMany({
+            include: {
+                owner: true,
+            },
+        });
     }
 
     async listFromDisk(): Promise<string[]> {
@@ -64,16 +74,59 @@ export class WorkflowService {
             .map((entry) => entry.name);
     }
 
-    async findById(workflowId: string): Promise<Workflow | null> {
-        return this.db.workflow.findUnique({
+    async findById(workflowId: string): Promise<WorkflowWithOwner | null> {
+        const wf = this.db.workflow.findUnique({
             where: { id: workflowId },
+            include: {
+                owner: true,
+            },
+        });
+        return wf;
+    }
+
+    // Lookup workflow by ID and enforce RBAC constraints before returning
+    async findRunnableWorkflowByUser(
+        workflowId: string,
+        userId: string,
+    ): Promise<WorkflowWithOwner | null> {
+        const wf = await this.findById(workflowId);
+
+        // Workflow does not exist
+        if (!wf) {
+            return null;
+        }
+
+        // Workflow is not runnable by user
+        if (!this.rbacUserCanRun(userId, wf)) {
+            return null;
+        }
+
+        return wf;
+    }
+
+    // Find all workflows a user can run (either the user is the owner, or the workflow is set to public visibility)
+    async findAllRunnableWorkflowsByUser(
+        userId: string,
+    ): Promise<WorkflowWithOwner[]> {
+        return this.db.workflow.findMany({
+            where: {
+                OR: [{ ownerId: userId }, { visibility: 'Public' }],
+            },
+            include: {
+                owner: true,
+            },
         });
     }
 
-    async findByOwner(ownerId: string): Promise<Workflow[]> {
-        return this.db.workflow.findMany({
-            where: { ownerId },
-        });
+    rbacUserCanRun(userId: string, workflow: WorkflowWithOwner): boolean {
+        return (
+            this.rbacUserCanUpdate(userId, workflow) ||
+            workflow.visibility === 'Public'
+        );
+    }
+
+    rbacUserCanUpdate(userId: string, workflow: WorkflowWithOwner): boolean {
+        return workflow.ownerId === userId;
     }
 
     getWorkflowPath(workflowId: string): string {

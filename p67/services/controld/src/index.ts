@@ -22,6 +22,11 @@ const start = async () => {
         server.log.debug(
             `Swagger UI available at http://localhost:${server.config.port}/docs`,
         );
+        if (server.config.debug.enableDefaultUser) {
+            server.log.debug(
+                `Running in debug mode with default user: ${server.config.debug.defaultUser}`,
+            );
+        }
     } catch (err) {
         server.log.error(err);
         process.exit(1);

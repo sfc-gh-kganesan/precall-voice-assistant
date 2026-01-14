@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { Runner } from '@controld/lib/runner.js';
 import {
     ErrorResponseSchema,
@@ -28,18 +27,28 @@ export function registerRunRoute(server: FastifyInstance) {
         },
         async (request, reply) => {
             try {
-                const { localStoragePath } = request.server.config;
                 const { workflowId } = request.params as { workflowId: string };
-                const wfdir = join(localStoragePath, workflowId);
+                const workflow =
+                    await fastify.workflowService.findRunnableWorkflowByUser(
+                        workflowId,
+                        request.user.id,
+                    );
 
-                if (!existsSync(wfdir)) {
+                if (!workflow) {
                     return reply.code(400).send({
                         error: 'Invalid request',
-                        message: `Workflow ${workflowId} does not exist`,
+                        message: `Workflow ${workflowId} either does not exist or you do not have permission to access it`,
                     });
                 }
 
-                const runnerInstance = new Runner(wfdir);
+                if (!existsSync(workflow.storagePath)) {
+                    return reply.code(400).send({
+                        error: 'Invalid request',
+                        message: `Workflow ${workflowId} does not exist on disk at the expected path ${workflow.storagePath}`,
+                    });
+                }
+
+                const runnerInstance = new Runner(workflow.storagePath);
                 const { stdout, stderr, exitCode, errors, log } =
                     await runnerInstance.start();
 

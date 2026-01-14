@@ -23,16 +23,17 @@ export function registerListRoute(server: FastifyInstance) {
         },
         async (req, reply) => {
             try {
-                const workflows = await fastify.workflowService.findByOwner(
-                    req.user.id,
-                );
+                const workflows =
+                    await fastify.workflowService.findAllRunnableWorkflowsByUser(
+                        req.user.id,
+                    );
                 return reply.code(200).send({
                     workflows: workflows.map((w) => {
                         return {
                             workflowId: w.id,
                             createdAt: formatDateISO(w.createdAt),
                             updatedAt: formatDateISO(w.updatedAt),
-                            owner: w.ownerId,
+                            owner: w.owner.snowflakeUser,
                             visibility: w.visibility,
                         };
                     }),
