@@ -101,8 +101,13 @@ export class ControldClient {
     async createWorkflow(
         file: File | Blob,
         filename?: string,
+        overwriteWorkflowId?: string,
     ): Promise<WorkflowCreateResponse> {
         const formData = new FormData();
+
+        if (overwriteWorkflowId) {
+            formData.append('overwriteWorkflowId', overwriteWorkflowId);
+        }
 
         if (file instanceof File) {
             formData.append('file', file);

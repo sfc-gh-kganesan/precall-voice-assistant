@@ -13,6 +13,7 @@ export interface WorkflowServiceConfig {
 export interface CreateWorkflowInput {
     ownerId: string;
     fileBuffer: Buffer;
+    overwriteWorkflowId?: string;
 }
 
 export interface CreateWorkflowResult {
@@ -32,8 +33,26 @@ export class WorkflowService {
     async create(
         ownerId: string,
         zipFileBuffer: Buffer,
+        overwriteWorkflowId?: string,
     ): Promise<WorkflowWithOwner> {
-        const workflowId = `wf-${randomUUID()}`;
+        let workflowId = `wf-${randomUUID()}`;
+
+        if (overwriteWorkflowId) {
+            // Delete the old implementation, if one exists, otherwise throw an error.
+            workflowId = overwriteWorkflowId;
+
+            const existingWorkflow = await this.findRunnableWorkflowByUser(
+                workflowId,
+                ownerId,
+            );
+            if (!existingWorkflow) {
+                throw new Error(`Workflow ${overwriteWorkflowId} not found`);
+            }
+
+            await this.db.workflow.delete({
+                where: { id: workflowId },
+            });
+        }
         const dest = join(this.localStoragePath, workflowId);
         const { dir } = await unzip(zipFileBuffer, dest);
 

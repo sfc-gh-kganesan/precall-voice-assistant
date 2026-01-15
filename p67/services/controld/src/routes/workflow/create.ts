@@ -29,10 +29,17 @@ export function registerCreateRoute(server: FastifyInstance) {
                     return reply.code(400).send({ error: 'No file uploaded' });
                 }
 
+                const overwriteField = data.fields.overwriteWorkflowId;
+                let overwriteWorkflowId: string | undefined;
+                if (overwriteField && 'value' in overwriteField) {
+                    overwriteWorkflowId = overwriteField.value?.toString();
+                }
+
                 const fileBuffer = await data.toBuffer();
                 const wf = await fastify.workflowService.create(
                     request.user.id /* ownerId */,
                     fileBuffer /* zip file buffer */,
+                    overwriteWorkflowId /* overwriteWorkflowId */,
                 );
                 return reply.code(200).send({ workflowId: wf.id });
             } catch (error) {

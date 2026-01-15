@@ -1,6 +1,7 @@
 import { select } from '@inquirer/prompts';
 import { Command } from '@p67-cli/Command.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
+import { DotP67Config } from '@p67-cli/config/DotP67Config.ts';
 import { ctx } from '@p67-cli/context';
 
 export const runCommand = new Command('run')
@@ -14,6 +15,8 @@ export const runCommand = new Command('run')
         ) => {
             try {
                 const { connection } = ctx();
+
+                const dotP67Config = new DotP67Config('.');
 
                 const client = new ControldClient({
                     baseUrl: connection.endpoint,
@@ -31,13 +34,26 @@ export const runCommand = new Command('run')
                     if (result.workflows.length === 0) {
                         throw new Error('No workflows found');
                     }
-
+                    const choices = result.workflows.map((wf) => ({
+                        value: wf.workflowId,
+                        updatedAt: wf.updatedAt,
+                        name: `${wf.workflowId} (${wf.updatedAt}, owner: ${wf.owner})`,
+                    }));
+                    // Sort the choices by updatedAt descending
+                    choices.sort(
+                        (a, b) =>
+                            new Date(b.updatedAt).getTime() -
+                            new Date(a.updatedAt).getTime(),
+                    );
+                    // If there's a workflowid in the dotP67Config, sort such that it's first.
+                    if (dotP67Config.get().workflowId) {
+                        choices.sort((a, _b) =>
+                            a.value === dotP67Config.get().workflowId ? -1 : 1,
+                        );
+                    }
                     selectedWorkflowId = await select({
                         message: 'Select a workflow to run:',
-                        choices: result.workflows.map((wf) => ({
-                            value: wf.workflowId,
-                            name: `${wf.workflowId} (${wf.updatedAt}, owner: ${wf.owner})`,
-                        })),
+                        choices: choices,
                     });
                 }
 
