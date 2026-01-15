@@ -1,5 +1,5 @@
 ---
-name: generate-workflow-ts
+name: generate-workflow
 allowed-tools: Bash(*)
 description: Modify and implement workflow code in pre-generated P67 projects using LangGraph, the P67 Agent SDK, and Cortex AI services.
 ---
