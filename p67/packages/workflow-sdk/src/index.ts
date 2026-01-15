@@ -1,8 +1,8 @@
 /**
  * @preserve
- * @p67/agent-sdk
+ * @p67/workflow-sdk
  *
- * Agent SDK for P67 platform
+ * Workflow SDK for P67 platform
  * Provides utilities for workflows to interact with the real world (namely, Snowflake and Cortex services)
  */
 
@@ -117,7 +117,7 @@ export interface EmailOptions {
  * Interface for the P67 Agent SDK
  * Defines the public API for interacting with Snowflake and Cortex services
  */
-export interface AgentSDK {
+export interface WorkflowSDK {
     /**
      * Executes a read-only SELECT query against Snowflake
      *

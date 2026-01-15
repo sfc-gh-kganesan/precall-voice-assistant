@@ -8,7 +8,6 @@ vi.mock('snowflake-sdk', () => ({
 }));
 
 import {
-    type AgentSDK,
     type AgentStreamEvent,
     type CortexAgentOptions,
     type CortexAgentResponse,
@@ -16,8 +15,9 @@ import {
     type EmailOptions,
     type P67ConfigValue,
     version,
-} from '@p67/agent-sdk';
-import { AgentSDKImpl } from './sdk-impl';
+    type WorkflowSDK,
+} from '@p67/workflow-sdk';
+import { WorkflowSDKImpl } from './sdk-impl';
 
 // Helper to create valid config Map
 const createValidConfig = (overrides?: Partial<P67ConfigValue>) => {
@@ -36,12 +36,12 @@ const createValidConfig = (overrides?: Partial<P67ConfigValue>) => {
     return configMap;
 };
 
-describe('agent-sdk', () => {
-    let sdk: AgentSDK;
+describe('workflow-sdk', () => {
+    let sdk: WorkflowSDK;
 
     beforeEach(() => {
         vi.resetModules();
-        sdk = new AgentSDKImpl({ snowflakeConfig: createValidConfig() });
+        sdk = new WorkflowSDKImpl({ snowflakeConfig: createValidConfig() });
     });
 
     afterEach(async () => {
@@ -55,9 +55,9 @@ describe('agent-sdk', () => {
         });
     });
 
-    describe('AgentSDK class', () => {
+    describe('WorkflowSDK class', () => {
         it('should create an instance', () => {
-            expect(sdk).toBeInstanceOf(AgentSDKImpl);
+            expect(sdk).toBeInstanceOf(WorkflowSDKImpl);
         });
 
         it('should create instance with minimal config', () => {
@@ -67,8 +67,8 @@ describe('agent-sdk', () => {
                 username: 'user',
                 token: 'token',
             });
-            const testSdk = new AgentSDKImpl({ snowflakeConfig: configMap });
-            expect(testSdk).toBeInstanceOf(AgentSDKImpl);
+            const testSdk = new WorkflowSDKImpl({ snowflakeConfig: configMap });
+            expect(testSdk).toBeInstanceOf(WorkflowSDKImpl);
         });
 
         it('should create instance with password auth', () => {
@@ -79,8 +79,8 @@ describe('agent-sdk', () => {
                 accessUrl: 'https://test.snowflakecomputing.com',
                 password: 'pass',
             });
-            const testSdk = new AgentSDKImpl({ snowflakeConfig: configMap });
-            expect(testSdk).toBeInstanceOf(AgentSDKImpl);
+            const testSdk = new WorkflowSDKImpl({ snowflakeConfig: configMap });
+            expect(testSdk).toBeInstanceOf(WorkflowSDKImpl);
         });
 
         it('should create instance with explicit authenticator', () => {
@@ -92,8 +92,8 @@ describe('agent-sdk', () => {
                 accessUrl: 'https://test.snowflakecomputing.com',
                 token: 'token',
             });
-            const testSdk = new AgentSDKImpl({ snowflakeConfig: configMap });
-            expect(testSdk).toBeInstanceOf(AgentSDKImpl);
+            const testSdk = new WorkflowSDKImpl({ snowflakeConfig: configMap });
+            expect(testSdk).toBeInstanceOf(WorkflowSDKImpl);
         });
     });
 
@@ -275,7 +275,7 @@ describe('agent-sdk', () => {
                 token: 'test_token',
                 // No email_integration in config
             });
-            const testSdk = new AgentSDKImpl({ snowflakeConfig: configMap });
+            const testSdk = new WorkflowSDKImpl({ snowflakeConfig: configMap });
 
             await expect(
                 testSdk.email({

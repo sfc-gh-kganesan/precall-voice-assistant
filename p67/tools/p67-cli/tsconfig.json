@@ -19,7 +19,7 @@
         "paths": {
             "@p67-cli/*": ["./src/*"],
             "@coco/*": ["../../coco/*"],
-            "@agent-sdk/*": ["../../packages/agent-sdk/src/*"]
+            "@workflow-sdk/*": ["../../packages/workflow-sdk/src/*"]
         },
 
         // Best practices

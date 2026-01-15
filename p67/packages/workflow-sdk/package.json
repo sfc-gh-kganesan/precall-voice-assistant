@@ -1,5 +1,5 @@
 {
-    "name": "@p67/agent-sdk",
+    "name": "@p67/workflow-sdk",
     "version": "0.1.0",
     "description": "Agent SDK for P67",
     "type": "module",

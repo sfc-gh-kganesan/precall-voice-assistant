@@ -58,8 +58,8 @@ init-provider-account: ## Initialize provider account with setup SQL
 	snow sql -f "./ops/provider_account_setup.sql" -c $(SNOW_CONNECTION)
 
 install-cli: ## Install the P67 CLI tool
-	pnpm install --filter "@p67/agent-sdk" --filter "@p67/cli"
-	pnpm --filter "@p67/agent-sdk" run build
+	pnpm install --filter "@p67/workflow-sdk" --filter "@p67/cli"
+	pnpm --filter "@p67/workflow-sdk" run build
 	make clean install -C ./tools/p67-cli
 
 list: ## List all services in p67 database

@@ -1,12 +1,11 @@
 /**
  * @preserve
- * @p67/agent-sdk
+ * @p67/workflow-sdk
  *
- * Agent SDK Implementation for P67 platform
+ * Workflow SDK Implementation for P67 platform
  */
 
 import {
-    type AgentSDK,
     type Binds,
     type CortexAgentOptions,
     type CortexAgentResponse,
@@ -18,7 +17,8 @@ import {
     P67ConfigValueSchema,
     type QueryResult,
     type SnowflakeStatement,
-} from '@p67/agent-sdk';
+    type WorkflowSDK,
+} from '@p67/workflow-sdk';
 import snowflake from 'snowflake-sdk';
 import type { Manifest } from './manifest';
 import type { ValueManager } from './value-manager';
@@ -27,7 +27,7 @@ import type { ValueManager } from './value-manager';
  * P67 Agent SDK Client
  * Encapsulates all API functions for interacting with Snowflake and Cortex services
  */
-export class AgentSDKImpl implements AgentSDK {
+export class WorkflowSDKImpl implements WorkflowSDK {
     private cachedConnection: snowflake.Connection | null = null;
     private isConnecting = false;
     private connectionPromise: Promise<snowflake.Connection> | null = null;

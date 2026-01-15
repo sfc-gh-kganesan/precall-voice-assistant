@@ -1,7 +1,5 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
-import sdksrc from '@agent-sdk/index.ts' with { type: 'file' };
 import gitignore from '@p67-cli/workspace/boiler-plate/.gitignore.src' with {
     type: 'file',
 };
@@ -17,6 +15,8 @@ import indexts from '@p67-cli/workspace/boiler-plate/src/index.ts.src' with {
 import tsconfigjson from '@p67-cli/workspace/boiler-plate/tsconfig.json.src' with {
     type: 'file',
 };
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import sdksrc from '@workflow-sdk/index.ts' with { type: 'file' };
 import { file } from 'bun';
 
 const files: Record<string, string> = {

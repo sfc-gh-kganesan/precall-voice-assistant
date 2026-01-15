@@ -16,7 +16,7 @@
         "sourceMap": true,
         "baseUrl": "./",
         "paths": {
-            "@p67/agent-sdk/*": ["src/*"]
+            "@p67/workflow-sdk/*": ["src/*"]
         }
     },
     "include": ["src/**/*"],

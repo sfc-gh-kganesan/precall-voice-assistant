@@ -55,11 +55,11 @@ Runtime (EVERY RUN):
 
 ```typescript
 // DO THIS - Call Cortex Analyst at runtime as a workflow step
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // SDK is passed by the runtime - don't create or close it
 async function analyze_drivers(
-    sdk: AgentSDK,
+    sdk: WorkflowSDK,
     accounts: string[]
 ): Promise<Record<string, any>> {
     const results: Record<string, any> = {};
@@ -103,7 +103,7 @@ All interaction with Snowflake and Cortex services **MUST** go through the P67 A
 
 ### SDK Overview
 
-The P67 Agent SDK (`@p67/agent-sdk`) provides a simple, secure interface for:
+The P67 Workflow SDK (`@p67/workflow-sdk`) provides a simple, secure interface for:
 
 -   Executing read-only SQL queries
 -   Calling Cortex Analyst with natural language
@@ -115,7 +115,7 @@ The P67 Agent SDK (`@p67/agent-sdk`) provides a simple, secure interface for:
 ```typescript
 // The SDK is injected by the P67 runtime into your workflow
 // Import the type from your local sdk.ts file
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 ```
 
 ### SDK Configuration
@@ -144,10 +144,10 @@ The configuration names and their details are managed by the P67 deployment, not
 **IMPORTANT**: Your workflow does **NOT** create or close the SDK. The P67 runtime injects the SDK into your workflow's `main()` function.
 
 ```typescript
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // The SDK is passed to your main function by the runtime
-export async function main(sdk: AgentSDK) {
+export async function main(sdk: WorkflowSDK) {
     // Use the SDK - don't create or close it
     const result = await sdk.executeQueryReadOnly(
         "SELECT * FROM my_table LIMIT 10"
@@ -466,7 +466,7 @@ This file contains:
 
 -   A basic LangGraph workflow with example nodes
 -   Proper `Annotation` API usage
--   The `main(sdk: AgentSDK)` export function
+-   The `main(sdk: WorkflowSDK)` export function
 -   SDK integration through state
 
 ### Step 2: Create OVERVIEW.md
@@ -543,11 +543,11 @@ The generated `src/index.ts` looks like this:
 ```typescript
 // src/index.ts
 import { StateGraph, Annotation } from "@langchain/langgraph";
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // Define the state structure
 const StateAnnotation = Annotation.Root({
-    sdk: Annotation<AgentSDK>({
+    sdk: Annotation<WorkflowSDK>({
         reducer: (_, right) => right,
     }),
     messages: Annotation<string[]>({
@@ -576,7 +576,7 @@ const workflow = new StateGraph(StateAnnotation)
 const app = workflow.compile();
 
 // Export main function - SDK is injected by the runtime
-export async function main(sdk: AgentSDK) {
+export async function main(sdk: WorkflowSDK) {
     console.log("Starting workflow...");
 
     const result = await app.invoke({
@@ -628,11 +628,11 @@ Always use LangGraph even for deterministic workflows. Use the `Annotation` API 
 
 ```typescript
 import { StateGraph, Annotation } from "@langchain/langgraph";
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // Define state with Annotation API
 const StateAnnotation = Annotation.Root({
-    sdk: Annotation<AgentSDK>({
+    sdk: Annotation<WorkflowSDK>({
         reducer: (_, right) => right,
     }),
     candidates: Annotation<Array<Record<string, any>>>({
@@ -702,9 +702,9 @@ const credit_change = candidate.CREDIT_CHANGE || 0;
 The SDK is injected into your `main()` function. Pass it to the workflow state:
 
 ```typescript
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
-export async function main(sdk: AgentSDK) {
+export async function main(sdk: WorkflowSDK) {
     // Pass SDK to workflow via initial state
     const result = await app.invoke({
         sdk: sdk, // Inject SDK into workflow state
@@ -721,7 +721,7 @@ export async function main(sdk: AgentSDK) {
 **3. Cortex Analyst SQL Execution Pattern**
 
 ```typescript
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // In a workflow node - SDK is available from state
 async function analyzeStep(state: typeof StateAnnotation.State) {
@@ -882,11 +882,11 @@ async function analyze_step(state: WorkflowState): Promise<WorkflowState> {
 
 ```typescript
 import { Annotation } from '@langchain/langgraph';
-import { AgentSDK } from './sdk';
+import { WorkflowSDK } from './sdk';
 
 // Define state with Annotation API
 const StateAnnotation = Annotation.Root({
-  sdk: Annotation<AgentSDK>({
+  sdk: Annotation<WorkflowSDK>({
     reducer: (_, right) => right,
   }),
   candidates: Annotation<Array<Record<string, any>>>({  // Results from step 1
@@ -993,7 +993,7 @@ import { vi, beforeEach } from "vitest";
 // Auto-mock the SDK module for all tests
 beforeEach(() => {
     vi.mock("../src/sdk.ts", () => ({
-        // Mock the AgentSDK type if needed for type checking
+        // Mock the WorkflowSDK type if needed for type checking
     }));
 });
 
@@ -1128,7 +1128,7 @@ npm test 2>&1 | grep -i "browser\|keyring\|auth"
 ❌ Not validating SDK response `.success` field before using data
 ❌ **Using lowercase object keys for SQL results (must be UPPERCASE)**
 ❌ **Creating or closing the SDK in workflow code (it's injected by runtime)**
-❌ **Changing the `main(sdk: AgentSDK)` function signature**
+❌ **Changing the `main(sdk: WorkflowSDK)` function signature**
 ❌ **Not passing SDK through workflow state to all nodes**
 ❌ **Using old `channels` API instead of `Annotation` API for state**
 ❌ **Using `snowflake-sdk` directly instead of the P67 Agent SDK**

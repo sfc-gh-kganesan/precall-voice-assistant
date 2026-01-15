@@ -7,7 +7,7 @@ Experimental platform for building, testing, and deploying agentic workflows on 
 ```
 .
 ├── packages/
-│   ├── agent-sdk/    # Agent SDK for P67 workflows
+│   ├── workflow-sdk/    # Agent SDK for P67 workflows
 │   ├── db/           # Database client with Prisma integration
 │   └── web/          # React 19 + Vite frontend
 ├── services/
@@ -29,7 +29,7 @@ Experimental platform for building, testing, and deploying agentic workflows on 
 ## Tech Stack
 
 **Packages:**
-- **agent-sdk:** TypeScript SDK for building P67 workflows with Snowflake integration
+- **workflow-sdk:** TypeScript SDK for building P67 workflows with Snowflake integration
 - **db:** Prisma + PostgreSQL adapter for database operations
 - **web:** React 19, TypeScript, Vite, Mantine UI
 
@@ -91,7 +91,7 @@ pnpm build
 Or build specific packages:
 
 ```bash
-cd packages/agent-sdk && pnpm build
+cd packages/workflow-sdk && pnpm build
 cd packages/db && pnpm build
 cd packages/web && pnpm build
 ```
@@ -178,7 +178,7 @@ pnpm dev  # Runs on http://localhost:3002
 
 ## Packages
 
-### agent-sdk
+### workflow-sdk
 
 TypeScript SDK for building workflows with Snowflake Cortex features:
 - Execute read-only SQL queries

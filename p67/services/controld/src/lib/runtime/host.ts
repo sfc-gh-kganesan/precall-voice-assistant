@@ -12,7 +12,7 @@ import {
     makeThrowErrorMessage,
     WorkflowError,
 } from '@controld/lib/runtime/schema.js';
-import { AgentSDKImpl, hydrateConfig } from '@controld/lib/sdk-impl.js';
+import { hydrateConfig, WorkflowSDKImpl } from '@controld/lib/sdk-impl.js';
 import { ValueManager } from '@controld/lib/value-manager.js';
 
 function sendError(error: WorkflowError, message: string | Error | unknown) {
@@ -110,7 +110,7 @@ async function handleMessage(message: Message) {
 
     try {
         const config = await hydrateConfig(manifest, valueManager);
-        const sdk = new AgentSDKImpl(config);
+        const sdk = new WorkflowSDKImpl(config);
         const result = await script.main(sdk);
         process.send?.({ type: 'result', data: result });
         process.exit(0);

@@ -1,17 +1,17 @@
-# @p67/agent-sdk
+# @p67/workflow-sdk
 
-Agent SDK for the P67 platform.
+Workflow SDK for the P67 platform.
 
 ## Installation
 
 ```bash
-pnpm install @p67/agent-sdk
+pnpm install @p67/workflow-sdk
 ```
 
 ## Usage
 
 ```typescript
-import { version } from '@p67/agent-sdk';
+import { version } from "@p67/workflow-sdk";
 
 console.log(version);
 ```
@@ -42,3 +42,4 @@ pnpm format:check
 # Type check
 pnpm type:check
 
+```
