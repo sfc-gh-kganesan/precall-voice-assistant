@@ -1,0 +1,50 @@
+[project]
+name = "invoice-extractor"
+version = "1.0.0"
+description = "Standalone invoice extraction using LangGraph agentic workflow"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # LangGraph and LangChain
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+    
+    # PDF Processing
+    "PyMuPDF>=1.24.0",
+    "pdfplumber>=0.11.0",
+    "pdf2image>=1.17.0",
+    
+    # OCR
+    "pytesseract>=0.3.10",
+    "pillow>=10.0.0",
+    
+    # Image processing
+    "opencv-python>=4.9.0",
+    "numpy>=1.26.0",
+    
+    # Data validation
+    "pydantic>=2.0.0",
+    
+    # Environment
+    "python-dotenv>=1.0.0",
+    
+    # Rich CLI
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+extract = "app.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+]
+
