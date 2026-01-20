@@ -1,7 +1,15 @@
 from datetime import datetime
 
 import pandas as pd
-from snowflake.core import Root
+from snowflake.core import CreateMode, Root
+from snowflake.core.table import (
+    ForeignKey,
+    PrimaryKey,
+    Table,
+    TableCollection,
+    TableColumn,
+    TableResource,
+)
 from snowflake.snowpark import Session
 from snowflake.snowpark import functions as F
 from snowflake.snowpark import types as T
@@ -9,55 +17,144 @@ from snowflake.snowpark import types as T
 from config import db_config, search_config
 
 
+def create_table(
+    table_collection: TableCollection,
+    name: str,
+    columns: list[TableColumn],
+    mode: CreateMode = CreateMode.error_if_exists,
+) -> TableResource:
+    table_definition = Table(name=name, columns=columns)
+    return table_collection.create(table_definition, mode=mode)
+
+
 class SnowflakeDataOperations:
     def __init__(self, session: Session):
         self._session = session
         self._root = Root(session)
 
-    def _ensure_evaluation_table_exists(self) -> None:
-        create_table_sql = f"""
-        CREATE TABLE IF NOT EXISTS {db_config.get_table_name(db_config.evaluation_results_table)} (
-            EVAL_ID INTEGER AUTOINCREMENT PRIMARY KEY,
-            QUERY STRING NOT NULL,
-            CONTEXT STRING,
-            ANSWER STRING,
-            METRICS VARIANT,
-            REASONS VARIANT,
-            CREATED_BY STRING,
-            CREATED_ON TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+    def _get_table_collection(self) -> TableCollection:
+        return self._root.databases[db_config.database].schemas[db_config.schema].tables
+
+    def _ensure_tables_exist(self) -> None:
+        tc = self._get_table_collection()
+
+        create_table(
+            tc,
+            db_config.results_table,
+            [
+                TableColumn(
+                    name="SEARCH_ID",
+                    datatype="INT",
+                    autoincrement=True,
+                    constraints=[PrimaryKey()],
+                ),
+                TableColumn(name="INPUT_TYPE", datatype="VARCHAR"),
+                TableColumn(name="INPUT_ARGS", datatype="VARIANT"),
+                TableColumn(name="RESPONSE", datatype="VARIANT"),
+                TableColumn(name="CREATED_BY", datatype="VARCHAR"),
+                TableColumn(name="CREATED_ON", datatype="TIMESTAMP_NTZ(9)"),
+            ],
+            CreateMode.if_not_exists,
         )
-        """
-        comment_sql = f"""
-        COMMENT ON TABLE {db_config.get_table_name(db_config.evaluation_results_table)} IS
-        'Stores LLM-as-a-Judge evaluation results with TruLens chain-of-thought reasoning'
-        """
-        self._session.sql(create_table_sql).collect()
-        self._session.sql(comment_sql).collect()
+
+        create_table(
+            tc,
+            db_config.target_table,
+            [
+                TableColumn(
+                    name="FEEDBACK_ID",
+                    datatype="INT",
+                    autoincrement=True,
+                    constraints=[PrimaryKey()],
+                ),
+                TableColumn(
+                    name="SEARCH_ID",
+                    datatype="INT",
+                    constraints=[
+                        ForeignKey(
+                            referenced_table_name=db_config.results_table,
+                            referenced_column_names=["SEARCH_ID"],
+                        )
+                    ],
+                ),
+                TableColumn(name="USER_FEEDBACK", datatype="VARCHAR"),
+                TableColumn(name="USER_RATING", datatype="INT"),
+                TableColumn(name="CREATED_BY", datatype="VARCHAR"),
+                TableColumn(name="CREATED_ON", datatype="TIMESTAMP_NTZ(9)"),
+            ],
+            CreateMode.if_not_exists,
+        )
+
+        create_table(
+            tc,
+            db_config.golden_pairs_table,
+            [
+                TableColumn(name="INCIDENT", datatype="VARCHAR"),
+                TableColumn(name="SSF_KB_GUEST", datatype="VARCHAR"),
+                TableColumn(name="INPUT_QUERY", datatype="VARCHAR"),
+                TableColumn(name="RESOLUTION_FROM_RESOLUTION_NOTES", datatype="VARCHAR"),
+                TableColumn(name="USER_EDUCATION_POSSIBLY_DUE_TO_KB_GAP_OR_MISSING_CONTENT", datatype="VARCHAR"),
+                TableColumn(name="SUGGESTED_RESOLUTION_CURATED", datatype="VARCHAR"),
+                TableColumn(name="RESOLUTION_DETAILS_FOUND_UNIQUE_TO_SSF_AND_NOT_COVERED_IN_SELFHELP", datatype="VARCHAR"),
+                TableColumn(name="COVERED_IN_SELFHELP", datatype="VARCHAR"),
+                TableColumn(name="FOUND_IN_CONCIERGE", datatype="VARCHAR"),
+                TableColumn(name="DEFLECTION", datatype="VARCHAR"),
+                TableColumn(name="LUMA_COMMENTS_AND_RESOLUTION", datatype="VARCHAR"),
+                TableColumn(name="CONCIERGE_RESPONSE_BETA", datatype="VARCHAR"),
+                TableColumn(name="ALTERNATE_QUERIES_OR_UTTERANCES", datatype="VARCHAR"),
+                TableColumn(name="FOLLOW_UP", datatype="VARCHAR"),
+            ],
+            CreateMode.if_not_exists,
+        )
+
+        create_table(
+            tc,
+            db_config.synthetic_pairs_table,
+            [
+                TableColumn(name="SEARCH_ID", datatype="VARCHAR"),
+                TableColumn(name="INPUT_TYPE", datatype="VARCHAR"),
+                TableColumn(name="INPUT_ARGS", datatype="VARCHAR"),
+                TableColumn(name="RESPONSE", datatype="VARCHAR"),
+                TableColumn(name="CREATED_BY", datatype="VARCHAR"),
+                TableColumn(name="CREATED_ON", datatype="TIMESTAMP_NTZ(9)"),
+            ],
+            CreateMode.if_not_exists,
+        )
+
+        create_table(
+            tc,
+            db_config.evaluation_results_table,
+            [
+                TableColumn(
+                    name="EVAL_ID",
+                    datatype="INT",
+                    autoincrement=True,
+                    constraints=[PrimaryKey()],
+                ),
+                TableColumn(name="QUERY", datatype="VARCHAR", nullable=False),
+                TableColumn(name="CONTEXT", datatype="VARCHAR"),
+                TableColumn(name="ANSWER", datatype="VARCHAR"),
+                TableColumn(name="METRICS", datatype="VARIANT"),
+                TableColumn(name="REASONS", datatype="VARIANT"),
+                TableColumn(name="CREATED_BY", datatype="VARCHAR"),
+                TableColumn(name="CREATED_ON", datatype="TIMESTAMP_NTZ(9)", default="CURRENT_TIMESTAMP()"),
+            ],
+            CreateMode.if_not_exists,
+        )
 
     def validate_environment(self) -> tuple[bool, list]:
-        required_tables = [
-            db_config.target_table,
-            db_config.results_table,
-            db_config.golden_pairs_table,
-        ]
         missing_resources = []
 
         try:
+            self._ensure_tables_exist()
+
             database = self._root.databases[db_config.database]
             schema = database.schemas[db_config.schema]
-
-            for table_name in required_tables:
-                try:
-                    _ = schema.tables[table_name]
-                except Exception:
-                    missing_resources.append(f"Table: {db_config.get_table_name(table_name)}")
 
             try:
                 _ = schema.cortex_search_services[db_config.search_service]
             except Exception:
                 missing_resources.append(f"Cortex Search Service: {db_config.get_table_name(db_config.search_service)}")
-
-            self._ensure_evaluation_table_exists()
 
         except Exception as e:
             return False, [f"Failed to validate environment: {str(e)}"]
@@ -170,11 +267,12 @@ class SnowflakeDataOperations:
 
             results = self._session.table(db_config.results_table).filter(F.upper(F.col("INPUT_TYPE")) == F.lit(input_type.upper())).with_column("INPUT_QUERY", F.col("INPUT_ARGS")["query"].cast(T.StringType())).join_table_function("flatten", F.col("RESPONSE")).select(*base_select)
             return results.to_pandas()
-        except Exception:
+        except Exception as e:
+            print(f"Error extracting search results: {e}")
             return pd.DataFrame()
 
     def get_baseline_results(self) -> pd.DataFrame:
-        golden_pair_results = self.extract_search_results("GOLDEN_PAIR", ["INDEX"])
+        golden_pair_results = self.extract_search_results("GOLDEN_PAIR", ["SEARCH_ID"])
         if not golden_pair_results.empty:
             original_golden_pairs = self._session.table(db_config.golden_pairs_table).to_pandas()
             return golden_pair_results.merge(original_golden_pairs, on="INPUT_QUERY", how="left")
@@ -250,3 +348,16 @@ class SnowflakeDataOperations:
 
     def call_stored_procedure(self, proc_name: str) -> pd.DataFrame:
         return self._session.call(proc_name).to_pandas()
+
+    def get_input_types(self) -> list[str]:
+        try:
+            types = self._session.table(db_config.get_table_name(db_config.results_table)).select(F.col("INPUT_TYPE")).distinct().sort(F.col("INPUT_TYPE")).to_pandas()
+            return types["INPUT_TYPE"].tolist()
+        except Exception:
+            return []
+
+    def get_feedback_for_query(self, query_id: int) -> pd.DataFrame:
+        try:
+            return self._session.table(db_config.get_table_name(db_config.target_table)).filter(F.col("SEARCH_ID") == F.lit(int(query_id))).select("USER_FEEDBACK", "USER_RATING", "CREATED_BY", "CREATED_ON").sort(F.col("CREATED_ON").desc()).to_pandas()
+        except Exception:
+            return pd.DataFrame(columns=["USER_FEEDBACK", "USER_RATING", "CREATED_BY", "CREATED_ON"])
