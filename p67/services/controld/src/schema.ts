@@ -124,3 +124,61 @@ export type SecretSaveBody = z.infer<typeof SecretSaveBodySchema>;
 export type SecretSaveResponse = z.infer<typeof SecretSaveResponseSchema>;
 export type SecretListResponse = z.infer<typeof SecretListResponseSchema>;
 export type SecretDeleteResponse = z.infer<typeof SecretDeleteResponseSchema>;
+
+// Log Schemas
+export const LogSourceSchema = z.enum([
+    'RuntimeHost',
+    'WorkflowNode',
+    'ToolCall',
+]);
+export type LogSourceType = z.infer<typeof LogSourceSchema>;
+
+export const LogListQuerySchema = z.object({
+    workflowId: z.string().optional(),
+    runId: z.string().optional(),
+    source: LogSourceSchema.optional(),
+    limit: z.coerce.number().optional().default(100),
+    offset: z.coerce.number().optional().default(0),
+});
+
+export const LogEntrySchema = z.object({
+    id: z.string(),
+    runId: z.string(),
+    workflowId: z.string(),
+    source: LogSourceSchema,
+    message: z.string(),
+    attributes: z.record(z.unknown()),
+    timestamp: z.string(),
+});
+
+export const LogListResponseSchema = z.object({
+    logs: z.array(LogEntrySchema),
+    total: z.number(),
+});
+
+export const RunListQuerySchema = z.object({
+    workflowId: z.string(),
+    limit: z.coerce.number().optional().default(20),
+    offset: z.coerce.number().optional().default(0),
+});
+
+export const RunEntrySchema = z.object({
+    id: z.string(),
+    workflowId: z.string(),
+    startedAt: z.string(),
+    completedAt: z.string().nullable(),
+    exitCode: z.number().nullable(),
+    logCount: z.number(),
+});
+
+export const RunListResponseSchema = z.object({
+    runs: z.array(RunEntrySchema),
+    total: z.number(),
+});
+
+export type LogListQuery = z.infer<typeof LogListQuerySchema>;
+export type LogEntry = z.infer<typeof LogEntrySchema>;
+export type LogListResponse = z.infer<typeof LogListResponseSchema>;
+export type RunListQuery = z.infer<typeof RunListQuerySchema>;
+export type RunEntry = z.infer<typeof RunEntrySchema>;
+export type RunListResponse = z.infer<typeof RunListResponseSchema>;

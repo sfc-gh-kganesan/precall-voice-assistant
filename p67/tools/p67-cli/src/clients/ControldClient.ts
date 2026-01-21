@@ -55,6 +55,46 @@ export interface SecretDeleteResponse {
     name: string;
 }
 
+// Log types
+export type LogSource = 'RuntimeHost' | 'WorkflowNode' | 'ToolCall';
+
+export interface LogEntry {
+    id: string;
+    runId: string;
+    workflowId: string;
+    source: LogSource;
+    message: string;
+    attributes: Record<string, unknown>;
+    timestamp: string;
+}
+
+export interface LogListResponse {
+    logs: LogEntry[];
+    total: number;
+}
+
+export interface LogListOptions {
+    workflowId?: string;
+    runId?: string;
+    source?: LogSource;
+    limit?: number;
+    offset?: number;
+}
+
+export interface RunEntry {
+    id: string;
+    workflowId: string;
+    startedAt: string;
+    completedAt: string | null;
+    exitCode: number | null;
+    logCount: number;
+}
+
+export interface RunListResponse {
+    runs: RunEntry[];
+    total: number;
+}
+
 export interface ControldClientConfig {
     baseUrl: string;
     pat: string;
@@ -217,5 +257,52 @@ export class ControldClient {
         }
 
         return (await response.json()) as SecretDeleteResponse;
+    }
+
+    // Log methods
+
+    async listLogs(options: LogListOptions = {}): Promise<LogListResponse> {
+        const params = new URLSearchParams();
+        if (options.workflowId) params.set('workflowId', options.workflowId);
+        if (options.runId) params.set('runId', options.runId);
+        if (options.source) params.set('source', options.source);
+        if (options.limit !== undefined)
+            params.set('limit', String(options.limit));
+        if (options.offset !== undefined)
+            params.set('offset', String(options.offset));
+
+        const queryString = params.toString();
+        const path = queryString
+            ? `/api/log/list?${queryString}`
+            : '/api/log/list';
+
+        const response = await this.get(path);
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as LogListResponse;
+    }
+
+    async listRuns(
+        workflowId: string,
+        options?: { limit?: number; offset?: number },
+    ): Promise<RunListResponse> {
+        const params = new URLSearchParams({ workflowId });
+        if (options?.limit !== undefined)
+            params.set('limit', String(options.limit));
+        if (options?.offset !== undefined)
+            params.set('offset', String(options.offset));
+
+        const response = await this.get(`/api/log/runs?${params.toString()}`);
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as RunListResponse;
     }
 }

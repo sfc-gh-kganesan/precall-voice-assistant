@@ -20,6 +20,7 @@ model User {
   snowflakeUser String   @unique
   workflows Workflow[]
   secrets Secret[]
+  workflowRuns WorkflowRun[]
 }
 
 enum WorkflowVisibility {
@@ -35,6 +36,45 @@ model Workflow {
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())
     visibility WorkflowVisibility @default(Private)
+    runs WorkflowRun[]
+}
+
+enum LogSource {
+    RuntimeHost      // Logs from the runtime host process
+    WorkflowNode     // Logs from workflow node execution
+    ToolCall         // Logs from tool/function calls
+}
+
+model WorkflowRun {
+    id          String    @id @default(uuid())
+    workflowId  String
+    workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+    userId      String
+    user        User      @relation(fields: [userId], references: [id])
+    startedAt   DateTime  @default(now())
+    completedAt DateTime?
+    exitCode    Int?
+    logs        Log[]
+
+    @@index([workflowId])
+    @@index([userId])
+}
+
+model Log {
+    id          String    @id @default(uuid())
+    runId       String
+    run         WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+    workflowId  String    // Denormalized for efficient querying
+    userId      String    // Denormalized for RBAC filtering
+    source      LogSource
+    message     String
+    attributes  Json      @default("{}")  // Custom key-value attributes
+    timestamp   DateTime  @default(now())
+
+    @@index([runId])
+    @@index([workflowId])
+    @@index([userId])
+    @@index([timestamp])
 }
 
 model Secret {

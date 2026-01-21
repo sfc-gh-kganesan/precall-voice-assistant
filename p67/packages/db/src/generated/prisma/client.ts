@@ -50,6 +50,16 @@ export type User = Prisma.UserModel
  */
 export type Workflow = Prisma.WorkflowModel
 /**
+ * Model WorkflowRun
+ * 
+ */
+export type WorkflowRun = Prisma.WorkflowRunModel
+/**
+ * Model Log
+ * 
+ */
+export type Log = Prisma.LogModel
+/**
  * Model Secret
  * 
  */

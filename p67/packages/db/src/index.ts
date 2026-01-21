@@ -1,7 +1,10 @@
 export type {
+    Log,
+    LogSource,
     PrismaClient,
     Secret,
     Workflow,
+    WorkflowRun,
 } from './generated/prisma/client.js';
 export { SecretModel } from './generated/prisma/models/Secret.js';
 export { UserModel } from './generated/prisma/models/User.js';
@@ -15,3 +18,8 @@ type WorkflowWithOwner = Prisma.WorkflowGetPayload<{
     include: { owner: true };
 }>;
 export type { WorkflowWithOwner };
+
+type WorkflowRunWithLogs = Prisma.WorkflowRunGetPayload<{
+    include: { logs: true };
+}>;
+export type { WorkflowRunWithLogs };

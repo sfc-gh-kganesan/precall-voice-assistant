@@ -386,6 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   User: 'User',
   Workflow: 'Workflow',
+  WorkflowRun: 'WorkflowRun',
+  Log: 'Log',
   Secret: 'Secret'
 } as const
 
@@ -402,7 +404,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "workflow" | "secret"
+    modelProps: "user" | "workflow" | "workflowRun" | "log" | "secret"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -554,6 +556,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    WorkflowRun: {
+      payload: Prisma.$WorkflowRunPayload<ExtArgs>
+      fields: Prisma.WorkflowRunFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WorkflowRunFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WorkflowRunFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+        }
+        findFirst: {
+          args: Prisma.WorkflowRunFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WorkflowRunFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+        }
+        findMany: {
+          args: Prisma.WorkflowRunFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>[]
+        }
+        create: {
+          args: Prisma.WorkflowRunCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+        }
+        createMany: {
+          args: Prisma.WorkflowRunCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WorkflowRunCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>[]
+        }
+        delete: {
+          args: Prisma.WorkflowRunDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+        }
+        update: {
+          args: Prisma.WorkflowRunUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+        }
+        deleteMany: {
+          args: Prisma.WorkflowRunDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WorkflowRunUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WorkflowRunUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>[]
+        }
+        upsert: {
+          args: Prisma.WorkflowRunUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+        }
+        aggregate: {
+          args: Prisma.WorkflowRunAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWorkflowRun>
+        }
+        groupBy: {
+          args: Prisma.WorkflowRunGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkflowRunGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WorkflowRunCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkflowRunCountAggregateOutputType> | number
+        }
+      }
+    }
+    Log: {
+      payload: Prisma.$LogPayload<ExtArgs>
+      fields: Prisma.LogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>
+        }
+        findFirst: {
+          args: Prisma.LogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>
+        }
+        findMany: {
+          args: Prisma.LogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>[]
+        }
+        create: {
+          args: Prisma.LogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>
+        }
+        createMany: {
+          args: Prisma.LogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>[]
+        }
+        delete: {
+          args: Prisma.LogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>
+        }
+        update: {
+          args: Prisma.LogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>
+        }
+        deleteMany: {
+          args: Prisma.LogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>[]
+        }
+        upsert: {
+          args: Prisma.LogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LogPayload>
+        }
+        aggregate: {
+          args: Prisma.LogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLog>
+        }
+        groupBy: {
+          args: Prisma.LogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LogCountAggregateOutputType> | number
+        }
+      }
+    }
     Secret: {
       payload: Prisma.$SecretPayload<ExtArgs>
       fields: Prisma.SecretFieldRefs
@@ -689,6 +839,32 @@ export const WorkflowScalarFieldEnum = {
 export type WorkflowScalarFieldEnum = (typeof WorkflowScalarFieldEnum)[keyof typeof WorkflowScalarFieldEnum]
 
 
+export const WorkflowRunScalarFieldEnum = {
+  id: 'id',
+  workflowId: 'workflowId',
+  userId: 'userId',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  exitCode: 'exitCode'
+} as const
+
+export type WorkflowRunScalarFieldEnum = (typeof WorkflowRunScalarFieldEnum)[keyof typeof WorkflowRunScalarFieldEnum]
+
+
+export const LogScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  workflowId: 'workflowId',
+  userId: 'userId',
+  source: 'source',
+  message: 'message',
+  attributes: 'attributes',
+  timestamp: 'timestamp'
+} as const
+
+export type LogScalarFieldEnum = (typeof LogScalarFieldEnum)[keyof typeof LogScalarFieldEnum]
+
+
 export const SecretScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -709,12 +885,36 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
 export const QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
 } as const
 
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
 
@@ -776,6 +976,48 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'LogSource'
+ */
+export type EnumLogSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LogSource'>
+    
+
+
+/**
+ * Reference to a field of type 'LogSource[]'
+ */
+export type ListEnumLogSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LogSource[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
+ * Reference to a field of type 'Float'
+ */
+export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
+    
+
+
+/**
+ * Reference to a field of type 'Float[]'
+ */
+export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
     
 
 /**
@@ -875,6 +1117,8 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   workflow?: Prisma.WorkflowOmit
+  workflowRun?: Prisma.WorkflowRunOmit
+  log?: Prisma.LogOmit
   secret?: Prisma.SecretOmit
 }
 

@@ -1,7 +1,8 @@
 import { fork } from 'node:child_process';
 import * as fs from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { LogService } from '@controld/lib/LogService.js';
 import type { Manifest } from '@controld/lib/manifest.js';
 import { parseManifest } from '@controld/lib/manifest.js';
 import {
@@ -24,6 +25,7 @@ export type RunResult = {
     log: string[];
     exitCode: number;
     errors: Array<{ error: WorkflowError; message: string }>;
+    runId: string;
 };
 
 export class Logger {
@@ -57,11 +59,17 @@ export class Logger {
 }
 
 export class Runner {
+    private workflowId: string;
+
     constructor(
         private readonly workflowDir: string,
         private readonly db: PrismaClient,
         private readonly userId: string,
-    ) {}
+        private readonly logService?: LogService,
+    ) {
+        // Extract workflow ID from directory name (e.g., "wf-abc123")
+        this.workflowId = basename(workflowDir);
+    }
 
     /**
      * Serializes a P67Config (with Map) to a plain object for IPC.
@@ -75,13 +83,48 @@ export class Runner {
     public async start(): Promise<RunResult> {
         console.log(`Running workflow from ${this.workflowDir}...`);
 
+        // Create a workflow run record if logService is available
+        let runId = 'unknown';
+        if (this.logService) {
+            const run = await this.logService.createRun(
+                this.workflowId,
+                this.userId,
+            );
+            runId = run.id;
+        }
+
+        // Helper to write logs to the database
+        const writeLog = async (
+            source: 'RuntimeHost' | 'WorkflowNode' | 'ToolCall',
+            message: string,
+            attributes?: Record<string, unknown>,
+        ) => {
+            if (this.logService) {
+                await this.logService.writeLog({
+                    runId,
+                    workflowId: this.workflowId,
+                    userId: this.userId,
+                    source,
+                    message,
+                    attributes,
+                });
+            }
+        };
+
         // Load and parse manifest
         const manifestPath = resolve(this.workflowDir, 'manifest.yaml');
         if (!fs.existsSync(manifestPath)) {
+            const errorMsg = `Manifest not found at ${manifestPath}`;
+            await writeLog('RuntimeHost', errorMsg, {
+                error: 'ManifestNotfound',
+            });
+            if (this.logService) {
+                await this.logService.completeRun(runId, 1);
+            }
             return {
                 stdout: [],
                 stderr: [],
-                log: [`Manifest not found at ${manifestPath}`],
+                log: [errorMsg],
                 exitCode: 1,
                 errors: [
                     {
@@ -89,6 +132,7 @@ export class Runner {
                         message: `${manifestPath} does not exist`,
                     },
                 ],
+                runId,
             };
         }
 
@@ -98,10 +142,17 @@ export class Runner {
         } catch (err) {
             const message =
                 err instanceof Error ? err.message : 'Unknown error';
+            const errorMsg = `Failed to read manifest: ${message}`;
+            await writeLog('RuntimeHost', errorMsg, {
+                error: 'ManifestLoadParseError',
+            });
+            if (this.logService) {
+                await this.logService.completeRun(runId, 1);
+            }
             return {
                 stdout: [],
                 stderr: [],
-                log: [`Failed to read manifest: ${message}`],
+                log: [errorMsg],
                 exitCode: 1,
                 errors: [
                     {
@@ -109,6 +160,7 @@ export class Runner {
                         message,
                     },
                 ],
+                runId,
             };
         }
 
@@ -118,10 +170,17 @@ export class Runner {
         } catch (err) {
             const message =
                 err instanceof Error ? err.message : 'Unknown error';
+            const errorMsg = `Failed to parse manifest: ${message}`;
+            await writeLog('RuntimeHost', errorMsg, {
+                error: 'ManifestLoadParseError',
+            });
+            if (this.logService) {
+                await this.logService.completeRun(runId, 1);
+            }
             return {
                 stdout: [],
                 stderr: [],
-                log: [`Failed to parse manifest: ${message}`],
+                log: [errorMsg],
                 exitCode: 1,
                 errors: [
                     {
@@ -129,6 +188,7 @@ export class Runner {
                         message,
                     },
                 ],
+                runId,
             };
         }
 
@@ -140,10 +200,17 @@ export class Runner {
         } catch (err) {
             const message =
                 err instanceof Error ? err.message : 'Unknown error';
+            const errorMsg = `Failed to hydrate config: ${message}`;
+            await writeLog('RuntimeHost', errorMsg, {
+                error: 'ExecutionError',
+            });
+            if (this.logService) {
+                await this.logService.completeRun(runId, 1);
+            }
             return {
                 stdout: [],
                 stderr: [],
-                log: [`Failed to hydrate config: ${message}`],
+                log: [errorMsg],
                 exitCode: 1,
                 errors: [
                     {
@@ -151,6 +218,7 @@ export class Runner {
                         message: `Config hydration failed: ${message}`,
                     },
                 ],
+                runId,
             };
         }
 
@@ -167,12 +235,15 @@ export class Runner {
         const errors: WorkflowErrorMessage[] = [];
         const logger = new Logger();
 
+        await writeLog('RuntimeHost', 'Starting workflow execution');
+
         if (proc.stdout) {
             proc.stdout.on('data', (data: Buffer) => {
                 const text = data.toString();
                 console.log('[Child stdout]:', text);
                 stdout.push(text);
                 logger.stdout(text.trim());
+                writeLog('RuntimeHost', text.trim(), { stream: 'stdout' });
             });
         }
 
@@ -182,6 +253,7 @@ export class Runner {
                 console.error('[Child stderr]:', text);
                 stderr.push(text);
                 logger.stderr(text.trim());
+                writeLog('RuntimeHost', text.trim(), { stream: 'stderr' });
             });
         }
 
@@ -217,6 +289,13 @@ export class Runner {
                     }
                     logger.error(`${pm.data.error}: ${pm.data.message}`);
                     errors.push(pm.data);
+                    writeLog(
+                        'RuntimeHost',
+                        `${pm.data.error}: ${pm.data.message}`,
+                        {
+                            error: pm.data.error,
+                        },
+                    );
                     break;
                 }
                 case MessageType.RunWorkflow:
@@ -239,6 +318,9 @@ export class Runner {
                 logger.debug(
                     `Runner received error message from child process: ${error}`,
                 );
+                writeLog('RuntimeHost', `Process error: ${error}`, {
+                    error: 'ProcessError',
+                });
                 resolve(1);
             });
 
@@ -247,12 +329,22 @@ export class Runner {
                 logger.debug(
                     `Runner received uncaught exception from child process: ${error}`,
                 );
+                writeLog('RuntimeHost', `Uncaught exception: ${error}`, {
+                    error: 'UncaughtException',
+                });
                 resolve(1);
             });
 
             proc.on('exit', (code) => {
                 console.log(`Child process exited with code ${code}`);
                 logger.debug(`Child process exited with code ${code}`);
+                writeLog(
+                    'RuntimeHost',
+                    `Workflow completed with exit code ${code}`,
+                    {
+                        exitCode: code,
+                    },
+                );
                 resolve(code || 0);
             });
         });
@@ -260,12 +352,18 @@ export class Runner {
         proc.send(m);
         const exitCode = await getExitCode;
 
+        // Complete the run record
+        if (this.logService) {
+            await this.logService.completeRun(runId, exitCode);
+        }
+
         return {
             stdout,
             stderr,
             log: logger.dump(),
             errors,
             exitCode,
+            runId,
         };
     }
 }

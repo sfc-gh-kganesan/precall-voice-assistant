@@ -1,4 +1,5 @@
 import { loadConfig, type ServerConfig } from '@controld/config.js';
+import { LogService } from '@controld/lib/LogService.js';
 import userPlugin from '@controld/lib/plugins/user.js';
 import { SecretService } from '@controld/lib/SecretService.js';
 import { WorkflowService } from '@controld/lib/WorkflowService.js';
@@ -19,6 +20,7 @@ declare module 'fastify' {
         config: ServerConfig;
         workflowService: WorkflowService;
         secretService: SecretService;
+        logService: LogService;
     }
 }
 
@@ -60,6 +62,14 @@ export async function buildServer(): Promise<FastifyInstance> {
     server.decorate(
         'secretService',
         new SecretService({
+            db: server.db,
+        }),
+    );
+
+    // Register log service
+    server.decorate(
+        'logService',
+        new LogService({
             db: server.db,
         }),
     );

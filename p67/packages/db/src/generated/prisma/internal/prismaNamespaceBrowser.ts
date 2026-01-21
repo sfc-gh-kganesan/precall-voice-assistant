@@ -53,6 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   User: 'User',
   Workflow: 'Workflow',
+  WorkflowRun: 'WorkflowRun',
+  Log: 'Log',
   Secret: 'Secret'
 } as const
 
@@ -94,6 +96,32 @@ export const WorkflowScalarFieldEnum = {
 export type WorkflowScalarFieldEnum = (typeof WorkflowScalarFieldEnum)[keyof typeof WorkflowScalarFieldEnum]
 
 
+export const WorkflowRunScalarFieldEnum = {
+  id: 'id',
+  workflowId: 'workflowId',
+  userId: 'userId',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  exitCode: 'exitCode'
+} as const
+
+export type WorkflowRunScalarFieldEnum = (typeof WorkflowRunScalarFieldEnum)[keyof typeof WorkflowRunScalarFieldEnum]
+
+
+export const LogScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  workflowId: 'workflowId',
+  userId: 'userId',
+  source: 'source',
+  message: 'message',
+  attributes: 'attributes',
+  timestamp: 'timestamp'
+} as const
+
+export type LogScalarFieldEnum = (typeof LogScalarFieldEnum)[keyof typeof LogScalarFieldEnum]
+
+
 export const SecretScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -114,10 +142,34 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const JsonNullValueInput = {
+  JsonNull: 'JsonNull'
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
 export const QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
 } as const
 
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: 'DbNull',
+  JsonNull: 'JsonNull',
+  AnyNull: 'AnyNull'
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 

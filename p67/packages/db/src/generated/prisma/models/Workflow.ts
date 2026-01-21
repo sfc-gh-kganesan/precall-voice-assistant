@@ -191,6 +191,7 @@ export type WorkflowWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Workflow"> | Date | string
   visibility?: Prisma.EnumWorkflowVisibilityFilter<"Workflow"> | $Enums.WorkflowVisibility
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  runs?: Prisma.WorkflowRunListRelationFilter
 }
 
 export type WorkflowOrderByWithRelationInput = {
@@ -201,6 +202,7 @@ export type WorkflowOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   visibility?: Prisma.SortOrder
   owner?: Prisma.UserOrderByWithRelationInput
+  runs?: Prisma.WorkflowRunOrderByRelationAggregateInput
 }
 
 export type WorkflowWhereUniqueInput = Prisma.AtLeast<{
@@ -214,6 +216,7 @@ export type WorkflowWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Workflow"> | Date | string
   visibility?: Prisma.EnumWorkflowVisibilityFilter<"Workflow"> | $Enums.WorkflowVisibility
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  runs?: Prisma.WorkflowRunListRelationFilter
 }, "id">
 
 export type WorkflowOrderByWithAggregationInput = {
@@ -247,6 +250,7 @@ export type WorkflowCreateInput = {
   updatedAt?: Date | string
   visibility?: $Enums.WorkflowVisibility
   owner: Prisma.UserCreateNestedOneWithoutWorkflowsInput
+  runs?: Prisma.WorkflowRunCreateNestedManyWithoutWorkflowInput
 }
 
 export type WorkflowUncheckedCreateInput = {
@@ -256,6 +260,7 @@ export type WorkflowUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   visibility?: $Enums.WorkflowVisibility
+  runs?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkflowInput
 }
 
 export type WorkflowUpdateInput = {
@@ -265,6 +270,7 @@ export type WorkflowUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   visibility?: Prisma.EnumWorkflowVisibilityFieldUpdateOperationsInput | $Enums.WorkflowVisibility
   owner?: Prisma.UserUpdateOneRequiredWithoutWorkflowsNestedInput
+  runs?: Prisma.WorkflowRunUpdateManyWithoutWorkflowNestedInput
 }
 
 export type WorkflowUncheckedUpdateInput = {
@@ -274,6 +280,7 @@ export type WorkflowUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   visibility?: Prisma.EnumWorkflowVisibilityFieldUpdateOperationsInput | $Enums.WorkflowVisibility
+  runs?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkflowNestedInput
 }
 
 export type WorkflowCreateManyInput = {
@@ -339,6 +346,11 @@ export type WorkflowMinOrderByAggregateInput = {
   visibility?: Prisma.SortOrder
 }
 
+export type WorkflowScalarRelationFilter = {
+  is?: Prisma.WorkflowWhereInput
+  isNot?: Prisma.WorkflowWhereInput
+}
+
 export type WorkflowCreateNestedManyWithoutOwnerInput = {
   create?: Prisma.XOR<Prisma.WorkflowCreateWithoutOwnerInput, Prisma.WorkflowUncheckedCreateWithoutOwnerInput> | Prisma.WorkflowCreateWithoutOwnerInput[] | Prisma.WorkflowUncheckedCreateWithoutOwnerInput[]
   connectOrCreate?: Prisma.WorkflowCreateOrConnectWithoutOwnerInput | Prisma.WorkflowCreateOrConnectWithoutOwnerInput[]
@@ -385,12 +397,27 @@ export type EnumWorkflowVisibilityFieldUpdateOperationsInput = {
   set?: $Enums.WorkflowVisibility
 }
 
+export type WorkflowCreateNestedOneWithoutRunsInput = {
+  create?: Prisma.XOR<Prisma.WorkflowCreateWithoutRunsInput, Prisma.WorkflowUncheckedCreateWithoutRunsInput>
+  connectOrCreate?: Prisma.WorkflowCreateOrConnectWithoutRunsInput
+  connect?: Prisma.WorkflowWhereUniqueInput
+}
+
+export type WorkflowUpdateOneRequiredWithoutRunsNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkflowCreateWithoutRunsInput, Prisma.WorkflowUncheckedCreateWithoutRunsInput>
+  connectOrCreate?: Prisma.WorkflowCreateOrConnectWithoutRunsInput
+  upsert?: Prisma.WorkflowUpsertWithoutRunsInput
+  connect?: Prisma.WorkflowWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkflowUpdateToOneWithWhereWithoutRunsInput, Prisma.WorkflowUpdateWithoutRunsInput>, Prisma.WorkflowUncheckedUpdateWithoutRunsInput>
+}
+
 export type WorkflowCreateWithoutOwnerInput = {
   id?: string
   storagePath: string
   createdAt?: Date | string
   updatedAt?: Date | string
   visibility?: $Enums.WorkflowVisibility
+  runs?: Prisma.WorkflowRunCreateNestedManyWithoutWorkflowInput
 }
 
 export type WorkflowUncheckedCreateWithoutOwnerInput = {
@@ -399,6 +426,7 @@ export type WorkflowUncheckedCreateWithoutOwnerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   visibility?: $Enums.WorkflowVisibility
+  runs?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutWorkflowInput
 }
 
 export type WorkflowCreateOrConnectWithoutOwnerInput = {
@@ -439,6 +467,58 @@ export type WorkflowScalarWhereInput = {
   visibility?: Prisma.EnumWorkflowVisibilityFilter<"Workflow"> | $Enums.WorkflowVisibility
 }
 
+export type WorkflowCreateWithoutRunsInput = {
+  id?: string
+  storagePath: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  visibility?: $Enums.WorkflowVisibility
+  owner: Prisma.UserCreateNestedOneWithoutWorkflowsInput
+}
+
+export type WorkflowUncheckedCreateWithoutRunsInput = {
+  id?: string
+  storagePath: string
+  ownerId: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  visibility?: $Enums.WorkflowVisibility
+}
+
+export type WorkflowCreateOrConnectWithoutRunsInput = {
+  where: Prisma.WorkflowWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkflowCreateWithoutRunsInput, Prisma.WorkflowUncheckedCreateWithoutRunsInput>
+}
+
+export type WorkflowUpsertWithoutRunsInput = {
+  update: Prisma.XOR<Prisma.WorkflowUpdateWithoutRunsInput, Prisma.WorkflowUncheckedUpdateWithoutRunsInput>
+  create: Prisma.XOR<Prisma.WorkflowCreateWithoutRunsInput, Prisma.WorkflowUncheckedCreateWithoutRunsInput>
+  where?: Prisma.WorkflowWhereInput
+}
+
+export type WorkflowUpdateToOneWithWhereWithoutRunsInput = {
+  where?: Prisma.WorkflowWhereInput
+  data: Prisma.XOR<Prisma.WorkflowUpdateWithoutRunsInput, Prisma.WorkflowUncheckedUpdateWithoutRunsInput>
+}
+
+export type WorkflowUpdateWithoutRunsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  storagePath?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  visibility?: Prisma.EnumWorkflowVisibilityFieldUpdateOperationsInput | $Enums.WorkflowVisibility
+  owner?: Prisma.UserUpdateOneRequiredWithoutWorkflowsNestedInput
+}
+
+export type WorkflowUncheckedUpdateWithoutRunsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  storagePath?: Prisma.StringFieldUpdateOperationsInput | string
+  ownerId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  visibility?: Prisma.EnumWorkflowVisibilityFieldUpdateOperationsInput | $Enums.WorkflowVisibility
+}
+
 export type WorkflowCreateManyOwnerInput = {
   id?: string
   storagePath: string
@@ -453,6 +533,7 @@ export type WorkflowUpdateWithoutOwnerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   visibility?: Prisma.EnumWorkflowVisibilityFieldUpdateOperationsInput | $Enums.WorkflowVisibility
+  runs?: Prisma.WorkflowRunUpdateManyWithoutWorkflowNestedInput
 }
 
 export type WorkflowUncheckedUpdateWithoutOwnerInput = {
@@ -461,6 +542,7 @@ export type WorkflowUncheckedUpdateWithoutOwnerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   visibility?: Prisma.EnumWorkflowVisibilityFieldUpdateOperationsInput | $Enums.WorkflowVisibility
+  runs?: Prisma.WorkflowRunUncheckedUpdateManyWithoutWorkflowNestedInput
 }
 
 export type WorkflowUncheckedUpdateManyWithoutOwnerInput = {
@@ -472,6 +554,35 @@ export type WorkflowUncheckedUpdateManyWithoutOwnerInput = {
 }
 
 
+/**
+ * Count Type WorkflowCountOutputType
+ */
+
+export type WorkflowCountOutputType = {
+  runs: number
+}
+
+export type WorkflowCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  runs?: boolean | WorkflowCountOutputTypeCountRunsArgs
+}
+
+/**
+ * WorkflowCountOutputType without action
+ */
+export type WorkflowCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkflowCountOutputType
+   */
+  select?: Prisma.WorkflowCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * WorkflowCountOutputType without action
+ */
+export type WorkflowCountOutputTypeCountRunsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WorkflowRunWhereInput
+}
+
 
 export type WorkflowSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -481,6 +592,8 @@ export type WorkflowSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   updatedAt?: boolean
   visibility?: boolean
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  runs?: boolean | Prisma.Workflow$runsArgs<ExtArgs>
+  _count?: boolean | Prisma.WorkflowCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workflow"]>
 
 export type WorkflowSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -515,6 +628,8 @@ export type WorkflowSelectScalar = {
 export type WorkflowOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "storagePath" | "ownerId" | "createdAt" | "updatedAt" | "visibility", ExtArgs["result"]["workflow"]>
 export type WorkflowInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  runs?: boolean | Prisma.Workflow$runsArgs<ExtArgs>
+  _count?: boolean | Prisma.WorkflowCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WorkflowIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -527,6 +642,7 @@ export type $WorkflowPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   name: "Workflow"
   objects: {
     owner: Prisma.$UserPayload<ExtArgs>
+    runs: Prisma.$WorkflowRunPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -930,6 +1046,7 @@ readonly fields: WorkflowFieldRefs;
 export interface Prisma__WorkflowClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   owner<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  runs<T extends Prisma.Workflow$runsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workflow$runsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1358,6 +1475,30 @@ export type WorkflowDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Limit how many Workflows to delete.
    */
   limit?: number
+}
+
+/**
+ * Workflow.runs
+ */
+export type Workflow$runsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkflowRun
+   */
+  select?: Prisma.WorkflowRunSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WorkflowRun
+   */
+  omit?: Prisma.WorkflowRunOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WorkflowRunInclude<ExtArgs> | null
+  where?: Prisma.WorkflowRunWhereInput
+  orderBy?: Prisma.WorkflowRunOrderByWithRelationInput | Prisma.WorkflowRunOrderByWithRelationInput[]
+  cursor?: Prisma.WorkflowRunWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WorkflowRunScalarFieldEnum | Prisma.WorkflowRunScalarFieldEnum[]
 }
 
 /**

@@ -52,6 +52,7 @@ export function registerRunRoute(server: FastifyInstance) {
                     workflow.storagePath,
                     fastify.db,
                     request.user.id,
+                    fastify.logService,
                 );
                 const { stdout, stderr, exitCode, errors, log } =
                     await runnerInstance.start();

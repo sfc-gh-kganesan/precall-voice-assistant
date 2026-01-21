@@ -10,5 +10,7 @@
  */
 export type * from './models/User.js'
 export type * from './models/Workflow.js'
+export type * from './models/WorkflowRun.js'
+export type * from './models/Log.js'
 export type * from './models/Secret.js'
 export type * from './commonInputTypes.js'

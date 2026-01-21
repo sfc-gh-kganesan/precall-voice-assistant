@@ -15,3 +15,12 @@ export const WorkflowVisibility = {
 } as const
 
 export type WorkflowVisibility = (typeof WorkflowVisibility)[keyof typeof WorkflowVisibility]
+
+
+export const LogSource = {
+  RuntimeHost: 'RuntimeHost',
+  WorkflowNode: 'WorkflowNode',
+  ToolCall: 'ToolCall'
+} as const
+
+export type LogSource = (typeof LogSource)[keyof typeof LogSource]
