@@ -1,9 +1,4 @@
-import os
-import zipfile
-from pathlib import Path
-
 import streamlit as st
-
 from config import db_config, ui_config
 
 st.set_page_config(
@@ -16,29 +11,10 @@ import pandas as pd  # noqa: E402
 from data_operations import SnowflakeDataOperations  # noqa: E402
 from eda import render_eda_tab  # noqa: E402
 from evaluation import render_evaluation_tab  # noqa: E402
+from seeding import get_sync_status, sync_searches  # noqa: E402
 from snowflake.snowpark import Session  # noqa: E402
 from snowflake.snowpark.context import get_active_session  # noqa: E402
 from ui_components import render_feedback_tab, render_playground_tab  # noqa: E402
-
-NLTK_DATA_PATH = Path(os.path.dirname(__file__)) / "nltk_data"
-TOKENIZER_PATH = NLTK_DATA_PATH / "tokenizers"
-
-try:
-    import nltk
-
-    os.environ["NLTK_DATA"] = str(NLTK_DATA_PATH)
-    nltk.data.path.insert(0, str(NLTK_DATA_PATH))
-
-    if not (TOKENIZER_PATH / "punkt_tab").exists():
-        TOKENIZER_PATH.mkdir(parents=True, exist_ok=True)
-        app_dir = Path(os.path.dirname(__file__))
-        for zip_name in ("punkt.zip", "punkt_tab.zip"):
-            zip_path = app_dir / zip_name
-            if zip_path.exists():
-                with zipfile.ZipFile(zip_path, mode="r") as zf:
-                    zf.extractall(TOKENIZER_PATH)
-except Exception:
-    pass
 
 
 @st.cache_resource
@@ -70,20 +46,46 @@ def render_header_metrics(data_ops: SnowflakeDataOperations, baseline_df: pd.Dat
     total_feedback = int(feedback_counts["FEEDBACK_COUNT"].sum()) if not feedback_counts.empty else 0
     total_queries = baseline_df["INPUT_QUERY"].nunique() if not baseline_df.empty else 0
     total_adhoc = adhoc_df["INPUT_QUERY"].nunique() if not adhoc_df.empty else 0
+    synthetic_count = data_ops.get_synthetic_query_count()
     avg_similarity = baseline_df["COSINE_SIMILARITY"].mean() if not baseline_df.empty else 0
 
-    cols = st.columns(4)
+    cols = st.columns(5)
     cols[0].metric("Golden Pairs", total_queries)
     cols[1].metric("Ad-hoc Searches", total_adhoc)
-    cols[2].metric("Feedback Received", total_feedback)
-    cols[3].metric("Avg Similarity", f"{avg_similarity:.3f}")
+    cols[2].metric("Synthetic Queries", synthetic_count)
+    cols[3].metric("Feedback Received", total_feedback)
+    cols[4].metric("Avg Similarity", f"{avg_similarity:.3f}")
 
 
 def main() -> None:
     st.title(ui_config.page_title)
     st.caption(f"Connected to `{db_config.database}.{db_config.schema}` | Search Service: `{db_config.search_service}`")
 
+    session = get_session()
     data_ops = get_data_operations()
+
+    with st.sidebar:
+        st.header("Sync Searches")
+        sync_status = get_sync_status(session)
+        unsearched_golden = sync_status["unsearched_golden_pairs"]
+        unsearched_synthetic = sync_status["unsearched_synthetic_pairs"]
+
+        st.metric("Unsearched Golden Pairs", unsearched_golden)
+        st.metric("Unsearched Synthetic Pairs", unsearched_synthetic)
+
+        if unsearched_golden > 0 or unsearched_synthetic > 0:
+            sync_golden = st.checkbox("Sync Golden Pairs", value=unsearched_golden > 0, disabled=unsearched_golden == 0)
+            sync_synthetic = st.checkbox("Sync Synthetic Pairs", value=unsearched_synthetic > 0, disabled=unsearched_synthetic == 0)
+
+            if st.button("Sync Now", type="primary"):
+                with st.spinner("Syncing searches..."):
+                    results = sync_searches(session, data_ops, sync_golden=sync_golden, sync_synthetic=sync_synthetic)
+                    st.success(f"Synced {results['golden_pairs']} golden pairs and {results['synthetic_pairs']} synthetic pairs")
+                    load_baseline_results.clear()
+                    load_adhoc_results.clear()
+                    st.rerun()
+        else:
+            st.info("All pairs are synced.")
 
     is_valid, missing_resources = data_ops.validate_environment()
     if not is_valid:

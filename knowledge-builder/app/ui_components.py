@@ -3,10 +3,9 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+from config import db_config, ui_config
 from data_operations import SnowflakeDataOperations
 from ui_utils import render_stars
-
-from config import db_config, ui_config
 
 
 def get_metrics(df: pd.DataFrame) -> tuple[int, int, float, float]:

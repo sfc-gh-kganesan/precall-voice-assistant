@@ -32,7 +32,7 @@ class ChunkingConfig:
 class SearchConfig:
     columns: tuple = ("CHUNK_TEXT",)
     filter: dict = None
-    limit: int = 1
+    limit: int = 5
 
     def __post_init__(self):
         if self.filter is None:

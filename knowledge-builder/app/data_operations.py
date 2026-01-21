@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pandas as pd
+from config import db_config, search_config
 from snowflake.core import CreateMode, Root
 from snowflake.core.table import (
     ForeignKey,
@@ -13,8 +14,6 @@ from snowflake.core.table import (
 from snowflake.snowpark import Session
 from snowflake.snowpark import functions as F
 from snowflake.snowpark import types as T
-
-from config import db_config, search_config
 
 
 def create_table(
@@ -111,12 +110,19 @@ class SnowflakeDataOperations:
             tc,
             db_config.synthetic_pairs_table,
             [
-                TableColumn(name="SEARCH_ID", datatype="VARCHAR"),
-                TableColumn(name="INPUT_TYPE", datatype="VARCHAR"),
-                TableColumn(name="INPUT_ARGS", datatype="VARCHAR"),
-                TableColumn(name="RESPONSE", datatype="VARCHAR"),
-                TableColumn(name="CREATED_BY", datatype="VARCHAR"),
-                TableColumn(name="CREATED_ON", datatype="TIMESTAMP_NTZ(9)"),
+                TableColumn(name="SOURCE_TABLE", datatype="VARCHAR"),
+                TableColumn(name="ATTRS", datatype="VARIANT"),
+                TableColumn(name="SCORING", datatype="VARIANT"),
+                TableColumn(name="GENERATED", datatype="VARIANT"),
+                TableColumn(name="L1_RAW", datatype="VARCHAR"),
+                TableColumn(name="L2_RAW", datatype="VARCHAR"),
+                TableColumn(name="L3_RAW", datatype="VARCHAR"),
+                TableColumn(name="L4_RAW", datatype="VARCHAR"),
+                TableColumn(name="L1_TAG", datatype="VARCHAR"),
+                TableColumn(name="L2_TAG", datatype="VARCHAR"),
+                TableColumn(name="L3_TAG", datatype="VARCHAR"),
+                TableColumn(name="L4_TAG", datatype="VARCHAR"),
+                TableColumn(name="CREATED_ON", datatype="TIMESTAMP_LTZ(9)", default="CURRENT_TIMESTAMP()"),
             ],
             CreateMode.if_not_exists,
         )
@@ -126,16 +132,19 @@ class SnowflakeDataOperations:
             db_config.evaluation_results_table,
             [
                 TableColumn(
-                    name="EVAL_ID",
+                    name="SEARCH_ID",
                     datatype="INT",
-                    autoincrement=True,
-                    constraints=[PrimaryKey()],
+                    constraints=[
+                        ForeignKey(
+                            referenced_table_name=db_config.results_table,
+                            referenced_column_names=["SEARCH_ID"],
+                        )
+                    ],
                 ),
-                TableColumn(name="QUERY", datatype="VARCHAR", nullable=False),
-                TableColumn(name="CONTEXT", datatype="VARCHAR"),
-                TableColumn(name="ANSWER", datatype="VARCHAR"),
-                TableColumn(name="METRICS", datatype="VARIANT"),
-                TableColumn(name="REASONS", datatype="VARIANT"),
+                TableColumn(name="INPUT_QUERY", datatype="VARCHAR"),
+                TableColumn(name="CHUNKS", datatype="VARCHAR"),
+                TableColumn(name="EVALUATION_MODEL", datatype="VARCHAR"),
+                TableColumn(name="EVALUATION", datatype="VARIANT"),
                 TableColumn(name="CREATED_BY", datatype="VARCHAR"),
                 TableColumn(name="CREATED_ON", datatype="TIMESTAMP_NTZ(9)", default="CURRENT_TIMESTAMP()"),
             ],
@@ -196,32 +205,25 @@ class SnowflakeDataOperations:
             ),
         ).write.save_as_table(search_feedback.fully_qualified_name, mode="append", column_order="name")
 
-    def save_evaluation_results(self, results_df: pd.DataFrame, metrics: list) -> None:
-        data = []
-        for _, row in results_df.iterrows():
-            metrics_dict = {}
-            reasons_dict = {}
-
-            for metric in metrics:
-                metric_key = metric.lower().replace(" ", "_")
-                reasons_key = f"{metric_key}_reasons"
-
-                if metric_key in row:
-                    metrics_dict[metric_key] = float(row[metric_key])
-
-                if reasons_key in row and row[reasons_key]:
-                    reasons_dict[metric_key] = row[reasons_key]
-
-            record = [
-                row["query"],
-                row["context"],
-                row["answer"],
-                metrics_dict,
-                reasons_dict if reasons_dict else None,
+    def save_evaluation_results(
+        self,
+        search_id: int,
+        input_query: str,
+        chunks: str,
+        evaluation_model: str,
+        evaluation: dict,
+    ) -> None:
+        data = [
+            [
+                search_id,
+                input_query,
+                chunks,
+                evaluation_model,
+                evaluation,
                 self._session.get_current_user(),
                 datetime.now(),
             ]
-            data.append(record)
+        ]
 
         evaluation_table = self._root.databases[db_config.database].schemas[db_config.schema].tables[db_config.evaluation_results_table]
 
@@ -229,11 +231,11 @@ class SnowflakeDataOperations:
             data,
             schema=T.StructType(
                 [
-                    T.StructField("QUERY", T.StringType()),
-                    T.StructField("CONTEXT", T.StringType()),
-                    T.StructField("ANSWER", T.StringType()),
-                    T.StructField("METRICS", T.VariantType()),
-                    T.StructField("REASONS", T.VariantType()),
+                    T.StructField("SEARCH_ID", T.IntegerType()),
+                    T.StructField("INPUT_QUERY", T.StringType()),
+                    T.StructField("CHUNKS", T.StringType()),
+                    T.StructField("EVALUATION_MODEL", T.StringType()),
+                    T.StructField("EVALUATION", T.VariantType()),
                     T.StructField("CREATED_BY", T.StringType()),
                     T.StructField("CREATED_ON", T.TimestampType()),
                 ]
@@ -244,6 +246,21 @@ class SnowflakeDataOperations:
         try:
             results = self._session.table(db_config.get_table_name(db_config.evaluation_results_table)).to_pandas()
             return results
+        except Exception:
+            return pd.DataFrame()
+
+    def get_evaluation_aggregate_stats(self) -> pd.DataFrame:
+        try:
+            return (
+                self._session.table(db_config.get_table_name(db_config.evaluation_results_table))
+                .select(
+                    F.count("*").alias("total_evaluations"),
+                    F.avg(F.col("EVALUATION")["metrics"]["answer_relevance"].cast("float")).alias("avg_answer_relevance"),
+                    F.avg(F.col("EVALUATION")["metrics"]["context_relevance"].cast("float")).alias("avg_context_relevance"),
+                    F.avg(F.col("EVALUATION")["metrics"]["groundedness"].cast("float")).alias("avg_groundedness"),
+                )
+                .to_pandas()
+            )
         except Exception:
             return pd.DataFrame()
 
@@ -361,3 +378,10 @@ class SnowflakeDataOperations:
             return self._session.table(db_config.get_table_name(db_config.target_table)).filter(F.col("SEARCH_ID") == F.lit(int(query_id))).select("USER_FEEDBACK", "USER_RATING", "CREATED_BY", "CREATED_ON").sort(F.col("CREATED_ON").desc()).to_pandas()
         except Exception:
             return pd.DataFrame(columns=["USER_FEEDBACK", "USER_RATING", "CREATED_BY", "CREATED_ON"])
+
+    def get_synthetic_query_count(self) -> int:
+        try:
+            count = self._session.table(db_config.get_table_name(db_config.synthetic_pairs_table)).count()
+            return count
+        except Exception:
+            return 0

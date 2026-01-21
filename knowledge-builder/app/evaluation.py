@@ -1,3 +1,5 @@
+import json
+
 import altair as alt
 import pandas as pd
 import streamlit as st
@@ -9,7 +11,6 @@ from ui_utils import create_bar_chart, render_reasoning, to_metric_key
 METRIC_EVALUATORS = {
     "Answer Relevance": lambda p, row: p.relevance_with_cot_reasons(prompt=row["query"], response=row["answer"], temperature=0.0),
     "Context Relevance": lambda p, row: p.context_relevance_with_cot_reasons(question=row["query"], context=row["context"], temperature=0.0),
-    "Groundedness": lambda p, row: p.groundedness_measure_with_cot_reasons(source=row["context"], statement=row["answer"], temperature=0.0),
     "Comprehensiveness": lambda p, row: p.generate_score_and_reasons(
         system_prompt="Rate how comprehensive this answer is for the given question. Consider whether it covers all important aspects and provides sufficient detail. Provide a score between 0 and 1, where 0 is not comprehensive at all and 1 is very comprehensive.",
         user_prompt=f"Question: {row['query']}\n\nAnswer: {row['answer']}",
@@ -37,8 +38,6 @@ def evaluate_metric(provider: Cortex, metric: str, row: pd.Series) -> tuple[floa
 def display_evaluation_results(
     df: pd.DataFrame,
     feedback_options: list[str],
-    reasons_df: pd.DataFrame = None,
-    reasons_col: str = "reasons",
 ) -> None:
     st.subheader("Average Scores")
     cols = st.columns(len(feedback_options))
@@ -49,7 +48,7 @@ def display_evaluation_results(
             cols[idx].metric(metric, f"{avg_score:.3f}")
 
     st.subheader("Detailed Results")
-    display_cols = ["query"] + [to_metric_key(m) for m in feedback_options if to_metric_key(m) in df.columns]
+    display_cols = ["input_query"] + [to_metric_key(m) for m in feedback_options if to_metric_key(m) in df.columns]
     st.dataframe(df[display_cols], use_container_width=True)
 
     for metric in feedback_options:
@@ -60,7 +59,7 @@ def display_evaluation_results(
                 x_col="index:O",
                 y_col=f"{metric_key}:Q",
                 title=f"{metric} Scores",
-                tooltip_cols=["query", metric_key],
+                tooltip_cols=["input_query", metric_key],
                 x_title="Query Index",
                 y_title=metric,
                 y_scale=alt.Scale(domain=[0, 1]),
@@ -68,27 +67,25 @@ def display_evaluation_results(
             )
             st.altair_chart(chart, use_container_width=True)
 
-    if reasons_df is not None and reasons_col in reasons_df.columns:
+    if "reasons" in df.columns:
         st.subheader("Chain-of-Thought Reasoning")
         st.markdown("Expand to see detailed reasoning for each evaluation:")
 
-        for idx, row in reasons_df.iterrows():
-            with st.expander(f"Query {idx + 1}: {row['query'][:100]}..."):
-                st.markdown(f"**Context:** {row['context'][:200]}...")
-                st.markdown(f"**Answer:** {row['answer'][:200]}...")
+        for idx, row in df.iterrows():
+            with st.expander(f"Query {idx + 1}: {row['input_query'][:100]}..."):
+                st.markdown(f"**Chunks:** {row['chunks'][:200]}...")
                 st.divider()
 
-                reasons_dict = row.get(reasons_col) or {}
+                reasons_dict = row.get("reasons") or {}
                 for metric in feedback_options:
                     metric_key = to_metric_key(metric)
-                    reasons_key = f"{metric_key}_reasons"
 
                     if metric_key in df.columns:
                         score = df.loc[idx, metric_key] if idx in df.index else None
                         if score is not None:
                             st.markdown(f"**{metric}:** {score:.3f}")
 
-                    reasons_data = row.get(reasons_key) if reasons_key in reasons_df.columns else reasons_dict.get(metric_key)
+                    reasons_data = reasons_dict.get(metric_key)
                     if reasons_data:
                         render_reasoning(reasons_data)
                     st.divider()
@@ -98,17 +95,18 @@ def render_evaluation_tab(data_ops: SnowflakeDataOperations) -> None:
     st.header("LLM-as-a-Judge Evaluation")
     st.caption("Evaluate search results using TruLens metrics powered by Cortex LLMs.")
 
+    evaluation_model = "llama3.1-70b"
+
     try:
         feedback_options = st.multiselect(
             "Select evaluation metrics:",
             options=[
                 "Answer Relevance",
                 "Context Relevance",
-                "Groundedness",
                 "Comprehensiveness",
                 "Harmfulness",
             ],
-            default=["Answer Relevance", "Context Relevance", "Groundedness"],
+            default=["Answer Relevance", "Context Relevance"],
             key="eval_metrics",
         )
 
@@ -129,17 +127,31 @@ def render_evaluation_tab(data_ops: SnowflakeDataOperations) -> None:
 
                 existing_results.columns = existing_results.columns.str.lower()
 
-                if "metrics" in existing_results.columns:
-                    metrics_df = pd.json_normalize(existing_results["metrics"])
+                if "evaluation" in existing_results.columns:
+                    # Parse EVALUATION variant column to extract metrics and reasons
+                    metrics_data = []
+                    reasons_data = []
+                    for eval_val in existing_results["evaluation"]:
+                        if isinstance(eval_val, str):
+                            eval_dict = json.loads(eval_val)
+                        else:
+                            eval_dict = eval_val or {}
+                        metrics_data.append(eval_dict.get("metrics", {}))
+                        reasons_data.append(eval_dict.get("reasons", {}))
+
+                    metrics_df = pd.json_normalize(metrics_data)
+                    existing_results["reasons"] = reasons_data
+
                     display_df = pd.concat(
                         [
                             existing_results[
                                 [
-                                    "query",
-                                    "context",
-                                    "answer",
+                                    "input_query",
+                                    "chunks",
+                                    "evaluation_model",
                                     "created_by",
                                     "created_on",
+                                    "reasons",
                                 ]
                             ],
                             metrics_df,
@@ -149,7 +161,7 @@ def render_evaluation_tab(data_ops: SnowflakeDataOperations) -> None:
                 else:
                     display_df = existing_results
 
-                display_evaluation_results(display_df, feedback_options, existing_results, "reasons")
+                display_evaluation_results(display_df, feedback_options)
                 return
         else:
             if st.button("Run Evaluation", key="run_eval_btn"):
@@ -168,65 +180,82 @@ def render_evaluation_tab(data_ops: SnowflakeDataOperations) -> None:
                 progress_bar = st.progress(0)
                 progress_bar.progress(0.1)
 
-                provider = Cortex(data_ops._session, model_engine="llama3.1-70b")
+                provider = Cortex(data_ops._session, model_engine=evaluation_model)
 
-                eval_df = data_ops._session.create_dataframe(
-                    baseline_df.head(10)[["INPUT_QUERY", "CHUNK_TEXT"]].values.tolist(),
-                    schema=["query", "context"],
-                )
-
-                eval_df = eval_df.with_column(
-                    "answer",
-                    F.call_builtin(
-                        "SNOWFLAKE.CORTEX.COMPLETE",
-                        F.lit("llama3.1-70b"),
-                        F.prompt(
-                            "Context: {0}\n\nQuestion: {1}\n\nPlease provide a helpful and accurate answer based on the context provided.",
-                            F.col("context"),
-                            F.col("query"),
-                        ),
-                    ),
-                )
+                # Get baseline data with SEARCH_ID
+                baseline_subset = baseline_df.head(10)[["SEARCH_ID", "INPUT_QUERY", "CHUNK_TEXT"]]
 
                 progress_bar.progress(0.3)
-                eval_results_df = eval_df.to_pandas()
-                eval_results_df.columns = eval_results_df.columns.str.lower()
 
-                total_metrics = len(feedback_options)
-                for idx, metric in enumerate(feedback_options):
-                    metric_key = to_metric_key(metric)
-                    st.text(f"Evaluating {metric}...")
+                len(feedback_options)
 
-                    scores = []
-                    reasons_list = []
+                for _, row in baseline_subset.iterrows():
+                    search_id = int(row["SEARCH_ID"])
+                    input_query = row["INPUT_QUERY"]
+                    chunks = row["CHUNK_TEXT"]
 
-                    for _, row in eval_results_df.iterrows():
+                    # Generate answer for evaluation
+                    answer_df = data_ops._session.create_dataframe(
+                        [[chunks, input_query]],
+                        schema=["context", "query"],
+                    ).with_column(
+                        "answer",
+                        F.call_builtin(
+                            "SNOWFLAKE.CORTEX.COMPLETE",
+                            F.lit(evaluation_model),
+                            F.prompt(
+                                "Context: {0}\n\nQuestion: {1}\n\nPlease provide a helpful and accurate answer based on the context provided.",
+                                F.col("context"),
+                                F.col("query"),
+                            ),
+                        ),
+                    ).to_pandas()
+
+                    answer = answer_df["ANSWER"].iloc[0] if not answer_df.empty else ""
+
+                    eval_row = pd.Series({
+                        "query": input_query,
+                        "context": chunks,
+                        "answer": answer,
+                    })
+
+                    metrics_dict = {}
+                    reasons_dict = {}
+
+                    for metric in feedback_options:
+                        metric_key = to_metric_key(metric)
+                        st.text(f"Evaluating {metric} for query: {input_query[:50]}...")
+
                         try:
-                            score, reasons = evaluate_metric(provider, metric, row)
-                            scores.append(score)
-                            reasons_list.append(reasons)
+                            score, reasons = evaluate_metric(provider, metric, eval_row)
+                            metrics_dict[metric_key] = float(score)
+                            if reasons:
+                                reasons_dict[metric_key] = reasons
                         except Exception as e:
-                            st.warning(f"Error evaluating {metric} for row: {str(e)}")
-                            scores.append(0.0)
-                            reasons_list.append({"error": str(e)})
+                            st.warning(f"Error evaluating {metric}: {str(e)}")
+                            metrics_dict[metric_key] = 0.0
+                            reasons_dict[metric_key] = {"error": str(e)}
 
-                    eval_results_df[metric_key] = scores
-                    eval_results_df[f"{metric_key}_reasons"] = reasons_list
-
-                    progress = 0.3 + (0.6 * (idx + 1) / total_metrics)
-                    progress_bar.progress(progress)
-
-                progress_bar.progress(1.0)
-
-                if not eval_results_df.empty:
-                    display_evaluation_results(eval_results_df, feedback_options, eval_results_df)
+                    evaluation = {
+                        "metrics": metrics_dict,
+                        "reasons": reasons_dict,
+                        "answer": answer,
+                    }
 
                     try:
-                        data_ops.save_evaluation_results(eval_results_df, feedback_options)
-                        st.success("Evaluation complete! Results saved to database.")
+                        data_ops.save_evaluation_results(
+                            search_id=search_id,
+                            input_query=input_query,
+                            chunks=chunks,
+                            evaluation_model=evaluation_model,
+                            evaluation=evaluation,
+                        )
                     except Exception as save_error:
-                        st.success("Evaluation complete!")
-                        st.warning(f"Note: Could not save results to database: {str(save_error)}")
+                        st.warning(f"Could not save result for search_id {search_id}: {str(save_error)}")
+
+                progress_bar.progress(1.0)
+                st.success("Evaluation complete! Results saved to database.")
+                st.rerun()
 
     except Exception as e:
         st.error(f"Error running evaluation: {str(e)}")

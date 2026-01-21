@@ -2,12 +2,11 @@ from datetime import datetime
 
 import pandas as pd
 import snowflake.snowpark as sp
+from config import db_config, search_config
 from data_operations import SnowflakeDataOperations
 from snowflake.snowpark import Session
 from snowflake.snowpark import functions as F
 from snowflake.snowpark import types as T
-
-from config import db_config, search_config
 
 
 def ingest_knowledge(session: Session, fp: str, table_name: str, mode: str) -> sp.DataFrame:
@@ -31,14 +30,97 @@ def ingest_golden_pairs(session: Session, table_name: str, mode: str = "overwrit
 
 def ingest_synthetic_pairs(session: Session, table_name: str, mode: str = "overwrite") -> sp.DataFrame:
     data = [
-        {"INCIDENT": "INC0012101", "INPUT_QUERY": "I received a suspicious email asking for my login credentials.", "SUGGESTED_RESOLUTION_CURATED": "Email identified as phishing. Purged from inbox and user directed to complete security awareness training."},
-        {"INCIDENT": "INC0012345", "INPUT_QUERY": "My company iPhone is stuck on the Apple logo after an update.", "SUGGESTED_RESOLUTION_CURATED": "Perform a forced restart. If unsuccessful, use Apple Configurator to restore the device to factory settings."},
-        {"INCIDENT": "INC0012678", "INPUT_QUERY": "Locked out of Workday after three failed login attempts.", "SUGGESTED_RESOLUTION_CURATED": "Unlocked account in Active Directory. User advised to clear browser cookies before attempting to log in again."},
-        {"INCIDENT": "INC0012899", "INPUT_QUERY": "External monitor is not detecting my laptop via the USB-C dock.", "SUGGESTED_RESOLUTION_CURATED": "Update DisplayLink drivers and power cycle the docking station by unplugging it for 30 seconds."},
-        {"INCIDENT": "INC0013112", "INPUT_QUERY": "Adobe Creative Cloud says my trial has expired, but I have a license.", "SUGGESTED_RESOLUTION_CURATED": "Signed out and back into the Adobe Desktop app using the 'Company Account' SSO option."},
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {"query": "I received a suspicious email asking for my login credentials.", "answer": "This appears to be a phishing attempt. Do not click any links or provide credentials. Forward the email to security@company.com and delete it from your inbox."},
+            "L1_RAW": "it services",
+            "L2_RAW": "access management",
+            "L3_RAW": "authentication",
+            "L4_RAW": "request process",
+            "L1_TAG": "IT Services",
+            "L2_TAG": "User Access Provisioning",
+            "L3_TAG": "Access and Authentication Management",
+            "L4_TAG": "Privileged Access Authentication Workflow",
+        },
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {"query": "My company iPhone is stuck on the Apple logo after an update.", "answer": "Perform a forced restart by pressing and releasing Volume Up, then Volume Down, then holding the Side button until the Apple logo reappears. If unsuccessful, use DFU mode restoration."},
+            "L1_RAW": "hardware",
+            "L2_RAW": "server management",
+            "L3_RAW": "batch job management",
+            "L4_RAW": "troubleshooting",
+            "L1_TAG": "IT Services",
+            "L2_TAG": "Network Resource Management",
+            "L3_TAG": "Batch Job Failure Troubleshooting",
+            "L4_TAG": "Technical Error Type Classification",
+        },
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {"query": "Locked out of Workday after three failed login attempts.", "answer": "Your account has been temporarily locked for security. Wait 15 minutes or contact IT Help Desk to manually unlock your account and reset your password."},
+            "L1_RAW": "access management",
+            "L2_RAW": "active directory",
+            "L3_RAW": "account management",
+            "L4_RAW": "account management",
+            "L1_TAG": "Access Management",
+            "L2_TAG": "Account Access Management",
+            "L3_TAG": "Identity and Access Management",
+            "L4_TAG": "User Account Permission Management",
+        },
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {"query": "External monitor is not detecting my laptop via the USB-C dock.", "answer": "Try these steps: 1) Unplug and reconnect the dock, 2) Update DisplayLink drivers, 3) Check display settings to detect external monitors, 4) Try a different USB-C port or cable."},
+            "L1_RAW": "hardware",
+            "L2_RAW": "monitoring",
+            "L3_RAW": "storage management",
+            "L4_RAW": "troubleshooting",
+            "L1_TAG": "IT Services",
+            "L2_TAG": "Network Connectivity Issues",
+            "L3_TAG": "Software Application Functionality",
+            "L4_TAG": "Application Specific Configuration Issues",
+        },
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {"query": "Adobe Creative Cloud says my trial has expired, but I have a license.", "answer": "Sign out of Adobe Desktop app, then sign back in using 'Company Account' SSO option. If the issue persists, verify your license is assigned in the Adobe Admin Console."},
+            "L1_RAW": "software",
+            "L2_RAW": "applications",
+            "L3_RAW": "authentication",
+            "L4_RAW": "error resolution",
+            "L1_TAG": "Application Systems",
+            "L2_TAG": "Enterprise Software Applications",
+            "L3_TAG": "Enterprise Software Applications",
+            "L4_TAG": "Application Launch Failure Diagnostics",
+        },
     ]
-    df = pd.DataFrame(data)
-    session.write_pandas(df.reset_index(drop=True), table_name, auto_create_table=True, overwrite=True)
+    df = session.create_dataframe(
+        data,
+        schema=T.StructType(
+            [
+                T.StructField("SOURCE_TABLE", T.StringType()),
+                T.StructField("ATTRS", T.VariantType()),
+                T.StructField("SCORING", T.VariantType()),
+                T.StructField("GENERATED", T.VariantType()),
+                T.StructField("L1_RAW", T.StringType()),
+                T.StructField("L2_RAW", T.StringType()),
+                T.StructField("L3_RAW", T.StringType()),
+                T.StructField("L4_RAW", T.StringType()),
+                T.StructField("L1_TAG", T.StringType()),
+                T.StructField("L2_TAG", T.StringType()),
+                T.StructField("L3_TAG", T.StringType()),
+                T.StructField("L4_TAG", T.StringType()),
+            ]
+        ),
+    )
+    df.write.save_as_table(table_name, mode=mode, column_order="name")
     return session.table(table_name)
 
 
@@ -74,7 +156,7 @@ def search_synthetic_pairs(
     data_ops: SnowflakeDataOperations,
     df: sp.DataFrame,
 ) -> None:
-    pdf = df.select(F.parse_json("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY")).to_pandas()
+    pdf = df.select(F.col("GENERATED")["query"].cast(T.StringType()).alias("INPUT_QUERY")).to_pandas()
     current_user = session.get_current_user()
     css = data_ops.get_cortex_search_service()
     for _, row in pdf.iterrows():
@@ -112,88 +194,71 @@ def deduplicate_search_results(session: Session) -> None:
     WHERE {table_name}.SEARCH_ID = SRC.SEARCH_ID""").collect()
 
 
-def ensure_analyze_image_links_proc(session: Session) -> None:
-    proc_name = db_config.get_table_name("ANALYZE_IMAGE_LINKS")
-    kb_table = db_config.get_table_name(db_config.kb_knowledge_table)
-    session.sql(f"""
-CREATE OR REPLACE PROCEDURE {proc_name}()
-RETURNS TABLE (CATEGORY STRING, COUNT INT, DISTINCT_ARTICLES INT)
-LANGUAGE PYTHON
-RUNTIME_VERSION = '3.11'
-PACKAGES = ('snowflake-snowpark-python', 'lxml', 'pandas')
-HANDLER = 'run'
-EXECUTE AS CALLER
-COMMENT = 'Analyze image src links from KB articles. Returns categories: base64, relative, sys_attachment, or domain.'
-AS
-$$
-import pandas as pd
-from lxml import html as lxml_html
-from urllib.parse import urlparse
-from snowflake.snowpark import Session
+def get_unsearched_golden_pairs(session: Session) -> sp.DataFrame:
+    """Get golden pairs that haven't been searched yet."""
+    golden_pairs = session.table(db_config.get_table_name(db_config.golden_pairs_table))
+    searched_queries = (
+        session.table(db_config.get_table_name(db_config.results_table))
+        .filter(F.col("INPUT_TYPE") == "GOLDEN_PAIR")
+        .select(F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY"))
+        .distinct()
+    )
+    return golden_pairs.join(searched_queries, on="INPUT_QUERY", how="anti")
 
-def extract_image_srcs(html_text: str) -> list:
-    if not html_text or not isinstance(html_text, str):
-        return []
-    try:
-        doc = lxml_html.fromstring(html_text)
-        return doc.xpath('//img/@src')
-    except Exception:
-        return []
 
-def categorize_src(src: str) -> str:
-    if not src:
-        return None
-    src = src.strip()
-    if src.startswith('data:'):
-        return '[1] base64'
-    if '/sys_attachment.do?' in src or src.startswith('sys_attachment.do?'):
-        return '[2] sys_attachment'
-    if src.startswith(('http://', 'https://', '//')):
-        try:
-            if src.startswith('//'):
-                src = 'https:' + src
-            parsed = urlparse(src)
-            domain = parsed.netloc.lower()
-            if domain:
-                return domain
-        except Exception:
-            pass
-        return '[4] unknown_url'
-    return '[3] relative'
+def get_unsearched_synthetic_pairs(session: Session) -> sp.DataFrame:
+    """Get synthetic pairs that haven't been searched yet."""
+    synthetic_pairs = session.table(db_config.get_table_name(db_config.synthetic_pairs_table))
+    searched_queries = (
+        session.table(db_config.get_table_name(db_config.results_table))
+        .filter(F.col("INPUT_TYPE") == "SYNTHETIC_PAIR")
+        .select(F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY"))
+        .distinct()
+    )
+    synthetic_with_query = synthetic_pairs.with_column(
+        "INPUT_QUERY",
+        F.col("GENERATED")["query"].cast(T.StringType())
+    )
+    return synthetic_with_query.join(searched_queries, on="INPUT_QUERY", how="anti")
 
-def run(session: Session):
-    df = session.sql(\"\"\"
-        SELECT SYS_ID, TEXT
-        FROM {kb_table}
-        WHERE TEXT IS NOT NULL AND ACTIVE = TRUE AND LATEST = TRUE
-    \"\"\").to_pandas()
 
-    if df.empty:
-        return session.create_dataframe([], schema=["CATEGORY", "COUNT", "DISTINCT_ARTICLES"])
+def sync_searches(
+    session: Session,
+    data_ops: SnowflakeDataOperations,
+    sync_golden: bool = True,
+    sync_synthetic: bool = True,
+) -> dict:
+    """
+    Sync searches for golden pairs and synthetic pairs that haven't been searched yet.
+    Returns a dict with counts of synced items.
+    """
+    results = {"golden_pairs": 0, "synthetic_pairs": 0}
 
-    processed_data = [(row["SYS_ID"], extract_image_srcs(row["TEXT"])) for _, row in df.iterrows()]
-    temp_df = pd.DataFrame(processed_data, columns=["ARTICLE_ID", "IMG_SRC"])
-    exploded_df = temp_df.explode("IMG_SRC").dropna(subset=["IMG_SRC"])
+    if sync_golden:
+        unsearched_golden = get_unsearched_golden_pairs(session)
+        count = unsearched_golden.count()
+        if count > 0:
+            search_golden_pairs(session, data_ops, unsearched_golden)
+            results["golden_pairs"] = count
 
-    if exploded_df.empty:
-        return session.create_dataframe([], schema=["CATEGORY", "COUNT", "DISTINCT_ARTICLES"])
+    if sync_synthetic:
+        unsearched_synthetic = get_unsearched_synthetic_pairs(session)
+        count = unsearched_synthetic.count()
+        if count > 0:
+            search_synthetic_pairs(session, data_ops, unsearched_synthetic)
+            results["synthetic_pairs"] = count
 
-    exploded_df["CATEGORY"] = exploded_df["IMG_SRC"].apply(categorize_src)
-    result = exploded_df.groupby("CATEGORY").agg(
-        COUNT=("CATEGORY", "size"),
-        DISTINCT_ARTICLES=("ARTICLE_ID", "nunique")
-    ).reset_index()
+    if results["golden_pairs"] > 0 or results["synthetic_pairs"] > 0:
+        deduplicate_search_results(session)
 
-    def sort_key(row):
-        if row["CATEGORY"].startswith("["):
-            return (0, row["CATEGORY"], 0)
-        return (1, "", -row["COUNT"])
+    return results
 
-    result["_sort"] = result.apply(sort_key, axis=1)
-    result = result.sort_values("_sort").drop(columns=["_sort"]).reset_index(drop=True)
-    result["COUNT"] = result["COUNT"].astype(int)
-    result["DISTINCT_ARTICLES"] = result["DISTINCT_ARTICLES"].astype(int)
 
-    return session.create_dataframe(result)
-$$
-""").collect()
+def get_sync_status(session: Session) -> dict:
+    """Get the current sync status showing how many pairs need to be synced."""
+    unsearched_golden = get_unsearched_golden_pairs(session).count()
+    unsearched_synthetic = get_unsearched_synthetic_pairs(session).count()
+    return {
+        "unsearched_golden_pairs": unsearched_golden,
+        "unsearched_synthetic_pairs": unsearched_synthetic,
+    }

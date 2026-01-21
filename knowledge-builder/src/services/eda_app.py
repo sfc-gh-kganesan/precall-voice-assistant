@@ -4,6 +4,7 @@ from urllib.parse import unquote, urlparse
 import altair as alt
 import pandas as pd
 import streamlit as st
+from lxml import html as lxml_html
 from snowflake.snowpark.context import get_active_session
 from ydata_profiling import ProfileReport
 
@@ -90,6 +91,77 @@ def analyze_outbound_links(df: pd.DataFrame, text_col: str = "TEXT") -> pd.DataF
     return result
 
 
+def extract_image_srcs(html_text: str) -> list[str]:
+    """Extract all image src attributes from HTML content."""
+    if not html_text or not isinstance(html_text, str):
+        return []
+    try:
+        doc = lxml_html.fromstring(html_text)
+        return doc.xpath("//img/@src")
+    except Exception:
+        return []
+
+
+def categorize_image_src(src: str) -> str | None:
+    """Categorize an image src into base64, sys_attachment, relative, or domain."""
+    if not src:
+        return None
+    src = src.strip()
+    if src.startswith("data:"):
+        return "[1] base64"
+    if "/sys_attachment.do?" in src or src.startswith("sys_attachment.do?"):
+        return "[2] sys_attachment"
+    if src.startswith(("http://", "https://", "//")):
+        try:
+            if src.startswith("//"):
+                src = "https:" + src
+            parsed = urlparse(src)
+            domain = parsed.netloc.lower()
+            if domain:
+                return domain
+        except Exception:
+            pass
+        return "[4] unknown_url"
+    return "[3] relative"
+
+
+def analyze_image_links(df: pd.DataFrame, text_col: str = "TEXT") -> pd.DataFrame:
+    """Analyze image src links from HTML content and return categorized counts."""
+    if df.empty:
+        return pd.DataFrame(columns=["CATEGORY", "COUNT", "DISTINCT_ARTICLES"])
+
+    processed_data = [
+        (row_id, extract_image_srcs(text))
+        for row_id, text in zip(df["SYS_ID"], df[text_col], strict=False)
+    ]
+
+    temp_df = pd.DataFrame(processed_data, columns=["ARTICLE_ID", "IMG_SRC"])
+    exploded_df = temp_df.explode("IMG_SRC").dropna(subset=["IMG_SRC"])
+
+    if exploded_df.empty:
+        return pd.DataFrame(columns=["CATEGORY", "COUNT", "DISTINCT_ARTICLES"])
+
+    exploded_df["CATEGORY"] = exploded_df["IMG_SRC"].apply(categorize_image_src)
+    result = (
+        exploded_df.groupby("CATEGORY")
+        .agg(
+            COUNT=("CATEGORY", "size"),
+            DISTINCT_ARTICLES=("ARTICLE_ID", "nunique"),
+        )
+        .reset_index()
+    )
+
+    def sort_key(cat: str) -> tuple:
+        if cat.startswith("["):
+            return (0, cat, 0)
+        return (1, "", -result.loc[result["CATEGORY"] == cat, "COUNT"].iloc[0])
+
+    result["_sort"] = result["CATEGORY"].apply(sort_key)
+    result = result.sort_values("_sort").drop(columns=["_sort"]).reset_index(drop=True)
+
+    return result
+
+
 # table_name input needs to be reviewed for this given
 # the following filter exprs where columns may not exist
 # english_only = F.col("LANGUAGE") == F.lit("English")
@@ -144,17 +216,15 @@ with ticket_taxonomy_tab:
 
 with image_links_tab:
     st.subheader("Image Link Analysis")
-    st.caption("Categorized image sources from <img> tags (via ANALYZE_IMAGE_LINKS SPROC).")
+    st.caption("Categorized image sources from <img> tags in article HTML content.")
 
-    # Call the stored procedure - runs server-side in Snowflake
-    image_summary = session.call("ANALYZE_IMAGE_LINKS").to_pandas()
+    image_summary = analyze_image_links(kb_knowledge, text_col="TEXT")
 
     if image_summary.empty:
         st.warning("No image links found in the dataset.")
     else:
         st.dataframe(image_summary, use_container_width=True)
 
-        # Visualization for top categories
         chart = (
             alt.Chart(image_summary.head(15))
             .mark_bar()

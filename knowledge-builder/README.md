@@ -216,7 +216,6 @@ SQL migrations are in `database/migrations/`, numbered for dependency order:
 | `07_create_proc_kb_get.sql` | KB_GET procedure |
 | `08_create_proc_kb_search.sql` | KB_SEARCH procedure |
 | `09_create_proc_kb_explore.sql` | KB_EXPLORE procedure |
-| `10_create_proc_analyze_images.sql` | ANALYZE_IMAGE_LINKS procedure |
 
 ### Schemachange Placeholders
 
