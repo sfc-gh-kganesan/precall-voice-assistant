@@ -175,6 +175,7 @@ export type UserWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   snowflakeUser?: Prisma.StringFilter<"User"> | string
   workflows?: Prisma.WorkflowListRelationFilter
+  secrets?: Prisma.SecretListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -183,6 +184,7 @@ export type UserOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   snowflakeUser?: Prisma.SortOrder
   workflows?: Prisma.WorkflowOrderByRelationAggregateInput
+  secrets?: Prisma.SecretOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -194,6 +196,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   workflows?: Prisma.WorkflowListRelationFilter
+  secrets?: Prisma.SecretListRelationFilter
 }, "id" | "snowflakeUser">
 
 export type UserOrderByWithAggregationInput = {
@@ -222,6 +225,7 @@ export type UserCreateInput = {
   updatedAt?: Date | string
   snowflakeUser: string
   workflows?: Prisma.WorkflowCreateNestedManyWithoutOwnerInput
+  secrets?: Prisma.SecretCreateNestedManyWithoutOwnerInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -230,6 +234,7 @@ export type UserUncheckedCreateInput = {
   updatedAt?: Date | string
   snowflakeUser: string
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutOwnerInput
+  secrets?: Prisma.SecretUncheckedCreateNestedManyWithoutOwnerInput
 }
 
 export type UserUpdateInput = {
@@ -238,6 +243,7 @@ export type UserUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   workflows?: Prisma.WorkflowUpdateManyWithoutOwnerNestedInput
+  secrets?: Prisma.SecretUpdateManyWithoutOwnerNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -246,6 +252,7 @@ export type UserUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutOwnerNestedInput
+  secrets?: Prisma.SecretUncheckedUpdateManyWithoutOwnerNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -317,11 +324,26 @@ export type UserUpdateOneRequiredWithoutWorkflowsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutWorkflowsInput, Prisma.UserUpdateWithoutWorkflowsInput>, Prisma.UserUncheckedUpdateWithoutWorkflowsInput>
 }
 
+export type UserCreateNestedOneWithoutSecretsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSecretsInput, Prisma.UserUncheckedCreateWithoutSecretsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSecretsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutSecretsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSecretsInput, Prisma.UserUncheckedCreateWithoutSecretsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSecretsInput
+  upsert?: Prisma.UserUpsertWithoutSecretsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSecretsInput, Prisma.UserUpdateWithoutSecretsInput>, Prisma.UserUncheckedUpdateWithoutSecretsInput>
+}
+
 export type UserCreateWithoutWorkflowsInput = {
   id?: string
   createdAt?: Date | string
   updatedAt?: Date | string
   snowflakeUser: string
+  secrets?: Prisma.SecretCreateNestedManyWithoutOwnerInput
 }
 
 export type UserUncheckedCreateWithoutWorkflowsInput = {
@@ -329,6 +351,7 @@ export type UserUncheckedCreateWithoutWorkflowsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   snowflakeUser: string
+  secrets?: Prisma.SecretUncheckedCreateNestedManyWithoutOwnerInput
 }
 
 export type UserCreateOrConnectWithoutWorkflowsInput = {
@@ -352,6 +375,7 @@ export type UserUpdateWithoutWorkflowsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
+  secrets?: Prisma.SecretUpdateManyWithoutOwnerNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWorkflowsInput = {
@@ -359,6 +383,55 @@ export type UserUncheckedUpdateWithoutWorkflowsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
+  secrets?: Prisma.SecretUncheckedUpdateManyWithoutOwnerNestedInput
+}
+
+export type UserCreateWithoutSecretsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  snowflakeUser: string
+  workflows?: Prisma.WorkflowCreateNestedManyWithoutOwnerInput
+}
+
+export type UserUncheckedCreateWithoutSecretsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  snowflakeUser: string
+  workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutOwnerInput
+}
+
+export type UserCreateOrConnectWithoutSecretsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutSecretsInput, Prisma.UserUncheckedCreateWithoutSecretsInput>
+}
+
+export type UserUpsertWithoutSecretsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutSecretsInput, Prisma.UserUncheckedUpdateWithoutSecretsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutSecretsInput, Prisma.UserUncheckedCreateWithoutSecretsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutSecretsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutSecretsInput, Prisma.UserUncheckedUpdateWithoutSecretsInput>
+}
+
+export type UserUpdateWithoutSecretsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
+  workflows?: Prisma.WorkflowUpdateManyWithoutOwnerNestedInput
+}
+
+export type UserUncheckedUpdateWithoutSecretsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
+  workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutOwnerNestedInput
 }
 
 
@@ -368,10 +441,12 @@ export type UserUncheckedUpdateWithoutWorkflowsInput = {
 
 export type UserCountOutputType = {
   workflows: number
+  secrets: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workflows?: boolean | UserCountOutputTypeCountWorkflowsArgs
+  secrets?: boolean | UserCountOutputTypeCountSecretsArgs
 }
 
 /**
@@ -391,6 +466,13 @@ export type UserCountOutputTypeCountWorkflowsArgs<ExtArgs extends runtime.Types.
   where?: Prisma.WorkflowWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountSecretsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SecretWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -398,6 +480,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   updatedAt?: boolean
   snowflakeUser?: boolean
   workflows?: boolean | Prisma.User$workflowsArgs<ExtArgs>
+  secrets?: boolean | Prisma.User$secretsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -425,6 +508,7 @@ export type UserSelectScalar = {
 export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "snowflakeUser", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workflows?: boolean | Prisma.User$workflowsArgs<ExtArgs>
+  secrets?: boolean | Prisma.User$secretsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -434,6 +518,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   name: "User"
   objects: {
     workflows: Prisma.$WorkflowPayload<ExtArgs>[]
+    secrets: Prisma.$SecretPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -835,6 +920,7 @@ readonly fields: UserFieldRefs;
 export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   workflows<T extends Prisma.User$workflowsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$workflowsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  secrets<T extends Prisma.User$secretsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$secretsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SecretPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1277,6 +1363,30 @@ export type User$workflowsArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   distinct?: Prisma.WorkflowScalarFieldEnum | Prisma.WorkflowScalarFieldEnum[]
+}
+
+/**
+ * User.secrets
+ */
+export type User$secretsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Secret
+   */
+  select?: Prisma.SecretSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Secret
+   */
+  omit?: Prisma.SecretOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SecretInclude<ExtArgs> | null
+  where?: Prisma.SecretWhereInput
+  orderBy?: Prisma.SecretOrderByWithRelationInput | Prisma.SecretOrderByWithRelationInput[]
+  cursor?: Prisma.SecretWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SecretScalarFieldEnum | Prisma.SecretScalarFieldEnum[]
 }
 
 /**

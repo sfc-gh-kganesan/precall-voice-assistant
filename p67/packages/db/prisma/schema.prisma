@@ -19,6 +19,7 @@ model User {
   updatedAt     DateTime @updatedAt
   snowflakeUser String   @unique
   workflows Workflow[]
+  secrets Secret[]
 }
 
 enum WorkflowVisibility {
@@ -34,4 +35,16 @@ model Workflow {
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())
     visibility WorkflowVisibility @default(Private)
+}
+
+model Secret {
+  id String @id @default(uuid())
+  name String   // make unique for the user
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id])
+  secret String
+  // tags
+  // TODO: sharing
 }

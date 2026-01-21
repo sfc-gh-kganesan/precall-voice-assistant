@@ -89,3 +89,38 @@ export const WhoamiResponseSchema = z.object({
 });
 
 export type WhoamiResponse = z.infer<typeof WhoamiResponseSchema>;
+
+// Secret Schemas
+export const SecretSaveBodySchema = z.object({
+    name: z.string().min(1),
+    secret: z.string().min(1),
+});
+
+export const SecretSaveResponseSchema = z.object({
+    name: z.string(),
+    created: z.boolean(),
+});
+
+export const SecretSchema = z.object({
+    name: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+});
+
+export const SecretListResponseSchema = z.object({
+    secrets: z.array(SecretSchema),
+});
+
+export const SecretDeleteParamsSchema = z.object({
+    name: z.string(),
+});
+
+export const SecretDeleteResponseSchema = z.object({
+    deleted: z.boolean(),
+    name: z.string(),
+});
+
+export type SecretSaveBody = z.infer<typeof SecretSaveBodySchema>;
+export type SecretSaveResponse = z.infer<typeof SecretSaveResponseSchema>;
+export type SecretListResponse = z.infer<typeof SecretListResponseSchema>;
+export type SecretDeleteResponse = z.infer<typeof SecretDeleteResponseSchema>;

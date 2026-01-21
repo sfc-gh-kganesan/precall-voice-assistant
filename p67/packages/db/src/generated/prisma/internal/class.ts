@@ -20,7 +20,7 @@ const config: runtime.GetPrismaClientConfig = {
   "clientVersion": "7.1.0",
   "engineVersion": "ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba",
   "activeProvider": "postgresql",
-  "inlineSchema": "// This is your Prisma schema file\n\ngenerator client {\n  provider               = \"prisma-client\"\n  output                 = \"../src/generated/prisma\"\n  runtime                = \"nodejs\"\n  moduleFormat           = \"esm\"\n  generatedFileExtension = \"ts\"\n  importFileExtension    = \"js\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel User {\n  id            String     @id @default(uuid())\n  createdAt     DateTime   @default(now())\n  updatedAt     DateTime   @updatedAt\n  snowflakeUser String     @unique\n  workflows     Workflow[]\n}\n\nenum WorkflowVisibility {\n  Private\n  Public\n}\n\nmodel Workflow {\n  id          String             @id @default(uuid())\n  storagePath String // the directory on disk (block storage volume) where workflow artifacts are stored\n  ownerId     String\n  owner       User               @relation(fields: [ownerId], references: [id])\n  createdAt   DateTime           @default(now())\n  updatedAt   DateTime           @default(now())\n  visibility  WorkflowVisibility @default(Private)\n}\n",
+  "inlineSchema": "// This is your Prisma schema file\n\ngenerator client {\n  provider               = \"prisma-client\"\n  output                 = \"../src/generated/prisma\"\n  runtime                = \"nodejs\"\n  moduleFormat           = \"esm\"\n  generatedFileExtension = \"ts\"\n  importFileExtension    = \"js\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel User {\n  id            String     @id @default(uuid())\n  createdAt     DateTime   @default(now())\n  updatedAt     DateTime   @updatedAt\n  snowflakeUser String     @unique\n  workflows     Workflow[]\n  secrets       Secret[]\n}\n\nenum WorkflowVisibility {\n  Private\n  Public\n}\n\nmodel Workflow {\n  id          String             @id @default(uuid())\n  storagePath String // the directory on disk (block storage volume) where workflow artifacts are stored\n  ownerId     String\n  owner       User               @relation(fields: [ownerId], references: [id])\n  createdAt   DateTime           @default(now())\n  updatedAt   DateTime           @default(now())\n  visibility  WorkflowVisibility @default(Private)\n}\n\nmodel Secret {\n  id        String   @id @default(uuid())\n  name      String // make unique for the user\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n  ownerId   String\n  owner     User     @relation(fields: [ownerId], references: [id])\n  secret    String\n  // tags\n  // TODO: sharing\n}\n",
   "runtimeDataModel": {
     "models": {},
     "enums": {},
@@ -28,7 +28,7 @@ const config: runtime.GetPrismaClientConfig = {
   }
 }
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"snowflakeUser\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"workflows\",\"kind\":\"object\",\"type\":\"Workflow\",\"relationName\":\"UserToWorkflow\"}],\"dbName\":null},\"Workflow\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"storagePath\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"ownerId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"owner\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"UserToWorkflow\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"visibility\",\"kind\":\"enum\",\"type\":\"WorkflowVisibility\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"snowflakeUser\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"workflows\",\"kind\":\"object\",\"type\":\"Workflow\",\"relationName\":\"UserToWorkflow\"},{\"name\":\"secrets\",\"kind\":\"object\",\"type\":\"Secret\",\"relationName\":\"SecretToUser\"}],\"dbName\":null},\"Workflow\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"storagePath\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"ownerId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"owner\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"UserToWorkflow\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"visibility\",\"kind\":\"enum\",\"type\":\"WorkflowVisibility\"}],\"dbName\":null},\"Secret\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"ownerId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"owner\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"SecretToUser\"},{\"name\":\"secret\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
 
 async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Module> {
   const { Buffer } = await import('node:buffer')
@@ -193,6 +193,16 @@ export interface PrismaClient<
     * ```
     */
   get workflow(): Prisma.WorkflowDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.secret`: Exposes CRUD operations for the **Secret** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Secrets
+    * const secrets = await prisma.secret.findMany()
+    * ```
+    */
+  get secret(): Prisma.SecretDelegate<ExtArgs, { omit: OmitOpts }>;
 }
 
 export function getPrismaClientClass(): PrismaClientConstructor {

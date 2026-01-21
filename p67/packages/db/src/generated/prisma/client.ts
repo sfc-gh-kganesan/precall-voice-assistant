@@ -49,3 +49,8 @@ export type User = Prisma.UserModel
  * 
  */
 export type Workflow = Prisma.WorkflowModel
+/**
+ * Model Secret
+ * 
+ */
+export type Secret = Prisma.SecretModel

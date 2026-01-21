@@ -21,6 +21,7 @@ diff: ## Show SQL diff between current database and Prisma schema
 
 deploy: ## Apply all pending migrations to the database
 	pnpm prisma migrate deploy
+	pnpm prisma generate
 
 migrate: ## Run migrate for dev to generate migration scripts
 	pnpm prisma migrate dev

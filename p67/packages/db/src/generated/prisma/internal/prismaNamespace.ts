@@ -385,7 +385,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
-  Workflow: 'Workflow'
+  Workflow: 'Workflow',
+  Secret: 'Secret'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -401,7 +402,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "workflow"
+    modelProps: "user" | "workflow" | "secret"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -553,6 +554,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    Secret: {
+      payload: Prisma.$SecretPayload<ExtArgs>
+      fields: Prisma.SecretFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SecretFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SecretFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>
+        }
+        findFirst: {
+          args: Prisma.SecretFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SecretFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>
+        }
+        findMany: {
+          args: Prisma.SecretFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>[]
+        }
+        create: {
+          args: Prisma.SecretCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>
+        }
+        createMany: {
+          args: Prisma.SecretCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SecretCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>[]
+        }
+        delete: {
+          args: Prisma.SecretDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>
+        }
+        update: {
+          args: Prisma.SecretUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>
+        }
+        deleteMany: {
+          args: Prisma.SecretDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SecretUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SecretUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>[]
+        }
+        upsert: {
+          args: Prisma.SecretUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SecretPayload>
+        }
+        aggregate: {
+          args: Prisma.SecretAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSecret>
+        }
+        groupBy: {
+          args: Prisma.SecretGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SecretGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SecretCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SecretCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -612,6 +687,18 @@ export const WorkflowScalarFieldEnum = {
 } as const
 
 export type WorkflowScalarFieldEnum = (typeof WorkflowScalarFieldEnum)[keyof typeof WorkflowScalarFieldEnum]
+
+
+export const SecretScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  ownerId: 'ownerId',
+  secret: 'secret'
+} as const
+
+export type SecretScalarFieldEnum = (typeof SecretScalarFieldEnum)[keyof typeof SecretScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -788,6 +875,7 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   workflow?: Prisma.WorkflowOmit
+  secret?: Prisma.SecretOmit
 }
 
 /* Types for Logging */

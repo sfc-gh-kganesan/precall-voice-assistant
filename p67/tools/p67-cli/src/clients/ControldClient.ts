@@ -34,6 +34,27 @@ export interface ErrorResponse {
     message?: string;
 }
 
+// Secret types
+export interface Secret {
+    name: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SecretSaveResponse {
+    name: string;
+    created: boolean;
+}
+
+export interface SecretListResponse {
+    secrets: Secret[];
+}
+
+export interface SecretDeleteResponse {
+    deleted: boolean;
+    name: string;
+}
+
 export interface ControldClientConfig {
     baseUrl: string;
     pat: string;
@@ -85,6 +106,10 @@ export class ControldClient {
 
     async post(path: string, options: RequestInit = {}): Promise<Response> {
         return this.fetch(path, { ...options, method: 'POST' });
+    }
+
+    async delete(path: string, options: RequestInit = {}): Promise<Response> {
+        return this.fetch(path, { ...options, method: 'DELETE' });
     }
 
     async health(): Promise<HealthResponse> {
@@ -147,5 +172,50 @@ export class ControldClient {
         }
 
         return (await response.json()) as WorkflowRunResponse;
+    }
+
+    // Secret methods
+
+    async saveSecret(
+        name: string,
+        secret: string,
+    ): Promise<SecretSaveResponse> {
+        const response = await this.post('/api/secret/save', {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, secret }),
+        });
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as SecretSaveResponse;
+    }
+
+    async listSecrets(): Promise<SecretListResponse> {
+        const response = await this.get('/api/secret/list');
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as SecretListResponse;
+    }
+
+    async deleteSecret(name: string): Promise<SecretDeleteResponse> {
+        const response = await this.delete(
+            `/api/secret/${encodeURIComponent(name)}`,
+        );
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as SecretDeleteResponse;
     }
 }
