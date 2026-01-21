@@ -5,6 +5,7 @@ export type {
     Secret,
     Workflow,
     WorkflowRun,
+    WorkflowRunStatus,
 } from './generated/prisma/client.js';
 export { SecretModel } from './generated/prisma/models/Secret.js';
 export { UserModel } from './generated/prisma/models/User.js';

@@ -102,7 +102,8 @@ export const WorkflowRunScalarFieldEnum = {
   userId: 'userId',
   startedAt: 'startedAt',
   completedAt: 'completedAt',
-  exitCode: 'exitCode'
+  exitCode: 'exitCode',
+  status: 'status'
 } as const
 
 export type WorkflowRunScalarFieldEnum = (typeof WorkflowRunScalarFieldEnum)[keyof typeof WorkflowRunScalarFieldEnum]

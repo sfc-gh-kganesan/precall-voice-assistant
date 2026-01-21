@@ -24,3 +24,13 @@ export const LogSource = {
 } as const
 
 export type LogSource = (typeof LogSource)[keyof typeof LogSource]
+
+
+export const WorkflowRunStatus = {
+  Running: 'Running',
+  Completed: 'Completed',
+  Failed: 'Failed',
+  Cancelled: 'Cancelled'
+} as const
+
+export type WorkflowRunStatus = (typeof WorkflowRunStatus)[keyof typeof WorkflowRunStatus]

@@ -1,4 +1,10 @@
-import type { Log, LogSource, PrismaClient, WorkflowRun } from '@p67/db';
+import type {
+    Log,
+    LogSource,
+    PrismaClient,
+    WorkflowRun,
+    WorkflowRunStatus,
+} from '@p67/db';
 
 export interface LogServiceConfig {
     db: PrismaClient;
@@ -46,11 +52,14 @@ export class LogService {
     }
 
     async completeRun(runId: string, exitCode: number): Promise<WorkflowRun> {
+        const status: WorkflowRunStatus =
+            exitCode === 0 ? 'Completed' : 'Failed';
         return this.db.workflowRun.update({
             where: { id: runId },
             data: {
                 completedAt: new Date(),
                 exitCode,
+                status,
             },
         });
     }

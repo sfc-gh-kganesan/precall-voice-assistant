@@ -111,6 +111,13 @@ export type IntNullableFilter<$PrismaModel = never> = {
   not?: Prisma.NestedIntNullableFilter<$PrismaModel> | number | null
 }
 
+export type EnumWorkflowRunStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkflowRunStatus | Prisma.EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWorkflowRunStatusFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+}
+
 export type SortOrderInput = {
   sort: Prisma.SortOrder
   nulls?: Prisma.NullsOrder
@@ -144,6 +151,16 @@ export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
   _sum?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _max?: Prisma.NestedIntNullableFilter<$PrismaModel>
+}
+
+export type EnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkflowRunStatus | Prisma.EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWorkflowRunStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWorkflowRunStatusFilter<$PrismaModel>
 }
 
 export type EnumLogSourceFilter<$PrismaModel = never> = {
@@ -320,6 +337,13 @@ export type NestedIntNullableFilter<$PrismaModel = never> = {
   not?: Prisma.NestedIntNullableFilter<$PrismaModel> | number | null
 }
 
+export type NestedEnumWorkflowRunStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkflowRunStatus | Prisma.EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWorkflowRunStatusFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+}
+
 export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
   equals?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel> | null
   in?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
@@ -359,6 +383,16 @@ export type NestedFloatNullableFilter<$PrismaModel = never> = {
   gt?: number | Prisma.FloatFieldRefInput<$PrismaModel>
   gte?: number | Prisma.FloatFieldRefInput<$PrismaModel>
   not?: Prisma.NestedFloatNullableFilter<$PrismaModel> | number | null
+}
+
+export type NestedEnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WorkflowRunStatus | Prisma.EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WorkflowRunStatus[] | Prisma.ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWorkflowRunStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWorkflowRunStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumLogSourceFilter<$PrismaModel = never> = {

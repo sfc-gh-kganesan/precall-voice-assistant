@@ -845,7 +845,8 @@ export const WorkflowRunScalarFieldEnum = {
   userId: 'userId',
   startedAt: 'startedAt',
   completedAt: 'completedAt',
-  exitCode: 'exitCode'
+  exitCode: 'exitCode',
+  status: 'status'
 } as const
 
 export type WorkflowRunScalarFieldEnum = (typeof WorkflowRunScalarFieldEnum)[keyof typeof WorkflowRunScalarFieldEnum]
@@ -976,6 +977,20 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'WorkflowRunStatus'
+ */
+export type EnumWorkflowRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WorkflowRunStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'WorkflowRunStatus[]'
+ */
+export type ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WorkflowRunStatus[]'>
     
 
 

@@ -45,19 +45,28 @@ enum LogSource {
     ToolCall         // Logs from tool/function calls
 }
 
+enum WorkflowRunStatus {
+    Running          // Workflow is currently executing
+    Completed        // Workflow finished successfully
+    Failed           // Workflow finished with an error
+    Cancelled        // Workflow was manually cancelled
+}
+
 model WorkflowRun {
-    id          String    @id @default(uuid())
+    id          String            @id @default(uuid())
     workflowId  String
-    workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+    workflow    Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
     userId      String
-    user        User      @relation(fields: [userId], references: [id])
-    startedAt   DateTime  @default(now())
+    user        User              @relation(fields: [userId], references: [id])
+    startedAt   DateTime          @default(now())
     completedAt DateTime?
     exitCode    Int?
+    status      WorkflowRunStatus @default(Running)
     logs        Log[]
 
     @@index([workflowId])
     @@index([userId])
+    @@index([status])
 }
 
 model Log {

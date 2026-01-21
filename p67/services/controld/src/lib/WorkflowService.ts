@@ -21,6 +21,22 @@ export interface CreateWorkflowResult {
     storagePath: string;
 }
 
+export class WorkflowLockedError extends Error {
+    constructor(
+        public readonly workflowId: string,
+        public readonly activeRunId: string,
+        public readonly startedAt: Date,
+    ) {
+        const elapsed = Math.round(
+            (Date.now() - startedAt.getTime()) / 1000 / 60,
+        );
+        super(
+            `Cannot overwrite workflow ${workflowId} while it is executing. Active run: ${activeRunId} (started ${elapsed} minute(s) ago)`,
+        );
+        this.name = 'WorkflowLockedError';
+    }
+}
+
 export class WorkflowService {
     private db: PrismaClient;
     private localStoragePath: string;
@@ -47,6 +63,16 @@ export class WorkflowService {
             );
             if (!existingWorkflow) {
                 throw new Error(`Workflow ${overwriteWorkflowId} not found`);
+            }
+
+            // Check if the workflow is currently executing
+            const activeRun = await this.findActiveRun(workflowId);
+            if (activeRun) {
+                throw new WorkflowLockedError(
+                    workflowId,
+                    activeRun.id,
+                    activeRun.startedAt,
+                );
             }
 
             await this.db.workflow.delete({
@@ -154,5 +180,26 @@ export class WorkflowService {
 
     workflowExistsOnDisk(workflowId: string): boolean {
         return existsSync(this.getWorkflowPath(workflowId));
+    }
+
+    /**
+     * Find an active (running) workflow run for the given workflow.
+     * Returns the active run if one exists, null otherwise.
+     *
+     * A run is considered active if:
+     * - status is 'Running' AND
+     * - completedAt is null (hasn't finished yet)
+     */
+    async findActiveRun(workflowId: string) {
+        return this.db.workflowRun.findFirst({
+            where: {
+                workflowId,
+                status: 'Running',
+                completedAt: null,
+            },
+            orderBy: {
+                startedAt: 'desc',
+            },
+        });
     }
 }

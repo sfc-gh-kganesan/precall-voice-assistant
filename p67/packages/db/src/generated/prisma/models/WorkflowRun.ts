@@ -41,6 +41,7 @@ export type WorkflowRunMinAggregateOutputType = {
   startedAt: Date | null
   completedAt: Date | null
   exitCode: number | null
+  status: $Enums.WorkflowRunStatus | null
 }
 
 export type WorkflowRunMaxAggregateOutputType = {
@@ -50,6 +51,7 @@ export type WorkflowRunMaxAggregateOutputType = {
   startedAt: Date | null
   completedAt: Date | null
   exitCode: number | null
+  status: $Enums.WorkflowRunStatus | null
 }
 
 export type WorkflowRunCountAggregateOutputType = {
@@ -59,6 +61,7 @@ export type WorkflowRunCountAggregateOutputType = {
   startedAt: number
   completedAt: number
   exitCode: number
+  status: number
   _all: number
 }
 
@@ -78,6 +81,7 @@ export type WorkflowRunMinAggregateInputType = {
   startedAt?: true
   completedAt?: true
   exitCode?: true
+  status?: true
 }
 
 export type WorkflowRunMaxAggregateInputType = {
@@ -87,6 +91,7 @@ export type WorkflowRunMaxAggregateInputType = {
   startedAt?: true
   completedAt?: true
   exitCode?: true
+  status?: true
 }
 
 export type WorkflowRunCountAggregateInputType = {
@@ -96,6 +101,7 @@ export type WorkflowRunCountAggregateInputType = {
   startedAt?: true
   completedAt?: true
   exitCode?: true
+  status?: true
   _all?: true
 }
 
@@ -192,6 +198,7 @@ export type WorkflowRunGroupByOutputType = {
   startedAt: Date
   completedAt: Date | null
   exitCode: number | null
+  status: $Enums.WorkflowRunStatus
   _count: WorkflowRunCountAggregateOutputType | null
   _avg: WorkflowRunAvgAggregateOutputType | null
   _sum: WorkflowRunSumAggregateOutputType | null
@@ -224,6 +231,7 @@ export type WorkflowRunWhereInput = {
   startedAt?: Prisma.DateTimeFilter<"WorkflowRun"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
   exitCode?: Prisma.IntNullableFilter<"WorkflowRun"> | number | null
+  status?: Prisma.EnumWorkflowRunStatusFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
   workflow?: Prisma.XOR<Prisma.WorkflowScalarRelationFilter, Prisma.WorkflowWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   logs?: Prisma.LogListRelationFilter
@@ -236,6 +244,7 @@ export type WorkflowRunOrderByWithRelationInput = {
   startedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   exitCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  status?: Prisma.SortOrder
   workflow?: Prisma.WorkflowOrderByWithRelationInput
   user?: Prisma.UserOrderByWithRelationInput
   logs?: Prisma.LogOrderByRelationAggregateInput
@@ -251,6 +260,7 @@ export type WorkflowRunWhereUniqueInput = Prisma.AtLeast<{
   startedAt?: Prisma.DateTimeFilter<"WorkflowRun"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
   exitCode?: Prisma.IntNullableFilter<"WorkflowRun"> | number | null
+  status?: Prisma.EnumWorkflowRunStatusFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
   workflow?: Prisma.XOR<Prisma.WorkflowScalarRelationFilter, Prisma.WorkflowWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   logs?: Prisma.LogListRelationFilter
@@ -263,6 +273,7 @@ export type WorkflowRunOrderByWithAggregationInput = {
   startedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   exitCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  status?: Prisma.SortOrder
   _count?: Prisma.WorkflowRunCountOrderByAggregateInput
   _avg?: Prisma.WorkflowRunAvgOrderByAggregateInput
   _max?: Prisma.WorkflowRunMaxOrderByAggregateInput
@@ -280,6 +291,7 @@ export type WorkflowRunScalarWhereWithAggregatesInput = {
   startedAt?: Prisma.DateTimeWithAggregatesFilter<"WorkflowRun"> | Date | string
   completedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"WorkflowRun"> | Date | string | null
   exitCode?: Prisma.IntNullableWithAggregatesFilter<"WorkflowRun"> | number | null
+  status?: Prisma.EnumWorkflowRunStatusWithAggregatesFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunCreateInput = {
@@ -287,6 +299,7 @@ export type WorkflowRunCreateInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
   workflow: Prisma.WorkflowCreateNestedOneWithoutRunsInput
   user: Prisma.UserCreateNestedOneWithoutWorkflowRunsInput
   logs?: Prisma.LogCreateNestedManyWithoutRunInput
@@ -299,6 +312,7 @@ export type WorkflowRunUncheckedCreateInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedCreateNestedManyWithoutRunInput
 }
 
@@ -307,6 +321,7 @@ export type WorkflowRunUpdateInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   workflow?: Prisma.WorkflowUpdateOneRequiredWithoutRunsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
   logs?: Prisma.LogUpdateManyWithoutRunNestedInput
@@ -319,6 +334,7 @@ export type WorkflowRunUncheckedUpdateInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedUpdateManyWithoutRunNestedInput
 }
 
@@ -329,6 +345,7 @@ export type WorkflowRunCreateManyInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunUpdateManyMutationInput = {
@@ -336,6 +353,7 @@ export type WorkflowRunUpdateManyMutationInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunUncheckedUpdateManyInput = {
@@ -345,6 +363,7 @@ export type WorkflowRunUncheckedUpdateManyInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunListRelationFilter = {
@@ -364,6 +383,7 @@ export type WorkflowRunCountOrderByAggregateInput = {
   startedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
   exitCode?: Prisma.SortOrder
+  status?: Prisma.SortOrder
 }
 
 export type WorkflowRunAvgOrderByAggregateInput = {
@@ -377,6 +397,7 @@ export type WorkflowRunMaxOrderByAggregateInput = {
   startedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
   exitCode?: Prisma.SortOrder
+  status?: Prisma.SortOrder
 }
 
 export type WorkflowRunMinOrderByAggregateInput = {
@@ -386,6 +407,7 @@ export type WorkflowRunMinOrderByAggregateInput = {
   startedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
   exitCode?: Prisma.SortOrder
+  status?: Prisma.SortOrder
 }
 
 export type WorkflowRunSumOrderByAggregateInput = {
@@ -493,6 +515,10 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type EnumWorkflowRunStatusFieldUpdateOperationsInput = {
+  set?: $Enums.WorkflowRunStatus
+}
+
 export type WorkflowRunCreateNestedOneWithoutLogsInput = {
   create?: Prisma.XOR<Prisma.WorkflowRunCreateWithoutLogsInput, Prisma.WorkflowRunUncheckedCreateWithoutLogsInput>
   connectOrCreate?: Prisma.WorkflowRunCreateOrConnectWithoutLogsInput
@@ -512,6 +538,7 @@ export type WorkflowRunCreateWithoutUserInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
   workflow: Prisma.WorkflowCreateNestedOneWithoutRunsInput
   logs?: Prisma.LogCreateNestedManyWithoutRunInput
 }
@@ -522,6 +549,7 @@ export type WorkflowRunUncheckedCreateWithoutUserInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedCreateNestedManyWithoutRunInput
 }
 
@@ -561,6 +589,7 @@ export type WorkflowRunScalarWhereInput = {
   startedAt?: Prisma.DateTimeFilter<"WorkflowRun"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
   exitCode?: Prisma.IntNullableFilter<"WorkflowRun"> | number | null
+  status?: Prisma.EnumWorkflowRunStatusFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunCreateWithoutWorkflowInput = {
@@ -568,6 +597,7 @@ export type WorkflowRunCreateWithoutWorkflowInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
   user: Prisma.UserCreateNestedOneWithoutWorkflowRunsInput
   logs?: Prisma.LogCreateNestedManyWithoutRunInput
 }
@@ -578,6 +608,7 @@ export type WorkflowRunUncheckedCreateWithoutWorkflowInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedCreateNestedManyWithoutRunInput
 }
 
@@ -612,6 +643,7 @@ export type WorkflowRunCreateWithoutLogsInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
   workflow: Prisma.WorkflowCreateNestedOneWithoutRunsInput
   user: Prisma.UserCreateNestedOneWithoutWorkflowRunsInput
 }
@@ -623,6 +655,7 @@ export type WorkflowRunUncheckedCreateWithoutLogsInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunCreateOrConnectWithoutLogsInput = {
@@ -646,6 +679,7 @@ export type WorkflowRunUpdateWithoutLogsInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   workflow?: Prisma.WorkflowUpdateOneRequiredWithoutRunsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
 }
@@ -657,6 +691,7 @@ export type WorkflowRunUncheckedUpdateWithoutLogsInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunCreateManyUserInput = {
@@ -665,6 +700,7 @@ export type WorkflowRunCreateManyUserInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunUpdateWithoutUserInput = {
@@ -672,6 +708,7 @@ export type WorkflowRunUpdateWithoutUserInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   workflow?: Prisma.WorkflowUpdateOneRequiredWithoutRunsNestedInput
   logs?: Prisma.LogUpdateManyWithoutRunNestedInput
 }
@@ -682,6 +719,7 @@ export type WorkflowRunUncheckedUpdateWithoutUserInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedUpdateManyWithoutRunNestedInput
 }
 
@@ -691,6 +729,7 @@ export type WorkflowRunUncheckedUpdateManyWithoutUserInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunCreateManyWorkflowInput = {
@@ -699,6 +738,7 @@ export type WorkflowRunCreateManyWorkflowInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
 }
 
 export type WorkflowRunUpdateWithoutWorkflowInput = {
@@ -706,6 +746,7 @@ export type WorkflowRunUpdateWithoutWorkflowInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   user?: Prisma.UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
   logs?: Prisma.LogUpdateManyWithoutRunNestedInput
 }
@@ -716,6 +757,7 @@ export type WorkflowRunUncheckedUpdateWithoutWorkflowInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedUpdateManyWithoutRunNestedInput
 }
 
@@ -725,6 +767,7 @@ export type WorkflowRunUncheckedUpdateManyWithoutWorkflowInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
 }
 
 
@@ -765,6 +808,7 @@ export type WorkflowRunSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   startedAt?: boolean
   completedAt?: boolean
   exitCode?: boolean
+  status?: boolean
   workflow?: boolean | Prisma.WorkflowDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   logs?: boolean | Prisma.WorkflowRun$logsArgs<ExtArgs>
@@ -778,6 +822,7 @@ export type WorkflowRunSelectCreateManyAndReturn<ExtArgs extends runtime.Types.E
   startedAt?: boolean
   completedAt?: boolean
   exitCode?: boolean
+  status?: boolean
   workflow?: boolean | Prisma.WorkflowDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workflowRun"]>
@@ -789,6 +834,7 @@ export type WorkflowRunSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.E
   startedAt?: boolean
   completedAt?: boolean
   exitCode?: boolean
+  status?: boolean
   workflow?: boolean | Prisma.WorkflowDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workflowRun"]>
@@ -800,9 +846,10 @@ export type WorkflowRunSelectScalar = {
   startedAt?: boolean
   completedAt?: boolean
   exitCode?: boolean
+  status?: boolean
 }
 
-export type WorkflowRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workflowId" | "userId" | "startedAt" | "completedAt" | "exitCode", ExtArgs["result"]["workflowRun"]>
+export type WorkflowRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workflowId" | "userId" | "startedAt" | "completedAt" | "exitCode" | "status", ExtArgs["result"]["workflowRun"]>
 export type WorkflowRunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workflow?: boolean | Prisma.WorkflowDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -832,6 +879,7 @@ export type $WorkflowRunPayload<ExtArgs extends runtime.Types.Extensions.Interna
     startedAt: Date
     completedAt: Date | null
     exitCode: number | null
+    status: $Enums.WorkflowRunStatus
   }, ExtArgs["result"]["workflowRun"]>
   composites: {}
 }
@@ -1264,6 +1312,7 @@ export interface WorkflowRunFieldRefs {
   readonly startedAt: Prisma.FieldRef<"WorkflowRun", 'DateTime'>
   readonly completedAt: Prisma.FieldRef<"WorkflowRun", 'DateTime'>
   readonly exitCode: Prisma.FieldRef<"WorkflowRun", 'Int'>
+  readonly status: Prisma.FieldRef<"WorkflowRun", 'WorkflowRunStatus'>
 }
     
 

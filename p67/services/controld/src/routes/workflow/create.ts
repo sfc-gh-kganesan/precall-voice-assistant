@@ -1,3 +1,4 @@
+import { WorkflowLockedError } from '@controld/lib/WorkflowService.js';
 import {
     ErrorResponseSchema,
     WorkflowCreateResponseSchema,
@@ -17,6 +18,7 @@ export function registerCreateRoute(server: FastifyInstance) {
                 response: {
                     200: WorkflowCreateResponseSchema,
                     400: ErrorResponseSchema,
+                    409: ErrorResponseSchema,
                     500: ErrorResponseSchema,
                 },
             },
@@ -44,6 +46,15 @@ export function registerCreateRoute(server: FastifyInstance) {
                 return reply.code(200).send({ workflowId: wf.id });
             } catch (error) {
                 console.error('Error creating workflow:', error);
+
+                // Handle workflow locked error with 409 Conflict
+                if (error instanceof WorkflowLockedError) {
+                    return reply.code(409).send({
+                        error: 'WorkflowLocked',
+                        message: error.message,
+                    });
+                }
+
                 return reply.code(500).send({
                     error: 'Internal server error',
                     message:

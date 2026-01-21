@@ -34,13 +34,13 @@ export const deployCommand = new Command('deploy')
 
                 // Check if file exists
                 if (!fs.existsSync(resolvedPath)) {
-                    throw new Error(`✗ Error: File not found: ${resolvedPath}`);
+                    throw new Error(`File not found: ${resolvedPath}`);
                 }
 
                 // Check if it's a file (not a directory)
                 const stats = fs.statSync(resolvedPath);
                 if (!stats.isFile()) {
-                    throw new Error(`✗ Error: ${resolvedPath} is not a file`);
+                    throw new Error(`${resolvedPath} is not a file`);
                 }
 
                 console.log(`Deploying workflow from: ${resolvedPath}\n`);
@@ -68,15 +68,28 @@ export const deployCommand = new Command('deploy')
                 const result = await client.createWorkflow(
                     blob,
                     filename,
-                    dotP67Config.get().workflowId,
+                    overwrite ? dotP67Config.get().workflowId : undefined,
                 );
 
-                console.log('✓ Workflow deployed successfully!');
+                console.log('Workflow deployed successfully!');
                 console.log(`  Workflow ID: ${result.workflowId}`);
 
                 dotP67Config.setWorkflowId(result.workflowId);
                 dotP67Config.write();
             } catch (error) {
+                // Check if this is a workflow locked error from the API
+                if (
+                    error instanceof Error &&
+                    error.message.includes('Cannot overwrite workflow') &&
+                    error.message.includes('while it is executing')
+                ) {
+                    console.error(`\nError: ${error.message}`);
+                    console.error(
+                        '\nTip: Wait for the workflow execution to complete, or run without --overwrite to deploy as a new workflow.',
+                    );
+                    process.exit(1);
+                }
+
                 console.error(
                     `Failed to deploy workflow from ${filePath || 'default location'}`,
                 );
