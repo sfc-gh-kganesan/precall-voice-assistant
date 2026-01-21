@@ -1,3 +1,4 @@
+import { P67ConfigValueSchema } from '@p67/workflow-sdk';
 import { z } from 'zod';
 
 // MessageType defines the full set of possible types of messages passed between Controld
@@ -24,12 +25,20 @@ const BaseMessageSchema = z.object({
     type: z.nativeEnum(MessageType),
 });
 
+// Serialized config schema for IPC (Map serialized as Record)
+const SerializedP67ConfigSchema = z.object({
+    snowflakeConfig: z.record(z.string(), P67ConfigValueSchema),
+});
+
+export type SerializedP67Config = z.infer<typeof SerializedP67ConfigSchema>;
+
 // RunWorkflowMessageSchema defines the messages which are sent from the Controld service
 // process to the forked runtime process to invoke a Workflow. These messages includes
 // information required for the runtime host to load and execute a workflow.
 const RunWorkflowMessageSchema = BaseMessageSchema.extend({
     type: z.literal(MessageType.RunWorkflow),
     dir: z.string(),
+    config: SerializedP67ConfigSchema,
 });
 
 // WorkflowErrorMessageSchema defines the messages which may be passed from the forked

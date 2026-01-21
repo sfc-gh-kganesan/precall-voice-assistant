@@ -205,6 +205,7 @@ export type SecretOrderByWithRelationInput = {
 
 export type SecretWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  ownerId_name?: Prisma.SecretOwnerIdNameCompoundUniqueInput
   AND?: Prisma.SecretWhereInput | Prisma.SecretWhereInput[]
   OR?: Prisma.SecretWhereInput[]
   NOT?: Prisma.SecretWhereInput | Prisma.SecretWhereInput[]
@@ -214,7 +215,7 @@ export type SecretWhereUniqueInput = Prisma.AtLeast<{
   ownerId?: Prisma.StringFilter<"Secret"> | string
   secret?: Prisma.StringFilter<"Secret"> | string
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
-}, "id">
+}, "id" | "ownerId_name">
 
 export type SecretOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -310,6 +311,11 @@ export type SecretListRelationFilter = {
 
 export type SecretOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type SecretOwnerIdNameCompoundUniqueInput = {
+  ownerId: string
+  name: string
 }
 
 export type SecretCountOrderByAggregateInput = {

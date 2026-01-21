@@ -5,9 +5,15 @@ import {
     makeRunWorkflowMessage,
     makeThrowErrorMessage,
     RunWorkflowMessageSchema,
+    type SerializedP67Config,
     WorkflowError,
     WorkflowErrorMessageSchema,
 } from './schema.js';
+
+// Test helper: minimal valid config
+const testConfig: SerializedP67Config = {
+    snowflakeConfig: {},
+};
 
 describe('runtime/schema', () => {
     describe('MessageType enum', () => {
@@ -47,14 +53,19 @@ describe('runtime/schema', () => {
         it('should create a RunWorkflow message with correct type', () => {
             const message = makeRunWorkflowMessage({
                 dir: '/path/to/workflow',
+                config: testConfig,
             });
 
             expect(message.type).toBe(MessageType.RunWorkflow);
             expect(message.dir).toBe('/path/to/workflow');
+            expect(message.config).toEqual(testConfig);
         });
 
         it('should create valid message that passes schema validation', () => {
-            const message = makeRunWorkflowMessage({ dir: '/test/dir' });
+            const message = makeRunWorkflowMessage({
+                dir: '/test/dir',
+                config: testConfig,
+            });
             const result = RunWorkflowMessageSchema.safeParse(message);
 
             expect(result.success).toBe(true);
@@ -89,6 +100,7 @@ describe('runtime/schema', () => {
             const message = {
                 type: MessageType.RunWorkflow,
                 dir: '/workflow/path',
+                config: testConfig,
             };
             const result = RunWorkflowMessageSchema.safeParse(message);
 
@@ -98,6 +110,17 @@ describe('runtime/schema', () => {
         it('should reject message with missing dir', () => {
             const message = {
                 type: MessageType.RunWorkflow,
+                config: testConfig,
+            };
+            const result = RunWorkflowMessageSchema.safeParse(message);
+
+            expect(result.success).toBe(false);
+        });
+
+        it('should reject message with missing config', () => {
+            const message = {
+                type: MessageType.RunWorkflow,
+                dir: '/workflow/path',
             };
             const result = RunWorkflowMessageSchema.safeParse(message);
 
@@ -108,6 +131,7 @@ describe('runtime/schema', () => {
             const message = {
                 type: MessageType.ThrowError,
                 dir: '/workflow/path',
+                config: testConfig,
             };
             const result = RunWorkflowMessageSchema.safeParse(message);
 
@@ -118,6 +142,7 @@ describe('runtime/schema', () => {
             const message = {
                 type: MessageType.RunWorkflow,
                 dir: 123,
+                config: testConfig,
             };
             const result = RunWorkflowMessageSchema.safeParse(message);
 
@@ -189,6 +214,7 @@ describe('runtime/schema', () => {
             const message = {
                 type: MessageType.RunWorkflow,
                 dir: '/test/path',
+                config: testConfig,
             };
             const result = MessageSchema.safeParse(message);
 

@@ -1,3 +1,4 @@
+import type { PrismaClient } from '@p67/db';
 import type { Value } from './manifest';
 /**
  * ValueManager is a class that manages the values of the config, looking
@@ -5,14 +6,14 @@ import type { Value } from './manifest';
  */
 export class ValueManager {
     private kvMap: Map<string, string>;
-    private secretMap: Map<string, string>;
+    private db: PrismaClient;
+    private userId: string;
 
-    constructor() {
+    constructor(db: PrismaClient, userId: string) {
+        this.db = db;
+        this.userId = userId;
+        // TODO: populate.
         this.kvMap = new Map<string, string>();
-        // TODO: populate.
-
-        this.secretMap = new Map<string, string>();
-        // TODO: populate.
     }
 
     async get(value?: Value): Promise<string | undefined> {
@@ -42,11 +43,17 @@ export class ValueManager {
     }
 
     async getSecret(secretRef: string): Promise<string> {
-        const secret = this.secretMap.get(secretRef);
+        const secret = await this.db.secret.findFirst({
+            where: {
+                ownerId: this.userId,
+                OR: [{ name: secretRef }, { id: secretRef }],
+            },
+        });
+
         if (!secret) {
             throw new Error(`Secret not found: ${secretRef}`);
         }
-        return secret;
+        return secret.secret;
     }
 
     async decryptSecret(secret: string): Promise<string> {

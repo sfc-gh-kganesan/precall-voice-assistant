@@ -38,13 +38,15 @@ model Workflow {
 }
 
 model Secret {
-  id String @id @default(uuid())
-  name String   // make unique for the user
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  ownerId String
-  owner User @relation(fields: [ownerId], references: [id])
-  secret String
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
+  secret    String
   // tags
   // TODO: sharing
+
+  @@unique([ownerId, name])
 }

@@ -31,7 +31,9 @@ export class SecretService {
 
         if (existing) {
             await this.db.secret.update({
-                where: { id: existing.id },
+                where: {
+                    ownerId_name: { ownerId, name },
+                },
                 data: {
                     secret,
                     updatedAt: new Date(),
@@ -71,16 +73,17 @@ export class SecretService {
         }
 
         await this.db.secret.delete({
-            where: { id: existing.id },
+            where: {
+                ownerId_name: { ownerId, name },
+            },
         });
         return true;
     }
 
     async findByName(ownerId: string, name: string): Promise<Secret | null> {
-        return this.db.secret.findFirst({
+        return this.db.secret.findUnique({
             where: {
-                ownerId,
-                name,
+                ownerId_name: { ownerId, name },
             },
         });
     }

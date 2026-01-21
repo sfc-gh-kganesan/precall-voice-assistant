@@ -1,14 +1,22 @@
 import { fork } from 'node:child_process';
+import * as fs from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Manifest } from '@controld/lib/manifest.js';
+import { parseManifest } from '@controld/lib/manifest.js';
 import {
     MessageSchema,
     MessageType,
     makeRunWorkflowMessage,
+    type SerializedP67Config,
     type WorkflowError,
     type WorkflowErrorMessage,
     WorkflowErrorMessageSchema,
 } from '@controld/lib/runtime/schema.js';
+import { hydrateConfig } from '@controld/lib/sdk-impl.js';
+import { ValueManager } from '@controld/lib/value-manager.js';
+import type { PrismaClient } from '@p67/db';
+import type { P67Config } from '@p67/workflow-sdk';
 
 export type RunResult = {
     stdout: string[];
@@ -49,10 +57,103 @@ export class Logger {
 }
 
 export class Runner {
-    constructor(private readonly workflowDir: string) {}
+    constructor(
+        private readonly workflowDir: string,
+        private readonly db: PrismaClient,
+        private readonly userId: string,
+    ) {}
+
+    /**
+     * Serializes a P67Config (with Map) to a plain object for IPC.
+     */
+    private serializeConfig(config: P67Config): SerializedP67Config {
+        return {
+            snowflakeConfig: Object.fromEntries(config.snowflakeConfig),
+        };
+    }
 
     public async start(): Promise<RunResult> {
         console.log(`Running workflow from ${this.workflowDir}...`);
+
+        // Load and parse manifest
+        const manifestPath = resolve(this.workflowDir, 'manifest.yaml');
+        if (!fs.existsSync(manifestPath)) {
+            return {
+                stdout: [],
+                stderr: [],
+                log: [`Manifest not found at ${manifestPath}`],
+                exitCode: 1,
+                errors: [
+                    {
+                        error: 'ManifestNotfound' as WorkflowError,
+                        message: `${manifestPath} does not exist`,
+                    },
+                ],
+            };
+        }
+
+        let manifestStr: string;
+        try {
+            manifestStr = await fs.promises.readFile(manifestPath, 'utf-8');
+        } catch (err) {
+            const message =
+                err instanceof Error ? err.message : 'Unknown error';
+            return {
+                stdout: [],
+                stderr: [],
+                log: [`Failed to read manifest: ${message}`],
+                exitCode: 1,
+                errors: [
+                    {
+                        error: 'ManifestLoadParseError' as WorkflowError,
+                        message,
+                    },
+                ],
+            };
+        }
+
+        let manifest: Manifest;
+        try {
+            manifest = parseManifest(manifestStr);
+        } catch (err) {
+            const message =
+                err instanceof Error ? err.message : 'Unknown error';
+            return {
+                stdout: [],
+                stderr: [],
+                log: [`Failed to parse manifest: ${message}`],
+                exitCode: 1,
+                errors: [
+                    {
+                        error: 'ManifestLoadParseError' as WorkflowError,
+                        message,
+                    },
+                ],
+            };
+        }
+
+        // Hydrate config using ValueManager
+        let hydratedConfig: P67Config;
+        try {
+            const valueManager = new ValueManager(this.db, this.userId);
+            hydratedConfig = await hydrateConfig(manifest, valueManager);
+        } catch (err) {
+            const message =
+                err instanceof Error ? err.message : 'Unknown error';
+            return {
+                stdout: [],
+                stderr: [],
+                log: [`Failed to hydrate config: ${message}`],
+                exitCode: 1,
+                errors: [
+                    {
+                        error: 'ExecutionError' as WorkflowError,
+                        message: `Config hydration failed: ${message}`,
+                    },
+                ],
+            };
+        }
+
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = dirname(__filename);
         const hostPath = resolve(__dirname, 'runtime', 'host.js');
@@ -129,6 +230,7 @@ export class Runner {
 
         const m = makeRunWorkflowMessage({
             dir: this.workflowDir,
+            config: this.serializeConfig(hydratedConfig),
         });
 
         const getExitCode = new Promise<number>((resolve) => {

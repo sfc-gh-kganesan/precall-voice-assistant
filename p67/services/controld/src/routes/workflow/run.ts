@@ -48,7 +48,11 @@ export function registerRunRoute(server: FastifyInstance) {
                     });
                 }
 
-                const runnerInstance = new Runner(workflow.storagePath);
+                const runnerInstance = new Runner(
+                    workflow.storagePath,
+                    fastify.db,
+                    request.user.id,
+                );
                 const { stdout, stderr, exitCode, errors, log } =
                     await runnerInstance.start();
 

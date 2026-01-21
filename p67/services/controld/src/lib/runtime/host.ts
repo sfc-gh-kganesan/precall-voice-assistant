@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { type Manifest, parseManifest } from '@controld/lib/manifest.js';
 import type {
     Message,
     RunWorkflowMessage,
+    SerializedP67Config,
     WorkflowErrorMessage,
 } from '@controld/lib/runtime/schema.js';
 import {
@@ -12,8 +12,8 @@ import {
     makeThrowErrorMessage,
     WorkflowError,
 } from '@controld/lib/runtime/schema.js';
-import { hydrateConfig, WorkflowSDKImpl } from '@controld/lib/sdk-impl.js';
-import { ValueManager } from '@controld/lib/value-manager.js';
+import { WorkflowSDKImpl } from '@controld/lib/sdk-impl.js';
+import type { P67Config } from '@p67/workflow-sdk';
 
 function sendError(error: WorkflowError, message: string | Error | unknown) {
     if (message instanceof Error) {
@@ -34,6 +34,15 @@ function sendError(error: WorkflowError, message: string | Error | unknown) {
     }
 
     process.exit(1);
+}
+
+/**
+ * Deserializes a SerializedP67Config (plain object) back to P67Config (with Map).
+ */
+function deserializeConfig(serialized: SerializedP67Config): P67Config {
+    return {
+        snowflakeConfig: new Map(Object.entries(serialized.snowflakeConfig)),
+    };
 }
 
 async function handleMessage(message: Message) {
@@ -81,35 +90,9 @@ async function handleMessage(message: Message) {
         return;
     }
 
-    const manifestPath = path.resolve(data.dir, 'manifest.yaml');
-    if (!fs.existsSync(manifestPath)) {
-        sendError(
-            WorkflowError.ManifestNotFound,
-            `${manifestPath} does not exist`,
-        );
-    }
-
-    let manifestStr = '';
     try {
-        manifestStr = await fs.promises.readFile(manifestPath, 'utf-8');
-    } catch (err) {
-        sendError(WorkflowError.ManifestLoadParseError, err);
-        return;
-    }
-
-    let manifest: Manifest;
-    try {
-        manifest = parseManifest(manifestStr);
-    } catch (err) {
-        sendError(WorkflowError.ManifestLoadParseError, err);
-        return;
-    }
-
-    // TODO: Use a real thing here.
-    const valueManager = new ValueManager();
-
-    try {
-        const config = await hydrateConfig(manifest, valueManager);
+        // Deserialize the config from the message and create the SDK
+        const config = deserializeConfig(data.config);
         const sdk = new WorkflowSDKImpl(config);
         const result = await script.main(sdk);
         process.send?.({ type: 'result', data: result });
