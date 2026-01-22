@@ -258,7 +258,17 @@ def get_sync_status(session: Session) -> dict:
     """Get the current sync status showing how many pairs need to be synced."""
     unsearched_golden = get_unsearched_golden_pairs(session).count()
     unsearched_synthetic = get_unsearched_synthetic_pairs(session).count()
+
+    # Count total queries by type
+    results_table = session.table(db_config.get_table_name(db_config.results_table))
+    total_golden = results_table.filter(F.upper(F.col("INPUT_TYPE")) == "GOLDEN_PAIR").count()
+    total_synthetic = results_table.filter(F.upper(F.col("INPUT_TYPE")) == "SYNTHETIC_PAIR").count()
+    total_adhoc = results_table.filter(F.upper(F.col("INPUT_TYPE")) == "ADHOC").count()
+
     return {
         "unsearched_golden_pairs": unsearched_golden,
         "unsearched_synthetic_pairs": unsearched_synthetic,
+        "total_golden_pairs": total_golden,
+        "total_synthetic_pairs": total_synthetic,
+        "total_adhoc_queries": total_adhoc,
     }

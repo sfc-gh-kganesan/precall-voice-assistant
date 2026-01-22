@@ -163,12 +163,12 @@ def render_carousel_query(
         with r_col1:
             if st.button("◀ Prev", disabled=current_response_idx == 0, key=f"{prefix}_{query_id}_prev_resp", use_container_width=True):
                 st.session_state[response_key] -= 1
-                st.rerun()
 
         with r_col2:
             if st.button("Next ▶", disabled=current_response_idx >= num_responses - 1, key=f"{prefix}_{query_id}_next_resp", use_container_width=True):
                 st.session_state[response_key] += 1
-                st.rerun()
+
+        current_response_idx = st.session_state[response_key]
 
         with r_col3:
             st.container(height=42, border=False).markdown(f"**Response {current_response_idx + 1} of {num_responses}**")
@@ -186,14 +186,55 @@ def render_playground_tab(data_ops: SnowflakeDataOperations) -> None:
     st.header("Search Playground")
     st.caption("Test ad-hoc queries against your knowledge base and provide feedback on results.")
 
+    with st.expander("Settings", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            num_results = st.slider(
+                "Number of results",
+                min_value=1,
+                max_value=10,
+                value=1,
+                key="playground_num_results",
+            )
+        with col2:
+            llm_model = st.selectbox(
+                "LLM Model",
+                options=[
+                    "claude-4-opus",
+                    "claude-4-sonnet",
+                    "claude-3-7-sonnet",
+                    "claude-3-5-sonnet",
+                    "deepseek-r1",
+                    "llama3-8b",
+                    "llama3-70b",
+                    "llama3.1-8b",
+                    "llama3.1-70b",
+                    "llama3.1-405b",
+                    "llama3.3-70b",
+                    "llama4-maverick",
+                    "llama4-scout",
+                    "mistral-large",
+                    "mistral-large2",
+                    "mistral-7b",
+                    "mixtral-8x7b",
+                    "openai-gpt-4.1",
+                    "openai-o4-mini",
+                    "snowflake-arctic",
+                    "snowflake-llama-3.1-405b",
+                    "snowflake-llama-3.3-70b",
+                ],
+                index=1,  # claude-4-sonnet
+                key="playground_llm_model",
+            )
+
     query = st.text_input("Search", key="playground_search")
 
     if st.button("Search", key="playground_search_btn") and query:
         with st.spinner("Searching..."):
-            search_id, results = data_ops.execute_playground_search(query)
+            search_id, results = data_ops.execute_playground_search(query, limit=num_results)
 
         st.subheader(f"Results for: {query}")
-        results_df = data_ops.generate_llm_responses(results, query)
+        results_df = data_ops.generate_llm_responses(results, query, model=llm_model)
 
         for idx, (row, result_dict) in enumerate(zip(results_df.itertuples(), results, strict=False), 1):
             st.markdown(f"### Result {idx}")
@@ -230,17 +271,18 @@ def render_feedback_tab(
     load_results_fn: Callable,
     on_feedback_submit: Callable = None,
 ) -> None:
-    st.header("Feedback Review")
+    st.header("Search Results Review")
+    st.caption("Review search results by query type and provide feedback on retrieval quality.")
 
     selected_types = st.multiselect(
-        "Source",
+        "Query Type",
         options=input_types,
         default=input_types[:1] if input_types else [],
         key="feedback_type_selector",
     )
 
     if not selected_types:
-        st.info("Select at least one source type to review feedback.")
+        st.info("Select at least one query type to review results.")
         return
 
     frames = []
@@ -277,6 +319,16 @@ def render_feedback_tab(
 
     st.divider()
 
+    render_carousel(source_df, data_ops, on_feedback_submit)
+
+
+@st.fragment
+def render_carousel(
+    source_df: pd.DataFrame,
+    data_ops: SnowflakeDataOperations,
+    on_feedback_submit: Callable = None,
+) -> None:
+    """Render the carousel as a fragment for faster navigation."""
     group_col = "INPUT_QUERY" if "INPUT_QUERY" in source_df.columns else "SEARCH_ID"
 
     if group_col not in source_df.columns:
@@ -285,23 +337,27 @@ def render_feedback_tab(
     grouped = list(source_df.groupby(group_col, sort=False))
     total_queries = len(grouped)
 
+    if total_queries == 0:
+        st.info("No queries to display.")
+        return
+
     if "carousel_index" not in st.session_state:
         st.session_state.carousel_index = 0
 
     st.session_state.carousel_index = min(st.session_state.carousel_index, total_queries - 1)
     current_idx = st.session_state.carousel_index
 
-    col1, col2, col3, col4 = st.columns([1, 1, 2, 2])
+    col1, col2, col3, col4 = st.columns([1, 1, 2, 4])
 
     with col1:
         if st.button("← Previous", disabled=current_idx == 0, use_container_width=True):
             st.session_state.carousel_index -= 1
-            st.rerun()
 
     with col2:
         if st.button("Next →", disabled=current_idx >= total_queries - 1, use_container_width=True):
             st.session_state.carousel_index += 1
-            st.rerun()
+
+    current_idx = st.session_state.carousel_index
 
     with col3:
         st.container(height=42, border=False).markdown(f"**Query {current_idx + 1} of {total_queries}**")
@@ -318,11 +374,10 @@ def render_feedback_tab(
         )
         if selected != current_idx:
             st.session_state.carousel_index = selected
-            st.rerun()
 
     st.divider()
 
-    _, group_data = grouped[current_idx]
+    _, group_data = grouped[st.session_state.carousel_index]
     row0 = group_data.iloc[0]
 
     query_id = row0.get("SEARCH_ID")

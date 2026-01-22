@@ -244,7 +244,21 @@ class SnowflakeDataOperations:
 
     def get_evaluation_results(self) -> pd.DataFrame:
         try:
-            results = self._session.table(db_config.get_table_name(db_config.evaluation_results_table)).to_pandas()
+            # Join with SEARCH_QUERIES to get INPUT_TYPE
+            results = self._session.sql(f"""
+                SELECT
+                    er.SEARCH_ID,
+                    er.INPUT_QUERY,
+                    er.CHUNKS,
+                    er.EVALUATION_MODEL,
+                    er.EVALUATION,
+                    er.CREATED_BY,
+                    er.CREATED_ON,
+                    sq.INPUT_TYPE
+                FROM {db_config.get_table_name(db_config.evaluation_results_table)} er
+                LEFT JOIN {db_config.get_table_name(db_config.results_table)} sq
+                    ON er.SEARCH_ID = sq.SEARCH_ID
+            """).to_pandas()
             return results
         except Exception:
             return pd.DataFrame()
@@ -298,6 +312,71 @@ class SnowflakeDataOperations:
     def get_adhoc_results(self) -> pd.DataFrame:
         return self.extract_search_results("ADHOC", ["SEARCH_ID"])
 
+    def extract_search_results_for_evaluation(self) -> pd.DataFrame:
+        """Extract all search results from SEARCH_QUERIES for evaluation.
+
+        Returns one row per query with SEARCH_ID, INPUT_QUERY, INPUT_TYPE,
+        and CHUNK_TEXT (all chunks concatenated).
+        """
+        try:
+            # Use SQL to flatten and aggregate chunks per query
+            results = self._session.sql(f"""
+                SELECT
+                    SEARCH_ID,
+                    INPUT_ARGS:query::STRING as INPUT_QUERY,
+                    INPUT_TYPE,
+                    LISTAGG(VALUE:CHUNK_TEXT::STRING, '\n\n---\n\n') WITHIN GROUP (ORDER BY INDEX) as CHUNK_TEXT
+                FROM {db_config.get_table_name(db_config.results_table)},
+                    LATERAL FLATTEN(input => RESPONSE)
+                GROUP BY SEARCH_ID, INPUT_ARGS:query::STRING, INPUT_TYPE
+            """)
+            return results.to_pandas()
+        except Exception as e:
+            print(f"Error extracting search results for evaluation: {e}")
+            return pd.DataFrame()
+
+    def get_evaluation_completion_stats(self) -> dict:
+        """Get evaluation completion statistics by input type.
+
+        Returns a dict with counts of total and evaluated queries per input type.
+        """
+        try:
+            # Get all search queries with their input types
+            search_queries = (
+                self._session.table(db_config.get_table_name(db_config.results_table))
+                .group_by("INPUT_TYPE")
+                .agg(F.count("*").alias("TOTAL"))
+                .to_pandas()
+            )
+
+            # Get evaluated search IDs with their input types
+            evaluated = self._session.sql(f"""
+                SELECT sq.INPUT_TYPE, COUNT(DISTINCT er.SEARCH_ID) as EVALUATED
+                FROM {db_config.get_table_name(db_config.results_table)} sq
+                JOIN {db_config.get_table_name(db_config.evaluation_results_table)} er
+                    ON sq.SEARCH_ID = er.SEARCH_ID
+                GROUP BY sq.INPUT_TYPE
+            """).to_pandas()
+
+            # Build stats dict
+            stats = {}
+            for _, row in search_queries.iterrows():
+                input_type = row["INPUT_TYPE"]
+                total = int(row["TOTAL"])
+                evaluated_count = 0
+                if not evaluated.empty and input_type in evaluated["INPUT_TYPE"].values:
+                    evaluated_count = int(evaluated[evaluated["INPUT_TYPE"] == input_type]["EVALUATED"].iloc[0])
+                stats[input_type] = {
+                    "total": total,
+                    "evaluated": evaluated_count,
+                    "remaining": total - evaluated_count,
+                }
+
+            return stats
+        except Exception as e:
+            print(f"Error getting evaluation completion stats: {e}")
+            return {}
+
     def get_feedback_counts(self) -> pd.DataFrame:
         try:
             feedback_counts = self._session.table(db_config.get_table_name(db_config.target_table)).group_by("SEARCH_ID").count().select(F.col("SEARCH_ID"), F.col("COUNT").alias("FEEDBACK_COUNT")).to_pandas()
@@ -308,10 +387,12 @@ class SnowflakeDataOperations:
     def get_knowledge_data(self, table_name: str) -> pd.DataFrame:
         return self._session.table(table_name).to_pandas()
 
-    def run_search(self, query: str, input_type: str) -> tuple[dict, list]:
+    def run_search(self, query: str, input_type: str, limit: int = None) -> tuple[dict, list]:
         cortex_search_service = self.get_cortex_search_service()
         search_args = search_config.to_dict()
         search_args.update({"query": query})
+        if limit is not None:
+            search_args["limit"] = limit
         response = cortex_search_service.search(**search_args)
         record = {
             "INPUT_QUERY": query,
@@ -323,8 +404,8 @@ class SnowflakeDataOperations:
         }
         return record, response.results
 
-    def execute_playground_search(self, query: str) -> tuple[int, list]:
-        record, results = self.run_search(query, "adhoc")
+    def execute_playground_search(self, query: str, limit: int = 1) -> tuple[int, list]:
+        record, results = self.run_search(query, "ADHOC", limit=limit)
 
         save_data = [
             [
@@ -337,12 +418,12 @@ class SnowflakeDataOperations:
         ]
         self.save_search(save_data)
 
-        saved_search = self._session.table(db_config.get_table_name(db_config.results_table)).filter(F.col("INPUT_TYPE") == F.lit("adhoc")).sort(F.col("CREATED_ON").desc()).limit(1).select("SEARCH_ID").collect()
+        saved_search = self._session.table(db_config.get_table_name(db_config.results_table)).filter(F.col("INPUT_TYPE") == F.lit("ADHOC")).sort(F.col("CREATED_ON").desc()).limit(1).select("SEARCH_ID").collect()
         search_id = saved_search[0]["SEARCH_ID"] if saved_search else None
 
         return search_id, results
 
-    def generate_llm_responses(self, results: list, query: str) -> pd.DataFrame:
+    def generate_llm_responses(self, results: list, query: str, model: str = "mistral-large2") -> pd.DataFrame:
         results_data = [(r["CHUNK_TEXT"], query) for r in results]
         results_df = (
             self._session.create_dataframe(results_data, schema=["chunk_text", "query"])
@@ -350,7 +431,7 @@ class SnowflakeDataOperations:
                 "agent_response",
                 F.call_builtin(
                     "SNOWFLAKE.CORTEX.COMPLETE",
-                    F.lit("mistral-large2"),
+                    F.lit(model),
                     F.prompt(
                         "You are a helpful AI assistant. Use the following context to answer the user's question.\n\nContext: {0}\n\nUser Question: {1}\n\nPlease provide a helpful and accurate answer based on the context provided.",
                         F.col("chunk_text"),
@@ -385,3 +466,118 @@ class SnowflakeDataOperations:
             return count
         except Exception:
             return 0
+
+    def get_taxonomy_evaluation_rollup(self) -> pd.DataFrame:
+        """Get evaluation metrics rolled up by taxonomy levels (L1-L4)."""
+        try:
+            sql = f"""
+            WITH base AS (
+                SELECT
+                    sp.L1_TAG, sp.L2_TAG, sp.L3_TAG, sp.L4_TAG,
+                    sp.GENERATED:query::STRING as QUERY,
+                    sq.SEARCH_ID,
+                    er.EVALUATION:metrics:answer_relevance::FLOAT as ANSWER_RELEVANCE,
+                    er.EVALUATION:metrics:context_relevance::FLOAT as CONTEXT_RELEVANCE,
+                    er.EVALUATION:metrics:comprehensiveness::FLOAT as COMPREHENSIVENESS,
+                    er.EVALUATION:metrics:harmfulness::FLOAT as HARMFULNESS
+                FROM {db_config.get_table_name(db_config.synthetic_pairs_table)} sp
+                LEFT JOIN {db_config.get_table_name(db_config.results_table)} sq
+                    ON sp.GENERATED:query::STRING = sq.INPUT_ARGS:query::STRING
+                    AND UPPER(sq.INPUT_TYPE) = 'SYNTHETIC_PAIR'
+                LEFT JOIN {db_config.get_table_name(db_config.evaluation_results_table)} er
+                    ON sq.SEARCH_ID = er.SEARCH_ID
+            )
+            SELECT
+                L1_TAG, L2_TAG, L3_TAG, L4_TAG,
+                COUNT(*) as QUERY_COUNT,
+                COUNT(ANSWER_RELEVANCE) as EVALUATED_COUNT,
+                AVG(ANSWER_RELEVANCE) as AVG_ANSWER_RELEVANCE,
+                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE,
+                AVG(COMPREHENSIVENESS) as AVG_COMPREHENSIVENESS,
+                AVG(HARMFULNESS) as AVG_HARMFULNESS
+            FROM base
+            GROUP BY L1_TAG, L2_TAG, L3_TAG, L4_TAG
+            ORDER BY L1_TAG, L2_TAG, L3_TAG, L4_TAG
+            """
+            return self._session.sql(sql).to_pandas()
+        except Exception as e:
+            print(f"Error getting taxonomy rollup: {e}")
+            return pd.DataFrame()
+
+    def get_taxonomy_summary_by_level(self, level: str = "L1_TAG") -> pd.DataFrame:
+        """Get evaluation metrics summarized at a specific taxonomy level."""
+        try:
+            sql = f"""
+            WITH base AS (
+                SELECT
+                    sp.L1_TAG, sp.L2_TAG, sp.L3_TAG, sp.L4_TAG,
+                    sp.GENERATED:query::STRING as QUERY,
+                    sq.SEARCH_ID,
+                    er.EVALUATION:metrics:answer_relevance::FLOAT as ANSWER_RELEVANCE,
+                    er.EVALUATION:metrics:context_relevance::FLOAT as CONTEXT_RELEVANCE,
+                    er.EVALUATION:metrics:comprehensiveness::FLOAT as COMPREHENSIVENESS,
+                    er.EVALUATION:metrics:harmfulness::FLOAT as HARMFULNESS
+                FROM {db_config.get_table_name(db_config.synthetic_pairs_table)} sp
+                LEFT JOIN {db_config.get_table_name(db_config.results_table)} sq
+                    ON sp.GENERATED:query::STRING = sq.INPUT_ARGS:query::STRING
+                    AND UPPER(sq.INPUT_TYPE) = 'SYNTHETIC_PAIR'
+                LEFT JOIN {db_config.get_table_name(db_config.evaluation_results_table)} er
+                    ON sq.SEARCH_ID = er.SEARCH_ID
+            )
+            SELECT
+                {level} as TAXONOMY_LEVEL,
+                COUNT(*) as QUERY_COUNT,
+                COUNT(ANSWER_RELEVANCE) as EVALUATED_COUNT,
+                AVG(ANSWER_RELEVANCE) as AVG_ANSWER_RELEVANCE,
+                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE,
+                AVG(COMPREHENSIVENESS) as AVG_COMPREHENSIVENESS,
+                AVG(HARMFULNESS) as AVG_HARMFULNESS
+            FROM base
+            GROUP BY {level}
+            ORDER BY {level}
+            """
+            return self._session.sql(sql).to_pandas()
+        except Exception as e:
+            print(f"Error getting taxonomy summary: {e}")
+            return pd.DataFrame()
+
+    def get_taxonomy_summary_by_levels(self, levels: list[str]) -> pd.DataFrame:
+        """Get evaluation metrics summarized by multiple taxonomy levels (hierarchical grouping)."""
+        if not levels:
+            levels = ["L1_TAG"]
+
+        try:
+            level_cols = ", ".join(levels)
+            sql = f"""
+            WITH base AS (
+                SELECT
+                    sp.L1_TAG, sp.L2_TAG, sp.L3_TAG, sp.L4_TAG,
+                    sp.GENERATED:query::STRING as QUERY,
+                    sq.SEARCH_ID,
+                    er.EVALUATION:metrics:answer_relevance::FLOAT as ANSWER_RELEVANCE,
+                    er.EVALUATION:metrics:context_relevance::FLOAT as CONTEXT_RELEVANCE,
+                    er.EVALUATION:metrics:comprehensiveness::FLOAT as COMPREHENSIVENESS,
+                    er.EVALUATION:metrics:harmfulness::FLOAT as HARMFULNESS
+                FROM {db_config.get_table_name(db_config.synthetic_pairs_table)} sp
+                LEFT JOIN {db_config.get_table_name(db_config.results_table)} sq
+                    ON sp.GENERATED:query::STRING = sq.INPUT_ARGS:query::STRING
+                    AND UPPER(sq.INPUT_TYPE) = 'SYNTHETIC_PAIR'
+                LEFT JOIN {db_config.get_table_name(db_config.evaluation_results_table)} er
+                    ON sq.SEARCH_ID = er.SEARCH_ID
+            )
+            SELECT
+                {level_cols},
+                COUNT(*) as QUERY_COUNT,
+                COUNT(CONTEXT_RELEVANCE) as EVALUATED_COUNT,
+                AVG(ANSWER_RELEVANCE) as AVG_ANSWER_RELEVANCE,
+                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE,
+                AVG(COMPREHENSIVENESS) as AVG_COMPREHENSIVENESS,
+                AVG(HARMFULNESS) as AVG_HARMFULNESS
+            FROM base
+            GROUP BY {level_cols}
+            ORDER BY {level_cols}
+            """
+            return self._session.sql(sql).to_pandas()
+        except Exception as e:
+            print(f"Error getting taxonomy summary by levels: {e}")
+            return pd.DataFrame()

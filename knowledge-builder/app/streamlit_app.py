@@ -14,6 +14,7 @@ from evaluation import render_evaluation_tab  # noqa: E402
 from seeding import get_sync_status, sync_searches  # noqa: E402
 from snowflake.snowpark import Session  # noqa: E402
 from snowflake.snowpark.context import get_active_session  # noqa: E402
+from taxonomy import render_taxonomy_tab  # noqa: E402
 from ui_components import render_feedback_tab, render_playground_tab  # noqa: E402
 
 
@@ -65,13 +66,24 @@ def main() -> None:
     data_ops = get_data_operations()
 
     with st.sidebar:
-        st.header("Sync Searches")
+        st.header("Search Status")
         sync_status = get_sync_status(session)
         unsearched_golden = sync_status["unsearched_golden_pairs"]
         unsearched_synthetic = sync_status["unsearched_synthetic_pairs"]
+        total_golden = sync_status["total_golden_pairs"]
+        total_synthetic = sync_status["total_synthetic_pairs"]
+        total_adhoc = sync_status["total_adhoc_queries"]
 
-        st.metric("Unsearched Golden Pairs", unsearched_golden)
-        st.metric("Unsearched Synthetic Pairs", unsearched_synthetic)
+        st.subheader("Totals")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Golden", total_golden)
+        col2.metric("Synthetic", total_synthetic)
+        col3.metric("Adhoc", total_adhoc)
+
+        st.subheader("Pending Sync")
+        col1, col2 = st.columns(2)
+        col1.metric("Golden", unsearched_golden)
+        col2.metric("Synthetic", unsearched_synthetic)
 
         if unsearched_golden > 0 or unsearched_synthetic > 0:
             sync_golden = st.checkbox("Sync Golden Pairs", value=unsearched_golden > 0, disabled=unsearched_golden == 0)
@@ -104,20 +116,12 @@ def main() -> None:
     if baseline_results_df.empty and adhoc_results_df.empty:
         st.warning("No results data available.")
 
-    input_types = []
-    if not baseline_results_df.empty:
-        input_types.append("baseline")
-    if not adhoc_results_df.empty:
-        input_types.append("adhoc")
+    input_types = data_ops.get_input_types()
 
     def load_results_by_type(_data_ops, result_type):
-        if result_type == "baseline":
-            return baseline_results_df
-        elif result_type == "adhoc":
-            return adhoc_results_df
-        return _data_ops.get_baseline_results().head(0)
+        return _data_ops.extract_search_results(result_type, ["SEARCH_ID"])
 
-    tabs = ["Feedback", "Playground", "Evaluation", "EDA"]
+    tabs = ["Feedback", "Playground", "Evaluation", "Taxonomy", "EDA"]
 
     if "selected_tab" not in st.session_state or st.session_state.selected_tab not in tabs:
         st.session_state.selected_tab = "Feedback"
@@ -145,6 +149,8 @@ def main() -> None:
         render_playground_tab(data_ops)
     elif selected_tab == "Evaluation":
         render_evaluation_tab(data_ops)
+    elif selected_tab == "Taxonomy":
+        render_taxonomy_tab(data_ops)
     elif selected_tab == "EDA":
         render_eda_tab(data_ops)
 
