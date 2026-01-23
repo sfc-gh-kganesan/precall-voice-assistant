@@ -54,10 +54,7 @@ class ServiceNowClient:
         self.password = password or os.environ.get("SERVICENOW_PASSWORD")
 
         if not self.username or not self.password:
-            raise ValueError(
-                "ServiceNow credentials required. Provide username/password or set "
-                "SERVICENOW_USERNAME and SERVICENOW_PASSWORD environment variables."
-            )
+            raise ValueError("ServiceNow credentials required. Provide username/password or set SERVICENOW_USERNAME and SERVICENOW_PASSWORD environment variables.")
 
         self._session = requests.Session()
         self._session.auth = HTTPBasicAuth(self.username, self.password)
@@ -76,9 +73,7 @@ class ServiceNowClient:
         **kwargs,
     ) -> requests.Response:
         url = urljoin(self._base_url + "/", endpoint.lstrip("/"))
-        response = self._session.request(
-            method, url, params=params, headers=headers, **kwargs
-        )
+        response = self._session.request(method, url, params=params, headers=headers, **kwargs)
         response.raise_for_status()
         return response
 
@@ -161,14 +156,10 @@ class ServiceNowClient:
         Returns:
             Binary content of the attachment
         """
-        response = self._request(
-            "GET", f"{sys_id}/file", headers={"Accept": "*/*"}
-        )
+        response = self._request("GET", f"{sys_id}/file", headers={"Accept": "*/*"})
         return response.content
 
-    def download_attachment_stream(
-        self, sys_id: str, chunk_size: int = 8192
-    ) -> Iterator[bytes]:
+    def download_attachment_stream(self, sys_id: str, chunk_size: int = 8192) -> Iterator[bytes]:
         """Stream download an attachment in chunks.
 
         Args:
@@ -179,9 +170,7 @@ class ServiceNowClient:
             Chunks of binary data
         """
         url = f"{self._base_url}/{sys_id}/file"
-        with self._session.get(
-            url, headers={"Accept": "*/*"}, stream=True
-        ) as response:
+        with self._session.get(url, headers={"Accept": "*/*"}, stream=True) as response:
             response.raise_for_status()
             for chunk in response.iter_content(chunk_size=chunk_size):
                 if chunk:
@@ -214,9 +203,7 @@ class ServiceNowClient:
         }
         headers = {"Content-Type": content_type}
 
-        response = self._request(
-            "POST", "file", params=params, headers=headers, data=content
-        )
+        response = self._request("POST", "file", params=params, headers=headers, data=content)
         data = response.json()
         return self._parse_attachment_metadata(data["result"])
 
@@ -240,9 +227,7 @@ class ServiceNowClient:
             sys_created_on=data.get("sys_created_on", ""),
             sys_updated_on=data.get("sys_updated_on", ""),
             compressed=data.get("compressed", "false").lower() == "true",
-            size_compressed=int(data["size_compressed"])
-            if data.get("size_compressed")
-            else None,
+            size_compressed=int(data["size_compressed"]) if data.get("size_compressed") else None,
         )
 
 

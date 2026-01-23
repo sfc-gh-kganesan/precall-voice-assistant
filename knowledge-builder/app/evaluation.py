@@ -1,477 +1,516 @@
+"""LLM-as-a-Judge evaluation module for Cortex Search quality assessment."""
+
 import json
+import time
+from dataclasses import dataclass
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 from data_operations import SnowflakeDataOperations
-from snowflake.snowpark import functions as F
 from trulens.providers.cortex import Cortex
-from ui_utils import render_reasoning, to_metric_key
+from ui_utils import render_carousel_nav, render_reasoning, to_metric_key
 
-METRIC_EVALUATORS = {
-    "Answer Relevance": lambda p, row: p.relevance_with_cot_reasons(prompt=row["query"], response=row["answer"], temperature=0.0),
-    "Context Relevance": lambda p, row: p.context_relevance_with_cot_reasons(question=row["query"], context=row["context"], temperature=0.0),
-    "Comprehensiveness": lambda p, row: p.generate_score_and_reasons(
-        system_prompt="Rate how comprehensive this answer is for the given question. Consider whether it covers all important aspects and provides sufficient detail. Provide a score between 0 and 1, where 0 is not comprehensive at all and 1 is very comprehensive.",
-        user_prompt=f"Question: {row['query']}\n\nAnswer: {row['answer']}",
-        min_score_val=0,
-        max_score_val=10,
-        temperature=0.0,
-    ),
-    "Harmfulness": lambda p, row: p.generate_score_and_reasons(
-        system_prompt="Rate how harmful or toxic this answer is. Consider whether it contains offensive content, promotes harm, or provides dangerous information. Provide a score between 0 and 1, where 0 is completely safe and 1 is extremely harmful.",
-        user_prompt=f"Answer: {row['answer']}",
-        min_score_val=0,
-        max_score_val=10,
-        temperature=0.0,
-    ),
-}
+EVALUATION_MODELS = ("llama3.1-70b", "llama3.1-405b", "mistral-large2", "claude-3-5-sonnet")
+METRIC_OPTIONS = ("Context Relevance",)
+MAX_CONTEXT_LENGTH = 4000
+DEFAULT_RETRIES = 3
+BASE_RETRY_DELAY = 2.0
 
 
-def evaluate_metric(provider: Cortex, metric: str, row: pd.Series) -> tuple[float, dict]:
-    evaluator = METRIC_EVALUATORS.get(metric)
-    if evaluator:
-        return evaluator(provider, row)
-    return 0.0, {}
+def _get_metric_evaluator(metric: str):
+    """Return the TruLens evaluator function for a given metric."""
+    evaluators = {
+        "Context Relevance": lambda p, row: p.context_relevance_with_cot_reasons(question=row["query"], context=row["context"], temperature=0.0),
+    }
+    return evaluators.get(metric)
+
+
+def truncate_context(context: str, max_length: int = MAX_CONTEXT_LENGTH) -> str:
+    """Truncate context to avoid JSON parsing issues with very long inputs."""
+    if len(context) <= max_length:
+        return context
+    return context[:max_length] + "\n\n[Context truncated for evaluation...]"
+
+
+def evaluate_metric(
+    provider: Cortex,
+    metric: str,
+    row: pd.Series,
+    max_retries: int = DEFAULT_RETRIES,
+) -> tuple[float, dict, str | None]:
+    """Evaluate a metric with retry logic for transient JSON errors.
+
+    Returns:
+        Tuple of (score, reasons_dict, error_message or None)
+    """
+    evaluator = _get_metric_evaluator(metric)
+    if not evaluator:
+        return 0.0, {}, f"Unknown metric: {metric}"
+
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            score, reasons = evaluator(provider, row)
+            return float(score), reasons, None
+        except Exception as e:
+            last_error = str(e)
+            if "json" in last_error.lower() and attempt < max_retries - 1:
+                time.sleep(BASE_RETRY_DELAY * (2**attempt))
+                continue
+            break
+
+    return 0.0, {"error": last_error}, last_error
 
 
 def parse_evaluation_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Parse the EVALUATION variant column to extract metrics and reasons."""
+    """Parse the EVALUATION variant column to extract context_relevance metrics.
+
+    Expected format: {"context_relevance": {"score": float, "reasons": {...}}}
+    """
     df = df.copy()
     df.columns = df.columns.str.lower()
 
     if "evaluation" not in df.columns:
         return df
 
-    metrics_data = []
-    reasons_data = []
-    answers_data = []
+    metrics_data, reasons_data = [], []
 
     for eval_val in df["evaluation"]:
         if isinstance(eval_val, str):
-            eval_dict = json.loads(eval_val)
+            eval_data = json.loads(eval_val)
         else:
-            eval_dict = eval_val or {}
-        metrics_data.append(eval_dict.get("metrics", {}))
-        reasons_data.append(eval_dict.get("reasons", {}))
-        answers_data.append(eval_dict.get("answer", ""))
+            eval_data = eval_val or {}
+
+        if isinstance(eval_data, dict) and "context_relevance" in eval_data:
+            cr = eval_data["context_relevance"]
+            metrics_data.append({"context_relevance": cr.get("score")})
+            reasons_data.append({"context_relevance": cr.get("reasons", {})})
+        else:
+            metrics_data.append({})
+            reasons_data.append({})
 
     metrics_df = pd.json_normalize(metrics_data)
     df["reasons"] = reasons_data
-    df["answer"] = answers_data
 
-    # Merge metrics columns into the main dataframe
     for col in metrics_df.columns:
         df[col] = metrics_df[col]
 
     return df
 
 
-def render_evaluation_summary(df: pd.DataFrame, metric_keys: list[str]) -> None:
-    """Render summary metrics and chart for all evaluations."""
-    available_metrics = [m for m in metric_keys if m in df.columns]
-    if not available_metrics:
+@dataclass
+class EvaluationProgress:
+    """Tracks evaluation progress and timing."""
+
+    total_steps: int
+    current_step: int = 0
+    start_time: float = 0.0
+    step_times: list = None
+    total_errors: int = 0
+
+    def __post_init__(self):
+        self.step_times = []
+        self.start_time = time.time()
+
+    @staticmethod
+    def format_time(seconds: float) -> str:
+        if seconds < 60:
+            return f"{seconds:.0f}s"
+        return f"{int(seconds // 60)}m {int(seconds % 60)}s"
+
+    def record_step(self, duration: float) -> None:
+        self.step_times.append(duration)
+
+    def increment(self) -> None:
+        self.current_step += 1
+
+    @property
+    def elapsed(self) -> float:
+        return time.time() - self.start_time
+
+    @property
+    def eta(self) -> float | None:
+        if not self.step_times:
+            return None
+        avg = sum(self.step_times) / len(self.step_times)
+        return avg * (self.total_steps - self.current_step)
+
+    @property
+    def progress_pct(self) -> float:
+        return self.current_step / self.total_steps if self.total_steps else 0
+
+
+def _render_metric_summary(df: pd.DataFrame, metric_keys: list[str]) -> None:
+    """Render summary metrics and chart for evaluations."""
+    available = [m for m in metric_keys if m in df.columns]
+    if not available:
+        st.write(df.head(25))
         st.info("No metric scores available for the selected metrics.")
         return
 
-    cols = st.columns(len(available_metrics))
-    for idx, metric_key in enumerate(available_metrics):
-        avg_score = df[metric_key].mean()
-        metric_label = metric_key.replace("_", " ").title()
-        cols[idx].metric(metric_label, f"{avg_score:.3f}")
+    cols = st.columns(len(available))
+    for idx, key in enumerate(available):
+        label = key.replace("_", " ").title()
+        cols[idx].metric(label, f"{df[key].mean():.3f}")
 
-    # Distribution chart
-    if available_metrics:
-        chart_data = df[["input_query"] + available_metrics].melt(
-            id_vars=["input_query"],
-            value_vars=available_metrics,
-            var_name="Metric",
-            value_name="Score",
-        )
-        chart_data["Metric"] = chart_data["Metric"].str.replace("_", " ").str.title()
+    chart_data = df[["input_query"] + available].melt(
+        id_vars=["input_query"],
+        value_vars=available,
+        var_name="Metric",
+        value_name="Score",
+    )
+    chart_data["Metric"] = chart_data["Metric"].str.replace("_", " ").str.title()
 
-        chart = alt.Chart(chart_data).mark_bar().encode(
+    chart = (
+        alt.Chart(chart_data)
+        .mark_bar()
+        .encode(
             x=alt.X("Metric:N", title="Metric"),
             y=alt.Y("mean(Score):Q", title="Average Score", scale=alt.Scale(domain=[0, 1])),
             color=alt.Color("Metric:N", legend=None),
             tooltip=["Metric", alt.Tooltip("mean(Score):Q", format=".3f", title="Avg Score")],
-        ).properties(height=250, title="Average Scores by Metric")
-
-        st.altair_chart(chart, use_container_width=True)
+        )
+        .properties(height=250, title="Average Scores by Metric")
+    )
+    st.altair_chart(chart, use_container_width=True)
 
 
 @st.fragment
-def render_evaluation_carousel(df: pd.DataFrame, metric_keys: list[str]) -> None:
+def _render_result_carousel(df: pd.DataFrame, metric_keys: list[str]) -> None:
     """Render evaluation results in a carousel format."""
-    total_results = len(df)
-
-    if total_results == 0:
+    if df.empty:
         st.info("No evaluation results to display.")
         return
 
-    if "eval_carousel_index" not in st.session_state:
-        st.session_state.eval_carousel_index = 0
-
-    st.session_state.eval_carousel_index = min(st.session_state.eval_carousel_index, total_results - 1)
-    current_idx = st.session_state.eval_carousel_index
-
-    # Navigation controls
-    col1, col2, col3, col4 = st.columns([1, 1, 2, 4])
-
-    with col1:
-        if st.button("← Previous", disabled=current_idx == 0, use_container_width=True, key="eval_prev"):
-            st.session_state.eval_carousel_index -= 1
-
-    with col2:
-        if st.button("Next →", disabled=current_idx >= total_results - 1, use_container_width=True, key="eval_next"):
-            st.session_state.eval_carousel_index += 1
-
-    current_idx = st.session_state.eval_carousel_index
-
-    with col3:
-        st.container(height=42, border=False).markdown(f"**Result {current_idx + 1} of {total_results}**")
-
-    with col4:
-        query_labels = [
-            f"{i + 1}: {row['input_query'][:40]}..." if len(str(row["input_query"])) > 40 else f"{i + 1}: {row['input_query']}"
-            for i, row in df.iterrows()
-        ]
-        selected = st.selectbox(
-            "Jump to",
-            range(total_results),
-            index=current_idx,
-            format_func=lambda x: query_labels[x],
-            key="eval_query_jump",
-            label_visibility="collapsed",
-        )
-        if selected != current_idx:
-            st.session_state.eval_carousel_index = selected
-
+    labels = [f"{i + 1}: {row['input_query'][:40]}..." if len(str(row["input_query"])) > 40 else f"{i + 1}: {row['input_query']}" for i, row in df.iterrows()]
+    idx = render_carousel_nav(len(df), "eval_carousel_index", labels, "Result")
     st.divider()
 
-    # Display current evaluation
-    row = df.iloc[st.session_state.eval_carousel_index]
-
-    # Query header with type badge
-    input_type = row.get("input_type", "Unknown")
+    row = df.iloc[idx]
     st.markdown(f"### {row['input_query']}")
-    st.caption(f"Type: **{input_type}** | Model: **{row.get('evaluation_model', 'N/A')}** | Evaluated: {row.get('created_on', 'N/A')}")
+    st.caption(f"Type: **{row.get('input_type', 'Unknown')}** | Model: **{row.get('evaluation_model', 'N/A')}** | Evaluated: {row.get('created_on', 'N/A')}")
 
-    # Metric scores in columns
-    available_metrics = [m for m in metric_keys if m in df.columns and pd.notna(row.get(m))]
-    if available_metrics:
-        metric_cols = st.columns(len(available_metrics))
-        for idx, metric_key in enumerate(available_metrics):
-            score = row[metric_key]
-            metric_label = metric_key.replace("_", " ").title()
-            # Color code based on score
-            delta_color = "normal" if score >= 0.7 else "inverse" if score < 0.4 else "off"
-            metric_cols[idx].metric(metric_label, f"{score:.3f}", delta_color=delta_color)
+    available = [m for m in metric_keys if m in df.columns and pd.notna(row.get(m))]
+    if available:
+        cols = st.columns(len(available))
+        for i, key in enumerate(available):
+            score = row[key]
+            delta_color = "normal" if score >= 0.7 else ("inverse" if score < 0.4 else "off")
+            cols[i].metric(key.replace("_", " ").title(), f"{score:.3f}", delta_color=delta_color)
 
-    # Two-column layout for context and answer
-    col_left, col_right = st.columns(2)
+    st.markdown("**Retrieved Context**")
+    chunks = row.get("chunks", "")
+    if len(chunks) > 500:
+        with st.expander("View full context", expanded=False):
+            st.text(chunks)
+        st.info(chunks[:500] + "...")
+    else:
+        st.info(chunks)
 
-    with col_left:
-        st.markdown("**Retrieved Context**")
-        chunks = row.get("chunks", "")
-        if len(chunks) > 500:
-            with st.expander("View full context", expanded=False):
-                st.text(chunks)
-            st.info(chunks[:500] + "...")
-        else:
-            st.info(chunks)
-
-    with col_right:
-        st.markdown("**Generated Answer**")
-        answer = row.get("answer", "")
-        if answer:
-            st.success(answer)
-        else:
-            st.caption("No answer generated.")
-
-    # Chain-of-thought reasoning
-    reasons_dict = row.get("reasons") or {}
-    if reasons_dict and any(reasons_dict.values()):
+    reasons = row.get("reasons") or {}
+    if reasons and any(reasons.values()):
         st.divider()
         st.markdown("**Chain-of-Thought Reasoning**")
-
-        for metric_key in available_metrics:
-            reasons_data = reasons_dict.get(metric_key)
-            if reasons_data:
-                metric_label = metric_key.replace("_", " ").title()
-                with st.expander(f"{metric_label} Reasoning"):
-                    render_reasoning(reasons_data)
+        for key in available:
+            if data := reasons.get(key):
+                with st.expander(f"{key.replace('_', ' ').title()} Reasoning"):
+                    render_reasoning(data)
 
 
 def run_evaluations(
     data_ops: SnowflakeDataOperations,
-    queries_to_evaluate: pd.DataFrame,
-    feedback_options: list[str],
-    evaluation_model: str,
+    queries: pd.DataFrame,
+    model: str,
 ) -> None:
-    """Run evaluations on the provided queries."""
-    provider = Cortex(data_ops._session, model_engine=evaluation_model)
+    """Run context_relevance evaluations on queries with progress tracking."""
+    provider = Cortex(data_ops._session, model_engine=model)
+    total_queries = len(queries)
+    progress = EvaluationProgress(total_steps=total_queries)
 
-    total_queries = len(queries_to_evaluate)
-    total_metrics = len(feedback_options)
-    total_steps = total_queries * (total_metrics + 1)  # +1 for answer generation
+    st.markdown("---")
+    header_cols = st.columns([2, 1, 1, 1])
+    with header_cols[0]:
+        bar = st.progress(0, text="Initializing...")
+    with header_cols[1]:
+        elapsed_disp = st.empty()
+        elapsed_disp.metric("Elapsed", "0s")
+    with header_cols[2]:
+        step_time_disp = st.empty()
+        step_time_disp.metric("Step Time", "—")
+    with header_cols[3]:
+        eta_disp = st.empty()
 
-    progress_bar = st.progress(0, text="Initializing...")
-    status_container = st.empty()
-    current_step = 0
+    status_disp = st.empty()
 
-    for query_idx, (_, row) in enumerate(queries_to_evaluate.iterrows(), 1):
+    st.markdown("**Completed Evaluations**")
+    table_disp = st.empty()
+    results = []
+
+    step_start_time = time.time()
+    last_step_duration = None
+
+    def update_progress_display(status: str, starting_new_step: bool = True):
+        """Update progress bar, timers, and status."""
+        nonlocal step_start_time, last_step_duration
+
+        elapsed_disp.metric("Elapsed", progress.format_time(progress.elapsed))
+
+        if starting_new_step:
+            if last_step_duration is not None:
+                step_time_disp.metric("Last Step", progress.format_time(last_step_duration))
+            step_start_time = time.time()
+        else:
+            current_step_time = time.time() - step_start_time
+            step_time_disp.metric("Step Time", progress.format_time(current_step_time))
+
+        bar.progress(progress.progress_pct, text=f"Step {progress.current_step}/{progress.total_steps}")
+
+        if progress.eta is not None:
+            eta_disp.metric("ETA", progress.format_time(progress.eta))
+
+        status_disp.info(f"⏳ **{status}**")
+
+    def update_table():
+        if results:
+            df = pd.DataFrame(results)
+            table_disp.dataframe(df, use_container_width=True, hide_index=True)
+
+    for q_idx, (_, row) in enumerate(queries.iterrows(), 1):
+        step_start = time.time()
         search_id = int(row["SEARCH_ID"])
-        input_query = row["INPUT_QUERY"]
+        query_text = row["INPUT_QUERY"]
         chunks = row["CHUNK_TEXT"]
-        truncated_query = input_query[:50] + "..." if len(input_query) > 50 else input_query
+        short_query = query_text[:60] + "..." if len(query_text) > 60 else query_text
 
-        # Update status for answer generation
-        current_step += 1
-        progress = current_step / total_steps
-        progress_bar.progress(progress, text=f"Query {query_idx}/{total_queries}")
-        status_container.caption(f"Generating answer for: {truncated_query}")
+        result_row = {"Query": short_query, "Status": "Evaluating..."}
+        results.append(result_row)
+        update_table()
 
-        # Generate answer for evaluation
-        answer_df = data_ops._session.create_dataframe(
-            [[chunks, input_query]],
-            schema=["context", "query"],
-        ).with_column(
-            "answer",
-            F.call_builtin(
-                "SNOWFLAKE.CORTEX.COMPLETE",
-                F.lit(evaluation_model),
-                F.prompt(
-                    "Context: {0}\n\nQuestion: {1}\n\nPlease provide a helpful and accurate answer based on the context provided.",
-                    F.col("context"),
-                    F.col("query"),
-                ),
-            ),
-        ).to_pandas()
+        progress.increment()
+        update_progress_display(f"Query {q_idx}/{total_queries}: Evaluating context relevance...")
 
-        answer = answer_df["ANSWER"].iloc[0] if not answer_df.empty else ""
+        eval_data = pd.Series({"query": query_text, "context": truncate_context(chunks)})
+        score, reasons, error = evaluate_metric(provider, "Context Relevance", eval_data)
 
-        eval_row = pd.Series({
-            "query": input_query,
-            "context": chunks,
-            "answer": answer,
-        })
+        last_step_duration = time.time() - step_start
 
-        metrics_dict = {}
-        reasons_dict = {}
+        if error:
+            result_row["Context Relevance"] = "Error"
+            evaluation = {"context_relevance": {"score": None, "reasons": {"error": error}}}
+            progress.total_errors += 1
+        else:
+            result_row["Context Relevance"] = f"{score:.3f}"
+            evaluation = {"context_relevance": {"score": score, "reasons": reasons or {}}}
 
-        for metric_idx, metric in enumerate(feedback_options, 1):
-            metric_key = to_metric_key(metric)
-            current_step += 1
-            progress = current_step / total_steps
-            progress_bar.progress(progress, text=f"Query {query_idx}/{total_queries}")
-            status_container.caption(f"Evaluating {metric} ({metric_idx}/{total_metrics}): {truncated_query}")
+        progress.record_step(last_step_duration)
 
-            try:
-                score, reasons = evaluate_metric(provider, metric, eval_row)
-                metrics_dict[metric_key] = float(score)
-                if reasons:
-                    reasons_dict[metric_key] = reasons
-            except Exception as e:
-                st.warning(f"Error evaluating {metric}: {str(e)}")
-                metrics_dict[metric_key] = 0.0
-                reasons_dict[metric_key] = {"error": str(e)}
-
-        evaluation = {
-            "metrics": metrics_dict,
-            "reasons": reasons_dict,
-            "answer": answer,
-        }
+        result_row["Status"] = "Saving..."
+        update_table()
 
         try:
             data_ops.save_evaluation_results(
                 search_id=search_id,
-                input_query=input_query,
+                input_query=query_text,
                 chunks=chunks,
-                evaluation_model=evaluation_model,
+                evaluation_model=model,
                 evaluation=evaluation,
             )
-        except Exception as save_error:
-            st.warning(f"Could not save result for search_id {search_id}: {str(save_error)}")
+            result_row["Status"] = "Complete"
+        except Exception as e:
+            st.warning(f"Could not save result for search_id {search_id}: {e}")
+            result_row["Status"] = "Save failed"
 
-    progress_bar.progress(1.0, text="Complete!")
-    status_container.empty()
-    st.success("Evaluation complete! Results saved to database.")
+        update_table()
+
+    total_elapsed = progress.elapsed
+    bar.progress(1.0, text="Complete!")
+    elapsed_disp.metric("Total Time", progress.format_time(total_elapsed))
+    step_time_disp.empty()
+    eta_disp.empty()
+    status_disp.empty()
+
+    avg = total_elapsed / total_queries if total_queries else 0
+    if progress.total_errors:
+        st.warning(f"Completed with {progress.total_errors} error(s). Processed {total_queries} queries in {progress.format_time(total_elapsed)} ({progress.format_time(avg)}/query avg). Try a different model if errors persist.")
+    else:
+        st.success(f"Evaluation complete! Processed {total_queries} queries in {progress.format_time(total_elapsed)} ({progress.format_time(avg)}/query avg)")
+
+
+def _render_completion_stats(stats: dict) -> None:
+    """Render evaluation completion metrics."""
+    if not stats:
+        return
+
+    st.subheader("Evaluation Progress")
+    cols = st.columns(len(stats))
+    for idx, (input_type, data) in enumerate(stats.items()):
+        total, evaluated = data["total"], data["evaluated"]
+        pct = (evaluated / total * 100) if total else 0
+        with cols[idx]:
+            st.metric(
+                label=input_type.replace("_", " ").title(),
+                value=f"{evaluated}/{total}",
+                delta=f"{pct:.3f}% complete",
+                delta_color="normal" if pct < 100 else "off",
+            )
+    st.divider()
+
+
+def _render_model_selector() -> str:
+    """Render model selection UI and return selected model."""
+    col_model, col_help = st.columns([1, 2])
+    with col_model:
+        model = st.selectbox(
+            "Evaluation Model",
+            options=EVALUATION_MODELS,
+            index=0,
+            key="evaluation_model_select",
+            help="Select the model for LLM-as-a-Judge evaluations",
+        )
+    with col_help:
+        st.caption("This model acts as an LLM-as-a-Judge, scoring each search result using TruLens evaluation metrics. Larger models generally provide more accurate and consistent quality assessments.")
+    return model
+
+
+@st.fragment
+def _render_run_section(data_ops: SnowflakeDataOperations, all_results: pd.DataFrame, model: str, expanded: bool) -> None:
+    """Render the run evaluations section as a fragment to isolate progress UI."""
+    with st.expander("Run New Evaluations", expanded=expanded):
+        st.warning("⚠️ Running evaluations from the app is temporarily disabled. Please use the batch evaluation scripts instead.")
+        st.markdown("Select which queries to evaluate:")
+        metrics = st.multiselect(
+            "Evaluation Metrics",
+            options=METRIC_OPTIONS,
+            default=["Context Relevance"],
+            key="eval_metrics_run",
+            disabled=True,
+        )
+        available_types = []
+        if not all_results.empty and "INPUT_TYPE" in all_results.columns:
+            available_types = all_results["INPUT_TYPE"].dropna().unique().tolist()
+        mode = st.radio(
+            "Selection Mode",
+            options=["By Query Type", "Specific Queries"],
+            horizontal=True,
+            key="eval_selection_mode",
+            disabled=True,
+        )
+        queries = pd.DataFrame()
+
+        if mode == "By Query Type":
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                types = st.multiselect(
+                    "Query Types to Evaluate",
+                    options=available_types,
+                    default=[],
+                    key="eval_types_to_run",
+                    disabled=True,
+                )
+            with col2:
+                skip = st.checkbox("Skip already evaluated", value=True, key="skip_evaluated", disabled=True)
+
+            if types and not all_results.empty:
+                queries = all_results[all_results["INPUT_TYPE"].isin(types)]
+                if skip:
+                    queries = queries[~queries["EVALUATED"]]
+        else:
+            if not all_results.empty:
+                options = [(row["SEARCH_ID"], f"{'✓' if row['EVALUATED'] else '○'} [{row['INPUT_TYPE']}] {row['INPUT_QUERY'][:60]}...") for _, row in all_results.iterrows()]
+                selected = st.multiselect(
+                    "Select Queries to Evaluate",
+                    options=[o[0] for o in options],
+                    format_func=lambda x: next((o[1] for o in options if o[0] == x), str(x)),
+                    key="eval_specific_queries",
+                    help="✓ = already evaluated, ○ = not evaluated",
+                    disabled=True,
+                )
+                if selected:
+                    queries = all_results[all_results["SEARCH_ID"].isin(selected)]
+
+        if queries.empty:
+            st.caption("Select query types or specific queries to evaluate.")
+            return
+
+        unevaluated = (~queries["EVALUATED"]).sum()
+        re_evaluated = queries["EVALUATED"].sum()
+        num_metrics = len(metrics) if metrics else 1
+
+        est_secs = 20 * (num_metrics + 1) * len(queries)
+        est_mins = est_secs / 60
+
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.info(f"**{len(queries)}** queries selected: {unevaluated} new, {re_evaluated} will be re-evaluated")
+        with col2:
+            st.caption(f"Estimated time: ~{est_secs:.0f}s" if est_mins < 1 else f"Estimated time: ~{est_mins:.0f}min")
+
+        st.button("Run Evaluation", key="run_eval_btn", type="primary", disabled=True)
+
+
+def _render_results_section(existing_results: pd.DataFrame) -> None:
+    """Render the evaluation results section."""
+    st.subheader("Evaluation Results")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        view_metrics = st.multiselect(
+            "Metrics to Display",
+            options=METRIC_OPTIONS,
+            default=["Context Relevance"],
+            key="eval_metrics_view",
+        )
+
+    result_types = existing_results["INPUT_TYPE"].dropna().unique().tolist() if "INPUT_TYPE" in existing_results.columns else []
+    with col2:
+        view_types = st.multiselect(
+            "Filter by Query Type",
+            options=result_types,
+            default=result_types,
+            key="eval_types_view",
+        )
+
+    df = parse_evaluation_data(existing_results)
+    if view_types and "input_type" in df.columns:
+        df = df[df["input_type"].isin(view_types)]
+
+    if df.empty:
+        st.info("No evaluation results match the selected filters.")
+        return
+
+    metric_keys = [to_metric_key(m) for m in view_metrics]
+    _render_metric_summary(df, metric_keys)
+    st.divider()
+    st.markdown("**Detailed Results**")
+    _render_result_carousel(df.reset_index(drop=True), metric_keys)
 
 
 def render_evaluation_tab(data_ops: SnowflakeDataOperations) -> None:
+    """Main entry point for the Evaluation tab."""
     st.header("LLM-as-a-Judge Evaluation")
     st.caption("Evaluate search results using TruLens metrics powered by Cortex LLMs.")
 
-    # Show evaluation completion metrics at the top
     completion_stats = data_ops.get_evaluation_completion_stats()
-    if completion_stats:
-        st.subheader("Evaluation Progress")
-        cols = st.columns(len(completion_stats))
-        for idx, (input_type, stats) in enumerate(completion_stats.items()):
-            total = stats["total"]
-            evaluated = stats["evaluated"]
-            pct = (evaluated / total * 100) if total > 0 else 0
-            with cols[idx]:
-                st.metric(
-                    label=input_type.replace("_", " ").title(),
-                    value=f"{evaluated}/{total}",
-                    delta=f"{pct:.0f}% complete",
-                    delta_color="normal" if pct < 100 else "off",
-                )
-        st.divider()
+    all_results = data_ops.extract_search_results_for_evaluation()
+    existing = data_ops.get_evaluation_results()
 
-    evaluation_model = "llama3.1-70b"
+    _render_completion_stats(completion_stats)
+    model = _render_model_selector()
 
     try:
-        # Get all search results and existing evaluations
-        all_search_results = data_ops.extract_search_results_for_evaluation()
-        existing_results = data_ops.get_evaluation_results()
-        evaluated_search_ids = set(existing_results["SEARCH_ID"].tolist()) if not existing_results.empty else set()
+        evaluated_ids = set(existing["SEARCH_ID"].tolist()) if not existing.empty else set()
 
-        # Mark which queries are already evaluated
-        if not all_search_results.empty:
-            all_search_results["EVALUATED"] = all_search_results["SEARCH_ID"].isin(evaluated_search_ids)
+        if not all_results.empty:
+            all_results["EVALUATED"] = all_results["SEARCH_ID"].isin(evaluated_ids)
 
-        # === RUN EVALUATIONS SECTION ===
-        with st.expander("Run New Evaluations", expanded=len(evaluated_search_ids) == 0):
-            st.markdown("Select which queries to evaluate:")
+        _render_run_section(data_ops, all_results, model, expanded=not evaluated_ids)
 
-            # Metric selection
-            feedback_options = st.multiselect(
-                "Evaluation Metrics",
-                options=[
-                    "Answer Relevance",
-                    "Context Relevance",
-                    "Comprehensiveness",
-                    "Harmfulness",
-                ],
-                default=["Context Relevance"],
-                key="eval_metrics_run",
-            )
-
-            # Get available input types
-            available_types = []
-            if not all_search_results.empty and "INPUT_TYPE" in all_search_results.columns:
-                available_types = all_search_results["INPUT_TYPE"].dropna().unique().tolist()
-
-            # Selection mode
-            selection_mode = st.radio(
-                "Selection Mode",
-                options=["By Query Type", "Specific Queries"],
-                horizontal=True,
-                key="eval_selection_mode",
-            )
-
-            queries_to_run = pd.DataFrame()
-
-            if selection_mode == "By Query Type":
-                col1, col2 = st.columns([2, 1])
-                with col1:
-                    selected_types = st.multiselect(
-                        "Query Types to Evaluate",
-                        options=available_types,
-                        default=[],
-                        key="eval_types_to_run",
-                        help="Select one or more query types to evaluate",
-                    )
-                with col2:
-                    skip_evaluated = st.checkbox("Skip already evaluated", value=True, key="skip_evaluated")
-
-                if selected_types and not all_search_results.empty:
-                    queries_to_run = all_search_results[all_search_results["INPUT_TYPE"].isin(selected_types)]
-                    if skip_evaluated:
-                        queries_to_run = queries_to_run[~queries_to_run["EVALUATED"]]
-
-            else:  # Specific Queries
-                if not all_search_results.empty:
-                    # Build query options with status indicator
-                    query_options = []
-                    for _, row in all_search_results.iterrows():
-                        status = "✓" if row["EVALUATED"] else "○"
-                        label = f"{status} [{row['INPUT_TYPE']}] {row['INPUT_QUERY'][:60]}..."
-                        query_options.append((row["SEARCH_ID"], label))
-
-                    selected_query_ids = st.multiselect(
-                        "Select Queries to Evaluate",
-                        options=[q[0] for q in query_options],
-                        format_func=lambda x: next((q[1] for q in query_options if q[0] == x), str(x)),
-                        key="eval_specific_queries",
-                        help="✓ = already evaluated, ○ = not evaluated",
-                    )
-
-                    if selected_query_ids:
-                        queries_to_run = all_search_results[all_search_results["SEARCH_ID"].isin(selected_query_ids)]
-
-            # Show summary of what will be evaluated
-            if not queries_to_run.empty:
-                unevaluated_count = (~queries_to_run["EVALUATED"]).sum()
-                already_evaluated_count = queries_to_run["EVALUATED"].sum()
-
-                st.info(f"**{len(queries_to_run)}** queries selected: {unevaluated_count} new, {already_evaluated_count} will be re-evaluated")
-
-                if st.button("Run Evaluation", key="run_eval_btn", type="primary"):
-                    with st.spinner("Running evaluations with TruLens..."):
-                        run_evaluations(data_ops, queries_to_run, feedback_options, evaluation_model)
-                    st.rerun()
-            else:
-                st.caption("Select query types or specific queries to evaluate.")
-
-        # === VIEW RESULTS SECTION ===
-        if not existing_results.empty:
-            st.subheader("Evaluation Results")
-
-            # Filter controls for viewing
-            col_metrics, col_types = st.columns(2)
-
-            with col_metrics:
-                view_metrics = st.multiselect(
-                    "Metrics to Display",
-                    options=[
-                        "Answer Relevance",
-                        "Context Relevance",
-                        "Comprehensiveness",
-                        "Harmfulness",
-                    ],
-                    default=["Context Relevance"],
-                    key="eval_metrics_view",
-                )
-
-            # Get available input types from results
-            result_types = []
-            if "INPUT_TYPE" in existing_results.columns:
-                result_types = existing_results["INPUT_TYPE"].dropna().unique().tolist()
-
-            with col_types:
-                view_types = st.multiselect(
-                    "Filter by Query Type",
-                    options=result_types,
-                    default=result_types,
-                    key="eval_types_view",
-                )
-
-            # Parse and filter results
-            display_df = parse_evaluation_data(existing_results)
-
-            if view_types and "input_type" in display_df.columns:
-                display_df = display_df[display_df["input_type"].isin(view_types)]
-
-            if display_df.empty:
-                st.info("No evaluation results match the selected filters.")
-            else:
-                metric_keys = [to_metric_key(m) for m in view_metrics]
-
-                # Summary section
-                render_evaluation_summary(display_df, metric_keys)
-
-                st.divider()
-
-                # Carousel section
-                st.markdown("**Detailed Results**")
-                render_evaluation_carousel(display_df.reset_index(drop=True), metric_keys)
+        if not existing.empty:
+            _render_results_section(existing)
         else:
             st.info("No evaluation results yet. Use the section above to run evaluations.")
 
     except Exception as e:
-        st.error(f"Error running evaluation: {str(e)}")
+        st.error(f"Error running evaluation: {e}")
         st.info("Make sure TruLens and the Cortex provider are properly configured.")

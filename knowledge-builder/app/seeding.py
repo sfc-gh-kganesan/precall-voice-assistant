@@ -22,6 +22,16 @@ def ingest_golden_pairs(session: Session, table_name: str, mode: str = "overwrit
         {"INCIDENT": "INC0010890", "INPUT_QUERY": "Requesting admin access for software installation on Macbook.", "SUGGESTED_RESOLUTION_CURATED": "Check if the software is in the Self-Service portal. If not, manager approval is required before granting temporary SUDO rights."},
         {"INCIDENT": "INC0011221", "INPUT_QUERY": "Printer in the London office (2nd floor) is jammed and showing error 404.", "SUGGESTED_RESOLUTION_CURATED": "On-site facilities notified. Hardware reset performed; confirmed paper tray 2 was overloaded with A3 paper."},
         {"INCIDENT": "INC0011456", "INPUT_QUERY": "New hire needs access to the Snowflake production warehouse.", "SUGGESTED_RESOLUTION_CURATED": "Assign the user to the 'SNOWFLAKE_PROD_READ' Okta group. Sync may take up to 30 minutes to reflect in the Cortex search role."},
+        {
+            "INCIDENT": "INC0011789",
+            "INPUT_QUERY": "My laptop battery drains completely within 2 hours even when plugged in.",
+            "SUGGESTED_RESOLUTION_CURATED": ("Run battery diagnostics via Dell SupportAssist or Apple Diagnostics. If battery health is below 80%, submit a hardware replacement request through the IT portal. Ensure power adapter wattage matches device requirements."),
+        },
+        {
+            "INCIDENT": "INC0012034",
+            "INPUT_QUERY": "Teams calls keep dropping after exactly 30 minutes.",
+            "SUGGESTED_RESOLUTION_CURATED": ("This is typically caused by VPN idle timeout settings. Switch to split-tunnel VPN profile for Teams traffic, or adjust the VPN client keep-alive settings. Verify Teams is excluded from VPN routing in the network configuration."),
+        },
     ]
     df = pd.DataFrame(data)
     session.write_pandas(df.reset_index(drop=True), table_name, auto_create_table=True, overwrite=(mode == "overwrite"))
@@ -99,6 +109,57 @@ def ingest_synthetic_pairs(session: Session, table_name: str, mode: str = "overw
             "L2_TAG": "Enterprise Software Applications",
             "L3_TAG": "Enterprise Software Applications",
             "L4_TAG": "Application Launch Failure Diagnostics",
+        },
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {
+                "query": "How do I set up my new laptop for the first time?",
+                "answer": ("Connect to the corporate WiFi network 'CorpNet-Secure' using your AD credentials. Open Company Portal app to install required software. Enroll in Microsoft Authenticator for MFA. Run Windows Update to ensure all security patches are applied."),
+            },
+            "L1_RAW": "hardware",
+            "L2_RAW": "device setup",
+            "L3_RAW": "onboarding",
+            "L4_RAW": "configuration",
+            "L1_TAG": "IT Services",
+            "L2_TAG": "Device Provisioning",
+            "L3_TAG": "New Employee Onboarding",
+            "L4_TAG": "Initial Device Configuration",
+        },
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {
+                "query": "Slack notifications are not appearing on my desktop.",
+                "answer": ("Check notification settings in Slack Preferences > Notifications. Ensure 'Do Not Disturb' is disabled. On Windows, verify Slack is allowed in Settings > System > Notifications. On Mac, check System Preferences > Notifications > Slack. Restart the Slack application after making changes."),
+            },
+            "L1_RAW": "software",
+            "L2_RAW": "collaboration tools",
+            "L3_RAW": "notifications",
+            "L4_RAW": "troubleshooting",
+            "L1_TAG": "Application Systems",
+            "L2_TAG": "Collaboration Software",
+            "L3_TAG": "Communication Tools Configuration",
+            "L4_TAG": "Notification System Troubleshooting",
+        },
+        {
+            "SOURCE_TABLE": "SEED_DATA",
+            "ATTRS": {},
+            "SCORING": {},
+            "GENERATED": {
+                "query": "I need to request a standing desk for my home office.",
+                "answer": ("Submit an ergonomic equipment request through the HR portal under Benefits > Work From Home Equipment. Attach a photo of your current workspace. Requests require manager approval and typically process within 5-7 business days. Standard budget allowance is $500 for home office equipment."),
+            },
+            "L1_RAW": "facilities",
+            "L2_RAW": "equipment",
+            "L3_RAW": "ergonomics",
+            "L4_RAW": "request process",
+            "L1_TAG": "Facilities Management",
+            "L2_TAG": "Office Equipment",
+            "L3_TAG": "Ergonomic Equipment Requests",
+            "L4_TAG": "Home Office Equipment Procurement",
         },
     ]
     df = session.create_dataframe(
@@ -197,28 +258,15 @@ def deduplicate_search_results(session: Session) -> None:
 def get_unsearched_golden_pairs(session: Session) -> sp.DataFrame:
     """Get golden pairs that haven't been searched yet."""
     golden_pairs = session.table(db_config.get_table_name(db_config.golden_pairs_table))
-    searched_queries = (
-        session.table(db_config.get_table_name(db_config.results_table))
-        .filter(F.col("INPUT_TYPE") == "GOLDEN_PAIR")
-        .select(F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY"))
-        .distinct()
-    )
+    searched_queries = session.table(db_config.get_table_name(db_config.results_table)).filter(F.col("INPUT_TYPE") == "GOLDEN_PAIR").select(F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY")).distinct()
     return golden_pairs.join(searched_queries, on="INPUT_QUERY", how="anti")
 
 
 def get_unsearched_synthetic_pairs(session: Session) -> sp.DataFrame:
     """Get synthetic pairs that haven't been searched yet."""
     synthetic_pairs = session.table(db_config.get_table_name(db_config.synthetic_pairs_table))
-    searched_queries = (
-        session.table(db_config.get_table_name(db_config.results_table))
-        .filter(F.col("INPUT_TYPE") == "SYNTHETIC_PAIR")
-        .select(F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY"))
-        .distinct()
-    )
-    synthetic_with_query = synthetic_pairs.with_column(
-        "INPUT_QUERY",
-        F.col("GENERATED")["query"].cast(T.StringType())
-    )
+    searched_queries = session.table(db_config.get_table_name(db_config.results_table)).filter(F.col("INPUT_TYPE") == "SYNTHETIC_PAIR").select(F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY")).distinct()
+    synthetic_with_query = synthetic_pairs.with_column("INPUT_QUERY", F.col("GENERATED")["query"].cast(T.StringType()))
     return synthetic_with_query.join(searched_queries, on="INPUT_QUERY", how="anti")
 
 
@@ -259,7 +307,6 @@ def get_sync_status(session: Session) -> dict:
     unsearched_golden = get_unsearched_golden_pairs(session).count()
     unsearched_synthetic = get_unsearched_synthetic_pairs(session).count()
 
-    # Count total queries by type
     results_table = session.table(db_config.get_table_name(db_config.results_table))
     total_golden = results_table.filter(F.upper(F.col("INPUT_TYPE")) == "GOLDEN_PAIR").count()
     total_synthetic = results_table.filter(F.upper(F.col("INPUT_TYPE")) == "SYNTHETIC_PAIR").count()

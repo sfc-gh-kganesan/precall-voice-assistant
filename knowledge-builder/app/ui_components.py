@@ -3,32 +3,9 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
-from config import db_config, ui_config
+from config import LLM_MODELS, db_config, ui_config
 from data_operations import SnowflakeDataOperations
-from ui_utils import render_stars
-
-
-def get_metrics(df: pd.DataFrame) -> tuple[int, int, float, float]:
-    return (
-        df["INPUT_QUERY"].nunique(),
-        df.shape[0],
-        df["COSINE_SIMILARITY"].mean().round(3),
-        df["TEXT_MATCH"].mean().round(3),
-    )
-
-
-def render_stats_tab(results_df: pd.DataFrame) -> None:
-    st.header("Stats")
-
-    with st.expander("Debug: View Raw Data Sample"):
-        st.dataframe(results_df.head(), width="stretch")
-
-    col1, col2, col3, col4 = st.columns(4)
-    metrics = get_metrics(results_df)
-    col1.metric("Input Queries", metrics[0])
-    col2.metric("Responses", str(metrics[1]))
-    col3.metric("Average Cosine Similarity", metrics[2])
-    col4.metric("Average Text Match", metrics[3])
+from ui_utils import render_carousel_nav, render_stars
 
 
 def render_response_card(
@@ -46,12 +23,12 @@ def render_response_card(
     cosine_similarity = row["COSINE_SIMILARITY"]
     text_match = row["TEXT_MATCH"]
 
-    st.markdown(f"### Response {idx} of {num_responses}")
+    st.markdown(f"### Retrieved Chunk {idx} of {num_responses}")
 
     c1, c2 = st.columns([1, 1])
 
     with c1:
-        st.markdown("**Retrieved Response**")
+        st.markdown("**Chunk Content**")
         st.info(chunk_text)
         col_a, col_b = st.columns(2)
         col_a.metric("Cosine Similarity", f"{cosine_similarity:.3f}")
@@ -75,16 +52,18 @@ def feedback_form(
     form_key = f"{prefix}_form_{query_id}_{row_index}"
 
     with st.form(key=form_key):
-        st.markdown("**User Evaluation**")
+        st.markdown("**Rate This Chunk**")
+        st.caption("How well does this retrieved chunk answer the query above?")
         rating = st.feedback("stars", key=f"{prefix}_rating_{query_id}_{row_index}")
         feedback = st.text_area(
             "Additional Comments",
             placeholder=ui_config.feedback_placeholder,
             key=f"{prefix}_text_{query_id}_{row_index}",
             height=ui_config.feedback_textarea_height,
+            help="Describe what's missing or how this chunk could better address the query.",
         )
 
-        submitted = st.form_submit_button("Save")
+        submitted = st.form_submit_button("Save Feedback")
 
         if submitted:
             if rating is None:
@@ -152,30 +131,15 @@ def render_carousel_query(
             render_response_card(row, idx, num_responses, query_id, input_query, row_index, data_ops, prefix=prefix, on_feedback_submit=on_feedback_submit)
     else:
         response_key = f"{prefix}_{query_id}_response_idx"
-        if response_key not in st.session_state:
-            st.session_state[response_key] = 0
+        current_idx = render_carousel_nav(
+            total_items=num_responses,
+            session_key=response_key,
+            label_prefix="Chunk",
+        )
 
-        st.session_state[response_key] = min(st.session_state[response_key], num_responses - 1)
-        current_response_idx = st.session_state[response_key]
-
-        r_col1, r_col2, r_col3 = st.columns([1, 1, 4])
-
-        with r_col1:
-            if st.button("◀ Prev", disabled=current_response_idx == 0, key=f"{prefix}_{query_id}_prev_resp", use_container_width=True):
-                st.session_state[response_key] -= 1
-
-        with r_col2:
-            if st.button("Next ▶", disabled=current_response_idx >= num_responses - 1, key=f"{prefix}_{query_id}_next_resp", use_container_width=True):
-                st.session_state[response_key] += 1
-
-        current_response_idx = st.session_state[response_key]
-
-        with r_col3:
-            st.container(height=42, border=False).markdown(f"**Response {current_response_idx + 1} of {num_responses}**")
-
-        row_index = group_data.index[current_response_idx]
-        row = group_data.iloc[current_response_idx]
-        render_response_card(row, current_response_idx + 1, num_responses, query_id, input_query, row_index, data_ops, prefix=prefix, on_feedback_submit=on_feedback_submit)
+        row_index = group_data.index[current_idx]
+        row = group_data.iloc[current_idx]
+        render_response_card(row, current_idx + 1, num_responses, query_id, input_query, row_index, data_ops, prefix=prefix, on_feedback_submit=on_feedback_submit)
 
     st.divider()
     st.markdown("**Existing Feedback**")
@@ -184,7 +148,7 @@ def render_carousel_query(
 
 def render_playground_tab(data_ops: SnowflakeDataOperations) -> None:
     st.header("Search Playground")
-    st.caption("Test ad-hoc queries against your knowledge base and provide feedback on results.")
+    st.caption("Test adhoc queries against your knowledge base and provide feedback on results.")
 
     with st.expander("Settings", expanded=False):
         col1, col2 = st.columns(2)
@@ -199,31 +163,8 @@ def render_playground_tab(data_ops: SnowflakeDataOperations) -> None:
         with col2:
             llm_model = st.selectbox(
                 "LLM Model",
-                options=[
-                    "claude-4-opus",
-                    "claude-4-sonnet",
-                    "claude-3-7-sonnet",
-                    "claude-3-5-sonnet",
-                    "deepseek-r1",
-                    "llama3-8b",
-                    "llama3-70b",
-                    "llama3.1-8b",
-                    "llama3.1-70b",
-                    "llama3.1-405b",
-                    "llama3.3-70b",
-                    "llama4-maverick",
-                    "llama4-scout",
-                    "mistral-large",
-                    "mistral-large2",
-                    "mistral-7b",
-                    "mixtral-8x7b",
-                    "openai-gpt-4.1",
-                    "openai-o4-mini",
-                    "snowflake-arctic",
-                    "snowflake-llama-3.1-405b",
-                    "snowflake-llama-3.3-70b",
-                ],
-                index=1,  # claude-4-sonnet
+                options=list(LLM_MODELS),
+                index=1,
                 key="playground_llm_model",
             )
 
@@ -233,36 +174,61 @@ def render_playground_tab(data_ops: SnowflakeDataOperations) -> None:
         with st.spinner("Searching..."):
             search_id, results = data_ops.execute_playground_search(query, limit=num_results)
 
-        st.subheader(f"Results for: {query}")
-        results_df = data_ops.generate_llm_responses(results, query, model=llm_model)
+        st.session_state["playground_last_search"] = {
+            "query": query,
+            "search_id": search_id,
+            "results": results,
+            "llm_model": llm_model,
+        }
 
-        for idx, (row, result_dict) in enumerate(zip(results_df.itertuples(), results, strict=False), 1):
-            st.markdown(f"### Result {idx}")
+    _render_playground_results(data_ops)
 
-            col1, col2 = st.columns([1, 1])
 
-            with col1:
-                st.markdown("**Chunk Details**")
-                col_a, col_b = st.columns(2)
-                col_a.metric("Text Match", f"{result_dict['@scores']['text_match']:.3f}")
-                col_b.metric(
-                    "Cosine Similarity",
-                    f"{result_dict['@scores']['cosine_similarity']:.3f}",
-                )
-                st.info(result_dict["CHUNK_TEXT"])
+@st.fragment
+def _render_playground_results(data_ops: SnowflakeDataOperations) -> None:
+    """Render playground search results as a fragment to prevent ghosting."""
+    if "playground_last_search" not in st.session_state:
+        return
 
-            with col2:
-                st.markdown("**Agent Response**")
-                st.write(row.agent_response)
+    search_data = st.session_state["playground_last_search"]
+    query = search_data["query"]
+    search_id = search_data["search_id"]
+    results = search_data["results"]
+    llm_model = search_data["llm_model"]
 
-            st.markdown("**Feedback**")
-            if search_id is not None:
-                feedback_form(search_id, idx, data_ops, prefix="playground")
-            else:
-                st.error("Could not retrieve search ID for feedback.")
+    if not results:
+        return
 
-            if idx < len(results):
-                st.divider()
+    st.subheader(f"Results for: {query}")
+    results_df = data_ops.generate_llm_responses(results, query, model=llm_model)
+
+    for idx, (row, result_dict) in enumerate(zip(results_df.itertuples(), results, strict=False), 1):
+        st.markdown(f"### Result {idx}")
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.markdown("**Chunk Details**")
+            col_a, col_b = st.columns(2)
+            col_a.metric("Text Match", f"{result_dict['@scores']['text_match']:.3f}")
+            col_b.metric(
+                "Cosine Similarity",
+                f"{result_dict['@scores']['cosine_similarity']:.3f}",
+            )
+            st.info(result_dict["CHUNK_TEXT"])
+
+        with col2:
+            st.markdown("**Agent Response**")
+            st.write(row.agent_response)
+
+        st.markdown("**Feedback**")
+        if search_id is not None:
+            feedback_form(search_id, idx, data_ops, prefix="playground")
+        else:
+            st.error("Could not retrieve search ID for feedback.")
+
+        if idx < len(results):
+            st.divider()
 
 
 def render_feedback_tab(
@@ -273,6 +239,24 @@ def render_feedback_tab(
 ) -> None:
     st.header("Search Results Review")
     st.caption("Review search results by query type and provide feedback on retrieval quality.")
+
+    with st.expander("How to provide feedback", expanded=False, icon=":material/help:"):
+        st.markdown("""
+**What you're evaluating:** Each query returns one or more *chunks* from your knowledge base.
+A chunk is a segment of text retrieved by the Cortex Search service based on semantic similarity to the query.
+
+**Your feedback helps answer:**
+- Does this chunk contain relevant information for the query?
+- Would this chunk help someone find an answer?
+- Is this the right content, or should a different article/section be returned?
+
+**Rating guide:**
+- :star: Poor - Chunk is irrelevant or misleading
+- :star::star: Below average - Chunk is tangentially related but not helpful
+- :star::star::star: Average - Chunk contains some useful information
+- :star::star::star::star: Good - Chunk is relevant and helpful
+- :star::star::star::star::star: Excellent - Chunk directly answers the query
+        """)
 
     selected_types = st.multiselect(
         "Query Type",
@@ -315,7 +299,7 @@ def render_feedback_tab(
     col1.metric("Queries", total_queries)
     col2.metric("Responses", total_responses)
     col3.metric("Reviewed", reviewed_queries)
-    col4.metric("Coverage", f"{review_pct:.0f}%")
+    col4.metric("Coverage", f"{review_pct:.3f}%")
 
     st.divider()
 
@@ -341,43 +325,18 @@ def render_carousel(
         st.info("No queries to display.")
         return
 
-    if "carousel_index" not in st.session_state:
-        st.session_state.carousel_index = 0
+    query_labels = [f"{i + 1}: {g[0][:40]}..." if len(str(g[0])) > 40 else f"{i + 1}: {g[0]}" for i, g in enumerate(grouped)]
 
-    st.session_state.carousel_index = min(st.session_state.carousel_index, total_queries - 1)
-    current_idx = st.session_state.carousel_index
-
-    col1, col2, col3, col4 = st.columns([1, 1, 2, 4])
-
-    with col1:
-        if st.button("← Previous", disabled=current_idx == 0, use_container_width=True):
-            st.session_state.carousel_index -= 1
-
-    with col2:
-        if st.button("Next →", disabled=current_idx >= total_queries - 1, use_container_width=True):
-            st.session_state.carousel_index += 1
-
-    current_idx = st.session_state.carousel_index
-
-    with col3:
-        st.container(height=42, border=False).markdown(f"**Query {current_idx + 1} of {total_queries}**")
-
-    with col4:
-        query_labels = [f"{i + 1}: {g[0][:40]}..." if len(str(g[0])) > 40 else f"{i + 1}: {g[0]}" for i, g in enumerate(grouped)]
-        selected = st.selectbox(
-            "Jump to",
-            range(total_queries),
-            index=current_idx,
-            format_func=lambda x: query_labels[x],
-            key="query_jump",
-            label_visibility="collapsed",
-        )
-        if selected != current_idx:
-            st.session_state.carousel_index = selected
+    current_idx = render_carousel_nav(
+        total_items=total_queries,
+        session_key="carousel_index",
+        item_labels=query_labels,
+        label_prefix="Query",
+    )
 
     st.divider()
 
-    _, group_data = grouped[st.session_state.carousel_index]
+    _, group_data = grouped[current_idx]
     row0 = group_data.iloc[0]
 
     query_id = row0.get("SEARCH_ID")

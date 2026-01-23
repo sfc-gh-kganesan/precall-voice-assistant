@@ -22,14 +22,14 @@ DECLARE
     result             VARIANT;
 BEGIN
     v_question := REQUEST:"question"::STRING;
-    
+
     IF (v_question IS NULL OR v_question = '') THEN
         RETURN OBJECT_CONSTRUCT(
             'error', 'REQUEST must include a question field',
             'request', REQUEST
         )::VARIANT;
     END IF;
-    
+
     v_limit := COALESCE(REQUEST:"limit"::NUMBER, 10);
     v_kb_number := REQUEST:"kb_number"::STRING;
     v_kb_sys_id := REQUEST:"kb_sys_id"::STRING;
@@ -42,13 +42,13 @@ BEGIN
         '"query": "' || REPLACE(:v_question, '"', '\\"') || '",' ||
         '"columns": ["KB_SYS_ID","KB_NUMBER","CHUNK_INDEX","CHUNK_TEXT"],' ||
         '"limit": ' || TO_VARCHAR(:v_limit);
-    
-    IF (v_kb_number IS NOT NULL OR v_kb_sys_id IS NOT NULL OR v_knowledge_base IS NOT NULL 
+
+    IF (v_kb_number IS NOT NULL OR v_kb_sys_id IS NOT NULL OR v_knowledge_base IS NOT NULL
         OR v_can_read IS NOT NULL OR v_cannot_read IS NOT NULL) THEN
         json_config := json_config || ',"filter": {';
-        
+
         LET filter_parts ARRAY := ARRAY_CONSTRUCT();
-        
+
         IF (v_kb_number IS NOT NULL) THEN
             filter_parts := ARRAY_APPEND(filter_parts, '"@eq": {"KB_NUMBER": "' || REPLACE(:v_kb_number, '"', '\\"') || '"}');
         END IF;
@@ -64,16 +64,16 @@ BEGIN
         IF (v_cannot_read IS NOT NULL) THEN
             filter_parts := ARRAY_APPEND(filter_parts, '"@eq": {"CANNOT_READ_USER_CRITERIA": "' || REPLACE(:v_cannot_read, '"', '\\"') || '"}');
         END IF;
-        
+
         IF (ARRAY_SIZE(filter_parts) = 1) THEN
             json_config := json_config || filter_parts[0];
         ELSE
             json_config := json_config || '"@and": [' || ARRAY_TO_STRING(filter_parts, ',') || ']';
         END IF;
-        
+
         json_config := json_config || '}';
     END IF;
-    
+
     json_config := json_config || '}';
     json_config_escaped := REPLACE(json_config, '''', '''''');
 
@@ -104,10 +104,10 @@ BEGIN
         )::VARIANT
         INTO :articles
         FROM (
-            SELECT 
+            SELECT
                 c.KB_SYS_ID,
                 MAX(c.KB_NUMBER) AS KB_NUMBER,
-                MAX(CASE WHEN c.CHUNK_INDEX = 0 OR c.CHUNK_INDEX = 1 THEN 
+                MAX(CASE WHEN c.CHUNK_INDEX = 0 OR c.CHUNK_INDEX = 1 THEN
                     <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(c.CHUNK_TEXT)['summary']::STRING
                 END) AS SUMMARY,
                 LISTAGG(

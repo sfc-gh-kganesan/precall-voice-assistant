@@ -32,7 +32,7 @@ BEGIN
 
     IF (v_kb_sys_id IS NOT NULL) THEN
         SELECT
-            MAX(CASE WHEN CHUNK_INDEX = 0 OR CHUNK_INDEX = 1 THEN 
+            MAX(CASE WHEN CHUNK_INDEX = 0 OR CHUNK_INDEX = 1 THEN
                 <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['summary']::STRING
             END) AS summary,
             LISTAGG(
@@ -46,7 +46,7 @@ BEGIN
         WHERE KB_SYS_ID = :v_kb_sys_id;
     ELSE
         SELECT
-            MAX(CASE WHEN CHUNK_INDEX = 0 OR CHUNK_INDEX = 1 THEN 
+            MAX(CASE WHEN CHUNK_INDEX = 0 OR CHUNK_INDEX = 1 THEN
                 <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['summary']::STRING
             END) AS summary,
             LISTAGG(

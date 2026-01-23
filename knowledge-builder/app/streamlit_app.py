@@ -7,12 +7,10 @@ st.set_page_config(
     layout="wide",
 )
 
-import pandas as pd  # noqa: E402
 from data_operations import SnowflakeDataOperations  # noqa: E402
 from eda import render_eda_tab  # noqa: E402
 from evaluation import render_evaluation_tab  # noqa: E402
 from seeding import get_sync_status, sync_searches  # noqa: E402
-from snowflake.snowpark import Session  # noqa: E402
 from snowflake.snowpark.context import get_active_session  # noqa: E402
 from taxonomy import render_taxonomy_tab  # noqa: E402
 from ui_components import render_feedback_tab, render_playground_tab  # noqa: E402
@@ -20,10 +18,7 @@ from ui_components import render_feedback_tab, render_playground_tab  # noqa: E4
 
 @st.cache_resource
 def get_session():
-    try:
-        return get_active_session()
-    except Exception:
-        return Session.builder.config("connection_name", "aifde").create()
+    return get_active_session()
 
 
 @st.cache_resource
@@ -32,40 +27,29 @@ def get_data_operations():
     return SnowflakeDataOperations(session)
 
 
-@st.cache_data(ttl=300)
-def load_baseline_results(_data_ops: SnowflakeDataOperations):
-    return _data_ops.get_baseline_results()
+def render_header_metrics(data_ops: SnowflakeDataOperations) -> None:
+    """Render prominent dashboard metrics at the top of the app."""
+    stats = data_ops.get_dashboard_stats()
 
-
-@st.cache_data(ttl=300)
-def load_adhoc_results(_data_ops: SnowflakeDataOperations):
-    return _data_ops.get_adhoc_results()
-
-
-def render_header_metrics(data_ops: SnowflakeDataOperations, baseline_df: pd.DataFrame, adhoc_df: pd.DataFrame) -> None:
-    feedback_counts = data_ops.get_feedback_counts()
-    total_feedback = int(feedback_counts["FEEDBACK_COUNT"].sum()) if not feedback_counts.empty else 0
-    total_queries = baseline_df["INPUT_QUERY"].nunique() if not baseline_df.empty else 0
-    total_adhoc = adhoc_df["INPUT_QUERY"].nunique() if not adhoc_df.empty else 0
-    synthetic_count = data_ops.get_synthetic_query_count()
-    avg_similarity = baseline_df["COSINE_SIMILARITY"].mean() if not baseline_df.empty else 0
-
-    cols = st.columns(5)
-    cols[0].metric("Golden Pairs", total_queries)
-    cols[1].metric("Ad-hoc Searches", total_adhoc)
-    cols[2].metric("Synthetic Queries", synthetic_count)
-    cols[3].metric("Feedback Received", total_feedback)
-    cols[4].metric("Avg Similarity", f"{avg_similarity:.3f}")
+    eval_pct = stats["eval_pct"]
+    st.metric(
+        "Evaluation Progress",
+        f"{stats['eval_completed']}/{stats['eval_total']}",
+        delta=f"{eval_pct:.3f}% complete",
+        delta_color="normal" if eval_pct < 100 else "off",
+    )
 
 
 def main() -> None:
     st.title(ui_config.page_title)
+    st.markdown("Evaluate and improve your Cortex Search retrieval quality through human feedback, LLM-as-a-judge metrics, and taxonomy analysis.")
     st.caption(f"Connected to `{db_config.database}.{db_config.schema}` | Search Service: `{db_config.search_service}`")
 
     session = get_session()
     data_ops = get_data_operations()
 
     with st.sidebar:
+        st.image("sanofi-600px.jpg")
         st.header("Search Status")
         sync_status = get_sync_status(session)
         unsearched_golden = sync_status["unsearched_golden_pairs"]
@@ -93,8 +77,6 @@ def main() -> None:
                 with st.spinner("Syncing searches..."):
                     results = sync_searches(session, data_ops, sync_golden=sync_golden, sync_synthetic=sync_synthetic)
                     st.success(f"Synced {results['golden_pairs']} golden pairs and {results['synthetic_pairs']} synthetic pairs")
-                    load_baseline_results.clear()
-                    load_adhoc_results.clear()
                     st.rerun()
         else:
             st.info("All pairs are synced.")
@@ -107,51 +89,29 @@ def main() -> None:
         st.info("Please ensure all required tables and services exist before using this application.")
         st.stop()
 
-    baseline_results_df = load_baseline_results(data_ops)
-    adhoc_results_df = load_adhoc_results(data_ops)
-
-    render_header_metrics(data_ops, baseline_results_df, adhoc_results_df)
+    render_header_metrics(data_ops)
     st.divider()
-
-    if baseline_results_df.empty and adhoc_results_df.empty:
-        st.warning("No results data available.")
 
     input_types = data_ops.get_input_types()
 
     def load_results_by_type(_data_ops, result_type):
         return _data_ops.extract_search_results(result_type, ["SEARCH_ID"])
 
-    tabs = ["Feedback", "Playground", "Evaluation", "Taxonomy", "EDA"]
+    tab_coverage, tab_eval, tab_playground, tab_feedback, tab_eda = st.tabs(["Quality Coverage", "Evaluation", "Playground", "Feedback", "EDA"])
 
-    if "selected_tab" not in st.session_state or st.session_state.selected_tab not in tabs:
-        st.session_state.selected_tab = "Feedback"
+    with tab_coverage:
+        render_taxonomy_tab(get_session())
 
-    selected_tab = st.radio(
-        "Navigation",
-        tabs,
-        index=tabs.index(st.session_state.selected_tab),
-        key="tab_selector",
-        horizontal=True,
-        label_visibility="collapsed",
-    )
-
-    st.session_state.selected_tab = selected_tab
-
-    st.divider()
-
-    def clear_results_cache():
-        load_baseline_results.clear()
-        load_adhoc_results.clear()
-
-    if selected_tab == "Feedback":
-        render_feedback_tab(data_ops, input_types, load_results_by_type, on_feedback_submit=clear_results_cache)
-    elif selected_tab == "Playground":
-        render_playground_tab(data_ops)
-    elif selected_tab == "Evaluation":
+    with tab_eval:
         render_evaluation_tab(data_ops)
-    elif selected_tab == "Taxonomy":
-        render_taxonomy_tab(data_ops)
-    elif selected_tab == "EDA":
+
+    with tab_playground:
+        render_playground_tab(data_ops)
+
+    with tab_feedback:
+        render_feedback_tab(data_ops, input_types, load_results_by_type)
+
+    with tab_eda:
         render_eda_tab(data_ops)
 
 

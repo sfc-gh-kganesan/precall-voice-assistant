@@ -244,7 +244,6 @@ class SnowflakeDataOperations:
 
     def get_evaluation_results(self) -> pd.DataFrame:
         try:
-            # Join with SEARCH_QUERIES to get INPUT_TYPE
             results = self._session.sql(f"""
                 SELECT
                     er.SEARCH_ID,
@@ -269,9 +268,7 @@ class SnowflakeDataOperations:
                 self._session.table(db_config.get_table_name(db_config.evaluation_results_table))
                 .select(
                     F.count("*").alias("total_evaluations"),
-                    F.avg(F.col("EVALUATION")["metrics"]["answer_relevance"].cast("float")).alias("avg_answer_relevance"),
-                    F.avg(F.col("EVALUATION")["metrics"]["context_relevance"].cast("float")).alias("avg_context_relevance"),
-                    F.avg(F.col("EVALUATION")["metrics"]["groundedness"].cast("float")).alias("avg_groundedness"),
+                    F.avg(F.col("EVALUATION")["context_relevance"]["score"].cast("float")).alias("avg_context_relevance"),
                 )
                 .to_pandas()
             )
@@ -319,7 +316,6 @@ class SnowflakeDataOperations:
         and CHUNK_TEXT (all chunks concatenated).
         """
         try:
-            # Use SQL to flatten and aggregate chunks per query
             results = self._session.sql(f"""
                 SELECT
                     SEARCH_ID,
@@ -341,15 +337,8 @@ class SnowflakeDataOperations:
         Returns a dict with counts of total and evaluated queries per input type.
         """
         try:
-            # Get all search queries with their input types
-            search_queries = (
-                self._session.table(db_config.get_table_name(db_config.results_table))
-                .group_by("INPUT_TYPE")
-                .agg(F.count("*").alias("TOTAL"))
-                .to_pandas()
-            )
+            search_queries = self._session.table(db_config.get_table_name(db_config.results_table)).group_by("INPUT_TYPE").agg(F.count("*").alias("TOTAL")).to_pandas()
 
-            # Get evaluated search IDs with their input types
             evaluated = self._session.sql(f"""
                 SELECT sq.INPUT_TYPE, COUNT(DISTINCT er.SEARCH_ID) as EVALUATED
                 FROM {db_config.get_table_name(db_config.results_table)} sq
@@ -358,7 +347,6 @@ class SnowflakeDataOperations:
                 GROUP BY sq.INPUT_TYPE
             """).to_pandas()
 
-            # Build stats dict
             stats = {}
             for _, row in search_queries.iterrows():
                 input_type = row["INPUT_TYPE"]
@@ -468,36 +456,42 @@ class SnowflakeDataOperations:
             return 0
 
     def get_taxonomy_evaluation_rollup(self) -> pd.DataFrame:
-        """Get evaluation metrics rolled up by taxonomy levels (L1-L4)."""
+        """Get evaluation metrics with SQL ROLLUP for hierarchical aggregation."""
         try:
             sql = f"""
-            WITH base AS (
+            WITH evals AS (
                 SELECT
-                    sp.L1_TAG, sp.L2_TAG, sp.L3_TAG, sp.L4_TAG,
-                    sp.GENERATED:query::STRING as QUERY,
-                    sq.SEARCH_ID,
-                    er.EVALUATION:metrics:answer_relevance::FLOAT as ANSWER_RELEVANCE,
-                    er.EVALUATION:metrics:context_relevance::FLOAT as CONTEXT_RELEVANCE,
-                    er.EVALUATION:metrics:comprehensiveness::FLOAT as COMPREHENSIVENESS,
-                    er.EVALUATION:metrics:harmfulness::FLOAT as HARMFULNESS
+                    er.INPUT_QUERY,
+                    er.EVALUATION:context_relevance:score::FLOAT as CONTEXT_RELEVANCE_SCORE
+                FROM {db_config.get_table_name(db_config.evaluation_results_table)} er
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY er.INPUT_QUERY ORDER BY er.CREATED_ON DESC) = 1
+            ),
+            taxonomies AS (
+                SELECT
+                    sp.GENERATED['query']::VARCHAR AS INPUT_QUERY,
+                    sp.L1_TAG,
+                    sp.L2_TAG,
+                    sp.L3_TAG,
+                    sp.L4_TAG,
+                    e.CONTEXT_RELEVANCE_SCORE
                 FROM {db_config.get_table_name(db_config.synthetic_pairs_table)} sp
-                LEFT JOIN {db_config.get_table_name(db_config.results_table)} sq
-                    ON sp.GENERATED:query::STRING = sq.INPUT_ARGS:query::STRING
-                    AND UPPER(sq.INPUT_TYPE) = 'SYNTHETIC_PAIR'
-                LEFT JOIN {db_config.get_table_name(db_config.evaluation_results_table)} er
-                    ON sq.SEARCH_ID = er.SEARCH_ID
+                INNER JOIN evals e ON sp.GENERATED['query']::VARCHAR = e.INPUT_QUERY
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY INPUT_QUERY ORDER BY NULL) = 1
             )
             SELECT
-                L1_TAG, L2_TAG, L3_TAG, L4_TAG,
-                COUNT(*) as QUERY_COUNT,
-                COUNT(ANSWER_RELEVANCE) as EVALUATED_COUNT,
-                AVG(ANSWER_RELEVANCE) as AVG_ANSWER_RELEVANCE,
-                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE,
-                AVG(COMPREHENSIVENESS) as AVG_COMPREHENSIVENESS,
-                AVG(HARMFULNESS) as AVG_HARMFULNESS
-            FROM base
-            GROUP BY L1_TAG, L2_TAG, L3_TAG, L4_TAG
-            ORDER BY L1_TAG, L2_TAG, L3_TAG, L4_TAG
+                L1_TAG,
+                L2_TAG,
+                L3_TAG,
+                L4_TAG,
+                COUNT(*) AS QUERY_COUNT,
+                ROUND(AVG(CONTEXT_RELEVANCE_SCORE), 2) AS AVG_CONTEXT_RELEVANCE_SCORE
+            FROM taxonomies
+            GROUP BY ROLLUP(L1_TAG, L2_TAG, L3_TAG, L4_TAG)
+            ORDER BY
+                L1_TAG NULLS LAST,
+                L2_TAG NULLS LAST,
+                L3_TAG NULLS LAST,
+                L4_TAG NULLS LAST
             """
             return self._session.sql(sql).to_pandas()
         except Exception as e:
@@ -508,30 +502,27 @@ class SnowflakeDataOperations:
         """Get evaluation metrics summarized at a specific taxonomy level."""
         try:
             sql = f"""
-            WITH base AS (
+            WITH evals AS (
+                SELECT
+                    er.SEARCH_ID,
+                    er.INPUT_QUERY,
+                    er.EVALUATION:context_relevance:score::FLOAT as CONTEXT_RELEVANCE
+                FROM {db_config.get_table_name(db_config.evaluation_results_table)} er
+            ),
+            base AS (
                 SELECT
                     sp.L1_TAG, sp.L2_TAG, sp.L3_TAG, sp.L4_TAG,
                     sp.GENERATED:query::STRING as QUERY,
-                    sq.SEARCH_ID,
-                    er.EVALUATION:metrics:answer_relevance::FLOAT as ANSWER_RELEVANCE,
-                    er.EVALUATION:metrics:context_relevance::FLOAT as CONTEXT_RELEVANCE,
-                    er.EVALUATION:metrics:comprehensiveness::FLOAT as COMPREHENSIVENESS,
-                    er.EVALUATION:metrics:harmfulness::FLOAT as HARMFULNESS
+                    ev.CONTEXT_RELEVANCE
                 FROM {db_config.get_table_name(db_config.synthetic_pairs_table)} sp
-                LEFT JOIN {db_config.get_table_name(db_config.results_table)} sq
-                    ON sp.GENERATED:query::STRING = sq.INPUT_ARGS:query::STRING
-                    AND UPPER(sq.INPUT_TYPE) = 'SYNTHETIC_PAIR'
-                LEFT JOIN {db_config.get_table_name(db_config.evaluation_results_table)} er
-                    ON sq.SEARCH_ID = er.SEARCH_ID
+                LEFT JOIN evals ev ON sp.GENERATED:query::STRING = ev.INPUT_QUERY
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY sp.GENERATED:query::STRING ORDER BY NULL) = 1
             )
             SELECT
                 {level} as TAXONOMY_LEVEL,
                 COUNT(*) as QUERY_COUNT,
-                COUNT(ANSWER_RELEVANCE) as EVALUATED_COUNT,
-                AVG(ANSWER_RELEVANCE) as AVG_ANSWER_RELEVANCE,
-                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE,
-                AVG(COMPREHENSIVENESS) as AVG_COMPREHENSIVENESS,
-                AVG(HARMFULNESS) as AVG_HARMFULNESS
+                COUNT(CONTEXT_RELEVANCE) as EVALUATED_COUNT,
+                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE
             FROM base
             GROUP BY {level}
             ORDER BY {level}
@@ -549,30 +540,27 @@ class SnowflakeDataOperations:
         try:
             level_cols = ", ".join(levels)
             sql = f"""
-            WITH base AS (
+            WITH evals AS (
+                SELECT
+                    er.SEARCH_ID,
+                    er.INPUT_QUERY,
+                    er.EVALUATION:context_relevance:score::FLOAT as CONTEXT_RELEVANCE
+                FROM {db_config.get_table_name(db_config.evaluation_results_table)} er
+            ),
+            base AS (
                 SELECT
                     sp.L1_TAG, sp.L2_TAG, sp.L3_TAG, sp.L4_TAG,
                     sp.GENERATED:query::STRING as QUERY,
-                    sq.SEARCH_ID,
-                    er.EVALUATION:metrics:answer_relevance::FLOAT as ANSWER_RELEVANCE,
-                    er.EVALUATION:metrics:context_relevance::FLOAT as CONTEXT_RELEVANCE,
-                    er.EVALUATION:metrics:comprehensiveness::FLOAT as COMPREHENSIVENESS,
-                    er.EVALUATION:metrics:harmfulness::FLOAT as HARMFULNESS
+                    ev.CONTEXT_RELEVANCE
                 FROM {db_config.get_table_name(db_config.synthetic_pairs_table)} sp
-                LEFT JOIN {db_config.get_table_name(db_config.results_table)} sq
-                    ON sp.GENERATED:query::STRING = sq.INPUT_ARGS:query::STRING
-                    AND UPPER(sq.INPUT_TYPE) = 'SYNTHETIC_PAIR'
-                LEFT JOIN {db_config.get_table_name(db_config.evaluation_results_table)} er
-                    ON sq.SEARCH_ID = er.SEARCH_ID
+                LEFT JOIN evals ev ON sp.GENERATED:query::STRING = ev.INPUT_QUERY
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY sp.GENERATED:query::STRING ORDER BY NULL) = 1
             )
             SELECT
                 {level_cols},
                 COUNT(*) as QUERY_COUNT,
                 COUNT(CONTEXT_RELEVANCE) as EVALUATED_COUNT,
-                AVG(ANSWER_RELEVANCE) as AVG_ANSWER_RELEVANCE,
-                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE,
-                AVG(COMPREHENSIVENESS) as AVG_COMPREHENSIVENESS,
-                AVG(HARMFULNESS) as AVG_HARMFULNESS
+                AVG(CONTEXT_RELEVANCE) as AVG_CONTEXT_RELEVANCE
             FROM base
             GROUP BY {level_cols}
             ORDER BY {level_cols}
@@ -581,3 +569,105 @@ class SnowflakeDataOperations:
         except Exception as e:
             print(f"Error getting taxonomy summary by levels: {e}")
             return pd.DataFrame()
+
+    def get_dashboard_stats(self) -> dict:
+        """Get aggregated statistics for the main dashboard header.
+
+        Returns a dict with evaluation progress, average scores, and taxonomy coverage.
+        """
+        stats = {
+            "eval_total": 0,
+            "eval_completed": 0,
+            "eval_pct": 0.0,
+            "avg_context_relevance": None,
+            "taxonomy_categories": 0,
+            "taxonomy_coverage_pct": 0.0,
+        }
+
+        try:
+            completion = self.get_evaluation_completion_stats()
+            if completion:
+                stats["eval_total"] = sum(v["total"] for v in completion.values())
+                stats["eval_completed"] = sum(v["evaluated"] for v in completion.values())
+                if stats["eval_total"] > 0:
+                    stats["eval_pct"] = (stats["eval_completed"] / stats["eval_total"]) * 100
+
+            eval_results = self.get_evaluation_results()
+            if not eval_results.empty and "EVALUATION" in eval_results.columns:
+                import json
+
+                scores = []
+                for val in eval_results["EVALUATION"]:
+                    try:
+                        data = json.loads(val) if isinstance(val, str) else (val or {})
+                        if isinstance(data, dict) and "context_relevance" in data:
+                            score = data["context_relevance"].get("score")
+                            if score is not None:
+                                scores.append(float(score))
+                    except (json.JSONDecodeError, TypeError, ValueError, AttributeError):
+                        continue
+
+                if scores:
+                    stats["avg_context_relevance"] = sum(scores) / len(scores)
+
+            taxonomy = self.get_taxonomy_summary_by_level("L1_TAG")
+            if not taxonomy.empty:
+                stats["taxonomy_categories"] = len(taxonomy)
+                evaluated = taxonomy[taxonomy["EVALUATED_COUNT"] > 0]
+                if stats["taxonomy_categories"] > 0:
+                    stats["taxonomy_coverage_pct"] = (len(evaluated) / stats["taxonomy_categories"]) * 100
+
+        except Exception as e:
+            print(f"Error getting dashboard stats: {e}")
+
+        return stats
+
+    def run_batch_context_evaluations(
+        self,
+        evaluation_model: str = "llama3.1-70b",
+        max_context_length: int = 4000,
+    ) -> int:
+        """Run context_relevance evaluation for all unevaluated queries.
+
+        Args:
+            evaluation_model: The Cortex model to use for evaluation.
+            max_context_length: Maximum context length to pass to the evaluator.
+
+        Returns:
+            Number of queries evaluated.
+        """
+        from trulens.providers.cortex import Cortex
+
+        provider = Cortex(self._session, model_engine=evaluation_model)
+
+        all_queries = self.extract_search_results_for_evaluation()
+        existing = self.get_evaluation_results()
+        evaluated_ids = set(existing["SEARCH_ID"]) if not existing.empty else set()
+        pending = all_queries[~all_queries["SEARCH_ID"].isin(evaluated_ids)]
+
+        evaluated_count = 0
+        for _, row in pending.iterrows():
+            try:
+                context = row["CHUNK_TEXT"]
+                if len(context) > max_context_length:
+                    context = context[:max_context_length] + "\n\n[Context truncated...]"
+
+                score, reasons = provider.context_relevance_with_cot_reasons(
+                    question=row["INPUT_QUERY"],
+                    context=context,
+                    temperature=0.0,
+                )
+
+                self.save_evaluation_results(
+                    search_id=int(row["SEARCH_ID"]),
+                    input_query=row["INPUT_QUERY"],
+                    chunks=row["CHUNK_TEXT"],
+                    evaluation_model=evaluation_model,
+                    evaluation={"context_relevance": {"score": float(score), "reasons": reasons or {}}},
+                )
+                evaluated_count += 1
+            except Exception as e:
+                print(f"Error evaluating search_id {row['SEARCH_ID']}: {e}")
+                continue
+
+        return evaluated_count

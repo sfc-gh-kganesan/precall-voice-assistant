@@ -56,10 +56,7 @@ def analyze_image_links(df: pd.DataFrame, text_col: str = "TEXT") -> pd.DataFram
         df = df.reset_index()
         id_col = "index"
 
-    processed_data = [
-        (row_id, extract_image_srcs(text))
-        for row_id, text in zip(df[id_col], df[text_col], strict=False)
-    ]
+    processed_data = [(row_id, extract_image_srcs(text)) for row_id, text in zip(df[id_col], df[text_col], strict=False)]
 
     temp_df = pd.DataFrame(processed_data, columns=["ARTICLE_ID", "IMG_SRC"])
     exploded_df = temp_df.explode("IMG_SRC").dropna(subset=["IMG_SRC"])
