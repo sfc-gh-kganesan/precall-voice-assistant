@@ -17,10 +17,10 @@ export STAGE=$STAGE
 export IMAGE_REPOSITORY=$IMAGE_REPOSITORY
 
 echo "Creating database if not exists"
-snow object create database name=$DATABASE --if-not-exists
+snow object create database name=$DATABASE --if-not-exists $SNOW_CONNECT
 
 echo "Creating schema if not exists"
-snow object create schema name=$SCHEMA --database $DATABASE --if-not-exists
+snow object create schema name=$SCHEMA --database $DATABASE --if-not-exists $SNOW_CONNECT
 
 echo "Creating compute pool"
 snow spcs compute-pool deploy $SNOW_CONNECT || true
@@ -32,7 +32,7 @@ echo "Logging in to image registry"
 snow spcs image-registry login $SNOW_CONNECT
 
 echo "Getting image repository URL"
-REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY$SNOW_CONNECT --database $DATABASE --schema $SCHEMA)
+REPO_URL=$(snow spcs image-repository url $IMAGE_REPOSITORY $SNOW_CONNECT --database $DATABASE --schema $SCHEMA)
 echo "REPO_URL: $REPO_URL"
 
 echo "Updating service_spec.yaml with image path"
