@@ -28,6 +28,7 @@ const BaseMessageSchema = z.object({
 // Serialized config schema for IPC (Map serialized as Record)
 const SerializedP67ConfigSchema = z.object({
     snowflakeConfig: z.record(z.string(), P67ConfigValueSchema),
+    parameters: z.record(z.string(), z.string()),
 });
 
 export type SerializedP67Config = z.infer<typeof SerializedP67ConfigSchema>;

@@ -343,7 +343,7 @@ describe('ControldClient', () => {
                 });
             }) as unknown as typeof globalThis.fetch;
 
-            const result = await client.runWorkflow(workflowId);
+            const result = await client.runWorkflow(workflowId, {});
 
             expect(result).toEqual(mockResponse);
             expect(result.success).toBe(true);
@@ -371,7 +371,7 @@ describe('ControldClient', () => {
                 });
             }) as unknown as typeof globalThis.fetch;
 
-            const result = await client.runWorkflow(workflowId);
+            const result = await client.runWorkflow(workflowId, {});
 
             expect(result).toEqual(mockResponse);
             expect(result.success).toBe(false);
@@ -394,7 +394,7 @@ describe('ControldClient', () => {
                 });
             }) as unknown as typeof globalThis.fetch;
 
-            expect(client.runWorkflow('wf-invalid')).rejects.toThrow(
+            expect(client.runWorkflow('wf-invalid', {})).rejects.toThrow(
                 'Workflow wf-invalid does not exist',
             );
 
@@ -430,7 +430,7 @@ describe('ControldClient', () => {
                 });
             }) as unknown as typeof globalThis.fetch;
 
-            await client.runWorkflow(workflowId);
+            await client.runWorkflow(workflowId, {});
 
             expect(globalThis.fetch).toHaveBeenCalled();
 

@@ -667,7 +667,9 @@ export async function hydrateConfig(
     const parameters = new Map<string, string>();
     for (const c of manifest.config) {
         if (c.parameters) {
+            console.log('🌶️ ✅ 🔥 MANIFEST PARAMETERS', c.parameters);
             for (const [key, value] of Object.entries(c.parameters)) {
+                console.log('🌶️ ✅ 🔥 MANIFEST PARAMETER', key, value);
                 parameters.set(key, (await valueManager.get(value)) ?? '');
             }
         }

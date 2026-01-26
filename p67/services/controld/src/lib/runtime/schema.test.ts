@@ -13,6 +13,7 @@ import {
 // Test helper: minimal valid config
 const testConfig: SerializedP67Config = {
     snowflakeConfig: {},
+    parameters: {},
 };
 
 describe('runtime/schema', () => {

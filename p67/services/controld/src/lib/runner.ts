@@ -66,9 +66,11 @@ export class Runner {
         private readonly db: PrismaClient,
         private readonly userId: string,
         private readonly logService?: LogService,
+        private readonly params?: Record<string, string>,
     ) {
         // Extract workflow ID from directory name (e.g., "wf-abc123")
         this.workflowId = basename(workflowDir);
+        this.params = params;
     }
 
     /**
@@ -77,6 +79,7 @@ export class Runner {
     private serializeConfig(config: P67Config): SerializedP67Config {
         return {
             snowflakeConfig: Object.fromEntries(config.snowflakeConfig),
+            parameters: this.params ?? {},
         };
     }
 
@@ -190,6 +193,17 @@ export class Runner {
                 ],
                 runId,
             };
+        }
+
+        // Override manifest parameters with CLI-provided params
+        for (const config of manifest.config) {
+            if (config.parameters) {
+                for (const [key, value] of Object.entries(this.params ?? {})) {
+                    if (key in config.parameters) {
+                        config.parameters[key] = { value };
+                    }
+                }
+            }
         }
 
         // Hydrate config using ValueManager

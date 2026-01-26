@@ -203,8 +203,16 @@ export class ControldClient {
         return (await response.json()) as WorkflowListResponse;
     }
 
-    async runWorkflow(workflowId: string): Promise<WorkflowRunResponse> {
-        const response = await this.post(`/api/workflow/${workflowId}/run`);
+    async runWorkflow(
+        workflowId: string,
+        params: Record<string, string>,
+    ): Promise<WorkflowRunResponse> {
+        const response = await this.post(`/api/workflow/${workflowId}/run`, {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params),
+        });
 
         if (!response.ok) {
             const error = (await response.json()) as ErrorResponse;
