@@ -21,6 +21,7 @@ export const P67ConfigValueSchema = z.object({
     database: z.string().optional(),
     schema: z.string().optional(),
     email_integration: z.string().optional(),
+    parameters: z.record(z.string(), z.string()).optional(),
 });
 
 export type P67ConfigValue = z.infer<typeof P67ConfigValueSchema>;
@@ -118,6 +119,14 @@ export interface EmailOptions {
  * Defines the public API for interacting with Snowflake and Cortex services
  */
 export interface WorkflowSDK {
+    /**
+     * Gets a parameter from the 'parameters' field of the config
+     * @param name - The name of the parameter
+     * @param config_name - The name of the config to use, if null, the only one will be used
+     * @returns The value of the parameter or undefined if the parameter is not found
+     */
+    getParameter(name: string, config_name?: string): string | undefined;
+
     /**
      * Executes a read-only SELECT query against Snowflake
      *

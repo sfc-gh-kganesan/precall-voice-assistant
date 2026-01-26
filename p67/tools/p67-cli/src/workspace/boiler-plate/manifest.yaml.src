@@ -25,6 +25,9 @@ config:
   #         value: <string>
   #       schema:
   #         value: <string>
+  #       parameters:
+  #         any_param_name:
+  #           value: <string>
   #
   # Example:
   #   account:
@@ -37,3 +40,6 @@ config:
   #     value: MY_DATABASE
   #   schema:
   #     value: PUBLIC
+  #   parameters:
+  #     email_recipient:
+  #       secretRef: workflow_recipient_secret

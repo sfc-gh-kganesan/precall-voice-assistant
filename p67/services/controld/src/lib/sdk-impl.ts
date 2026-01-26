@@ -216,6 +216,17 @@ export class WorkflowSDKImpl implements WorkflowSDK {
         });
     }
 
+    /**
+     * Gets a parameter from the 'parameters' field of the config
+     * @param name - The name of the parameter
+     * @param config_name - The name of the config to use, if null, the only one will be used
+     * @returns The value of the parameter or undefined if the parameter is not found
+     */
+    getParameter(name: string, config_name?: string): string | undefined {
+        const cfg = this.cfg(config_name);
+        return cfg.parameters?.[name];
+    }
+
     async executeQueryReadOnly(
         stmt: SnowflakeStatement,
         config_name?: string,
@@ -653,6 +664,15 @@ export async function hydrateConfig(
 ): Promise<P67Config> {
     const config = new Map<string, P67ConfigValue>();
 
+    const parameters = new Map<string, string>();
+    for (const c of manifest.config) {
+        if (c.parameters) {
+            for (const [key, value] of Object.entries(c.parameters)) {
+                parameters.set(key, (await valueManager.get(value)) ?? '');
+            }
+        }
+    }
+
     for (const c of manifest.config) {
         const validated = validateConfig({
             account: await valueManager.get(c.account),
@@ -665,6 +685,7 @@ export async function hydrateConfig(
             database: await valueManager.get(c.database),
             schema: await valueManager.get(c.schema),
             email_integration: await valueManager.get(c.email_integration),
+            parameters: Object.fromEntries(parameters),
         });
         config.set(c.config_name, validated);
     }
