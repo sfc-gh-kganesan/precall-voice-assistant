@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workflow Editor</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11/marked.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { display: flex; height: 100vh; font-family: sans-serif; }
+        #left { width: 200px; border-right: 1px solid #ccc; display: flex; flex-direction: column; }
+        #middle { flex: 1; display: flex; flex-direction: column; }
+        #right { width: 300px; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
+        #diagram { flex: 1; border-bottom: 1px solid #ccc; }
+        #bottom { height: 200px; display: flex; }
+        #properties, #code { flex: 1; border-right: 1px solid #ccc; overflow-y: auto; overflow-x: hidden; padding: 10px; }
+        #code { display: flex; flex-direction: column; padding: 0; }
+        #folders, #messages { flex: 1; overflow: auto; padding: 10px; }
+        #messages { font-size: 13px; }
+        #chat-input-container { display: flex; flex-direction: column; padding: 10px; border-top: 1px solid #ccc; }
+        button { padding: 8px; margin: 5px; cursor: pointer; }
+        textarea { width: 100%; border: 1px solid #ccc; }
+        #code-editor { flex: 1; border: none; padding: 10px; font-family: monospace; resize: none; white-space: pre; overflow-x: auto; }
+        #chat-input { flex: 1; min-height: 60px; resize: none; padding: 8px; font-family: sans-serif; font-size: 13px; }
+        .resizer { background: #ccc; position: relative; }
+        .resizer-v { width: 4px; cursor: col-resize; }
+        .resizer-h { height: 4px; cursor: row-resize; }
+        .tab { display: inline-block; padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab.active { border-bottom-color: #007bff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+        th { background: #f0f0f0; font-weight: bold; }
+        .context-menu { display: none; position: absolute; background: white; border: 1px solid #ccc; box-shadow: 2px 2px 8px rgba(0,0,0,0.2); z-index: 1000; }
+        .context-menu-item { padding: 8px 12px; cursor: pointer; }
+        .context-menu-item:hover { background: #f0f0f0; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 20px; border: 1px solid #ccc; min-width: 300px; }
+        .modal-content input, .modal-content select { width: 100%; padding: 6px; margin: 5px 0; border: 1px solid #ccc; }
+        .modal-content button { margin: 5px 5px 0 0; padding: 6px 12px; }
+
+        /* Markdown styling for chat messages */
+        #messages code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 13px; }
+        #messages pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; margin: 8px 0; }
+        #messages pre code { background: none; padding: 0; }
+        #messages ul, #messages ol { margin: 8px 0; padding-left: 24px; }
+        #messages li { margin: 4px 0; }
+        #messages p { margin: 8px 0; }
+        #messages h1, #messages h2, #messages h3 { margin: 12px 0 8px 0; }
+        #messages h1 { font-size: 18px; font-weight: bold; }
+        #messages h2 { font-size: 16px; font-weight: bold; }
+        #messages h3 { font-size: 14px; font-weight: bold; }
+        #messages blockquote { border-left: 3px solid #ccc; padding-left: 10px; margin: 8px 0; color: #666; }
+        #messages a { color: #0066cc; text-decoration: underline; }
+        #messages strong { font-weight: bold; }
+        #messages em { font-style: italic; }
+    </style>
+</head>
+<body>
+    <div id="var-modal" class="modal">
+        <div class="modal-content">
+            <h3>Add Variable</h3>
+            <label>Name:</label>
+            <input type="text" id="modal-var-name">
+            <label>Type:</label>
+            <select id="modal-var-type">
+                <option value="string">string</option>
+                <option value="number">number</option>
+                <option value="integer">integer</option>
+                <option value="boolean">boolean</option>
+                <option value="object">object</option>
+                <option value="array">array</option>
+            </select>
+            <label>Description:</label>
+            <input type="text" id="modal-var-desc">
+            <div>
+                <button onclick="submitAddVariable()">Add</button>
+                <button onclick="closeVarModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="input-modal" class="modal">
+        <div class="modal-content">
+            <h3>Add Input Mapping</h3>
+            <label>Parameter Name:</label>
+            <input type="text" id="modal-input-param">
+            <label>Variable Expression:</label>
+            <input type="text" id="modal-input-expr">
+            <div>
+                <button onclick="submitAddInput()">Add</button>
+                <button onclick="closeInputModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="output-modal" class="modal">
+        <div class="modal-content">
+            <h3>Add Output Mapping</h3>
+            <label>Variable Name:</label>
+            <input type="text" id="modal-output-var">
+            <label>Output Expression:</label>
+            <input type="text" id="modal-output-expr">
+            <div>
+                <button onclick="submitAddOutput()">Add</button>
+                <button onclick="closeOutputModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="generic-prompt-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="generic-prompt-title"></h3>
+            <div id="generic-prompt-fields"></div>
+            <div>
+                <button id="generic-prompt-submit">OK</button>
+                <button id="generic-prompt-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="node-menu" class="context-menu">
+        <div class="context-menu-item" data-action="connect">Connect</div>
+        <div class="context-menu-item" data-action="remove">Remove</div>
+    </div>
+    <div id="edge-menu" class="context-menu">
+        <div class="context-menu-item" data-action="remove">Remove Edge</div>
+    </div>
+    <div id="diagram-menu" class="context-menu">
+        <div class="context-menu-item" data-type="action_node">Add Action Node</div>
+        <div class="context-menu-item" data-type="query_node">Add Query Node</div>
+        <div class="context-menu-item" data-type="decision_node">Add Decision Node</div>
+        <div class="context-menu-item" data-type="human_node">Add Human Node</div>
+    </div>
+    <div id="left">
+        <button id="add-project">+ Project</button>
+        <div id="folders"></div>
+    </div>
+
+    <div class="resizer resizer-v" id="resizer-left"></div>
+
+    <div id="middle">
+        <div id="diagram">
+            <button id="save-workflow">Save Workflow</button>
+            <button id="explain-workflow">Explain Workflow</button>
+            <button id="vibe-workflow">Vibe Workflow</button>
+            <button id="generate-code">Generate Code</button>
+            <div id="mermaid-diagram"></div>
+        </div>
+        <div class="resizer resizer-h" id="resizer-middle"></div>
+        <div id="bottom">
+            <div id="properties"></div>
+            <div class="resizer resizer-v" id="resizer-bottom"></div>
+            <div id="code">
+                <div style="padding: 10px; border-bottom: 1px solid #ccc;">
+                    <button id="save-code">Save Code</button>
+                    <button id="explain-function">Explain Code</button>
+                    <button id="vibe-code">Vibe Code</button>
+                </div>
+                <textarea id="code-editor"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="resizer resizer-v" id="resizer-right"></div>
+
+    <div id="right">
+        <div id="messages"></div>
+        <div class="resizer resizer-h" id="resizer-chat"></div>
+        <div id="chat-input-container">
+            <textarea id="chat-input"></textarea>
+            <button id="send">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            themeVariables: {
+                edgeLabelBackground: '#ffffff',
+                lineColor: '#333333',
+                primaryBorderColor: '#333333'
+            }
+        });
+
+        // Generic prompt modal
+        let promptResolve = null;
+
+        async function showPrompt(title, label = '', defaultValue = '') {
+            return new Promise((resolve) => {
+                document.getElementById('generic-prompt-title').textContent = title;
+                document.getElementById('generic-prompt-fields').innerHTML =
+                    `<label>${label}</label><input type="text" id="generic-prompt-input" value="${defaultValue}">`;
+                document.getElementById('generic-prompt-modal').style.display = 'flex';
+                promptResolve = resolve;
+                setTimeout(() => document.getElementById('generic-prompt-input').focus(), 100);
+            });
+        }
+
+        document.getElementById('generic-prompt-submit').onclick = () => {
+            const value = document.getElementById('generic-prompt-input').value.trim();
+            document.getElementById('generic-prompt-modal').style.display = 'none';
+            if (promptResolve) promptResolve(value || null);
+        };
+
+        document.getElementById('generic-prompt-cancel').onclick = () => {
+            document.getElementById('generic-prompt-modal').style.display = 'none';
+            if (promptResolve) promptResolve(null);
+        };
+
+        document.addEventListener('keydown', (e) => {
+            const modal = document.getElementById('generic-prompt-modal');
+            if (modal.style.display === 'flex' && e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('generic-prompt-submit').click();
+            }
+        });
+
+        // State management
+        let state = {
+            websocket: null,
+            currentSessionId: null,
+            currentFolder: null
+        };
+
+        const CONFIG = {
+            fastServerUrl: 'http://localhost:8765'
+        };
+
+        // Mermaid reserved keywords mapping
+        const MERMAID_RESERVED_KEYWORDS = {
+            'end': 'end_node',
+            'start': 'start_node',
+            'graph': 'graph_node',
+            'subgraph': 'subgraph_node',
+            'style': 'style_node',
+            'class': 'class_node',
+            'click': 'click_node',
+            'direction': 'direction_node',
+            'default': 'default_node'
+        };
+
+        // Reverse mapping for event handlers
+        const MERMAID_REVERSE_KEYWORDS = Object.fromEntries(
+            Object.entries(MERMAID_RESERVED_KEYWORDS).map(([k, v]) => [v, k])
+        );
+
+        // Helper function to escape node IDs
+        const escapeNodeId = (id) => {
+            const lowerID = id.toLowerCase();
+            return MERMAID_RESERVED_KEYWORDS[lowerID] || id;
+        };
+
+        // Helper function to reverse escape node IDs
+        const unescapeNodeId = (id) => {
+            return MERMAID_REVERSE_KEYWORDS[id] || id;
+        };
+
+        // Resizer logic
+        let isResizing = false;
+        let currentResizer = null;
+
+        const RESIZER_CONFIGS = {
+            'resizer-left': {
+                type: 'width',
+                getSize: (e) => e.clientX,
+                apply: (size) => document.getElementById('left').style.width = size + 'px'
+            },
+            'resizer-right': {
+                type: 'width',
+                getSize: (e) => window.innerWidth - e.clientX,
+                apply: (size) => document.getElementById('right').style.width = size + 'px'
+            },
+            'resizer-middle': {
+                type: 'flex',
+                elements: ['diagram', 'bottom'],
+                getRect: () => document.getElementById('diagram').parentElement.getBoundingClientRect(),
+                getSize: (e, rect) => e.clientY - rect.top,
+                apply: (size, rect, elements) => {
+                    elements[0].style.flex = size;
+                    elements[1].style.flex = rect.height - size;
+                }
+            },
+            'resizer-bottom': {
+                type: 'flex',
+                elements: ['properties', 'code'],
+                getRect: () => document.getElementById('properties').parentElement.getBoundingClientRect(),
+                getSize: (e, rect) => e.clientX - rect.left,
+                apply: (size, rect, elements) => {
+                    elements[0].style.flex = size;
+                    elements[1].style.flex = rect.width - size;
+                }
+            },
+            'resizer-chat': {
+                type: 'flex',
+                elements: ['messages', 'chat-input-container'],
+                getRect: () => document.getElementById('messages').parentElement.getBoundingClientRect(),
+                getSize: (e, rect) => e.clientY - rect.top,
+                apply: (size, rect, elements) => {
+                    elements[0].style.flex = size;
+                    elements[1].style.flex = rect.height - size;
+                }
+            }
+        };
+
+        document.querySelectorAll('.resizer').forEach(resizer => {
+            resizer.addEventListener('mousedown', () => {
+                isResizing = true;
+                currentResizer = resizer;
+                document.body.style.userSelect = 'none';
+            });
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing || !currentResizer) return;
+
+            const config = RESIZER_CONFIGS[currentResizer.id];
+            if (!config) return;
+
+            if (config.type === 'width') {
+                config.apply(config.getSize(e));
+            } else {
+                const rect = config.getRect();
+                const size = config.getSize(e, rect);
+                const elements = config.elements.map(id => document.getElementById(id));
+                config.apply(size, rect, elements);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isResizing = false;
+            currentResizer = null;
+            document.body.style.userSelect = '';
+        });
+
+        // Folder logic
+        let currentFolder = null;
+        let currentWorkflow = null;
+
+        async function loadFolders() {
+            try {
+                const res = await fetch('/api/folders');
+                const data = await res.json();
+                const folders = data.folders || data || [];
+                const folderList = document.getElementById('folders');
+                folderList.innerHTML = '';
+
+                if (!Array.isArray(folders) || folders.length === 0) {
+                    folderList.textContent = 'No folders found';
+                    return;
+                }
+
+                folders.forEach(folder => {
+                    const btn = document.createElement('button');
+                    btn.textContent = folder.name || folder;
+                    btn.style.width = '100%';
+                    btn.style.textAlign = 'left';
+                    btn.className = 'folder-btn';
+                    btn.dataset.folderName = folder.name || folder;
+                    btn.onclick = () => selectFolder(folder);
+                    folderList.appendChild(btn);
+                });
+            } catch (err) {
+                document.getElementById('folders').textContent = 'Error loading folders';
+                console.error(err);
+            }
+        }
+
+        async function selectFolder(folder) {
+            currentFolder = folder;
+            state.currentFolder = folder;
+            loadedCode = '';
+            document.getElementById('properties').innerHTML = '';
+            document.getElementById('code-editor').value = '';
+
+            // Update button styles to highlight selected project
+            document.querySelectorAll('.folder-btn').forEach(btn => {
+                if (btn.dataset.folderName === (folder.name || folder)) {
+                    btn.style.background = '#007bff';
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.background = '';
+                    btn.style.color = '';
+                }
+            });
+
+            await loadWorkflow();
+            await createChatSession();
+        }
+
+        async function loadWorkflow() {
+            if (!currentFolder) return;
+            try {
+                const path = (currentFolder.path || currentFolder.name || currentFolder) + '/workflow_spec.json';
+                const res = await fetch(path);
+                if (!res.ok) throw new Error('Workflow not found');
+                const spec = await res.json();
+                if (spec.workflows && spec.workflows[0]) {
+                    currentWorkflow = spec.workflows[0];
+                    await renderDiagram(currentWorkflow);
+                }
+            } catch (err) {
+                // Initialize empty workflow if none exists
+                currentWorkflow = {
+                    name: 'New Workflow',
+                    variables: [],
+                    nodes: [],
+                    edges: []
+                };
+                document.getElementById('mermaid-diagram').textContent = 'Right-click to add nodes';
+                console.error(err);
+            }
+        }
+
+        async function renderDiagram(workflow) {
+            let mermaid = 'graph LR\n';
+            workflow.nodes.forEach(n => {
+                const id = escapeNodeId(n.id);
+                const name = n.name;
+
+                if (n.type === 'start_node' || n.type === 'end_node') {
+                    mermaid += `    ${id}([${name}])\n`;
+                } else if (n.type === 'decision_node') {
+                    mermaid += `    ${id}{${name}}\n`;
+                } else {
+                    mermaid += `    ${id}[${name}]\n`;
+                }
+            });
+
+            workflow.edges.forEach(e => {
+                const fromNode = escapeNodeId(e.from_node);
+                const toNode = escapeNodeId(e.to_node);
+                if (e.label) {
+                    mermaid += `    ${fromNode} -->|${e.label}| ${toNode}\n`;
+                } else {
+                    mermaid += `    ${fromNode} --> ${toNode}\n`;
+                }
+            });
+
+            // Add highlighting for the current node
+            if (currentDisplayedNode) {
+                const currentId = escapeNodeId(currentDisplayedNode.id);
+                mermaid += `    style ${currentId} fill:#ffeb3b,stroke:#f44336,stroke-width:4px\n`;
+            }
+
+            const div = document.getElementById('mermaid-diagram');
+            div.innerHTML = `<pre class="mermaid">${mermaid}</pre>`;
+
+            if (window.mermaid) {
+                try {
+                    await window.mermaid.run({nodes: [div.querySelector('.mermaid')]});
+                    setTimeout(() => attachNodeHandlers(workflow), 100);
+                } catch (error) {
+                    console.error('Mermaid rendering failed:', error);
+                    div.innerHTML = `<pre style="color: red; white-space: pre-wrap;">Error rendering diagram: ${error.message || 'Unknown error'}\n\nGenerated Mermaid:\n${mermaid}</pre>`;
+                }
+            }
+        }
+
+        function attachNodeHandlers(workflow) {
+            const svg = document.querySelector('#mermaid-diagram svg');
+            if (!svg) return;
+
+            const getNodeId = (el) => {
+                let id = el.id.replace('flowchart-', '').replace(/-\d+$/, '');
+                // Map back from escaped ID to original ID if needed
+                return unescapeNodeId(id);
+            };
+
+            // Node handlers
+            svg.querySelectorAll('.node').forEach(el => {
+                el.style.cursor = 'pointer';
+                el.onclick = async (e) => {
+                    e.stopPropagation();
+                    const id = getNodeId(el);
+                    if (connecting) {
+                        await completeConnection(id);
+                    } else {
+                        const node = workflow.nodes.find(n => n.id === id);
+                        if (node) await showNodeDetails(node);
+                    }
+                };
+                el.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    contextNode = getNodeId(el);
+                    showMenu(document.getElementById('node-menu'), e.pageX, e.pageY);
+                };
+            });
+
+            // Edge handlers - create invisible overlay for easier clicking
+            svg.querySelectorAll('.flowchart-link').forEach(el => {
+                const clone = el.cloneNode(true);
+                clone.setAttribute('stroke-width', '10');
+                clone.setAttribute('stroke-opacity', '0');
+                clone.style.cursor = 'pointer';
+                clone.style.pointerEvents = 'stroke';
+                clone.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    contextEdge = workflow.edges.find(edge =>
+                        el.id.includes(edge.from_node) && el.id.includes(edge.to_node)
+                    )?.id;
+                    if (contextEdge) showMenu(document.getElementById('edge-menu'), e.pageX, e.pageY);
+                };
+                el.parentNode.appendChild(clone);
+            });
+        }
+
+        let tempLine = null;
+        function handleConnectionMove(e) {
+            if (!connecting || !connectFrom) return;
+            const svg = document.querySelector('#mermaid-diagram svg');
+            if (!svg) return;
+
+            const srcEl = svg.querySelector(`[id*="flowchart-${connectFrom}"]`);
+            if (!srcEl) return;
+
+            if (!tempLine) {
+                tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                tempLine.setAttribute('stroke', '#333');
+                tempLine.setAttribute('stroke-width', '2');
+                tempLine.setAttribute('stroke-dasharray', '5,5');
+                svg.appendChild(tempLine);
+            }
+
+            const srcRect = srcEl.getBoundingClientRect();
+            const svgRect = svg.getBoundingClientRect();
+            const pt = svg.createSVGPoint();
+
+            pt.x = srcRect.left + srcRect.width / 2;
+            pt.y = srcRect.top + srcRect.height / 2;
+            const srcPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const tgtPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+            tempLine.setAttribute('x1', srcPt.x);
+            tempLine.setAttribute('y1', srcPt.y);
+            tempLine.setAttribute('x2', tgtPt.x);
+            tempLine.setAttribute('y2', tgtPt.y);
+        }
+
+        async function showNodeDetails(node) {
+            currentDisplayedNode = node;
+            currentTabIndex = 0;
+            const props = document.getElementById('properties');
+            const isParam = ['action_node', 'query_node', 'human_node'].includes(node.type);
+            const isDecision = node.type === 'decision_node';
+            const isStartEnd = ['start_node', 'end_node'].includes(node.type);
+
+            let html = '<div>';
+            html += `<span class="tab active" onclick="showTab(0)">Basic</span>`;
+            if (isParam) {
+                html += `<span class="tab" onclick="showTab(1)">Input</span><span class="tab" onclick="showTab(2)">Output</span>`;
+            } else if (isDecision) {
+                html += `<span class="tab" onclick="showTab(1)">Branches</span>`;
+            } else if (isStartEnd) {
+                html += `<span class="tab" onclick="showTab(1)">Variables</span>`;
+            }
+            html += '</div>';
+
+            // Basic tab
+            html += '<div class="tab-content active"><table>';
+            html += `<tr><td>Name</td><td>${node.name}</td></tr>`;
+            html += `<tr><td>Type</td><td>${node.type}</td></tr>`;
+            html += `<tr><td>Description</td><td><input type="text" id="node-description" value="${node.description || ''}" style="width: 100%; border: 1px solid #ccc; padding: 4px;" onchange="updateNodeDescription('${node.id}', this.value)"></td></tr>`;
+            if (node.action_name) html += `<tr><td>Action</td><td>${node.action_name}</td></tr>`;
+            if (node.question) html += `<tr><td>Question</td><td>${node.question}</td></tr>`;
+            if (node.human_role) html += `<tr><td>Role</td><td>${node.human_role}</td></tr>`;
+            if (node.human_task) html += `<tr><td>Task</td><td>${node.human_task}</td></tr>`;
+            html += '</table></div>';
+
+            // Input tab
+            if (isParam) {
+                html += '<div class="tab-content"><table>';
+                html += '<tr><th>Parameter</th><th>Expression</th><th>Action</th></tr>';
+                if (node.input_mappings?.length) {
+                    node.input_mappings.forEach((m, idx) => {
+                        html += `<tr>
+                            <td>${m.param_name}</td>
+                            <td>${m.variable_expression}</td>
+                            <td><button onclick="deleteInputMapping('${node.id}', ${idx})">Delete</button></td>
+                        </tr>`;
+                    });
+                } else {
+                    html += '<tr><td colspan="3">None</td></tr>';
+                }
+                html += '</table>';
+                html += `<button onclick="showAddInputDialog('${node.id}')" style="margin-top: 10px; width: 100%;">Add Input</button>`;
+                html += '</div>';
+
+                // Output tab
+                html += '<div class="tab-content"><table>';
+                html += '<tr><th>Variable</th><th>Expression</th><th>Action</th></tr>';
+                if (node.output_mappings?.length) {
+                    node.output_mappings.forEach((m, idx) => {
+                        html += `<tr>
+                            <td>${m.variable_name}</td>
+                            <td>${m.out_param_expression}</td>
+                            <td><button onclick="deleteOutputMapping('${node.id}', ${idx})">Delete</button></td>
+                        </tr>`;
+                    });
+                } else {
+                    html += '<tr><td colspan="3">None</td></tr>';
+                }
+                html += '</table>';
+                html += `<button onclick="showAddOutputDialog('${node.id}')" style="margin-top: 10px; width: 100%;">Add Output</button>`;
+                html += '</div>';
+            }
+
+            // Branches tab
+            if (isDecision) {
+                html += '<div class="tab-content"><table>';
+                html += '<tr><th>Label</th><th>Condition</th></tr>';
+                if (node.branches?.length) {
+                    node.branches.forEach(b => html += `<tr><td>${b.label}</td><td>${b.condition}</td></tr>`);
+                } else {
+                    html += '<tr><td colspan="2">None</td></tr>';
+                }
+                html += '</table></div>';
+            }
+
+            // Variables tab
+            if (isStartEnd && currentWorkflow) {
+                html += '<div class="tab-content"><table>';
+                html += '<tr><th>Name</th><th>Type</th><th>Description</th><th>Action</th></tr>';
+                if (currentWorkflow.variables?.length) {
+                    currentWorkflow.variables.forEach((v, idx) => {
+                        html += `<tr>
+                            <td>${v.name}</td>
+                            <td>${v.data_type || 'string'}</td>
+                            <td>${v.description || ''}</td>
+                            <td><button onclick="deleteVariable(${idx})">Delete</button></td>
+                        </tr>`;
+                    });
+                } else {
+                    html += '<tr><td colspan="4">None</td></tr>';
+                }
+                html += '</table>';
+                html += '<button onclick="showAddVariableDialog()" style="margin-top: 10px; width: 100%;">Add Variable</button>';
+                html += '</div>';
+            }
+
+            props.innerHTML = html;
+            showTab(currentTabIndex);
+            await loadCode(node);
+            await renderDiagram(currentWorkflow);
+        }
+
+        function updateNodeDescription(nodeId, description) {
+            if (!currentWorkflow) return;
+            const node = currentWorkflow.nodes.find(n => n.id === nodeId);
+            if (node) {
+                node.description = description;
+                renderDiagram(currentWorkflow);
+            }
+        }
+
+        // =============================================================================
+        // State Management
+        // =============================================================================
+        let currentNodeId = null;
+        let currentTabIndex = 0;
+        let currentDisplayedNode = null;
+
+        // =============================================================================
+        // DOM Helper Functions
+        // =============================================================================
+        const DOM = {
+            get: (id) => document.getElementById(id),
+            show: (id) => DOM.get(id).style.display = 'flex',
+            hide: (id) => DOM.get(id).style.display = 'none',
+            getValue: (id) => DOM.get(id).value.trim(),
+            setValue: (id, value) => DOM.get(id).value = value,
+            clearFields: (fields) => fields.forEach(field => DOM.setValue(field, ''))
+        };
+
+        // =============================================================================
+        // Utility Functions
+        // =============================================================================
+        function refreshStartEndNode() {
+            const node = currentWorkflow.nodes.find(n => ['start_node', 'end_node'].includes(n.type));
+            if (node) showNodeDetails(node);
+        }
+
+        function refreshPropertiesPanel() {
+            if (currentDisplayedNode) {
+                const updatedNode = currentWorkflow.nodes.find(n => n.id === currentDisplayedNode.id);
+                if (updatedNode) showNodeDetails(updatedNode);
+            }
+        }
+
+        // =============================================================================
+        // Modal Management
+        // =============================================================================
+        function showModal(modalId, fields = []) {
+            DOM.clearFields(fields);
+            DOM.show(modalId);
+        }
+
+        function closeModal(modalId) {
+            DOM.hide(modalId);
+            currentNodeId = null;
+        }
+
+        // =============================================================================
+        // Variable Management
+        // =============================================================================
+        function showAddVariableDialog() {
+            showModal('var-modal', ['modal-var-name', 'modal-var-desc']);
+            DOM.setValue('modal-var-type', 'string');
+        }
+
+        function closeVarModal() {
+            closeModal('var-modal');
+        }
+
+        function submitAddVariable() {
+            const name = DOM.getValue('modal-var-name');
+            const data_type = DOM.get('modal-var-type').value;
+            const description = DOM.getValue('modal-var-desc');
+
+            if (!name) return alert('Variable name is required');
+            if (currentWorkflow.variables.some(v => v.name === name)) return alert('Variable name already exists');
+
+            currentWorkflow.variables.push({ name, data_type, description });
+            closeVarModal();
+            refreshStartEndNode();
+        }
+
+        function deleteVariable(index) {
+            if (!currentWorkflow) return;
+            if (confirm(`Delete variable "${currentWorkflow.variables[index].name}"?`)) {
+                currentWorkflow.variables.splice(index, 1);
+                refreshStartEndNode();
+            }
+        }
+
+        // =============================================================================
+        // Mapping Management
+        // =============================================================================
+        function addMapping(node, mappingType, data) {
+            if (!node[mappingType]) node[mappingType] = [];
+            node[mappingType].push(data);
+            showNodeDetails(node);
+        }
+
+        function deleteMapping(nodeId, mappingType, index, message) {
+            const node = currentWorkflow.nodes.find(n => n.id === nodeId);
+            if (!node) return;
+            if (confirm(message)) {
+                node[mappingType].splice(index, 1);
+                showNodeDetails(node);
+            }
+        }
+
+        // =============================================================================
+        // Input/Output Mapping Management
+        // =============================================================================
+        function showAddInputDialog(nodeId) {
+            currentNodeId = nodeId;
+            showModal('input-modal', ['modal-input-param', 'modal-input-expr']);
+        }
+
+        function closeInputModal() {
+            closeModal('input-modal');
+        }
+
+        function submitAddInput() {
+            const param_name = DOM.getValue('modal-input-param');
+            const variable_expression = DOM.getValue('modal-input-expr');
+
+            if (!param_name || !variable_expression) return alert('Both parameter name and expression are required');
+
+            const node = currentWorkflow.nodes.find(n => n.id === currentNodeId);
+            if (!node) return;
+
+            if (!node.input_mappings) node.input_mappings = [];
+            if (node.input_mappings.some(m => m.param_name === param_name)) {
+                return alert('Parameter name already exists');
+            }
+
+            addMapping(node, 'input_mappings', { param_name, variable_expression });
+            closeInputModal();
+        }
+
+        function deleteInputMapping(nodeId, index) {
+            deleteMapping(nodeId, 'input_mappings', index, 'Delete this input mapping?');
+        }
+
+        function showAddOutputDialog(nodeId) {
+            currentNodeId = nodeId;
+            showModal('output-modal', ['modal-output-var', 'modal-output-expr']);
+        }
+
+        function closeOutputModal() {
+            closeModal('output-modal');
+        }
+
+        function submitAddOutput() {
+            const variable_name = DOM.getValue('modal-output-var');
+            const out_param_expression = DOM.getValue('modal-output-expr');
+
+            if (!variable_name || !out_param_expression) return alert('Both variable name and expression are required');
+
+            const node = currentWorkflow.nodes.find(n => n.id === currentNodeId);
+            if (!node) return;
+
+            if (!node.output_mappings) node.output_mappings = [];
+            if (node.output_mappings.some(m => m.variable_name === variable_name)) {
+                return alert('Variable name already exists');
+            }
+
+            addMapping(node, 'output_mappings', { variable_name, out_param_expression });
+            closeOutputModal();
+        }
+
+        function deleteOutputMapping(nodeId, index) {
+            deleteMapping(nodeId, 'output_mappings', index, 'Delete this output mapping?');
+        }
+
+        // =============================================================================
+        // Tab Management
+        // =============================================================================
+        function showTab(idx) {
+            currentTabIndex = idx;
+            const props = DOM.get('properties');
+            props.querySelectorAll('.tab').forEach((t, i) => t.className = i === idx ? 'tab active' : 'tab');
+            props.querySelectorAll('.tab-content').forEach((c, i) => c.className = i === idx ? 'tab-content active' : 'tab-content');
+        }
+
+        // =============================================================================
+        // Code Editor Management
+        // =============================================================================
+        let loadedCode = '';
+        let currentCodeFile = null;
+
+        async function reloadCode() {
+            if (!currentFolder || !currentCodeFile) return;
+            try {
+                const res = await fetch(currentCodeFile + '?t=' + Date.now());
+                if (res.ok) {
+                    loadedCode = await res.text();
+                    const editor = document.getElementById('code-editor');
+                    if (editor) editor.value = loadedCode;
+                }
+            } catch (err) {
+                console.error('Error reloading code:', err);
+            }
+        }
+
+        async function loadCode(node) {
+            if (!currentFolder) return;
+
+            const editor = document.getElementById('code-editor');
+
+            if (!loadedCode) {
+                try {
+                    const path = (currentFolder.path || currentFolder.name) + '/src/index.ts';
+                    currentCodeFile = path;
+                    const res = await fetch(path);
+                    loadedCode = res.ok ? await res.text() : '// File not found';
+                } catch (err) {
+                    loadedCode = '// Error loading code';
+                    currentCodeFile = null;
+                }
+            }
+
+            editor.value = loadedCode;
+            scrollToNode(node, editor);
+        }
+
+        async function saveFile(filePath, content, successMsg) {
+            try {
+                const res = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filePath, content })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(successMsg);
+                    return true;
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to save'));
+                    return false;
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+                return false;
+            }
+        }
+
+        async function saveCode() {
+            if (!currentCodeFile) {
+                alert('No file to save');
+                return;
+            }
+
+            const code = document.getElementById('code-editor').value;
+            if (await saveFile(currentCodeFile, code, 'Saved')) {
+                loadedCode = code;
+            }
+        }
+
+        async function saveWorkflow() {
+            if (!currentWorkflow || !currentFolder) {
+                alert('No workflow to save');
+                return;
+            }
+
+            const path = (currentFolder.path || currentFolder.name) + '/workflow_spec.json';
+            const workflowSpec = { workflows: [currentWorkflow] };
+
+            if (await saveFile(path, JSON.stringify(workflowSpec, null, 2), 'Workflow saved')) {
+                const message = "'workflow_spec.json' has changed. Reload it and summarize what has been changed.";
+                if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
+                    addMessage('user', message);
+                    addThinkingIndicator();
+                    state.websocket.send(JSON.stringify({ type: 'input', content: message }));
+                } else {
+                    addMessage('system', 'Cannot send message: No active chat session');
+                }
+            }
+        }
+
+        async function generateCode() {
+            // Save code first if there's a file loaded
+            if (currentCodeFile) {
+                try {
+                    const code = document.getElementById('code-editor').value;
+                    const res = await fetch('/api/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filePath: currentCodeFile, content: code })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        loadedCode = code;
+                        addMessage('system', 'Code saved automatically');
+                    } else {
+                        addMessage('system', 'Warning: Failed to save code - ' + (data.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    addMessage('system', 'Warning: Failed to save code - ' + err.message);
+                }
+            }
+
+            const message = '/generate-workflow-code';
+
+            // Check if websocket is connected
+            if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
+                addMessage('user', message);
+                addThinkingIndicator();
+                state.websocket.send(JSON.stringify({ type: 'input', content: message }));
+            } else {
+                addMessage('system', 'Cannot send message: No active chat session');
+            }
+        }
+
+        function vibeWorkflow() {
+            const message = '/define-workflow';
+
+            // Clear current node selection and UI
+            currentDisplayedNode = null;
+            currentNodeId = null;
+            loadedCode = '';
+            document.getElementById('properties').innerHTML = '';
+            document.getElementById('code-editor').value = '';
+            document.getElementById('mermaid-diagram').textContent = 'Waiting for workflow definition...';
+
+            // Check if websocket is connected
+            if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
+                addMessage('user', message);
+                addThinkingIndicator();
+                state.websocket.send(JSON.stringify({ type: 'input', content: message }));
+            } else {
+                addMessage('system', 'Cannot send message: No active chat session');
+            }
+        }
+
+        function explainWorkflow() {
+            const message = 'Summarize the workflow logic based on workflow_spec.json';
+
+            // Check if websocket is connected
+            if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
+                addMessage('user', message);
+                addThinkingIndicator();
+                state.websocket.send(JSON.stringify({ type: 'input', content: message }));
+            } else {
+                addMessage('system', 'Cannot send message: No active chat session');
+            }
+        }
+
+        function vibeCode() {
+            if (!currentDisplayedNode) {
+                alert('Please select a node first');
+                return;
+            }
+
+            const nodeId = currentDisplayedNode.id;
+            const message = `Write the function ${nodeId}() in source code src/index.ts based on my next instructions. Do not change other functions.`;
+
+            // Check if websocket is connected
+            if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
+                addMessage('user', message);
+                addThinkingIndicator();
+                state.websocket.send(JSON.stringify({ type: 'input', content: message }));
+            } else {
+                addMessage('system', 'Cannot send message: No active chat session');
+            }
+        }
+
+        function explainFunction() {
+            if (!currentDisplayedNode) {
+                alert('Please select a node first');
+                return;
+            }
+
+            const nodeId = currentDisplayedNode.id;
+            const message = `Explain the function ${nodeId}(), based on source code src/index.ts`;
+
+            // Check if websocket is connected
+            if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
+                addMessage('user', message);
+                addThinkingIndicator();
+                state.websocket.send(JSON.stringify({ type: 'input', content: message }));
+            } else {
+                addMessage('system', 'Cannot send message: No active chat session');
+            }
+        }
+
+        function scrollToNode(node, editor) {
+            const lines = editor.value.split('\n');
+            const nodeId = node.id;
+
+            // Special handling for start_node and end_node
+            if (node.type === 'start_node' || node.type === 'end_node') {
+                const graphLine = lines.findIndex(l => l.includes('new StateGraph('));
+                if (graphLine !== -1) {
+                    const lineHeight = editor.scrollHeight / lines.length;
+                    setTimeout(() => editor.scrollTop = (graphLine - 2) * lineHeight, 50);
+                } else {
+                    editor.value = `// StateGraph construction not found`;
+                }
+                return;
+            }
+
+            // Regular node handling
+            const camelCase = nodeId.replace(/_([a-z])/g, (_, l) => l.toUpperCase());
+            const line = lines.findIndex(l =>
+                new RegExp(`(async\\s+)?function\\s+(${nodeId}|${camelCase})\\s*\\(`).test(l)
+            );
+            if (line !== -1) {
+                const lineHeight = editor.scrollHeight / lines.length;
+                setTimeout(() => editor.scrollTop = (line - 2) * lineHeight, 50);
+            } else {
+                editor.value = `// Function not found for node: ${nodeId}\n// Also tried: ${camelCase}`;
+            }
+        }
+
+        async function addProject() {
+            const name = await showPrompt('Create Project', 'Project name:');
+            if (!name) return;
+            try {
+                const res = await fetch('/api/create-project', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectName: name })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed to create project');
+
+                // Reload the folder list
+                await loadFolders();
+
+                // Automatically select the newly created project
+                const newFolder = { name: name, path: name };
+                await selectFolder(newFolder);
+
+                alert(`Project "${name}" created successfully!`);
+            } catch (err) {
+                alert('Error: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        document.getElementById('add-project').addEventListener('click', addProject);
+        document.getElementById('save-code').addEventListener('click', saveCode);
+        document.getElementById('vibe-code').addEventListener('click', vibeCode);
+        document.getElementById('explain-function').addEventListener('click', explainFunction);
+        document.getElementById('save-workflow').addEventListener('click', saveWorkflow);
+        document.getElementById('explain-workflow').addEventListener('click', explainWorkflow);
+        document.getElementById('vibe-workflow').addEventListener('click', vibeWorkflow);
+        document.getElementById('generate-code').addEventListener('click', generateCode);
+        loadFolders();
+
+        // =============================================================================
+        // Context Menu Management
+        // =============================================================================
+        let contextNode = null, contextEdge = null, connecting = false, connectFrom = null;
+
+        function hideMenus() {
+            document.querySelectorAll('.context-menu').forEach(m => m.style.display = 'none');
+        }
+
+        function showMenu(menu, x, y) {
+            hideMenus();
+            menu.style.display = 'block';
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        document.addEventListener('click', hideMenus);
+
+        // Setup diagram right-click menu for adding nodes (works even with empty diagram)
+        const diagramEl = document.getElementById('diagram');
+        if (diagramEl) {
+            diagramEl.addEventListener('contextmenu', (e) => {
+                if (!currentFolder || !currentWorkflow) return;
+                if (!e.target.closest('.node') && !e.target.closest('.flowchart-link')) {
+                    e.preventDefault();
+                    showMenu(document.getElementById('diagram-menu'), e.pageX, e.pageY);
+                }
+            });
+        } else {
+            console.error('Diagram element not found!');
+        }
+
+        // Node menu
+        document.querySelectorAll('#node-menu .context-menu-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (!contextNode || !currentWorkflow) return;
+                if (e.target.dataset.action === 'connect') {
+                    connecting = true;
+                    connectFrom = contextNode;
+                    document.body.style.cursor = 'crosshair';
+                    const svg = document.querySelector('#mermaid-diagram svg');
+                    if (svg) svg.addEventListener('mousemove', handleConnectionMove);
+                } else {
+                    const node = currentWorkflow.nodes.find(n => n.id === contextNode);
+                    if (node?.type === 'start_node') return alert('Cannot remove start node');
+                    if (confirm(`Remove "${node?.name}"?`)) removeNode(contextNode);
+                }
+            });
+        });
+
+        // Edge menu
+        document.querySelector('#edge-menu [data-action="remove"]').addEventListener('click', () => {
+            if (contextEdge && confirm('Remove edge?')) removeEdge(contextEdge);
+        });
+
+        // Diagram menu
+        document.querySelectorAll('#diagram-menu .context-menu-item').forEach(item => {
+            item.addEventListener('click', (e) => { if (currentWorkflow) addNode(e.target.dataset.type); });
+        });
+
+        function generateUniqueNodeId(name) {
+            // Try snake_case encoding first
+            let id = name.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            if (!currentWorkflow.nodes.find(n => n.id === id)) return id;
+
+            // Try camelCase if snake_case collides
+            id = name.trim().replace(/\s+(.)/g, (_, c) => c.toUpperCase()).replace(/[^a-zA-Z0-9]/g, '');
+            id = id.charAt(0).toLowerCase() + id.slice(1);
+            if (!currentWorkflow.nodes.find(n => n.id === id)) return id;
+
+            // Both formats collide
+            return null;
+        }
+
+        async function configureNodeByType(node) {
+            if (['action_node', 'query_node', 'human_node'].includes(node.type)) {
+                node.input_mappings = [];
+                node.output_mappings = [];
+
+                if (node.type === 'action_node') {
+                    const actionName = await showPrompt('Action Node', 'Action name:', 'action_' + node.id);
+                    node.action_name = actionName || 'action_' + node.id;
+                }
+                else if (node.type === 'query_node') {
+                    const question = await showPrompt('Query Node', 'Query question:', 'Query');
+                    node.question = question || 'Query';
+                }
+                else if (node.type === 'human_node') {
+                    const role = await showPrompt('Human Node', 'Human role:', 'User');
+                    node.human_role = role || 'User';
+                    const task = await showPrompt('Human Node', 'Task:', 'Review');
+                    node.human_task = task || 'Review';
+                }
+            }
+            else if (node.type === 'decision_node') {
+                node.branches = [];
+            }
+        }
+
+        async function addNode(type) {
+            const name = await showPrompt(`Add ${type.replace('_', ' ')}`, 'Node name:');
+            if (!name) return;
+
+            const id = generateUniqueNodeId(name);
+            if (!id) {
+                alert(`Node name "${name.trim()}" is already taken. Please choose a different name.`);
+                return;
+            }
+
+            const node = { id, type, name: name.trim(), description: name.trim() };
+            await configureNodeByType(node);
+
+            currentWorkflow.nodes.push(node);
+            renderDiagram(currentWorkflow);
+        }
+
+        function cleanupDecisionBranch(edge) {
+            const src = currentWorkflow.nodes.find(n => n.id === edge.from_node);
+            if (src?.type === 'decision_node' && edge.label && src.branches) {
+                src.branches = src.branches.filter(b => b.label !== edge.label);
+            }
+        }
+
+        function removeNode(nodeId) {
+            currentWorkflow.edges.filter(e => e.to_node === nodeId).forEach(cleanupDecisionBranch);
+            currentWorkflow.nodes = currentWorkflow.nodes.filter(n => n.id !== nodeId);
+            currentWorkflow.edges = currentWorkflow.edges.filter(e => e.from_node !== nodeId && e.to_node !== nodeId);
+
+            // Clear selection if removed node was selected
+            if (currentNodeId === nodeId) {
+                currentNodeId = null;
+                DOM.get('properties').innerHTML = '';
+            }
+            if (currentDisplayedNode && currentDisplayedNode.id === nodeId) {
+                currentDisplayedNode = null;
+                DOM.get('properties').innerHTML = '';
+                document.getElementById('code-editor').value = '';
+                // No node selected now, so render directly
+                renderDiagram(currentWorkflow);
+            } else {
+                // Another node is selected, refresh it (which will also render the diagram)
+                refreshPropertiesPanel();
+            }
+        }
+
+        function removeEdge(edgeId) {
+            const edge = currentWorkflow.edges.find(e => e.id === edgeId);
+            if (!edge) return;
+            cleanupDecisionBranch(edge);
+            currentWorkflow.edges = currentWorkflow.edges.filter(e => e.id !== edgeId);
+
+            // If a node is currently displayed, refresh it (which will also render the diagram)
+            // Otherwise, just render the diagram directly
+            if (currentDisplayedNode) {
+                refreshPropertiesPanel();
+            } else {
+                renderDiagram(currentWorkflow);
+            }
+        }
+
+        function cancelConnection() {
+            connecting = false;
+            connectFrom = null;
+            document.body.style.cursor = '';
+            if (tempLine) {
+                tempLine.remove();
+                tempLine = null;
+            }
+            const svg = document.querySelector('#mermaid-diagram svg');
+            if (svg) svg.removeEventListener('mousemove', handleConnectionMove);
+        }
+
+        async function completeConnection(toNodeId) {
+            if (!connecting || !connectFrom || connectFrom === toNodeId) return cancelConnection();
+            if (currentWorkflow.edges.some(e => e.from_node === connectFrom && e.to_node === toNodeId)) {
+                alert('Edge exists');
+                return cancelConnection();
+            }
+
+            let id = `e${currentWorkflow.edges.length + 1}`;
+            while (currentWorkflow.edges.find(e => e.id === id)) id = `e${parseInt(id.slice(1)) + 1}`;
+            const edge = { id, from_node: connectFrom, to_node: toNodeId };
+            const src = currentWorkflow.nodes.find(n => n.id === connectFrom);
+
+            if (src?.type === 'decision_node') {
+                const label = await showPrompt('Decision Branch', 'Edge label:');
+                if (!label) { alert('Label required'); return cancelConnection(); }
+                edge.label = label.trim();
+                if (!src.branches) src.branches = [];
+                if (src.branches.find(b => b.label === edge.label)) { alert('Label exists'); return cancelConnection(); }
+                const condition = await showPrompt('Decision Branch', 'Condition:');
+                if (!condition) { alert('Condition required'); return cancelConnection(); }
+                src.branches.push({ label: edge.label, condition: condition.trim() });
+            }
+
+            currentWorkflow.edges.push(edge);
+
+            // If a node is currently displayed, refresh it (which will also render the diagram)
+            // Otherwise, just render the diagram directly
+            if (currentDisplayedNode) {
+                refreshPropertiesPanel();
+            } else {
+                renderDiagram(currentWorkflow);
+            }
+            cancelConnection();
+        }
+
+        // =============================================================================
+        // WebSocket Chat Management
+        // =============================================================================
+        async function createHTTPSession(workdir) {
+            const response = await fetch(`${CONFIG.fastServerUrl}/api/sessions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workdir })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            if (data.status !== 'success') {
+                throw new Error(data.error || 'Failed to create session');
+            }
+
+            return data;
+        }
+
+        async function handleWebSocketMessage(event) {
+            let data;
+            try {
+                data = JSON.parse(event.data);
+            } catch (e) {
+                console.error('Received non-JSON message:', event.data);
+                addMessage('agent', event.data);
+                return;
+            }
+
+            if (data.type === 'output') {
+                let output;
+                try {
+                    output = JSON.parse(data.content);
+                } catch (e) {
+                    console.error('Output content is not JSON:', data.content);
+                    addMessage('agent', data.content);
+                    return;
+                }
+
+                if (output.type === 'event') {
+                    const eventType = output.data.type;
+                    const text = output.data.text || output.data.content || '';
+
+                    if (eventType === 'text_delta' || eventType === 'text') {
+                        appendMessage(text);
+                    } else if (eventType === 'text_done' || eventType === 'completed') {
+                        await loadWorkflow();
+                        await reloadCode();
+                        refreshPropertiesPanel();
+                    }
+                }
+            }
+        }
+
+        function setupWebSocket(websocketUrl) {
+            const ws = new WebSocket(websocketUrl);
+            state.websocket = ws;
+
+            ws.onopen = () => {
+                addMessage('system', 'Connected - ready to chat');
+            };
+
+            ws.onmessage = handleWebSocketMessage;
+            ws.onerror = () => addMessage('system', 'Connection error');
+            ws.onclose = () => { if (state.websocket === ws) state.websocket = null; };
+
+            return ws;
+        }
+
+        function closeOldWebSocket() {
+            if (state.websocket) {
+                const oldWs = state.websocket;
+                oldWs.onclose = null;
+                oldWs.close();
+            }
+        }
+
+        function isRetriableError(error) {
+            return error.message.includes('fetch') ||
+                   error.message.includes('NetworkError') ||
+                   error.message.includes('Failed to fetch') ||
+                   error.message.includes('HTTP 5');
+        }
+
+        async function createChatSession(retryCount = 0) {
+            if (!currentFolder) return;
+
+            const maxRetries = 3;
+            const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+
+            document.getElementById('messages').innerHTML = '';
+
+            try {
+                const folderName = currentFolder.name || currentFolder;
+                const workdir = currentFolder.path || folderName;
+
+                const sessionData = await createHTTPSession(workdir);
+                state.currentSessionId = sessionData.session_id;
+
+                closeOldWebSocket();
+                setupWebSocket(sessionData.websocket_url);
+
+                addMessage('system', `Chat session created for: ${folderName}`);
+            } catch (error) {
+                const errorMsg = error.message || error.toString() || 'Unknown error';
+
+                if (isRetriableError(error) && retryCount < maxRetries) {
+                    addMessage('system', `Connection failed. Retrying in ${retryDelay/1000}s... (${retryCount + 1}/${maxRetries})`);
+                    setTimeout(() => createChatSession(retryCount + 1), retryDelay);
+                } else {
+                    addMessage('system', `Error: ${errorMsg}`);
+                    if (retryCount >= maxRetries) {
+                        addMessage('system', 'Max retries reached. Please check if the fast server is running on port 8765.');
+                    }
+                    state.websocket = null;
+                    state.currentSessionId = null;
+                }
+            }
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            if (!state.websocket || state.websocket.readyState !== WebSocket.OPEN) {
+                addMessage('system', 'No active session. Please select a folder.');
+                return;
+            }
+
+            addMessage('user', message);
+            input.value = '';
+            addThinkingIndicator();
+            state.websocket.send(JSON.stringify({ type: 'input', content: message }));
+        }
+
+        const MESSAGE_STYLES = {
+            user: { background: '#0e639c', color: 'white', isPlainText: true },
+            agent: { background: '#e8e8e8', isPlainText: false },
+            system: { background: '#fff3cd', fontSize: '12px', isPlainText: true }
+        };
+
+        function addMessage(type, text) {
+            const messagesDiv = document.getElementById('messages');
+            const div = document.createElement('div');
+            const style = MESSAGE_STYLES[type];
+
+            Object.assign(div.style, {
+                margin: '10px',
+                padding: '8px',
+                borderRadius: '4px',
+                wordWrap: 'break-word',
+                ...style
+            });
+
+            if (style.isPlainText) {
+                div.textContent = text;
+            } else {
+                div.dataset.content = text;
+                div.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+            }
+
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addThinkingIndicator() {
+            const messagesDiv = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.style.margin = '10px';
+            div.style.padding = '8px';
+            div.style.borderRadius = '4px';
+            div.style.wordWrap = 'break-word';
+            div.style.background = '#e8e8e8';
+            div.style.fontStyle = 'italic';
+            div.style.color = '#666';
+            div.dataset.isThinking = 'true';
+            div.textContent = 'Thinking...';
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function appendMessage(text) {
+            const messagesDiv = document.getElementById('messages');
+            const last = messagesDiv.lastElementChild;
+
+            if (last && last.style.background === 'rgb(232, 232, 232)') {
+                // If it's a thinking indicator, replace it with actual content
+                if (last.dataset.isThinking === 'true') {
+                    delete last.dataset.isThinking;
+                    last.style.fontStyle = 'normal';
+                    last.style.color = '';
+                    last.dataset.content = text;
+                    last.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+                } else {
+                    const content = (last.dataset.content || '') + text;
+                    last.dataset.content = content;
+                    last.innerHTML = typeof marked !== 'undefined' ? marked.parse(content) : content;
+                }
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            } else {
+                addMessage('agent', text);
+            }
+        }
+
+        document.getElementById('send').onclick = sendChatMessage;
+        document.getElementById('chat-input').onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        };
+    </script>
+</body>
+</html>

@@ -31,7 +31,6 @@ class WorkflowServerHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         """Handle POST requests for file saving."""
         import json
-        import shutil
 
         # Decode the URL path
         path = unquote(self.path)
@@ -95,9 +94,8 @@ class WorkflowServerHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({'error': 'Invalid project name'}).encode())
                     return
 
-                # Get current working directory (should be the example_workflows directory)
+                # Get current working directory
                 workdir = os.getcwd()
-                template_dir = os.path.join(workdir, 'template')
                 new_project_dir = os.path.join(workdir, project_name)
 
                 # Check if project already exists
@@ -108,46 +106,30 @@ class WorkflowServerHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({'error': 'Project already exists'}).encode())
                     return
 
-                # Check if template directory exists
-                if not os.path.exists(template_dir):
+                # Pre-create the directory so p67 init doesn't prompt
+                os.makedirs(new_project_dir, exist_ok=True)
+                print(f"[Server] Created directory: {new_project_dir}")
+
+                # Use p67 init command to create the project
+                import subprocess
+                result = subprocess.run(
+                    ['p67', 'init', '-p', workdir, project_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                if result.returncode != 0:
+                    error_msg = result.stderr.strip() or result.stdout.strip() or 'Failed to create project'
+                    print(f"[Server] p67 init failed: {error_msg}")
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
-                    self.wfile.write(json.dumps({'error': 'Template directory not found'}).encode())
+                    self.wfile.write(json.dumps({'error': error_msg}).encode())
                     return
 
-                # Create the new project directory
-                os.makedirs(new_project_dir, exist_ok=True)
-
-                # Copy .cortex/commands directory
-                template_commands_dir = os.path.join(template_dir, '.cortex', 'commands')
-                new_commands_dir = os.path.join(new_project_dir, '.cortex', 'commands')
-                if os.path.exists(template_commands_dir):
-                    shutil.copytree(template_commands_dir, new_commands_dir)
-                    print(f"[Server] Copied .cortex/commands to {new_commands_dir}")
-
-                # Copy conf directory
-                template_conf_dir = os.path.join(template_dir, 'conf')
-                new_conf_dir = os.path.join(new_project_dir, 'conf')
-                if os.path.exists(template_conf_dir):
-                    shutil.copytree(template_conf_dir, new_conf_dir)
-                    print(f"[Server] Copied conf to {new_conf_dir}")
-
-                # Copy AGENTS.md
-                template_agents_md = os.path.join(template_dir, 'AGENTS.md')
-                new_agents_md = os.path.join(new_project_dir, 'AGENTS.md')
-                if os.path.exists(template_agents_md):
-                    shutil.copy2(template_agents_md, new_agents_md)
-                    print(f"[Server] Copied AGENTS.md to {new_agents_md}")
-
-                # Copy LEARN_WORKFLOW.md
-                template_learn_md = os.path.join(template_dir, 'LEARN_WORKFLOW.md')
-                new_learn_md = os.path.join(new_project_dir, 'LEARN_WORKFLOW.md')
-                if os.path.exists(template_learn_md):
-                    shutil.copy2(template_learn_md, new_learn_md)
-                    print(f"[Server] Copied LEARN_WORKFLOW.md to {new_learn_md}")
-
                 print(f"[Server] Created new project: {project_name}")
+                print(f"[Server] p67 output: {result.stdout}")
 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
@@ -158,6 +140,20 @@ class WorkflowServerHandler(http.server.SimpleHTTPRequestHandler):
                     'projectPath': project_name
                 }).encode())
 
+            except subprocess.TimeoutExpired:
+                print(f"[Server] p67 init command timed out")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Project creation timed out'}).encode())
+                return
+            except FileNotFoundError:
+                print(f"[Server] p67 command not found")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'p67 command not found. Please ensure p67 is installed.'}).encode())
+                return
             except Exception as e:
                 print(f"[Server] Error creating project: {e}")
                 import traceback

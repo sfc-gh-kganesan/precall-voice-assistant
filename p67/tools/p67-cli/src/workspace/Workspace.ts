@@ -3,6 +3,12 @@ import { dirname, join } from 'node:path';
 import gitignore from '@p67-cli/workspace/boiler-plate/.gitignore.src' with {
     type: 'file',
 };
+import workflowGraphSchema from '@p67-cli/workspace/boiler-plate/conf/workflow_graph_schema.json.src' with {
+    type: 'file',
+};
+import learnWorkflow from '@p67-cli/workspace/boiler-plate/LEARN_WORKFLOW.md.src' with {
+    type: 'file',
+};
 import manifestyaml from '@p67-cli/workspace/boiler-plate/manifest.yaml.src' with {
     type: 'file',
 };
@@ -26,6 +32,8 @@ const files: Record<string, string> = {
     [packagejson]: 'package.json',
     [tsconfigjson]: 'tsconfig.json',
     [manifestyaml]: 'manifest.yaml',
+    [learnWorkflow]: 'LEARN_WORKFLOW.md',
+    [workflowGraphSchema]: 'conf/workflow_graph_schema.json',
 };
 
 export class Workspace {

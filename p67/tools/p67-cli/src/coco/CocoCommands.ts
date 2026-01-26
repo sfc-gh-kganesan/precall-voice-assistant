@@ -6,16 +6,21 @@ import defineWorkflowCommand from '@coco/commands/define-workflow.md' with {
 import generateWorkflowCommand from '@coco/commands/generate-workflow.md' with {
     type: 'file',
 };
+import generateWorkflowCodeCommand from '@coco/commands/generate-workflow-code.md' with {
+    type: 'file',
+};
 import { file } from 'bun';
 
 enum Command {
     DefineWorkflow = 'DefineWorkflow',
     GenerateWorkflow = 'GenerateWorkflow',
+    GenerateWorkflowCode = 'GenerateWorkflowCode',
 }
 
 const commandMap: Record<Command, string> = {
     [Command.DefineWorkflow]: defineWorkflowCommand,
     [Command.GenerateWorkflow]: generateWorkflowCommand,
+    [Command.GenerateWorkflowCode]: generateWorkflowCodeCommand,
 };
 
 interface InstallResult {
@@ -63,6 +68,9 @@ export class CocoCommands {
         );
         res.installedCommands.push(
             await this.installCommand(Command.GenerateWorkflow),
+        );
+        res.installedCommands.push(
+            await this.installCommand(Command.GenerateWorkflowCode),
         );
 
         return res;
