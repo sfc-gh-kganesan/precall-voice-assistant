@@ -58,37 +58,12 @@ _connection-flag:
         echo "--connection $SNOW_CONNECTION"
     fi
 
-# Private: Run SQL file with native snow sql variables
-_run-sql sql_file fetch_repo_url="false":
+# Run schemachange migrations
+migrate:
     #!/usr/bin/env bash
     set -euo pipefail
-    CONNECTION_FLAG=$(just _connection-flag)
-
-    # Conditionally get repository URL (only needed for service deployment SQL files)
-    SPCS_REPO_URL=""
-    if [ "{{fetch_repo_url}}" = "true" ]; then
-        SPCS_REPO_URL=$(snow spcs image-repository url $SPCS_IMAGE_REPO_NAME $CONNECTION_FLAG --database $SPCS_DATABASE_NAME --schema $SPCS_SCHEMA_NAME --role $ROLE_NAME --silent 2>/dev/null || echo "")
-    fi
-
-    # Build variable flags for snow sql
-    VARIABLE_FLAGS="-D ROLE_NAME=$ROLE_NAME"
-    VARIABLE_FLAGS+=" -D KB_DATABASE_NAME=$KB_DATABASE_NAME"
-    VARIABLE_FLAGS+=" -D KB_SCHEMA_NAME=$KB_SCHEMA_NAME"
-    VARIABLE_FLAGS+=" -D KB_TABLE_NAME=$KB_TABLE_NAME"
-    VARIABLE_FLAGS+=" -D SPCS_COMPUTE_POOL_NAME=$SPCS_COMPUTE_POOL_NAME"
-    VARIABLE_FLAGS+=" -D SPCS_IMAGE_REPO_NAME=$SPCS_IMAGE_REPO_NAME"
-    VARIABLE_FLAGS+=" -D SPCS_STAGE_NAME=$SPCS_STAGE_NAME"
-    VARIABLE_FLAGS+=" -D SPCS_DATABASE_NAME=$SPCS_DATABASE_NAME"
-    VARIABLE_FLAGS+=" -D SPCS_SCHEMA_NAME=$SPCS_SCHEMA_NAME"
-    VARIABLE_FLAGS+=" -D SPCS_WAREHOUSE_NAME=$SPCS_WAREHOUSE_NAME"
-    VARIABLE_FLAGS+=" -D SPCS_REPO_URL=$SPCS_REPO_URL"
-    VARIABLE_FLAGS+=" -D SPCS_EAI_NAME=$SPCS_EAI_NAME"
-    VARIABLE_FLAGS+=" -D KB_BUILDER_SVC_NAME=$KB_BUILDER_SVC_NAME"
-    VARIABLE_FLAGS+=" -D KB_BUILDER_IMAGE_NAME=$KB_BUILDER_IMAGE_NAME"
-    VARIABLE_FLAGS+=" -D SNOW_CONNECTION=$SNOW_CONNECTION"
-
-    # Execute SQL with --silent
-    snow sql -f "{{sql_file}}" $CONNECTION_FLAG --role $ROLE_NAME $VARIABLE_FLAGS --silent
+    echo "🗄️  Running database migrations with schemachange..."
+    uv run schemachange deploy -C "$SNOW_CONNECTION"
 
 deploy:
     #!/usr/bin/env bash
@@ -99,16 +74,9 @@ deploy:
     echo "🔐 Logging into Snowflake image registry..."
     snow spcs image-registry login --role $ROLE_NAME $CONNECTION_FLAG --silent || echo "⚠️  Registry login failed or already logged in"
 
-    # Setup infrastructure
-    echo "🏗️  Setting up Snowflake infrastructure..."
-    echo "Creating database schema..."
-    just _run-sql database/schema/database_setup.sql
-    echo "Creating network rules..."
-    just _run-sql database/infrastructure/network_rules.sql
-    echo "Creating compute pool..."
-    just _run-sql database/infrastructure/compute_pool.sql
-    echo "🔧 Deploying optional HTML utility functions..."
-    just _run-sql database/functions/html_utils.sql
+    # Run database migrations with schemachange
+    echo "🗄️  Running database migrations..."
+    just migrate
 
     # Build and push Docker image
     echo "🐳 Building Docker image..."
@@ -118,26 +86,6 @@ deploy:
     cd ..
     echo "📤 Pushing to Snowflake image repository..."
     docker push $SPCS_REPO_URL/kb-builder-svc:latest --quiet
-
-    # Deploy service
-    echo "🚢 Deploying service to Snowflake..."
-    just _run-sql database/infrastructure/kb_builder_service.sql "true"
-
-    # Deploy example job
-    echo "🦀 Building Rust example job Docker image..."
-    cd docker && docker build --rm --platform linux/amd64 -t $SPCS_REPO_URL/example-job:latest -f Dockerfile.example_job ../. --quiet
-    cd ..
-    echo "📤 Pushing example-job to Snowflake..."
-    docker push $SPCS_REPO_URL/example-job:latest --quiet
-    echo "🚢 Deploying example job service..."
-    just _run-sql database/jobs/example_job_service.sql "true"
-
-    # Deploy service functions
-    echo "🔧 Deploying service functions..."
-    just _run-sql database/functions/kb_service_functions.sql "true"
-
-    echo "Waiting for service to initialize..."
-    sleep 5
 
     # Deploy Streamlit app
     echo "🎨 Deploying Streamlit app..."

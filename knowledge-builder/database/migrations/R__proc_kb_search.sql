@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.KB_SEARCH(REQUEST VARIANT)
+CREATE OR REPLACE PROCEDURE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_SEARCH(REQUEST VARIANT)
 RETURNS VARIANT
 LANGUAGE SQL
 EXECUTE AS CALLER
@@ -80,7 +80,7 @@ BEGIN
     EXECUTE IMMEDIATE
         'SELECT PARSE_JSON(' ||
             'SNOWFLAKE.CORTEX.SEARCH_PREVIEW(''' ||
-                '<% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.KB_SEARCH' || ''', ' ||
+                '{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_SEARCH' || ''', ' ||
                 '''' || json_config_escaped || '''' ||
             ')' ||
         '):"results" AS results';
@@ -108,14 +108,14 @@ BEGIN
                 c.KB_SYS_ID,
                 MAX(c.KB_NUMBER) AS KB_NUMBER,
                 MAX(CASE WHEN c.CHUNK_INDEX = 0 OR c.CHUNK_INDEX = 1 THEN
-                    <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(c.CHUNK_TEXT)['summary']::STRING
+                    {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FN_DECOMPOSE_CHUNK(c.CHUNK_TEXT)['summary']::STRING
                 END) AS SUMMARY,
                 LISTAGG(
-                    COALESCE(<% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(c.CHUNK_TEXT)['chunk_text']::STRING, ''),
+                    COALESCE({{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FN_DECOMPOSE_CHUNK(c.CHUNK_TEXT)['chunk_text']::STRING, ''),
                     ''
                 ) WITHIN GROUP (ORDER BY TRY_TO_NUMBER(c.CHUNK_INDEX), c.CHUNK_INDEX) AS FULL_TEXT,
                 COUNT(*) AS CHUNK_COUNT
-            FROM <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.KB_CHUNKS c
+            FROM {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_CHUNKS c
             WHERE c.KB_SYS_ID IN (
                 SELECT DISTINCT sr.value['KB_SYS_ID']::STRING
                 FROM TABLE(FLATTEN(input => :search_results)) sr

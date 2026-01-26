@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.KB_GET(REQUEST VARIANT)
+CREATE OR REPLACE PROCEDURE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_GET(REQUEST VARIANT)
 RETURNS VARIANT
 LANGUAGE SQL
 EXECUTE AS CALLER
@@ -33,30 +33,30 @@ BEGIN
     IF (v_kb_sys_id IS NOT NULL) THEN
         SELECT
             MAX(CASE WHEN CHUNK_INDEX = 0 OR CHUNK_INDEX = 1 THEN
-                <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['summary']::STRING
+                {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['summary']::STRING
             END) AS summary,
             LISTAGG(
-                COALESCE(<% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['chunk_text']::STRING, ''),
+                COALESCE({{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['chunk_text']::STRING, ''),
                 ''
             ) WITHIN GROUP (ORDER BY TRY_TO_NUMBER(CHUNK_INDEX), CHUNK_INDEX) AS text,
             COUNT(*) AS chunk_count,
             MAX(KB_NUMBER)::STRING AS kb_number
         INTO :v_summary, :v_text, :v_chunk_count, :v_kb_number
-        FROM <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.KB_CHUNKS
+        FROM {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_CHUNKS
         WHERE KB_SYS_ID = :v_kb_sys_id;
     ELSE
         SELECT
             MAX(CASE WHEN CHUNK_INDEX = 0 OR CHUNK_INDEX = 1 THEN
-                <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['summary']::STRING
+                {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['summary']::STRING
             END) AS summary,
             LISTAGG(
-                COALESCE(<% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['chunk_text']::STRING, ''),
+                COALESCE({{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FN_DECOMPOSE_CHUNK(CHUNK_TEXT)['chunk_text']::STRING, ''),
                 ''
             ) WITHIN GROUP (ORDER BY TRY_TO_NUMBER(CHUNK_INDEX), CHUNK_INDEX) AS text,
             COUNT(*) AS chunk_count,
             MAX(KB_SYS_ID)::STRING AS kb_sys_id
         INTO :v_summary, :v_text, :v_chunk_count, :v_kb_sys_id
-        FROM <% KB_DATABASE_NAME %>.<% KB_SCHEMA_NAME %>.KB_CHUNKS
+        FROM {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_CHUNKS
         WHERE KB_NUMBER::STRING = :v_kb_number;
     END IF;
 
