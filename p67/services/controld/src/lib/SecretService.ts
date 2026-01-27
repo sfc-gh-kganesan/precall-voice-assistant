@@ -1,4 +1,5 @@
 import type { PrismaClient, Secret } from '@p67/db';
+import { encrypt } from './crypto.js';
 
 export interface SecretServiceConfig {
     db: PrismaClient;
@@ -29,13 +30,17 @@ export class SecretService {
     ): Promise<SaveSecretResult> {
         const existing = await this.findByName(ownerId, name);
 
+        console.log('🌶️ ✅ 🔥 SECRET', secret);
+        const encryptedSecret = encrypt(secret);
+        console.log('🌶️ ✅ 🔥 ENCRYPTED SECRET', encryptedSecret);
+
         if (existing) {
             await this.db.secret.update({
                 where: {
                     ownerId_name: { ownerId, name },
                 },
                 data: {
-                    secret,
+                    secret: encryptedSecret,
                     updatedAt: new Date(),
                 },
             });
@@ -45,7 +50,7 @@ export class SecretService {
         await this.db.secret.create({
             data: {
                 name,
-                secret,
+                secret: encryptedSecret,
                 ownerId,
             },
         });

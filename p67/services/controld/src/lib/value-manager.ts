@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@p67/db';
+import { decrypt } from './crypto.js';
 import type { Value } from './manifest';
 /**
  * ValueManager is a class that manages the values of the config, looking
@@ -57,7 +58,6 @@ export class ValueManager {
     }
 
     async decryptSecret(secret: string): Promise<string> {
-        // TODO: implement
-        return secret;
+        return decrypt(secret);
     }
 }

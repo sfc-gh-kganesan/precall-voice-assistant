@@ -29,6 +29,8 @@ services:
         environment:
             DATA_ROOT: /app/services/controld/.local-storage
             DATABASE_URL: postgresql://postgres:password@postgres:5432/controld_dev?schema=public
+            # Generate with: openssl rand -base64 32
+            ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
             NODE_ENV: development
             DEBUG_ENABLE_DEFAULT_USER: true
             DEBUG_DEFAULT_USER: bobthebuilder

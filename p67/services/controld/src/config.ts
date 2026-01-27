@@ -28,6 +28,9 @@ export type ServerConfig = {
     database: {
         url: string;
     };
+    encryption: {
+        key: string;
+    };
     debug: {
         enableDefaultUser: boolean;
         defaultUser?: string;
@@ -72,6 +75,15 @@ export const loadConfig = (): ServerConfig => {
         console.log('🔥 RUH-ROH: missing database url');
     }
 
+    // Encryption key for secrets
+    const encryptionKey =
+        readFileIfExistsSync('/opt/creds/encryption_key/secret_string') ??
+        process.env.ENCRYPTION_KEY;
+
+    if (!encryptionKey) {
+        console.log('🔥 RUH-ROH: missing encryption key');
+    }
+
     return {
         port: parseInt(process.env.PORT || '3002', 10),
         nodeEnv: process.env.NODE_ENV || 'development',
@@ -90,6 +102,9 @@ export const loadConfig = (): ServerConfig => {
         },
         database: {
             url: databaseUrl ?? '',
+        },
+        encryption: {
+            key: encryptionKey ?? '',
         },
         debug: {
             enableDefaultUser: process.env.DEBUG_ENABLE_DEFAULT_USER === 'true',

@@ -1,4 +1,5 @@
 import { loadConfig, type ServerConfig } from '@controld/config.js';
+import { initCrypto } from '@controld/lib/crypto.js';
 import { LogService } from '@controld/lib/LogService.js';
 import userPlugin from '@controld/lib/plugins/user.js';
 import { SecretService } from '@controld/lib/SecretService.js';
@@ -26,6 +27,15 @@ declare module 'fastify' {
 
 export async function buildServer(): Promise<FastifyInstance> {
     const config = loadConfig();
+
+    // Initialize encryption for secrets
+    if (config.encryption.key) {
+        initCrypto(config.encryption.key);
+    } else {
+        console.warn(
+            '⚠️  ENCRYPTION_KEY not set - secret encryption/decryption will fail',
+        );
+    }
 
     const server = Fastify({
         logger: {
