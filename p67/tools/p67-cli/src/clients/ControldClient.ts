@@ -35,8 +35,11 @@ export interface ErrorResponse {
 }
 
 // Secret types
+export type SecretType = 'Secret' | 'OAuth';
+
 export interface Secret {
     name: string;
+    type: SecretType;
     createdAt: string;
     updatedAt: string;
 }
@@ -53,6 +56,20 @@ export interface SecretListResponse {
 export interface SecretDeleteResponse {
     deleted: boolean;
     name: string;
+}
+
+export interface SecretGetResponse {
+    name: string;
+    value: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface OAuthRefreshResponse {
+    name: string;
+    provider: string;
+    expiresAt: string | null;
+    refreshed: boolean;
 }
 
 // Log types
@@ -227,12 +244,13 @@ export class ControldClient {
     async saveSecret(
         name: string,
         secret: string,
+        type: SecretType = 'Secret',
     ): Promise<SecretSaveResponse> {
         const response = await this.post('/api/secret/save', {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ name, secret }),
+            body: JSON.stringify({ name, secret, type }),
         });
 
         if (!response.ok) {
@@ -243,8 +261,9 @@ export class ControldClient {
         return (await response.json()) as SecretSaveResponse;
     }
 
-    async listSecrets(): Promise<SecretListResponse> {
-        const response = await this.get('/api/secret/list');
+    async listSecrets(type?: SecretType): Promise<SecretListResponse> {
+        const params = type ? `?type=${encodeURIComponent(type)}` : '';
+        const response = await this.get(`/api/secret/list${params}`);
 
         if (!response.ok) {
             const error = (await response.json()) as ErrorResponse;
@@ -265,6 +284,39 @@ export class ControldClient {
         }
 
         return (await response.json()) as SecretDeleteResponse;
+    }
+
+    async getSecret(name: string): Promise<SecretGetResponse> {
+        const response = await this.get(
+            `/api/secret/${encodeURIComponent(name)}`,
+        );
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as SecretGetResponse;
+    }
+
+    async refreshOAuthToken(
+        name: string,
+        clientId: string,
+        clientSecret: string,
+    ): Promise<OAuthRefreshResponse> {
+        const response = await this.post('/api/secret/oauth/refresh', {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, clientId, clientSecret }),
+        });
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as OAuthRefreshResponse;
     }
 
     // Log methods

@@ -129,7 +129,8 @@ export const SecretScalarFieldEnum = {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   ownerId: 'ownerId',
-  secret: 'secret'
+  secret: 'secret',
+  type: 'type'
 } as const
 
 export type SecretScalarFieldEnum = (typeof SecretScalarFieldEnum)[keyof typeof SecretScalarFieldEnum]

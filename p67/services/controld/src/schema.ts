@@ -91,9 +91,12 @@ export const WhoamiResponseSchema = z.object({
 export type WhoamiResponse = z.infer<typeof WhoamiResponseSchema>;
 
 // Secret Schemas
+export const SecretTypeSchema = z.enum(['Secret', 'OAuth']);
+
 export const SecretSaveBodySchema = z.object({
     name: z.string().min(1),
     secret: z.string().min(1),
+    type: SecretTypeSchema.optional().default('Secret'),
 });
 
 export const SecretSaveResponseSchema = z.object({
@@ -103,8 +106,13 @@ export const SecretSaveResponseSchema = z.object({
 
 export const SecretSchema = z.object({
     name: z.string(),
+    type: SecretTypeSchema,
     createdAt: z.string(),
     updatedAt: z.string(),
+});
+
+export const SecretListQuerySchema = z.object({
+    type: SecretTypeSchema.optional(),
 });
 
 export const SecretListResponseSchema = z.object({
@@ -120,10 +128,37 @@ export const SecretDeleteResponseSchema = z.object({
     name: z.string(),
 });
 
+export const SecretGetParamsSchema = z.object({
+    name: z.string(),
+});
+
+export const SecretGetResponseSchema = z.object({
+    name: z.string(),
+    value: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+});
+
+export const OAuthRefreshBodySchema = z.object({
+    name: z.string().min(1),
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
+});
+
+export const OAuthRefreshResponseSchema = z.object({
+    name: z.string(),
+    provider: z.string(),
+    expiresAt: z.string().nullable(),
+    refreshed: z.boolean(),
+});
+
 export type SecretSaveBody = z.infer<typeof SecretSaveBodySchema>;
 export type SecretSaveResponse = z.infer<typeof SecretSaveResponseSchema>;
 export type SecretListResponse = z.infer<typeof SecretListResponseSchema>;
 export type SecretDeleteResponse = z.infer<typeof SecretDeleteResponseSchema>;
+export type SecretGetResponse = z.infer<typeof SecretGetResponseSchema>;
+export type OAuthRefreshBody = z.infer<typeof OAuthRefreshBodySchema>;
+export type OAuthRefreshResponse = z.infer<typeof OAuthRefreshResponseSchema>;
 
 // Log Schemas
 export const LogSourceSchema = z.enum([

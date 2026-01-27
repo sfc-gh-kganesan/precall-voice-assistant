@@ -1,4 +1,4 @@
-import type { PrismaClient, Secret } from '@p67/db';
+import type { PrismaClient, Secret, SecretType } from '@p67/db';
 import { encrypt } from './crypto.js';
 
 export interface SecretServiceConfig {
@@ -12,6 +12,7 @@ export interface SaveSecretResult {
 
 export interface SecretMetadata {
     name: string;
+    type: SecretType;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -27,12 +28,11 @@ export class SecretService {
         ownerId: string,
         name: string,
         secret: string,
+        type: SecretType = 'Secret',
     ): Promise<SaveSecretResult> {
         const existing = await this.findByName(ownerId, name);
 
-        console.log('🌶️ ✅ 🔥 SECRET', secret);
         const encryptedSecret = encrypt(secret);
-        console.log('🌶️ ✅ 🔥 ENCRYPTED SECRET', encryptedSecret);
 
         if (existing) {
             await this.db.secret.update({
@@ -41,6 +41,7 @@ export class SecretService {
                 },
                 data: {
                     secret: encryptedSecret,
+                    type,
                     updatedAt: new Date(),
                 },
             });
@@ -51,17 +52,22 @@ export class SecretService {
             data: {
                 name,
                 secret: encryptedSecret,
+                type,
                 ownerId,
             },
         });
         return { name, created: true };
     }
 
-    async list(ownerId: string): Promise<SecretMetadata[]> {
+    async list(ownerId: string, type?: SecretType): Promise<SecretMetadata[]> {
         const secrets = await this.db.secret.findMany({
-            where: { ownerId },
+            where: {
+                ownerId,
+                ...(type ? { type } : {}),
+            },
             select: {
                 name: true,
+                type: true,
                 createdAt: true,
                 updatedAt: true,
             },

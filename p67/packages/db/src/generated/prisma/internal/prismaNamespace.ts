@@ -872,7 +872,8 @@ export const SecretScalarFieldEnum = {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   ownerId: 'ownerId',
-  secret: 'secret'
+  secret: 'secret',
+  type: 'type'
 } as const
 
 export type SecretScalarFieldEnum = (typeof SecretScalarFieldEnum)[keyof typeof SecretScalarFieldEnum]
@@ -1019,6 +1020,20 @@ export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'J
  * Reference to a field of type 'QueryMode'
  */
 export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
+ * Reference to a field of type 'SecretType'
+ */
+export type EnumSecretTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SecretType'>
+    
+
+
+/**
+ * Reference to a field of type 'SecretType[]'
+ */
+export type ListEnumSecretTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SecretType[]'>
     
 
 

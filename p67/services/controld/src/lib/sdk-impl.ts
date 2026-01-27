@@ -11,6 +11,8 @@ import {
     type CortexAgentResponse,
     type CortexAnalystResponse,
     type EmailOptions,
+    type HttpRequestOptions,
+    type HttpResponse,
     type P67Config,
     P67ConfigSchema,
     type P67ConfigValue,
@@ -24,6 +26,20 @@ import type { Manifest } from './manifest';
 import type { ValueManager } from './value-manager';
 
 /**
+ * Function type for resolving OAuth tokens
+ */
+export type OAuthTokenResolver = (oauthRef: string) => Promise<string>;
+
+/**
+ * Configuration options for WorkflowSDKImpl
+ */
+export interface WorkflowSDKImplOptions {
+    config: P67Config;
+    /** Optional OAuth token resolver for httpRequest with oauthRef */
+    oauthTokenResolver?: OAuthTokenResolver;
+}
+
+/**
  * P67 Agent SDK Client
  * Encapsulates all API functions for interacting with Snowflake and Cortex services
  */
@@ -32,9 +48,17 @@ export class WorkflowSDKImpl implements WorkflowSDK {
     private isConnecting = false;
     private connectionPromise: Promise<snowflake.Connection> | null = null;
     private config: P67Config;
+    private oauthTokenResolver?: OAuthTokenResolver;
 
-    constructor(config: P67Config) {
-        this.config = P67ConfigSchema.parse(config);
+    constructor(configOrOptions: P67Config | WorkflowSDKImplOptions) {
+        if ('snowflakeConfig' in configOrOptions) {
+            // Legacy constructor: just P67Config
+            this.config = P67ConfigSchema.parse(configOrOptions);
+        } else {
+            // New constructor: WorkflowSDKImplOptions
+            this.config = P67ConfigSchema.parse(configOrOptions.config);
+            this.oauthTokenResolver = configOrOptions.oauthTokenResolver;
+        }
     }
 
     private getSnowflakeConnectionOptions(
@@ -625,6 +649,135 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             });
         }
     }
+
+    /**
+     * Makes an HTTP request to an external service
+     * Supports automatic OAuth token injection via oauthRef
+     */
+    async httpRequest(options: HttpRequestOptions): Promise<HttpResponse> {
+        try {
+            const {
+                url,
+                method = 'GET',
+                headers = {},
+                body,
+                oauthRef,
+                timeout = 30000,
+            } = options;
+
+            // Build request headers
+            const requestHeaders: Record<string, string> = { ...headers };
+
+            // If oauthRef is provided, resolve the token and add Authorization header
+            if (oauthRef) {
+                if (!this.oauthTokenResolver) {
+                    return {
+                        success: false,
+                        status: 0,
+                        headers: {},
+                        error: 'OAuth token resolver not configured. Cannot use oauthRef.',
+                    };
+                }
+
+                try {
+                    const accessToken = await this.oauthTokenResolver(oauthRef);
+                    requestHeaders.Authorization = `Bearer ${accessToken}`;
+                } catch (error) {
+                    return {
+                        success: false,
+                        status: 0,
+                        headers: {},
+                        error: `Failed to resolve OAuth token "${oauthRef}": ${error instanceof Error ? error.message : String(error)}`,
+                    };
+                }
+            }
+
+            // Serialize body if it's an object
+            let requestBody: string | undefined;
+            if (body !== undefined) {
+                if (typeof body === 'string') {
+                    requestBody = body;
+                } else {
+                    requestBody = JSON.stringify(body);
+                    // Set Content-Type if not already set
+                    if (!requestHeaders['Content-Type']) {
+                        requestHeaders['Content-Type'] = 'application/json';
+                    }
+                }
+            }
+
+            // Make the request
+            const response = await fetch(url, {
+                method,
+                headers: requestHeaders,
+                body: requestBody,
+                signal: AbortSignal.timeout(timeout),
+            });
+
+            // Parse response headers
+            const responseHeaders: Record<string, string> = {};
+            response.headers.forEach((value, key) => {
+                responseHeaders[key] = value;
+            });
+
+            // Parse response body
+            let data: unknown;
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch {
+                    // If JSON parsing fails, try text
+                    data = await response.text();
+                }
+            } else {
+                data = await response.text();
+            }
+
+            const success = response.ok;
+
+            if (success) {
+                return {
+                    success: true,
+                    status: response.status,
+                    headers: responseHeaders,
+                    data,
+                };
+            } else {
+                return {
+                    success: false,
+                    status: response.status,
+                    headers: responseHeaders,
+                    data,
+                    error: `HTTP ${response.status}: ${response.statusText}`,
+                };
+            }
+        } catch (error) {
+            // Handle network errors, timeouts, etc.
+            const errorMessage =
+                error instanceof Error ? error.message : String(error);
+
+            // Check for timeout
+            if (
+                errorMessage.includes('abort') ||
+                errorMessage.includes('timeout')
+            ) {
+                return {
+                    success: false,
+                    status: 0,
+                    headers: {},
+                    error: `Request timeout: ${errorMessage}`,
+                };
+            }
+
+            return {
+                success: false,
+                status: 0,
+                headers: {},
+                error: `Request failed: ${errorMessage}`,
+            };
+        }
+    }
 }
 
 function validateConfig(config: P67ConfigValue): P67ConfigValue {
@@ -706,4 +859,18 @@ export async function hydrateConfig(
     }
 
     return { snowflakeConfig: config };
+}
+
+/**
+ * Create a WorkflowSDK instance with OAuth support
+ */
+export function createWorkflowSDK(
+    config: P67Config,
+    valueManager: ValueManager,
+): WorkflowSDK {
+    return new WorkflowSDKImpl({
+        config,
+        oauthTokenResolver: (oauthRef: string) =>
+            valueManager.getOAuthToken(oauthRef),
+    });
 }

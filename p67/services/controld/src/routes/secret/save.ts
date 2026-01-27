@@ -25,12 +25,13 @@ export function registerSaveRoute(server: FastifyInstance) {
         },
         async (request, reply) => {
             try {
-                const { name, secret } = request.body;
+                const { name, secret, type } = request.body;
 
                 const result = await fastify.secretService.save(
                     request.user.id,
                     name,
                     secret,
+                    type,
                 );
 
                 return reply.code(200).send(result);

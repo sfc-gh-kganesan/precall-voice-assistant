@@ -3,8 +3,9 @@ import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { ctx } from '@p67-cli/context';
 
 export const listCommand = new Command('list')
-    .description('List all secrets (names only)')
-    .action(async () => {
+    .description('List all secrets (excluding OAuth tokens)')
+    .option('--all', 'Include OAuth tokens in the list')
+    .action(async (options: { all?: boolean }) => {
         try {
             const { connection } = ctx();
 
@@ -13,7 +14,10 @@ export const listCommand = new Command('list')
                 pat: connection.pat,
             });
 
-            const result = await client.listSecrets();
+            // Filter to only regular secrets unless --all is specified
+            const result = await client.listSecrets(
+                options.all ? undefined : 'Secret',
+            );
 
             if (result.secrets.length === 0) {
                 console.log('No secrets found.');

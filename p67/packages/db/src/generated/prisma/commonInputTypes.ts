@@ -231,6 +231,23 @@ export type JsonWithAggregatesFilterBase<$PrismaModel = never> = {
   _max?: Prisma.NestedJsonFilter<$PrismaModel>
 }
 
+export type EnumSecretTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.SecretType | Prisma.EnumSecretTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSecretTypeFilter<$PrismaModel> | $Enums.SecretType
+}
+
+export type EnumSecretTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SecretType | Prisma.EnumSecretTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSecretTypeWithAggregatesFilter<$PrismaModel> | $Enums.SecretType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSecretTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSecretTypeFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -434,6 +451,23 @@ export type NestedJsonFilterBase<$PrismaModel = never> = {
   gt?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel>
   gte?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel>
   not?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel> | Prisma.JsonNullValueFilter
+}
+
+export type NestedEnumSecretTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.SecretType | Prisma.EnumSecretTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSecretTypeFilter<$PrismaModel> | $Enums.SecretType
+}
+
+export type NestedEnumSecretTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SecretType | Prisma.EnumSecretTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SecretType[] | Prisma.ListEnumSecretTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSecretTypeWithAggregatesFilter<$PrismaModel> | $Enums.SecretType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSecretTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSecretTypeFilter<$PrismaModel>
 }
 
 

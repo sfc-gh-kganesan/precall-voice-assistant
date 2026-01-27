@@ -1,6 +1,7 @@
 import { formatDateISO } from '@controld/lib/fmt.js';
 import {
     ErrorResponseSchema,
+    SecretListQuerySchema,
     SecretListResponseSchema,
 } from '@controld/schema.js';
 import type { FastifyInstance } from 'fastify';
@@ -15,6 +16,7 @@ export function registerListRoute(server: FastifyInstance) {
             schema: {
                 description: 'List all secrets for the authenticated user',
                 tags: ['Secret'],
+                querystring: SecretListQuerySchema,
                 response: {
                     200: SecretListResponseSchema,
                     500: ErrorResponseSchema,
@@ -23,13 +25,16 @@ export function registerListRoute(server: FastifyInstance) {
         },
         async (request, reply) => {
             try {
+                const { type } = request.query;
                 const secrets = await fastify.secretService.list(
                     request.user.id,
+                    type,
                 );
 
                 return reply.code(200).send({
                     secrets: secrets.map((s) => ({
                         name: s.name,
+                        type: s.type,
                         createdAt: formatDateISO(s.createdAt),
                         updatedAt: formatDateISO(s.updatedAt),
                     })),

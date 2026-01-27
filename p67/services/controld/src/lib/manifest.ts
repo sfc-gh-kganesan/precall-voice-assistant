@@ -1,12 +1,13 @@
 import yaml from 'yaml';
 import { z } from 'zod';
 
-// ValueSchema is a sum-type. It can be one of a value, a valueRef, or a
-// secretRef.
+// ValueSchema is a sum-type. It can be one of a value, a valueRef, a
+// secretRef, or an oauthRef.
 const ValueSchema = z.object({
     value: z.string().optional(),
     valueRef: z.string().optional(),
     secretRef: z.string().optional(),
+    oauthRef: z.string().optional(), // Reference to an OAuth token secret
 });
 
 export type Value = z.infer<typeof ValueSchema>;

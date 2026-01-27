@@ -3,6 +3,7 @@ export type {
     LogSource,
     PrismaClient,
     Secret,
+    SecretType,
     Workflow,
     WorkflowRun,
     WorkflowRunStatus,

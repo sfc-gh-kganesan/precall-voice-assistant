@@ -31,6 +31,7 @@ export type SecretMinAggregateOutputType = {
   updatedAt: Date | null
   ownerId: string | null
   secret: string | null
+  type: $Enums.SecretType | null
 }
 
 export type SecretMaxAggregateOutputType = {
@@ -40,6 +41,7 @@ export type SecretMaxAggregateOutputType = {
   updatedAt: Date | null
   ownerId: string | null
   secret: string | null
+  type: $Enums.SecretType | null
 }
 
 export type SecretCountAggregateOutputType = {
@@ -49,6 +51,7 @@ export type SecretCountAggregateOutputType = {
   updatedAt: number
   ownerId: number
   secret: number
+  type: number
   _all: number
 }
 
@@ -60,6 +63,7 @@ export type SecretMinAggregateInputType = {
   updatedAt?: true
   ownerId?: true
   secret?: true
+  type?: true
 }
 
 export type SecretMaxAggregateInputType = {
@@ -69,6 +73,7 @@ export type SecretMaxAggregateInputType = {
   updatedAt?: true
   ownerId?: true
   secret?: true
+  type?: true
 }
 
 export type SecretCountAggregateInputType = {
@@ -78,6 +83,7 @@ export type SecretCountAggregateInputType = {
   updatedAt?: true
   ownerId?: true
   secret?: true
+  type?: true
   _all?: true
 }
 
@@ -160,6 +166,7 @@ export type SecretGroupByOutputType = {
   updatedAt: Date
   ownerId: string
   secret: string
+  type: $Enums.SecretType
   _count: SecretCountAggregateOutputType | null
   _min: SecretMinAggregateOutputType | null
   _max: SecretMaxAggregateOutputType | null
@@ -190,6 +197,7 @@ export type SecretWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Secret"> | Date | string
   ownerId?: Prisma.StringFilter<"Secret"> | string
   secret?: Prisma.StringFilter<"Secret"> | string
+  type?: Prisma.EnumSecretTypeFilter<"Secret"> | $Enums.SecretType
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }
 
@@ -200,6 +208,7 @@ export type SecretOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   secret?: Prisma.SortOrder
+  type?: Prisma.SortOrder
   owner?: Prisma.UserOrderByWithRelationInput
 }
 
@@ -214,6 +223,7 @@ export type SecretWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Secret"> | Date | string
   ownerId?: Prisma.StringFilter<"Secret"> | string
   secret?: Prisma.StringFilter<"Secret"> | string
+  type?: Prisma.EnumSecretTypeFilter<"Secret"> | $Enums.SecretType
   owner?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }, "id" | "ownerId_name">
 
@@ -224,6 +234,7 @@ export type SecretOrderByWithAggregationInput = {
   updatedAt?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   secret?: Prisma.SortOrder
+  type?: Prisma.SortOrder
   _count?: Prisma.SecretCountOrderByAggregateInput
   _max?: Prisma.SecretMaxOrderByAggregateInput
   _min?: Prisma.SecretMinOrderByAggregateInput
@@ -239,6 +250,7 @@ export type SecretScalarWhereWithAggregatesInput = {
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Secret"> | Date | string
   ownerId?: Prisma.StringWithAggregatesFilter<"Secret"> | string
   secret?: Prisma.StringWithAggregatesFilter<"Secret"> | string
+  type?: Prisma.EnumSecretTypeWithAggregatesFilter<"Secret"> | $Enums.SecretType
 }
 
 export type SecretCreateInput = {
@@ -247,6 +259,7 @@ export type SecretCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   secret: string
+  type?: $Enums.SecretType
   owner: Prisma.UserCreateNestedOneWithoutSecretsInput
 }
 
@@ -257,6 +270,7 @@ export type SecretUncheckedCreateInput = {
   updatedAt?: Date | string
   ownerId: string
   secret: string
+  type?: $Enums.SecretType
 }
 
 export type SecretUpdateInput = {
@@ -265,6 +279,7 @@ export type SecretUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   secret?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumSecretTypeFieldUpdateOperationsInput | $Enums.SecretType
   owner?: Prisma.UserUpdateOneRequiredWithoutSecretsNestedInput
 }
 
@@ -275,6 +290,7 @@ export type SecretUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   secret?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumSecretTypeFieldUpdateOperationsInput | $Enums.SecretType
 }
 
 export type SecretCreateManyInput = {
@@ -284,6 +300,7 @@ export type SecretCreateManyInput = {
   updatedAt?: Date | string
   ownerId: string
   secret: string
+  type?: $Enums.SecretType
 }
 
 export type SecretUpdateManyMutationInput = {
@@ -292,6 +309,7 @@ export type SecretUpdateManyMutationInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   secret?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumSecretTypeFieldUpdateOperationsInput | $Enums.SecretType
 }
 
 export type SecretUncheckedUpdateManyInput = {
@@ -301,6 +319,7 @@ export type SecretUncheckedUpdateManyInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   ownerId?: Prisma.StringFieldUpdateOperationsInput | string
   secret?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumSecretTypeFieldUpdateOperationsInput | $Enums.SecretType
 }
 
 export type SecretListRelationFilter = {
@@ -325,6 +344,7 @@ export type SecretCountOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   secret?: Prisma.SortOrder
+  type?: Prisma.SortOrder
 }
 
 export type SecretMaxOrderByAggregateInput = {
@@ -334,6 +354,7 @@ export type SecretMaxOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   secret?: Prisma.SortOrder
+  type?: Prisma.SortOrder
 }
 
 export type SecretMinOrderByAggregateInput = {
@@ -343,6 +364,7 @@ export type SecretMinOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
   ownerId?: Prisma.SortOrder
   secret?: Prisma.SortOrder
+  type?: Prisma.SortOrder
 }
 
 export type SecretCreateNestedManyWithoutOwnerInput = {
@@ -387,12 +409,17 @@ export type SecretUncheckedUpdateManyWithoutOwnerNestedInput = {
   deleteMany?: Prisma.SecretScalarWhereInput | Prisma.SecretScalarWhereInput[]
 }
 
+export type EnumSecretTypeFieldUpdateOperationsInput = {
+  set?: $Enums.SecretType
+}
+
 export type SecretCreateWithoutOwnerInput = {
   id?: string
   name: string
   createdAt?: Date | string
   updatedAt?: Date | string
   secret: string
+  type?: $Enums.SecretType
 }
 
 export type SecretUncheckedCreateWithoutOwnerInput = {
@@ -401,6 +428,7 @@ export type SecretUncheckedCreateWithoutOwnerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   secret: string
+  type?: $Enums.SecretType
 }
 
 export type SecretCreateOrConnectWithoutOwnerInput = {
@@ -439,6 +467,7 @@ export type SecretScalarWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Secret"> | Date | string
   ownerId?: Prisma.StringFilter<"Secret"> | string
   secret?: Prisma.StringFilter<"Secret"> | string
+  type?: Prisma.EnumSecretTypeFilter<"Secret"> | $Enums.SecretType
 }
 
 export type SecretCreateManyOwnerInput = {
@@ -447,6 +476,7 @@ export type SecretCreateManyOwnerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   secret: string
+  type?: $Enums.SecretType
 }
 
 export type SecretUpdateWithoutOwnerInput = {
@@ -455,6 +485,7 @@ export type SecretUpdateWithoutOwnerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   secret?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumSecretTypeFieldUpdateOperationsInput | $Enums.SecretType
 }
 
 export type SecretUncheckedUpdateWithoutOwnerInput = {
@@ -463,6 +494,7 @@ export type SecretUncheckedUpdateWithoutOwnerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   secret?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumSecretTypeFieldUpdateOperationsInput | $Enums.SecretType
 }
 
 export type SecretUncheckedUpdateManyWithoutOwnerInput = {
@@ -471,6 +503,7 @@ export type SecretUncheckedUpdateManyWithoutOwnerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   secret?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumSecretTypeFieldUpdateOperationsInput | $Enums.SecretType
 }
 
 
@@ -482,6 +515,7 @@ export type SecretSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   updatedAt?: boolean
   ownerId?: boolean
   secret?: boolean
+  type?: boolean
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["secret"]>
 
@@ -492,6 +526,7 @@ export type SecretSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   updatedAt?: boolean
   ownerId?: boolean
   secret?: boolean
+  type?: boolean
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["secret"]>
 
@@ -502,6 +537,7 @@ export type SecretSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   updatedAt?: boolean
   ownerId?: boolean
   secret?: boolean
+  type?: boolean
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["secret"]>
 
@@ -512,9 +548,10 @@ export type SecretSelectScalar = {
   updatedAt?: boolean
   ownerId?: boolean
   secret?: boolean
+  type?: boolean
 }
 
-export type SecretOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "createdAt" | "updatedAt" | "ownerId" | "secret", ExtArgs["result"]["secret"]>
+export type SecretOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "createdAt" | "updatedAt" | "ownerId" | "secret" | "type", ExtArgs["result"]["secret"]>
 export type SecretInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   owner?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -537,6 +574,7 @@ export type $SecretPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     updatedAt: Date
     ownerId: string
     secret: string
+    type: $Enums.SecretType
   }, ExtArgs["result"]["secret"]>
   composites: {}
 }
@@ -967,6 +1005,7 @@ export interface SecretFieldRefs {
   readonly updatedAt: Prisma.FieldRef<"Secret", 'DateTime'>
   readonly ownerId: Prisma.FieldRef<"Secret", 'String'>
   readonly secret: Prisma.FieldRef<"Secret", 'String'>
+  readonly type: Prisma.FieldRef<"Secret", 'SecretType'>
 }
     
 

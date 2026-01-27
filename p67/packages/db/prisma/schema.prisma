@@ -86,14 +86,20 @@ model Log {
     @@index([timestamp])
 }
 
+enum SecretType {
+    Secret      // Regular secret (default)
+    OAuth       // OAuth token
+}
+
 model Secret {
-  id        String   @id @default(uuid())
+  id        String     @id @default(uuid())
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id])
+  owner     User       @relation(fields: [ownerId], references: [id])
   secret    String
+  type      SecretType @default(Secret)
   // tags
   // TODO: sharing
 

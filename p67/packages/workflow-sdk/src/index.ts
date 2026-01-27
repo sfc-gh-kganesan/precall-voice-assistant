@@ -115,6 +115,40 @@ export interface EmailOptions {
 }
 
 /**
+ * HTTP request options for external API calls
+ */
+export interface HttpRequestOptions {
+    /** The URL to request */
+    url: string;
+    /** HTTP method (defaults to GET) */
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD';
+    /** Request headers */
+    headers?: Record<string, string>;
+    /** Request body (will be JSON serialized if object) */
+    body?: unknown;
+    /** OAuth secret reference for automatic Bearer token injection */
+    oauthRef?: string;
+    /** Request timeout in milliseconds (default 30000) */
+    timeout?: number;
+}
+
+/**
+ * HTTP response from external API call
+ */
+export interface HttpResponse {
+    /** Whether the request succeeded (2xx status) */
+    success: boolean;
+    /** HTTP status code */
+    status: number;
+    /** Response headers */
+    headers: Record<string, string>;
+    /** Response body (parsed as JSON if content-type is application/json) */
+    data?: unknown;
+    /** Error message if request failed */
+    error?: string;
+}
+
+/**
  * Interface for the P67 Agent SDK
  * Defines the public API for interacting with Snowflake and Cortex services
  */
@@ -294,4 +328,54 @@ export interface WorkflowSDK {
      * }
      */
     close(): Promise<void>;
+
+    /**
+     * Makes an HTTP request to an external service
+     *
+     * If `oauthRef` is provided, automatically:
+     * - Retrieves the OAuth token from secrets
+     * - Refreshes the token if expired (when refresh_token is available)
+     * - Adds `Authorization: Bearer <token>` header
+     *
+     * @param options - Request configuration
+     *   - `url`: The URL to request (required)
+     *   - `method`: HTTP method (defaults to 'GET')
+     *   - `headers`: Additional request headers
+     *   - `body`: Request body (JSON serialized if object)
+     *   - `oauthRef`: OAuth secret reference for Bearer token injection
+     *   - `timeout`: Request timeout in milliseconds (default 30000)
+     * @returns Response object with `success`, `status`, `headers`, `data` or `error`.
+     *          Never throws - errors are returned in the response object.
+     *
+     * @example
+     * // Simple GET request with OAuth
+     * const response = await sdk.httpRequest({
+     *     url: 'https://api.github.com/user',
+     *     oauthRef: 'github_oauth',
+     * });
+     *
+     * if (response.success) {
+     *     console.log('User:', response.data);
+     * } else {
+     *     console.error('Error:', response.error);
+     * }
+     *
+     * @example
+     * // POST request with body
+     * const response = await sdk.httpRequest({
+     *     url: 'https://api.example.com/data',
+     *     method: 'POST',
+     *     headers: { 'Content-Type': 'application/json' },
+     *     body: { key: 'value' },
+     *     oauthRef: 'example_oauth',
+     * });
+     *
+     * @example
+     * // Request without OAuth (manual auth)
+     * const response = await sdk.httpRequest({
+     *     url: 'https://api.example.com/public',
+     *     headers: { 'X-API-Key': sdk.getParameter('api_key') },
+     * });
+     */
+    httpRequest(options: HttpRequestOptions): Promise<HttpResponse>;
 }

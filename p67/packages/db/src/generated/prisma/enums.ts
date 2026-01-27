@@ -34,3 +34,11 @@ export const WorkflowRunStatus = {
 } as const
 
 export type WorkflowRunStatus = (typeof WorkflowRunStatus)[keyof typeof WorkflowRunStatus]
+
+
+export const SecretType = {
+  Secret: 'Secret',
+  OAuth: 'OAuth'
+} as const
+
+export type SecretType = (typeof SecretType)[keyof typeof SecretType]
