@@ -123,9 +123,17 @@ export interface WorkflowSDK {
      * Gets a parameter from the 'parameters' field of the config
      * @param name - The name of the parameter
      * @param config_name - The name of the config to use, if null, the only one will be used
-     * @returns The value of the parameter or undefined if the parameter is not found
+     * @returns The value of the parameter
+     * @throws {Error} If the parameter is not found
      */
     getParameter(name: string, config_name?: string): string | undefined;
+
+    /**
+     * Gets all parameters from the 'parameters' field of the config
+     * @param config_name - The name of the config to use, if null, the only one will be used
+     * @returns The parameters as a record of name-value pairs
+     */
+    getParameters(config_name?: string): Record<string, string>;
 
     /**
      * Executes a read-only SELECT query against Snowflake

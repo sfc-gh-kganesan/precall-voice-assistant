@@ -220,11 +220,26 @@ export class WorkflowSDKImpl implements WorkflowSDK {
      * Gets a parameter from the 'parameters' field of the config
      * @param name - The name of the parameter
      * @param config_name - The name of the config to use, if null, the only one will be used
-     * @returns The value of the parameter or undefined if the parameter is not found
+     * @returns The value of the parameter
+     * @throws {Error} If the parameter is not found
      */
-    getParameter(name: string, config_name?: string): string | undefined {
+    getParameter(name: string, config_name?: string): string {
         const cfg = this.cfg(config_name);
-        return cfg.parameters?.[name];
+        const value = cfg.parameters?.[name];
+        if (value === undefined) {
+            throw new Error(`Parameter '${name}' not found`);
+        }
+        return value;
+    }
+
+    /**
+     * Gets all parameters from the 'parameters' field of the config
+     * @param config_name - The name of the config to use, if null, the only one will be used
+     * @returns The parameters as a record of name-value pairs
+     */
+    getParameters(config_name?: string): Record<string, string> {
+        const cfg = this.cfg(config_name);
+        return cfg.parameters || {};
     }
 
     async executeQueryReadOnly(
@@ -667,9 +682,7 @@ export async function hydrateConfig(
     const parameters = new Map<string, string>();
     for (const c of manifest.config) {
         if (c.parameters) {
-            console.log('🌶️ ✅ 🔥 MANIFEST PARAMETERS', c.parameters);
             for (const [key, value] of Object.entries(c.parameters)) {
-                console.log('🌶️ ✅ 🔥 MANIFEST PARAMETER', key, value);
                 parameters.set(key, (await valueManager.get(value)) ?? '');
             }
         }
