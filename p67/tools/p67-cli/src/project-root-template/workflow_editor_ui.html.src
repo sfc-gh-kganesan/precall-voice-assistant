@@ -54,6 +54,12 @@
         #messages a { color: #0066cc; text-decoration: underline; }
         #messages strong { font-weight: bold; }
         #messages em { font-style: italic; }
+
+        /* Progress bar animation */
+        @keyframes progress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
     </style>
 </head>
 <body>
@@ -225,6 +231,68 @@
             fastServerUrl: 'http://localhost:8765'
         };
 
+        // Button state management
+        const ButtonState = {
+            enableButton: (id) => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                }
+            },
+            disableButton: (id) => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'not-allowed';
+                }
+            },
+            markWorkflowChanged: () => {
+                ButtonState.enableButton('save-workflow');
+            },
+            markWorkflowSaved: () => {
+                ButtonState.disableButton('save-workflow');
+            },
+            markWorkflowLoaded: () => {
+                ButtonState.enableButton('explain-workflow');
+                ButtonState.enableButton('generate-code');
+            },
+            markCodeChanged: () => {
+                ButtonState.enableButton('save-code');
+            },
+            markCodeSaved: () => {
+                ButtonState.disableButton('save-code');
+            },
+            markFunctionFound: () => {
+                ButtonState.enableButton('explain-function');
+            },
+            markProjectSelected: () => {
+                ButtonState.enableButton('vibe-workflow');
+            },
+            markNodeSelected: () => {
+                ButtonState.enableButton('vibe-code');
+            },
+            markNodeDeselected: () => {
+                ButtonState.disableButton('vibe-code');
+            },
+            resetAllButtons: () => {
+                ButtonState.disableButton('save-workflow');
+                ButtonState.disableButton('explain-workflow');
+                ButtonState.disableButton('vibe-workflow');
+                ButtonState.disableButton('generate-code');
+                ButtonState.disableButton('save-code');
+                ButtonState.disableButton('explain-function');
+                ButtonState.disableButton('vibe-code');
+            }
+        };
+
+        // Initialize button states on load
+        document.addEventListener('DOMContentLoaded', () => {
+            ButtonState.resetAllButtons();
+        });
+
         // Mermaid reserved keywords mapping
         const MERMAID_RESERVED_KEYWORDS = {
             'end': 'end_node',
@@ -367,9 +435,21 @@
         async function selectFolder(folder) {
             currentFolder = folder;
             state.currentFolder = folder;
+
+            // Clear all current state
             loadedCode = '';
+            currentDisplayedNode = null;
+            currentNodeId = null;
+            currentCodeFile = null;
+            currentTabIndex = 0;
+
+            // Clear UI
             document.getElementById('properties').innerHTML = '';
             document.getElementById('code-editor').value = '';
+            document.getElementById('mermaid-diagram').innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Loading workflow...</div>';
+
+            // Reset all buttons
+            ButtonState.resetAllButtons();
 
             // Update button styles to highlight selected project
             document.querySelectorAll('.folder-btn').forEach(btn => {
@@ -384,6 +464,9 @@
 
             await loadWorkflow();
             await createChatSession();
+
+            // Enable vibe workflow button after project is selected
+            ButtonState.markProjectSelected();
         }
 
         async function loadWorkflow() {
@@ -448,6 +531,10 @@
                 try {
                     await window.mermaid.run({nodes: [div.querySelector('.mermaid')]});
                     setTimeout(() => attachNodeHandlers(workflow), 100);
+                    // Enable workflow-related buttons after diagram is rendered
+                    if (workflow.nodes && workflow.nodes.length > 0) {
+                        ButtonState.markWorkflowLoaded();
+                    }
                 } catch (error) {
                     console.error('Mermaid rendering failed:', error);
                     div.innerHTML = `<pre style="color: red; white-space: pre-wrap;">Error rendering diagram: ${error.message || 'Unknown error'}\n\nGenerated Mermaid:\n${mermaid}</pre>`;
@@ -645,6 +732,13 @@
             showTab(currentTabIndex);
             await loadCode(node);
             await renderDiagram(currentWorkflow);
+
+            // Enable vibe-code button only for non-start/end nodes
+            if (isStartEnd) {
+                ButtonState.markNodeDeselected();
+            } else {
+                ButtonState.markNodeSelected();
+            }
         }
 
         function updateNodeDescription(nodeId, description) {
@@ -652,6 +746,7 @@
             const node = currentWorkflow.nodes.find(n => n.id === nodeId);
             if (node) {
                 node.description = description;
+                ButtonState.markWorkflowChanged();
                 renderDiagram(currentWorkflow);
             }
         }
@@ -724,6 +819,7 @@
             if (currentWorkflow.variables.some(v => v.name === name)) return alert('Variable name already exists');
 
             currentWorkflow.variables.push({ name, data_type, description });
+            ButtonState.markWorkflowChanged();
             closeVarModal();
             refreshStartEndNode();
         }
@@ -732,6 +828,7 @@
             if (!currentWorkflow) return;
             if (confirm(`Delete variable "${currentWorkflow.variables[index].name}"?`)) {
                 currentWorkflow.variables.splice(index, 1);
+                ButtonState.markWorkflowChanged();
                 refreshStartEndNode();
             }
         }
@@ -742,6 +839,7 @@
         function addMapping(node, mappingType, data) {
             if (!node[mappingType]) node[mappingType] = [];
             node[mappingType].push(data);
+            ButtonState.markWorkflowChanged();
             showNodeDetails(node);
         }
 
@@ -750,6 +848,7 @@
             if (!node) return;
             if (confirm(message)) {
                 node[mappingType].splice(index, 1);
+                ButtonState.markWorkflowChanged();
                 showNodeDetails(node);
             }
         }
@@ -900,6 +999,7 @@
             const code = document.getElementById('code-editor').value;
             if (await saveFile(currentCodeFile, code, 'Saved')) {
                 loadedCode = code;
+                ButtonState.markCodeSaved();
             }
         }
 
@@ -913,6 +1013,7 @@
             const workflowSpec = { workflows: [currentWorkflow] };
 
             if (await saveFile(path, JSON.stringify(workflowSpec, null, 2), 'Workflow saved')) {
+                ButtonState.markWorkflowSaved();
                 const message = "'workflow_spec.json' has changed. Reload it and summarize what has been changed.";
                 if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
                     addMessage('user', message);
@@ -1040,6 +1141,7 @@
                 if (graphLine !== -1) {
                     const lineHeight = editor.scrollHeight / lines.length;
                     setTimeout(() => editor.scrollTop = (graphLine - 2) * lineHeight, 50);
+                    ButtonState.markFunctionFound();
                 } else {
                     editor.value = `// StateGraph construction not found`;
                 }
@@ -1054,6 +1156,7 @@
             if (line !== -1) {
                 const lineHeight = editor.scrollHeight / lines.length;
                 setTimeout(() => editor.scrollTop = (line - 2) * lineHeight, 50);
+                ButtonState.markFunctionFound();
             } else {
                 editor.value = `// Function not found for node: ${nodeId}\n// Also tried: ${camelCase}`;
             }
@@ -1062,6 +1165,13 @@
         async function addProject() {
             const name = await showPrompt('Create Project', 'Project name:');
             if (!name) return;
+
+            // Show progress bar
+            const progressBar = document.createElement('div');
+            progressBar.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10000;';
+            progressBar.innerHTML = '<div style="text-align: center;"><div style="margin-bottom: 10px;">Creating project...</div><div style="width: 200px; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;"><div style="width: 100%; height: 100%; background: #4CAF50; animation: progress 1.5s ease-in-out infinite;"></div></div></div>';
+            document.body.appendChild(progressBar);
+
             try {
                 const res = await fetch('/api/create-project', {
                     method: 'POST',
@@ -1077,11 +1187,12 @@
                 // Automatically select the newly created project
                 const newFolder = { name: name, path: name };
                 await selectFolder(newFolder);
-
-                alert(`Project "${name}" created successfully!`);
             } catch (err) {
                 alert('Error: ' + err.message);
                 console.error(err);
+            } finally {
+                // Remove progress bar
+                document.body.removeChild(progressBar);
             }
         }
 
@@ -1093,6 +1204,17 @@
         document.getElementById('explain-workflow').addEventListener('click', explainWorkflow);
         document.getElementById('vibe-workflow').addEventListener('click', vibeWorkflow);
         document.getElementById('generate-code').addEventListener('click', generateCode);
+
+        // Code editor change detection
+        document.getElementById('code-editor').addEventListener('input', () => {
+            if (loadedCode && document.getElementById('code-editor').value !== loadedCode) {
+                ButtonState.markCodeChanged();
+            }
+        });
+
+        // Initialize all buttons as disabled
+        ButtonState.resetAllButtons();
+
         loadFolders();
 
         // =============================================================================
@@ -1208,6 +1330,7 @@
             await configureNodeByType(node);
 
             currentWorkflow.nodes.push(node);
+            ButtonState.markWorkflowChanged();
             renderDiagram(currentWorkflow);
         }
 
@@ -1223,15 +1346,19 @@
             currentWorkflow.nodes = currentWorkflow.nodes.filter(n => n.id !== nodeId);
             currentWorkflow.edges = currentWorkflow.edges.filter(e => e.from_node !== nodeId && e.to_node !== nodeId);
 
+            ButtonState.markWorkflowChanged();
+
             // Clear selection if removed node was selected
             if (currentNodeId === nodeId) {
                 currentNodeId = null;
                 DOM.get('properties').innerHTML = '';
+                ButtonState.markNodeDeselected();
             }
             if (currentDisplayedNode && currentDisplayedNode.id === nodeId) {
                 currentDisplayedNode = null;
                 DOM.get('properties').innerHTML = '';
                 document.getElementById('code-editor').value = '';
+                ButtonState.markNodeDeselected();
                 // No node selected now, so render directly
                 renderDiagram(currentWorkflow);
             } else {
@@ -1245,6 +1372,8 @@
             if (!edge) return;
             cleanupDecisionBranch(edge);
             currentWorkflow.edges = currentWorkflow.edges.filter(e => e.id !== edgeId);
+
+            ButtonState.markWorkflowChanged();
 
             // If a node is currently displayed, refresh it (which will also render the diagram)
             // Otherwise, just render the diagram directly
@@ -1291,6 +1420,7 @@
             }
 
             currentWorkflow.edges.push(edge);
+            ButtonState.markWorkflowChanged();
 
             // If a node is currently displayed, refresh it (which will also render the diagram)
             // Otherwise, just render the diagram directly
@@ -1352,6 +1482,7 @@
                     if (eventType === 'text_delta' || eventType === 'text') {
                         appendMessage(text);
                     } else if (eventType === 'text_done' || eventType === 'completed') {
+                        removeThinkingIndicator();
                         await loadWorkflow();
                         await reloadCode();
                         refreshPropertiesPanel();
@@ -1449,64 +1580,106 @@
             system: { background: '#fff3cd', fontSize: '12px', isPlainText: true }
         };
 
+        // Message helper functions
+        const MessageHelpers = {
+            getMessagesDiv: () => document.getElementById('messages'),
+
+            scrollToBottom: () => {
+                const div = MessageHelpers.getMessagesDiv();
+                div.scrollTop = div.scrollHeight;
+            },
+
+            parseMarkdown: (text) => {
+                return typeof marked !== 'undefined' ? marked.parse(text) : text;
+            },
+
+            applyBaseStyles: (div) => {
+                Object.assign(div.style, {
+                    margin: '10px',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    wordWrap: 'break-word'
+                });
+            },
+
+            createProgressBarHTML: () => `
+                <div style="margin-bottom: 8px; font-size: 13px; color: #666;">Processing...</div>
+                <div style="width: 100%; height: 6px; background: #d0d0d0; border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
+                    <div style="width: 40%; height: 100%; background: linear-gradient(90deg, #007bff, #0056b3); border-radius: 3px; animation: progress 1.5s ease-in-out infinite;"></div>
+                </div>
+                <div class="thinking-content" style="display: none;"></div>
+            `
+        };
+
         function addMessage(type, text) {
-            const messagesDiv = document.getElementById('messages');
+            const messagesDiv = MessageHelpers.getMessagesDiv();
             const div = document.createElement('div');
             const style = MESSAGE_STYLES[type];
 
-            Object.assign(div.style, {
-                margin: '10px',
-                padding: '8px',
-                borderRadius: '4px',
-                wordWrap: 'break-word',
-                ...style
-            });
+            MessageHelpers.applyBaseStyles(div);
+            Object.assign(div.style, style);
 
             if (style.isPlainText) {
                 div.textContent = text;
             } else {
                 div.dataset.content = text;
-                div.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+                div.innerHTML = MessageHelpers.parseMarkdown(text);
             }
 
             messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            MessageHelpers.scrollToBottom();
         }
 
         function addThinkingIndicator() {
-            const messagesDiv = document.getElementById('messages');
+            const messagesDiv = MessageHelpers.getMessagesDiv();
             const div = document.createElement('div');
-            div.style.margin = '10px';
-            div.style.padding = '8px';
-            div.style.borderRadius = '4px';
-            div.style.wordWrap = 'break-word';
+
+            MessageHelpers.applyBaseStyles(div);
+            div.style.padding = '12px';
             div.style.background = '#e8e8e8';
-            div.style.fontStyle = 'italic';
-            div.style.color = '#666';
             div.dataset.isThinking = 'true';
-            div.textContent = 'Thinking...';
+            div.innerHTML = MessageHelpers.createProgressBarHTML();
+
             messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            MessageHelpers.scrollToBottom();
+        }
+
+        function removeThinkingIndicator() {
+            const messagesDiv = MessageHelpers.getMessagesDiv();
+            const last = messagesDiv.lastElementChild;
+
+            if (last && last.dataset.isThinking === 'true') {
+                const contentDiv = last.querySelector('.thinking-content');
+                const content = contentDiv ? contentDiv.innerHTML : '';
+
+                delete last.dataset.isThinking;
+                last.dataset.content = last.dataset.content || '';
+                last.innerHTML = content || last.dataset.content;
+
+                MessageHelpers.scrollToBottom();
+            }
         }
 
         function appendMessage(text) {
-            const messagesDiv = document.getElementById('messages');
+            const messagesDiv = MessageHelpers.getMessagesDiv();
             const last = messagesDiv.lastElementChild;
 
             if (last && last.style.background === 'rgb(232, 232, 232)') {
-                // If it's a thinking indicator, replace it with actual content
                 if (last.dataset.isThinking === 'true') {
-                    delete last.dataset.isThinking;
-                    last.style.fontStyle = 'normal';
-                    last.style.color = '';
-                    last.dataset.content = text;
-                    last.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+                    const contentDiv = last.querySelector('.thinking-content');
+                    if (contentDiv) {
+                        const currentContent = last.dataset.content || '';
+                        const newContent = currentContent + text;
+                        last.dataset.content = newContent;
+                        contentDiv.innerHTML = MessageHelpers.parseMarkdown(newContent);
+                        contentDiv.style.display = 'block';
+                    }
                 } else {
                     const content = (last.dataset.content || '') + text;
                     last.dataset.content = content;
-                    last.innerHTML = typeof marked !== 'undefined' ? marked.parse(content) : content;
+                    last.innerHTML = MessageHelpers.parseMarkdown(content);
                 }
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                MessageHelpers.scrollToBottom();
             } else {
                 addMessage('agent', text);
             }

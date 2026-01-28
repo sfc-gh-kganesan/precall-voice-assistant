@@ -139,6 +139,53 @@ const result = await sdk.executeQueryReadOnly(
 
 The configuration names and their details are managed by the P67 deployment, not by your workflow code.
 
+**When using `sdk.getParameters()` with multiple configurations:**
+
+If your manifest.yaml defines multiple Snowflake configurations, you should pass the config_name to `sdk.getParameters()` to retrieve configuration-specific parameters:
+
+```typescript
+// Single config - no parameter needed
+const result = await app.invoke({
+    sdk: sdk,
+    ...sdk.getParameters(),
+});
+
+// Multiple configs - specify which one to use
+const result = await app.invoke({
+    sdk: sdk,
+    ...sdk.getParameters("production"), // Get parameters for "production" config
+});
+```
+
+Then pass the same config_name to SDK methods throughout your workflow:
+
+```typescript
+// Add config_name to your state
+const StateAnnotation = Annotation.Root({
+    sdk: Annotation<AgentSDK>({
+        reducer: (_, right) => right,
+    }),
+    config_name: Annotation<string | undefined>({
+        reducer: (_, right) => right,
+    }),
+    // ... other fields
+});
+
+// Use config_name in workflow nodes
+async function some_node(state: typeof StateAnnotation.State) {
+    const { sdk, config_name } = state;
+
+    // Pass config_name to SDK methods
+    const result = await sdk.executeQueryReadOnly(
+        "SELECT * FROM my_table",
+        config_name
+    );
+
+    return { /* updates */ };
+}
+```
+
+
 ### SDK Injection Pattern
 
 **IMPORTANT**: Your workflow does **NOT** create or close the SDK. The P67 runtime injects the SDK into your workflow's `main()` function.
@@ -456,6 +503,127 @@ When implementing or updating workflow code based on `workflow_spec.json`, follo
    - Do NOT convert to camelCase
    - The function name must be an exact string match to the node ID
 
+### Node Type Implementation Guidelines
+
+When implementing workflow nodes, follow these type-specific patterns:
+
+#### **query_node: Cortex Agent Query**
+
+**CRITICAL INSTRUCTION**: When implementing a `query_node`, **ALWAYS** use the existing Cortex Agent:
+
+- **Agent Name**: `SNOWFLAKE_INTELLIGENCE.AGENTS.CORTEX_SEARCH_USAGE_AGENT`
+- **Config Name**: `default`
+
+**Implementation Pattern**:
+
+```typescript
+// query_node implementation - function name must match node.id from workflow_spec.json
+// Example: if node.id is "search_query", function name must be "search_query"
+async function search_query(state: typeof StateAnnotation.State) {
+    const { sdk, user_query } = state;
+
+    // ALWAYS use this agent for query_node
+    const response = await sdk.callCortexAgent(
+        "SNOWFLAKE_INTELLIGENCE.AGENTS.CORTEX_SEARCH_USAGE_AGENT",
+        user_query,  // The user's natural language question
+        "default",   // Always use "default" config
+        async (chunk) => {
+            // Handle streaming response
+            console.log("Agent response chunk:", chunk);
+        }
+    );
+
+    return {
+        query_result: response,
+        // ... other state updates
+    };
+}
+```
+
+**Key Points**:
+- Function name MUST match the node `id` from workflow_spec.json (e.g., if node.id is "search_query", use `async function search_query(...)`)
+- Do NOT ask the user which agent to use for query_node
+- Do NOT create or call a different Cortex Agent
+- Always use `SNOWFLAKE_INTELLIGENCE.AGENTS.CORTEX_SEARCH_USAGE_AGENT`
+- Always use `"default"` as the config_name parameter
+- Always provide the `onstream` callback for handling streaming responses
+
+#### **action_node: General Actions**
+
+For `action_node` types, follow these steps:
+
+1. **Look up the appropriate SDK method** from the action specification in workflow_spec.json
+2. **If you find a matching SDK method**, implement it:
+   - Use `sdk.executeQueryReadOnly()` for SQL queries
+   - Use `sdk.queryCortexAnalyst()` for natural language data analysis
+   - Use `sdk.callCortexAgent()` for Cortex Agent interactions
+3. **If no matching SDK method exists**, create a placeholder function and inform the user:
+
+```typescript
+// action_node with placeholder - function name matches node.id
+async function custom_action(state: typeof StateAnnotation.State) {
+    // TODO: User needs to implement this custom action
+    // This placeholder is generated because no matching SDK method was found
+    console.log("Placeholder: Implement custom_action logic here");
+
+    return {
+        // Return appropriate state updates
+    };
+}
+```
+
+#### **decision_node: Conditional Routing with LangGraph**
+
+**CRITICAL**: A `decision_node` is implemented as a **conditional edge** in LangGraph, not as a regular node.
+
+**Implementation Pattern**:
+
+1. Create a **routing function** named after the node_id from workflow_spec.json
+2. The routing function **returns a string** corresponding to one of the **branch labels** defined in the decision_node
+3. Use `addConditionalEdges()` in the graph instead of `addNode()`
+
+**Example**:
+
+```typescript
+// Routing function - name must match decision_node.id from workflow_spec.json
+// Example: if decision_node.id is "validate_result", use that exact name
+function validate_result(state: typeof StateAnnotation.State): string {
+    const { some_value } = state;
+
+    // Return a string matching one of the branch labels from workflow_spec.json
+    // Example: if branches are [{ label: "approved", ... }, { label: "rejected", ... }]
+    if (some_value > threshold) {
+        return "approved";  // Must match branch label exactly
+    } else {
+        return "rejected";  // Must match branch label exactly
+    }
+}
+
+// In the graph construction, use addConditionalEdges (NOT addNode)
+const workflow = new StateGraph(StateAnnotation)
+    .addNode("previous_node", previous_node)
+    // Decision node is a conditional edge, not a node
+    .addConditionalEdges(
+        "previous_node",           // Source node
+        validate_result,           // Routing function
+        {
+            "approved": "success_node",   // Map branch label to target node
+            "rejected": "failure_node",   // Map branch label to target node
+        }
+    );
+```
+
+**Key Points for decision_node**:
+- **Routing function signature**: Takes state, returns a string (the branch label)
+- **Function name**: Must match decision_node.id from workflow_spec.json exactly
+- **Return value**: Must be one of the branch label strings defined in the decision_node branches
+- **Graph construction**: Use `addConditionalEdges()`, NOT `addNode()`
+- **Branch mapping**: The third parameter maps branch labels to target node IDs
+- Check workflow_spec.json for:
+  - The decision_node.id (for function name)
+  - The branch labels (for return values)
+  - The branch target nodes (for the mapping object)
+
 ### Additional Information to Gather from User (if not in workflow_spec.json)
 
 Only ask users for information NOT specified in workflow_spec.json:
@@ -463,6 +631,7 @@ Only ask users for information NOT specified in workflow_spec.json:
 1. **Snowflake Configuration**:
     - Which Snowflake configuration name to use (if multiple are available)
     - The P67 runtime will have these already configured
+    - Check the file manifest.yaml to check if there are multiple configurations. If so, when the sdk call has a "config" parameter, ask user which config to use.
 2. **Semantic Models** (if using Cortex Analyst):
     - Stage path to Cortex Analyst semantic model (e.g., `@my_stage/model.yaml`)
     - This will be passed to `sdk.queryCortexAnalyst()` calls
@@ -634,6 +803,7 @@ export async function main(sdk: AgentSDK) {
         sdk: sdk,
         messages: [],
         currentNode: "",
+        ...sdk.getParameters(), // If multiple configs in manifest.yaml, pass config_name: sdk.getParameters("production")
     });
 
     console.log("Workflow completed:", result);

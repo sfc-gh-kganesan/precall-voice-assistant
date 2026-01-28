@@ -70,6 +70,11 @@ Once you have gathered sufficient requirements, create the workflow specificatio
 - Understand the objective of the workflow, its input and output
 - Identify the workflow variables needed to store the state of the workflow during its execution
 - Breakdown the overall process into nodes, each node capture a specific processing step in the workflow.  Determine if the node should be action_node, query_node, decision_node, subgraph_node, human_node, start_node, end_node.
+- **IMPORTANT - Node Naming**: Use your common sense to specify node IDs, node names, and action names that are human comprehensible and descriptive. DO NOT ask the user for these details. Examples:
+  - Node ID must be unique and use snake_case (e.g., "validate_invoice", "check_approval_status", "send_notification")
+  - Node name should be descriptive of what the node does (e.g., "Validate Invoice", "Check Approval Status", "Send Notification")
+  - Action name should clearly describe the action being performed (e.g., "validate_invoice_data", "check_if_approved", "send_email_notification")
+  - Choose names that make the workflow logic clear and self-documenting
 - Determine how the nodes read and write the workflow variables
 - Connect nodes with each other through edges which controls how processing are chained together to form the complete workflow
 - **CRITICAL for decision_node edges**: When creating edges from a decision_node, ensure that each edge's `label` field EXACTLY MATCHES one of the branch labels defined in that decision_node's `branches` array. This is required for proper workflow execution.
