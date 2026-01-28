@@ -1,8 +1,13 @@
 import { randomBytes } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
+import { createServer as createHttpServer, type Server } from 'node:http';
+import {
+    createServer as createHttpsServer,
+    type Server as HttpsServer,
+} from 'node:https';
 import { Command } from '@p67-cli/Command.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { ctx } from '@p67-cli/context';
+import selfsigned from 'selfsigned';
 
 /**
  * Known OAuth provider configurations
@@ -15,6 +20,7 @@ const KNOWN_PROVIDERS: Record<
         tokenUrl: string;
         defaultScopes: string[];
         extraAuthParams?: Record<string, string>;
+        requiresHttps?: boolean;
     }
 > = {
     github: {
@@ -38,6 +44,7 @@ const KNOWN_PROVIDERS: Record<
         authorizationUrl: 'https://slack.com/oauth/v2/authorize',
         tokenUrl: 'https://slack.com/api/oauth.v2.access',
         defaultScopes: ['chat:write', 'users:read'],
+        requiresHttps: true,
     },
     microsoft: {
         name: 'Microsoft',
@@ -123,9 +130,41 @@ function buildAuthorizationUrl(
 }
 
 /**
+ * Generate a self-signed certificate for HTTPS localhost
+ */
+async function generateSelfSignedCert(): Promise<{
+    key: string;
+    cert: string;
+}> {
+    const attrs = [{ name: 'commonName', value: 'localhost' }];
+    const now = new Date();
+    const notAfter = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+
+    const pems = await selfsigned.generate(attrs, {
+        notBeforeDate: now,
+        notAfterDate: notAfter,
+        keySize: 2048,
+        extensions: [
+            {
+                name: 'subjectAltName',
+                altNames: [
+                    { type: 2, value: 'localhost' }, // DNS
+                    { type: 7, ip: '127.0.0.1' }, // IP
+                ],
+            },
+        ],
+    });
+
+    return {
+        key: pems.private,
+        cert: pems.cert,
+    };
+}
+
+/**
  * Get the callback server port
  */
-function getServerPort(server: Server): number {
+function getServerPort(server: Server | HttpsServer): number {
     const address = server.address();
     if (typeof address === 'object' && address) {
         return address.port;
@@ -155,6 +194,96 @@ async function openBrowser(url: string): Promise<void> {
     await execAsync(command);
 }
 
+/**
+ * Create the request handler for OAuth callback
+ */
+function createCallbackHandler(
+    state: string,
+    resolveCallback: (result: { code: string }) => void,
+    rejectCallback: (error: Error) => void,
+) {
+    return (
+        req: { url?: string },
+        res: {
+            writeHead: (code: number, headers: Record<string, string>) => void;
+            end: (body: string) => void;
+        },
+    ) => {
+        const url = new URL(req.url || '', 'http://localhost');
+
+        if (url.pathname === '/callback') {
+            const code = url.searchParams.get('code');
+            const receivedState = url.searchParams.get('state');
+            const error = url.searchParams.get('error');
+
+            if (error) {
+                res.writeHead(400, { 'Content-Type': 'text/html' });
+                res.end(`
+                    <html>
+                        <head><title>OAuth Error</title></head>
+                        <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                            <h1>Authorization Failed</h1>
+                            <p>Error: ${error}</p>
+                            <p style="color: #666;">You can close this window.</p>
+                        </body>
+                    </html>
+                `);
+                rejectCallback(new Error(`OAuth error: ${error}`));
+                return;
+            }
+
+            if (receivedState !== state) {
+                res.writeHead(400, { 'Content-Type': 'text/html' });
+                res.end(`
+                    <html>
+                        <head><title>OAuth Error</title></head>
+                        <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                            <h1>Authorization Failed</h1>
+                            <p>Invalid state parameter. Possible CSRF attack.</p>
+                            <p style="color: #666;">You can close this window.</p>
+                        </body>
+                    </html>
+                `);
+                rejectCallback(new Error('Invalid state parameter'));
+                return;
+            }
+
+            if (!code) {
+                res.writeHead(400, { 'Content-Type': 'text/html' });
+                res.end(`
+                    <html>
+                        <head><title>OAuth Error</title></head>
+                        <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                            <h1>Authorization Failed</h1>
+                            <p>No authorization code received.</p>
+                            <p style="color: #666;">You can close this window.</p>
+                        </body>
+                    </html>
+                `);
+                rejectCallback(new Error('No authorization code received'));
+                return;
+            }
+
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(`
+                <html>
+                    <head><title>OAuth Success</title></head>
+                    <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                        <h1>Authorization Successful!</h1>
+                        <p>You can close this window and return to the terminal.</p>
+                        <script>setTimeout(() => window.close(), 2000);</script>
+                    </body>
+                </html>
+            `);
+
+            resolveCallback({ code });
+        } else {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not found');
+        }
+    };
+}
+
 export const connectCommand = new Command('connect')
     .description('Connect to an OAuth provider and store credentials')
     .argument(
@@ -180,6 +309,10 @@ export const connectCommand = new Command('connect')
         parseInt,
     )
     .option(
+        '--https',
+        'Use HTTPS with self-signed certificate (required for some providers like Slack)',
+    )
+    .option(
         '--authorization-url <url>',
         'Authorization URL (required for custom provider)',
     )
@@ -193,6 +326,7 @@ export const connectCommand = new Command('connect')
                 clientSecret?: string;
                 scopes?: string;
                 port?: number;
+                https?: boolean;
                 authorizationUrl?: string;
                 tokenUrl?: string;
             },
@@ -225,6 +359,7 @@ export const connectCommand = new Command('connect')
                 let scopes: string[];
                 let extraAuthParams: Record<string, string> | undefined;
                 let providerName: string;
+                let useHttps = options.https || false;
 
                 if (providerLower === 'custom') {
                     if (!options.authorizationUrl || !options.tokenUrl) {
@@ -253,6 +388,14 @@ export const connectCommand = new Command('connect')
                         : knownProvider.defaultScopes;
                     extraAuthParams = knownProvider.extraAuthParams;
                     providerName = providerLower;
+
+                    // Auto-enable HTTPS for providers that require it
+                    if (knownProvider.requiresHttps && !useHttps) {
+                        console.log(
+                            `Note: ${knownProvider.name} requires HTTPS. Enabling --https automatically.\n`,
+                        );
+                        useHttps = true;
+                    }
                 }
 
                 // Generate CSRF state token
@@ -261,99 +404,38 @@ export const connectCommand = new Command('connect')
                 // Start the callback server first to get the port
                 console.log('Starting OAuth flow...');
 
-                // Create a promise that will be resolved when we get the callback
-                let resolveCallback: (result: {
-                    code: string;
-                    server: Server;
-                }) => void;
-                let rejectCallback: (error: Error) => void;
-                const callbackPromise = new Promise<{
-                    code: string;
-                    server: Server;
-                }>((resolve, reject) => {
-                    resolveCallback = resolve;
-                    rejectCallback = reject;
-                });
+                // Create a deferred promise for the callback
+                const deferred = {
+                    resolve: (_result: { code: string }) => {},
+                    reject: (_error: Error) => {},
+                    promise: null as unknown as Promise<{ code: string }>,
+                };
+                deferred.promise = new Promise<{ code: string }>(
+                    (resolve, reject) => {
+                        deferred.resolve = resolve;
+                        deferred.reject = reject;
+                    },
+                );
 
-                // Start the server
-                const server = createServer((req, res) => {
-                    const url = new URL(req.url || '', `http://localhost`);
+                // Create the request handler
+                const handler = createCallbackHandler(
+                    state,
+                    deferred.resolve,
+                    deferred.reject,
+                );
 
-                    if (url.pathname === '/callback') {
-                        const code = url.searchParams.get('code');
-                        const receivedState = url.searchParams.get('state');
-                        const error = url.searchParams.get('error');
+                // Start the server (HTTP or HTTPS)
+                let server: Server | HttpsServer;
 
-                        if (error) {
-                            res.writeHead(400, { 'Content-Type': 'text/html' });
-                            res.end(`
-                                <html>
-                                    <head><title>OAuth Error</title></head>
-                                    <body style="font-family: system-ui; padding: 40px; text-align: center;">
-                                        <h1>❌ Authorization Failed</h1>
-                                        <p>Error: ${error}</p>
-                                        <p style="color: #666;">You can close this window.</p>
-                                    </body>
-                                </html>
-                            `);
-                            rejectCallback(new Error(`OAuth error: ${error}`));
-                            return;
-                        }
-
-                        if (receivedState !== state) {
-                            res.writeHead(400, { 'Content-Type': 'text/html' });
-                            res.end(`
-                                <html>
-                                    <head><title>OAuth Error</title></head>
-                                    <body style="font-family: system-ui; padding: 40px; text-align: center;">
-                                        <h1>❌ Authorization Failed</h1>
-                                        <p>Invalid state parameter. Possible CSRF attack.</p>
-                                        <p style="color: #666;">You can close this window.</p>
-                                    </body>
-                                </html>
-                            `);
-                            rejectCallback(
-                                new Error('Invalid state parameter'),
-                            );
-                            return;
-                        }
-
-                        if (!code) {
-                            res.writeHead(400, { 'Content-Type': 'text/html' });
-                            res.end(`
-                                <html>
-                                    <head><title>OAuth Error</title></head>
-                                    <body style="font-family: system-ui; padding: 40px; text-align: center;">
-                                        <h1>❌ Authorization Failed</h1>
-                                        <p>No authorization code received.</p>
-                                        <p style="color: #666;">You can close this window.</p>
-                                    </body>
-                                </html>
-                            `);
-                            rejectCallback(
-                                new Error('No authorization code received'),
-                            );
-                            return;
-                        }
-
-                        res.writeHead(200, { 'Content-Type': 'text/html' });
-                        res.end(`
-                            <html>
-                                <head><title>OAuth Success</title></head>
-                                <body style="font-family: system-ui; padding: 40px; text-align: center;">
-                                    <h1>✅ Authorization Successful!</h1>
-                                    <p>You can close this window and return to the terminal.</p>
-                                    <script>setTimeout(() => window.close(), 2000);</script>
-                                </body>
-                            </html>
-                        `);
-
-                        resolveCallback({ code, server });
-                    } else {
-                        res.writeHead(404, { 'Content-Type': 'text/plain' });
-                        res.end('Not found');
-                    }
-                });
+                if (useHttps) {
+                    console.log(
+                        'Generating self-signed certificate for HTTPS...',
+                    );
+                    const { key, cert } = await generateSelfSignedCert();
+                    server = createHttpsServer({ key, cert }, handler);
+                } else {
+                    server = createHttpServer(handler);
+                }
 
                 // Start listening - use specified port or 0 for random
                 await new Promise<void>((resolve, reject) => {
@@ -374,12 +456,20 @@ export const connectCommand = new Command('connect')
                 });
 
                 const port = getServerPort(server);
-                const redirectUri = `http://localhost:${port}/callback`;
+                const protocol = useHttps ? 'https' : 'http';
+                const redirectUri = `${protocol}://localhost:${port}/callback`;
 
-                if (options.port) {
-                    console.log(`\nUsing callback URL: ${redirectUri}`);
+                console.log(`\nUsing callback URL: ${redirectUri}`);
+                console.log(
+                    'Make sure this URL is registered in your OAuth app settings.\n',
+                );
+
+                if (useHttps) {
                     console.log(
-                        'Make sure this URL is registered in your OAuth app settings.\n',
+                        'Note: Your browser may show a security warning for the self-signed certificate.',
+                    );
+                    console.log(
+                        'You may need to manually accept it to complete the OAuth flow.\n',
                     );
                 }
 
@@ -394,7 +484,7 @@ export const connectCommand = new Command('connect')
                 );
 
                 console.log(
-                    `\nOpening browser for ${KNOWN_PROVIDERS[providerLower]?.name || 'OAuth'} authorization...`,
+                    `Opening browser for ${KNOWN_PROVIDERS[providerLower]?.name || 'OAuth'} authorization...`,
                 );
                 console.log(
                     `If the browser doesn't open, visit:\n${authUrl}\n`,
@@ -407,7 +497,7 @@ export const connectCommand = new Command('connect')
                 const timeoutId = setTimeout(
                     () => {
                         server.close();
-                        rejectCallback(
+                        deferred.reject(
                             new Error(
                                 'OAuth timeout: no callback received within 5 minutes',
                             ),
@@ -418,7 +508,7 @@ export const connectCommand = new Command('connect')
 
                 // Wait for callback
                 console.log('Waiting for authorization...');
-                const { code } = await callbackPromise;
+                const { code } = await deferred.promise;
                 clearTimeout(timeoutId);
 
                 console.log(
