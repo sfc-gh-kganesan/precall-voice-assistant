@@ -1,0 +1,10 @@
+name: app_environment
+channels:
+  - snowflake
+dependencies:
+  - plotly=6.5.0
+  - pydantic=2.8.2
+  - python=3.10.*
+  - snowflake-snowpark-python=
+  - streamlit=
+  - streamlit-plotly-events=0.0.6
