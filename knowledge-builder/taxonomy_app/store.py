@@ -102,7 +102,8 @@ def reducer(state: Store, action: Action) -> Store:
         if not new_state.source_types:
             new_state.source_types = action.source_types
         if not new_state.answerable_filter:
-            new_state.answerable_filter = action.answerable_options
+            # Default to 'yes' to show cases that could be solved by knowledge base
+            new_state.answerable_filter = ['yes'] if 'yes' in action.answerable_options else action.answerable_options
 
     elif action.type == "set_ai_summary":
         new_state.ai_summary = action.summary

@@ -19,6 +19,7 @@ st.set_page_config(
 
 # Import modules after st.set_page_config
 from components import (
+    inject_app_styles,
     render_data_table,
     render_debug_panel,
     render_filters,
@@ -45,6 +46,9 @@ def main():
     # Initialize state
     init_store()
     store = get_store()
+
+    # Inject CSS styles (once, before any UI)
+    inject_app_styles()
 
     # Header
     st.title("Knowledge Base Gap Analysis")
@@ -85,6 +89,9 @@ def main():
 
     st.divider()
 
+    # Filters at the top
+    render_filters(source_types, answerable_options)
+
     # Apply filters to get filtered dataset
     filtered_df = filter_data(
         df=merged_df,
@@ -120,22 +127,17 @@ def main():
 
     # Show selection info
     if any([store.selected_l1, store.selected_l2, store.selected_l3, store.selected_l4]):
-        st.info(f"Showing {len(filtered_df):,} records for selected taxonomy path")
+        st.info(f"Showing {len(filtered_df):,} tickets for selected taxonomy path")
     else:
-        st.caption(f"Showing all {len(filtered_df):,} records")
-
-    st.divider()
-
-    # Filters above the data table
-    render_filters(source_types, answerable_options)
+        st.caption(f"Showing all {len(filtered_df):,} tickets")
 
     # Data table
     render_data_table(filtered_df)
 
     st.divider()
 
-    # Compute KPIs once for reuse
-    kpis = compute_kpis(filtered_df)
+    # Compute KPIs once for reuse (pass total population for percentage calculation)
+    kpis = compute_kpis(filtered_df, total_population=len(merged_df))
 
     # KPI Bento boxes
     st.subheader("Key Metrics")

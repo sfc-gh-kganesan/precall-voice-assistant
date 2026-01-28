@@ -183,6 +183,48 @@ def expand_attrs_col(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def extract_response_scores(df: pd.DataFrame) -> tuple[list[float], list[float]]:
+    """
+    Extract all cosine_similarity and text_match scores from the RESPONSE column.
+
+    The RESPONSE column contains a list of search results, each with scoring metrics
+    nested under the @scores key.
+
+    Returns:
+        Tuple of (all_cosine_scores, all_text_match_scores)
+    """
+    if "RESPONSE" not in df.columns:
+        return [], []
+
+    all_cosine_scores = []
+    all_text_match_scores = []
+
+    for response in df["RESPONSE"]:
+        if pd.isna(response):
+            continue
+
+        data = response
+        if isinstance(response, str):
+            try:
+                data = json.loads(response)
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        # RESPONSE is a list of results
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    # Scores are nested under @scores
+                    scores = item.get("@scores", {})
+                    if isinstance(scores, dict):
+                        if "cosine_similarity" in scores and scores["cosine_similarity"] is not None:
+                            all_cosine_scores.append(float(scores["cosine_similarity"]))
+                        if "text_match" in scores and scores["text_match"] is not None:
+                            all_text_match_scores.append(float(scores["text_match"]))
+
+    return all_cosine_scores, all_text_match_scores
+
+
 @st.cache_data(ttl=300)
 def get_merged_data(_session: Session) -> pd.DataFrame:
     """
@@ -276,14 +318,22 @@ def filter_data(
     return filtered
 
 
-def compute_kpis(df: pd.DataFrame) -> dict:
+def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
     """
     Compute KPI metrics from filtered dataframe.
+
+    Args:
+        df: Filtered dataframe to compute KPIs from
+        total_population: Total number of records before filtering (for percentage calculation)
     """
     if df.empty:
         return {
-            "query_count": 0,
+            "ticket_count": 0,
+            "total_population": total_population or 0,
+            "ticket_pct_of_total": 0.0,
             "avg_context_relevance": None,
+            "avg_cosine_similarity": None,
+            "avg_text_match": None,
             "answerable_breakdown": {},
         }
 
@@ -292,6 +342,11 @@ def compute_kpis(df: pd.DataFrame) -> dict:
     # Context relevance
     avg_context_relevance = df["CONTEXT_RELEVANCE_SCORE"].mean()
 
+    # Cosine similarity and text match - flatten all results and aggregate
+    cosine_scores, text_match_scores = extract_response_scores(df)
+    avg_cosine_similarity = sum(cosine_scores) / len(cosine_scores) if cosine_scores else None
+    avg_text_match = sum(text_match_scores) / len(text_match_scores) if text_match_scores else None
+
     # Answerable breakdown - compute percentages for all actual values
     answerable_counts = df["answerable_with_kb"].value_counts()
     answerable_breakdown = {
@@ -299,11 +354,68 @@ def compute_kpis(df: pd.DataFrame) -> dict:
         for value, count in answerable_counts.items()
     }
 
+    # Calculate percentage of total population
+    total_pop = total_population or total
+    ticket_pct = (total / total_pop * 100) if total_pop > 0 else 0.0
+
     return {
-        "query_count": total,
+        "ticket_count": total,
+        "total_population": total_pop,
+        "ticket_pct_of_total": ticket_pct,
         "avg_context_relevance": avg_context_relevance,
+        "avg_cosine_similarity": avg_cosine_similarity,
+        "avg_text_match": avg_text_match,
         "answerable_breakdown": answerable_breakdown,
     }
+
+
+def _extract_cosine_scores(response) -> list[float]:
+    """Extract all cosine_similarity scores from a single RESPONSE value."""
+    if pd.isna(response):
+        return []
+    data = response
+    if isinstance(response, str):
+        try:
+            data = json.loads(response)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    scores = []
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                s = item.get("@scores", {})
+                if isinstance(s, dict) and "cosine_similarity" in s and s["cosine_similarity"] is not None:
+                    scores.append(float(s["cosine_similarity"]))
+    return scores
+
+
+def _extract_text_match_scores(response) -> list[float]:
+    """Extract all text_match scores from a single RESPONSE value."""
+    if pd.isna(response):
+        return []
+    data = response
+    if isinstance(response, str):
+        try:
+            data = json.loads(response)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    scores = []
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                s = item.get("@scores", {})
+                if isinstance(s, dict) and "text_match" in s and s["text_match"] is not None:
+                    scores.append(float(s["text_match"]))
+    return scores
+
+
+def _flatten_and_mean(series: pd.Series) -> float | None:
+    """Flatten a series of lists and compute the mean of all values."""
+    all_values = []
+    for lst in series:
+        if isinstance(lst, list):
+            all_values.extend(lst)
+    return sum(all_values) / len(all_values) if all_values else None
 
 
 def prepare_sunburst_data(
@@ -331,17 +443,28 @@ def prepare_sunburst_data(
     if not path_cols:
         path_cols = ["L1_TAG"]  # Default to L1 if nothing selected
 
+    # Extract scores from RESPONSE into columns for aggregation
+    df = df.copy()
+    df["_cosine_scores"] = df["RESPONSE"].apply(_extract_cosine_scores)
+    df["_text_match_scores"] = df["RESPONSE"].apply(_extract_text_match_scores)
+
     # Group by the visible levels and compute metrics
     grouped = (
         df
         .groupby(path_cols, dropna=False)
         .agg({
             "CONTEXT_RELEVANCE_SCORE": "mean",
-            "query": "count"
+            "query": "count",
+            "_cosine_scores": _flatten_and_mean,
+            "_text_match_scores": _flatten_and_mean,
         })
         .reset_index()
     )
-    grouped = grouped.rename(columns={"query": "QUERY_COUNT"})
+    grouped = grouped.rename(columns={
+        "query": "TICKET_COUNT",
+        "_cosine_scores": "AVG_COSINE_SIMILARITY",
+        "_text_match_scores": "AVG_TEXT_MATCH",
+    })
 
     # Fill NaN values for path columns
     for col in path_cols:

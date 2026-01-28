@@ -29,10 +29,11 @@ def render_sunburst(grouped_df: pd.DataFrame, path_cols: list[str]) -> None:
     fig = px.sunburst(
         grouped_df,
         path=path_cols,
-        values="QUERY_COUNT",
+        values="TICKET_COUNT",
         color="CONTEXT_RELEVANCE_SCORE",
         color_continuous_scale="Blues",
-        title="Taxonomy Distribution by Query Count",
+        title="Taxonomy Distribution by Ticket Count",
+        labels={"CONTEXT_RELEVANCE_SCORE": "Context Relevance"},
     )
 
     fig.update_layout(
@@ -50,6 +51,15 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
     Each level filters the options available in the next level.
     """
     store = get_store()
+
+    # Handle clear request from previous run (must happen before widgets are instantiated)
+    if st.session_state.get("_clear_taxonomy_requested"):
+        del st.session_state["_clear_taxonomy_requested"]
+        # Set widget values to "All" before widgets are created
+        st.session_state["sel_l1"] = "All"
+        st.session_state["sel_l2"] = "All"
+        st.session_state["sel_l3"] = "All"
+        st.session_state["sel_l4"] = "All"
 
     st.markdown("**Filter by Taxonomy:**")
 
@@ -160,6 +170,8 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         st.markdown("<br>", unsafe_allow_html=True)  # Align with dropdowns
         if st.button("Clear", key="btn_clear_taxonomy"):
             dispatch(ClearSelectionAction())
+            # Set flag to clear widget keys on next run (before widgets are instantiated)
+            st.session_state["_clear_taxonomy_requested"] = True
             st.rerun()
 
     # Show current selection as breadcrumb
@@ -181,8 +193,7 @@ def render_filters(source_types: list[str], answerable_options: list[str]) -> No
     """Render filter controls for source type and answerable_with_kb."""
     store = get_store()
 
-    # Give filters more breathing room with 3 columns (2 for filters, 1 spacer)
-    col1, col2, col_spacer = st.columns([2, 2, 3])
+    col1, col2 = st.columns(2)
 
     with col1:
         # Use store values only if they're valid options, otherwise use all options
@@ -217,74 +228,149 @@ def render_filters(source_types: list[str], answerable_options: list[str]) -> No
         )
 
 
-def render_kpi_bento(kpis: dict) -> None:
-    """Render KPI metrics as bento box cards with visual styling."""
-
-    # CSS for bento box styling
+def inject_app_styles() -> None:
+    """
+    Inject all application CSS styles.
+    Call once at the top of the main app, before any UI rendering.
+    """
     st.markdown("""
     <style>
     .bento-box {
         background-color: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 10px;
-        padding: 20px;
+        padding: 16px 20px;
         text-align: center;
+        height: 130px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        box-sizing: border-box;
     }
     .bento-label {
         font-size: 14px;
         color: rgba(255, 255, 255, 0.7);
         margin-bottom: 8px;
+        line-height: 1.2;
     }
     .bento-value {
         font-size: 32px;
         font-weight: bold;
         color: white;
+        line-height: 1.2;
     }
     .bento-value-small {
         font-size: 24px;
         font-weight: bold;
         color: white;
+        line-height: 1.2;
+    }
+    .bento-subtitle {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 4px;
+        line-height: 1.2;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # First row: Query Count and Context Relevance
-    col1, col2 = st.columns(2)
+
+def render_bento_box(label: str, value: str, subtitle: str | None = None, small_value: bool = False, hidden: bool = False) -> None:
+    """
+    Render a single bento box with consistent structure.
+    Pure render function - requires inject_app_styles() to be called first.
+
+    Args:
+        label: The header label text
+        value: The main value to display
+        subtitle: Optional subtitle text below the value
+        small_value: If True, use smaller font for value
+        hidden: If True, render invisible placeholder for grid alignment
+    """
+    box_style = "visibility: hidden;" if hidden else ""
+    value_class = "bento-value-small" if small_value else "bento-value"
+    # Always render 3 rows for consistent height
+    # Use opacity: 0 (not visibility: hidden) to ensure space is reserved
+    subtitle_content = subtitle if subtitle else "&nbsp;"
+    subtitle_style = "" if subtitle else "opacity: 0;"
+
+    st.markdown(f"""
+    <div class="bento-box" style="{box_style}">
+        <div class="bento-label">{label}</div>
+        <div class="{value_class}">{value}</div>
+        <div class="bento-subtitle" style="{subtitle_style}">{subtitle_content}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_kpi_bento(kpis: dict) -> None:
+    """Render KPI metrics as bento box cards with visual styling."""
+
+    # First row: Ticket Count, Context Relevance, Cosine Similarity, Text Match
+    col1, col2, col3, col4 = st.columns(4, vertical_alignment="center")
+
+    # Calculate ticket count and percentage of total
+    ticket_count = kpis['ticket_count']
+    total_population = kpis.get('total_population', ticket_count)
+    ticket_pct = kpis.get('ticket_pct_of_total', 100.0)
 
     with col1:
-        st.markdown(f"""
-        <div class="bento-box">
-            <div class="bento-label">Query Count</div>
-            <div class="bento-value">{kpis['query_count']:,}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_bento_box(
+            label="Ticket Count",
+            value=f"{ticket_count:,}",
+            subtitle=f"({ticket_pct:.1f}% of {total_population:,} total)"
+        )
 
     with col2:
         relevance = kpis['avg_context_relevance']
         relevance_display = f"{relevance:.2f}" if relevance is not None and not pd.isna(relevance) else "N/A"
-        st.markdown(f"""
-        <div class="bento-box">
-            <div class="bento-label">Avg Context Relevance</div>
-            <div class="bento-value">{relevance_display}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_bento_box(
+            label="Avg Context Relevance",
+            value=relevance_display
+        )
+
+    with col3:
+        cosine_sim = kpis.get('avg_cosine_similarity')
+        cosine_display = f"{cosine_sim:.3f}" if cosine_sim is not None and not pd.isna(cosine_sim) else "N/A"
+        render_bento_box(
+            label="Avg Cosine Similarity",
+            value=cosine_display
+        )
+
+    with col4:
+        text_match = kpis.get('avg_text_match')
+        text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
+        render_bento_box(
+            label="Avg Text Match",
+            value=text_match_display
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Second row: Answerable by KB breakdown
+    # Second row: Answerable by KB breakdown (always use 4 columns to match first row)
     breakdown = kpis.get('answerable_breakdown', {})
 
     if breakdown:
-        cols = st.columns(len(breakdown))
-        for i, (value, pct) in enumerate(sorted(breakdown.items())):
+        cols = st.columns(4, vertical_alignment="center")
+        sorted_breakdown = sorted(breakdown.items())
+
+        for i in range(4):
             with cols[i]:
-                label = value.capitalize() if value else "Unknown"
-                st.markdown(f"""
-                <div class="bento-box">
-                    <div class="bento-label">Answerable: {label}</div>
-                    <div class="bento-value-small">{pct:.1f}%</div>
-                </div>
-                """, unsafe_allow_html=True)
+                if i < len(sorted_breakdown):
+                    value, pct = sorted_breakdown[i]
+                    label = value.capitalize() if value else "Unknown"
+                    render_bento_box(
+                        label=f"Answerable: {label}",
+                        value=f"{pct:.1f}%",
+                        small_value=True
+                    )
+                else:
+                    render_bento_box(
+                        label="&nbsp;",
+                        value="&nbsp;",
+                        hidden=True
+                    )
 
 
 def render_data_table(df: pd.DataFrame) -> None:
@@ -307,15 +393,28 @@ def render_data_table(df: pd.DataFrame) -> None:
         "SOURCE_TABLE",
     ]
 
+    # Rename columns for display
+    column_rename_map = {
+        "query": "Service Ticket",
+        "answerable_with_kb": "Answerable by KB",
+        "CONTEXT_RELEVANCE_SCORE": "Context Relevance",
+        "estimated_complexity": "Complexity",
+        "SOURCE_TABLE": "Source Type",
+    }
+
     # Only include columns that exist
     available_cols = [c for c in display_cols if c in df.columns]
 
-    st.subheader(f"Synthetic Pairs ({len(df):,} records)")
+    st.subheader(f"Service Tickets ({len(df):,} records)")
     st.caption("Click a row to inspect details below")
+
+    # Create display dataframe with renamed columns
+    display_df = df[available_cols].copy()
+    display_df = display_df.rename(columns={k: v for k, v in column_rename_map.items() if k in available_cols})
 
     # Dataframe with row selection enabled
     event = st.dataframe(
-        df[available_cols],
+        display_df,
         use_container_width=True,
         hide_index=True,
         height=350,
@@ -350,7 +449,7 @@ def render_data_table(df: pd.DataFrame) -> None:
             reason = row.get('CONTEXT_RELEVANCE_REASON', '')
             if pd.notna(reason) and reason:
                 st.markdown("**Chain of Thought Reasoning:**")
-                st.code(str(reason), language=None)
+                st.markdown(f'<div style="background-color: rgba(128, 128, 128, 0.1); padding: 1rem; border-radius: 0.5rem; white-space: pre-wrap; word-wrap: break-word;">{str(reason)}</div>', unsafe_allow_html=True)
             else:
                 st.caption("No evaluation reasoning available")
 
@@ -451,7 +550,7 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
                     🤖 Knowledge Gap Analysis
                 </div>
                 <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5);">
-                    {len(filtered_df):,} evaluations • Avg Score: {avg_score:.2f}
+                    {len(filtered_df):,} tickets • Avg Score: {avg_score:.2f}
                 </div>
             </div>
             <div style="color: white; font-size: 15px; line-height: 1.8;">
@@ -486,7 +585,7 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
                 🤖 Knowledge Gap Analysis
             </div>
             <div style="font-size: 13px; color: rgba(255, 255, 255, 0.5);">
-                Analyze {len(filtered_df):,} context relevance evaluations
+                Analyze {len(filtered_df):,} service tickets
             </div>
         </div>
         """, unsafe_allow_html=True)
