@@ -86,7 +86,7 @@ export const createProjectRootCommand = new Command('createProjectRoot')
                 );
                 console.log(`  cd ${targetDir}`);
                 console.log('  uv init');
-                console.log('  uv add fastapi uvicorn');
+                console.log('  uv add fastapi "uvicorn[standard]"');
                 return;
             }
         } catch {
@@ -111,13 +111,18 @@ export const createProjectRootCommand = new Command('createProjectRoot')
             return;
         }
 
-        // Run uv add fastapi uvicorn
-        console.log('\nInstalling Python dependencies (fastapi, uvicorn)...');
-        const uvAddProc = Bun.spawn(['uv', 'add', 'fastapi', 'uvicorn'], {
-            cwd: targetDir,
-            stdout: 'inherit',
-            stderr: 'inherit',
-        });
+        // Run uv add fastapi uvicorn[standard]
+        console.log(
+            '\nInstalling Python dependencies (fastapi, uvicorn[standard])...',
+        );
+        const uvAddProc = Bun.spawn(
+            ['uv', 'add', 'fastapi', 'uvicorn[standard]'],
+            {
+                cwd: targetDir,
+                stdout: 'inherit',
+                stderr: 'inherit',
+            },
+        );
 
         const uvAddExitCode = await uvAddProc.exited;
 
@@ -128,7 +133,7 @@ export const createProjectRootCommand = new Command('createProjectRoot')
                 '\n✗ Failed to install Python dependencies. Please run manually:',
             );
             console.log(`  cd ${targetDir}`);
-            console.log('  uv add fastapi uvicorn');
+            console.log('  uv add fastapi "uvicorn[standard]"');
         }
 
         console.log('\n✓ Setup complete!');
