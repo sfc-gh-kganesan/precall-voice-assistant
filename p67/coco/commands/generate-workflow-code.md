@@ -55,11 +55,11 @@ Runtime (EVERY RUN):
 
 ```typescript
 // DO THIS - Call Cortex Analyst at runtime as a workflow step
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // SDK is passed by the runtime - don't create or close it
 async function analyze_drivers(
-    sdk: AgentSDK,
+    sdk: WorkflowSDK,
     accounts: string[]
 ): Promise<Record<string, any>> {
     const results: Record<string, any> = {};
@@ -115,7 +115,7 @@ The P67 Agent SDK (`@p67/agent-sdk`) provides a simple, secure interface for:
 ```typescript
 // The SDK is injected by the P67 runtime into your workflow
 // Import the type from your local sdk.ts file
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 ```
 
 ### SDK Configuration
@@ -162,7 +162,7 @@ Then pass the same config_name to SDK methods throughout your workflow:
 ```typescript
 // Add config_name to your state
 const StateAnnotation = Annotation.Root({
-    sdk: Annotation<AgentSDK>({
+    sdk: Annotation<WorkflowSDK>({
         reducer: (_, right) => right,
     }),
     config_name: Annotation<string | undefined>({
@@ -191,10 +191,10 @@ async function some_node(state: typeof StateAnnotation.State) {
 **IMPORTANT**: Your workflow does **NOT** create or close the SDK. The P67 runtime injects the SDK into your workflow's `main()` function.
 
 ```typescript
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // The SDK is passed to your main function by the runtime
-export async function main(sdk: AgentSDK) {
+export async function main(sdk: WorkflowSDK) {
     // Use the SDK - don't create or close it
     const result = await sdk.executeQueryReadOnly(
         "SELECT * FROM my_table LIMIT 10"
@@ -681,7 +681,7 @@ This file contains:
 
 -   A basic LangGraph workflow with example nodes
 -   Proper `Annotation` API usage
--   The `main(sdk: AgentSDK)` export function
+-   The `main(sdk: WorkflowSDK)` export function
 -   SDK integration through state
 
 ### Step 2: Create OVERVIEW.md
@@ -692,7 +692,7 @@ Before modifying code, create OVERVIEW.md with:
 2. **Architecture**: LangGraph state machine design
 3. **Steps**: Detailed breakdown of each workflow node
 4. **Modifications Needed**: Which parts of index.ts need to change
-5. **Additional Files**: Any new files to create (utils.ts, step files, etc.)
+5. **Additional Files**: Any new files to create (utils.ts etc.)
 6. **Implementation Strategy**: How to achieve requirements using ONLY:
     - Built-in JavaScript/TypeScript features
     - P67 Agent SDK
@@ -761,11 +761,11 @@ The generated `src/index.ts` looks like this:
 ```typescript
 // src/index.ts
 import { StateGraph, Annotation } from "@langchain/langgraph";
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // Define the state structure
 const StateAnnotation = Annotation.Root({
-    sdk: Annotation<AgentSDK>({
+    sdk: Annotation<WorkflowSDK>({
         reducer: (_, right) => right,
     }),
     messages: Annotation<string[]>({
@@ -796,7 +796,7 @@ const workflow = new StateGraph(StateAnnotation)
 const app = workflow.compile();
 
 // Export main function - SDK is injected by the runtime
-export async function main(sdk: AgentSDK) {
+export async function main(sdk: WorkflowSDK) {
     console.log("Starting workflow...");
 
     const result = await app.invoke({
@@ -849,11 +849,11 @@ Always use LangGraph even for deterministic workflows. Use the `Annotation` API 
 
 ```typescript
 import { StateGraph, Annotation } from "@langchain/langgraph";
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // Define state with Annotation API
 const StateAnnotation = Annotation.Root({
-    sdk: Annotation<AgentSDK>({
+    sdk: Annotation<WorkflowSDK>({
         reducer: (_, right) => right,
     }),
     candidates: Annotation<Array<Record<string, any>>>({
@@ -926,9 +926,9 @@ const credit_change = candidate.CREDIT_CHANGE || 0;
 The SDK is injected into your `main()` function. Pass it to the workflow state:
 
 ```typescript
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
-export async function main(sdk: AgentSDK) {
+export async function main(sdk: WorkflowSDK) {
     // Pass SDK to workflow via initial state
     const result = await app.invoke({
         sdk: sdk, // Inject SDK into workflow state
@@ -945,7 +945,7 @@ export async function main(sdk: AgentSDK) {
 **3. Cortex Analyst SQL Execution Pattern**
 
 ```typescript
-import { AgentSDK } from "./sdk";
+import { WorkflowSDK } from "./sdk";
 
 // In a workflow node - SDK is available from state
 async function analyzeStep(state: typeof StateAnnotation.State) {
@@ -1021,32 +1021,31 @@ async function callAgentStep(state: typeof StateAnnotation.State) {
 Always log inputs/outputs and add debug prints:
 
 ```typescript
-import { log_state } from "./utils";
+// Inside a workflow node function (e.g., "find_candidates" node from workflow_spec.json)
+async function find_candidates(state: typeof StateAnnotation.State) {
+    const { sdk } = state;
+    const question = "Find candidate accounts";
 
-// Log before expensive operation
-log_state({
-    step_name: "step1_find_candidates",
-    line_ref: "step1.ts:42",
-    inputs: { question },
-    outputs: { status: "calling_analyst" },
-});
+    // Log before expensive operation
+    console.log(`[index.ts:42] [find_candidates] Starting - question: ${question}`);
 
-// Execute operation with SDK
-const response = await sdk.queryCortexAnalyst(question);
+    // Execute operation with SDK
+    const response = await sdk.queryCortexAnalyst(question);
 
-// Log result
-log_state({
-    step_name: "step1_find_candidates",
-    line_ref: "step1.ts:90",
-    inputs: { success: response.success },
-    outputs: { has_data: !!response.data, error: response.error },
-});
+    // Log result with details
+    console.log(`[index.ts:50] [find_candidates] Completed - success: ${response.success}, has_data: ${!!response.data}`);
+    if (!response.success) {
+        console.log(`[index.ts:52] [find_candidates] Error: ${response.error}`);
+    }
 
-// Add user-visible debug output
-if (response.success) {
-    console.log("✅ Cortex Analyst query succeeded");
-} else {
-    console.log("❌ Cortex Analyst query failed:", response.error);
+    // Add user-visible debug output
+    if (response.success) {
+        console.log("✅ Cortex Analyst query succeeded");
+    } else {
+        console.log("❌ Cortex Analyst query failed:", response.error);
+    }
+
+    return { candidates: response.data };
 }
 ```
 
@@ -1111,11 +1110,11 @@ async function analyze_step(state: WorkflowState): Promise<WorkflowState> {
 
 ```typescript
 import { Annotation } from '@langchain/langgraph';
-import { AgentSDK } from './sdk';
+import { WorkflowSDK } from './sdk';
 
 // Define state with Annotation API
 const StateAnnotation = Annotation.Root({
-  sdk: Annotation<AgentSDK>({
+  sdk: Annotation<WorkflowSDK>({
     reducer: (_, right) => right,
   }),
   candidates: Annotation<Array<Record<string, any>>>({  // Results from step 1
@@ -1222,7 +1221,7 @@ import { vi, beforeEach } from "vitest";
 // Auto-mock the SDK module for all tests
 beforeEach(() => {
     vi.mock("../src/sdk.ts", () => ({
-        // Mock the AgentSDK type if needed for type checking
+        // Mock the WorkflowSDK type if needed for type checking
     }));
 });
 
@@ -1359,7 +1358,7 @@ npm test 2>&1 | grep -i "browser\|keyring\|auth"
 ❌ Not validating SDK response `.success` field before using data
 ❌ **Using lowercase object keys for SQL results (must be UPPERCASE)**
 ❌ **Creating or closing the SDK in workflow code (it's injected by runtime)**
-❌ **Changing the `main(sdk: AgentSDK)` function signature**
+❌ **Changing the `main(sdk: WorkflowSDK)` function signature**
 ❌ **Not passing SDK through workflow state to all nodes**
 ❌ **Using old `channels` API instead of `Annotation` API for state**
 ❌ **Using `snowflake-sdk` directly instead of the P67 Agent SDK**
