@@ -346,12 +346,12 @@ def render_kpi_bento(kpis: dict) -> None:
             value=text_match_display
         )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Second row: Answerable by KB breakdown (always use 4 columns to match first row)
+    # Second row: Answerable by KB breakdown (only show if multiple values)
     breakdown = kpis.get('answerable_breakdown', {})
 
-    if breakdown:
+    # Hide the row if only one option selected (100% is redundant)
+    if len(breakdown) > 1:
+        st.markdown("<br>", unsafe_allow_html=True)
         cols = st.columns(4, vertical_alignment="center")
         sorted_breakdown = sorted(breakdown.items())
 
