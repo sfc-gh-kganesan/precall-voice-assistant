@@ -27,6 +27,20 @@ export const WorkflowListResponseSchema = z.object({
     workflows: z.array(WorkflowSchema),
 });
 
+export const RunStatusSchema = z.enum([
+    'running',
+    'completed',
+    'interrupted',
+    'failed',
+]);
+
+export const PendingInterruptSchema = z.object({
+    interruptId: z.string(),
+    value: z.unknown(),
+    timestamp: z.string(),
+    nodeId: z.string().optional(),
+});
+
 export const WorkflowRunResponseSchema = z.object({
     exitCode: z.number(),
     stdout: z.array(z.string()),
@@ -39,6 +53,9 @@ export const WorkflowRunResponseSchema = z.object({
             message: z.string(),
         }),
     ),
+    status: RunStatusSchema.optional(),
+    pendingInterrupt: PendingInterruptSchema.optional(),
+    runId: z.string().optional(),
 });
 
 export const WorkflowRunParamsSchema = z.object({
@@ -217,3 +234,58 @@ export type LogListResponse = z.infer<typeof LogListResponseSchema>;
 export type RunListQuery = z.infer<typeof RunListQuerySchema>;
 export type RunEntry = z.infer<typeof RunEntrySchema>;
 export type RunListResponse = z.infer<typeof RunListResponseSchema>;
+
+// Interrupt Schemas
+export const InterruptStatusSchema = z.enum(['Pending', 'Resumed', 'Expired']);
+export type InterruptStatusType = z.infer<typeof InterruptStatusSchema>;
+
+export const InterruptSchema = z.object({
+    id: z.string(),
+    runId: z.string(),
+    workflowId: z.string(),
+    payload: z.unknown(),
+    nodeId: z.string().nullable(),
+    status: InterruptStatusSchema,
+    response: z.unknown().nullable(),
+    createdAt: z.string(),
+    resumedAt: z.string().nullable(),
+});
+
+export const InterruptListQuerySchema = z.object({
+    workflowId: z.string().optional(),
+    runId: z.string().optional(),
+    status: InterruptStatusSchema.optional(),
+    limit: z.coerce.number().optional().default(20),
+    offset: z.coerce.number().optional().default(0),
+});
+
+export const InterruptListResponseSchema = z.object({
+    interrupts: z.array(InterruptSchema),
+    total: z.number(),
+});
+
+export const InterruptGetParamsSchema = z.object({
+    interruptId: z.string(),
+});
+
+export const InterruptResumeParamsSchema = z.object({
+    interruptId: z.string(),
+});
+
+export const InterruptResumeBodySchema = z.object({
+    response: z.unknown(),
+});
+
+export const InterruptResumeResponseSchema = z.object({
+    success: z.boolean(),
+    interruptId: z.string(),
+    resumedAt: z.string(),
+});
+
+export type Interrupt = z.infer<typeof InterruptSchema>;
+export type InterruptListQuery = z.infer<typeof InterruptListQuerySchema>;
+export type InterruptListResponse = z.infer<typeof InterruptListResponseSchema>;
+export type InterruptResumeBody = z.infer<typeof InterruptResumeBodySchema>;
+export type InterruptResumeResponse = z.infer<
+    typeof InterruptResumeResponseSchema
+>;

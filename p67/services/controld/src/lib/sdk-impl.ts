@@ -5,6 +5,7 @@
  * Workflow SDK Implementation for P67 platform
  */
 
+import * as crypto from 'node:crypto';
 import {
     type Binds,
     type CortexAgentOptions,
@@ -13,6 +14,7 @@ import {
     type EmailOptions,
     type HttpRequestOptions,
     type HttpResponse,
+    type InterruptOptions,
     type P67Config,
     P67ConfigSchema,
     type P67ConfigValue,
@@ -22,8 +24,15 @@ import {
     type WorkflowSDK,
 } from '@p67/workflow-sdk';
 import snowflake from 'snowflake-sdk';
-import type { Manifest } from './manifest';
-import type { ValueManager } from './value-manager';
+import type { Manifest } from './manifest.js';
+import {
+    type InterruptMessage,
+    MessageSchema,
+    MessageType,
+    makeInterruptMessage,
+    type ResumeInterruptMessage,
+} from './runtime/schema.js';
+import type { ValueManager } from './value-manager.js';
 
 /**
  * Function type for resolving OAuth tokens
@@ -49,6 +58,13 @@ export class WorkflowSDKImpl implements WorkflowSDK {
     private connectionPromise: Promise<snowflake.Connection> | null = null;
     private config: P67Config;
     private oauthTokenResolver?: OAuthTokenResolver;
+    private pendingInterrupts: Map<
+        string,
+        {
+            resolve: (value: unknown) => void;
+            reject: (error: Error) => void;
+        }
+    > = new Map();
 
     constructor(configOrOptions: P67Config | WorkflowSDKImplOptions) {
         if ('snowflakeConfig' in configOrOptions) {
@@ -59,6 +75,44 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             this.config = P67ConfigSchema.parse(configOrOptions.config);
             this.oauthTokenResolver = configOrOptions.oauthTokenResolver;
         }
+
+        // Listen for resume messages from parent process (used in child process context)
+        this.setupResumeListener();
+    }
+
+    /**
+     * Sets up listener for ResumeInterrupt messages from parent process
+     */
+    private setupResumeListener(): void {
+        process.on('message', (message: unknown) => {
+            console.log(
+                `[SDK] Received message from parent:`,
+                JSON.stringify(message),
+            );
+            const parsed = MessageSchema.safeParse(message);
+            if (!parsed.success) {
+                console.log(`[SDK] Failed to parse message:`, parsed.error);
+                return;
+            }
+
+            if (parsed.data.type === MessageType.ResumeInterrupt) {
+                const { interruptId, response } =
+                    parsed.data as ResumeInterruptMessage;
+                console.log(
+                    `[SDK] Processing ResumeInterrupt for: ${interruptId}`,
+                );
+                const pending = this.pendingInterrupts.get(interruptId);
+                if (pending) {
+                    console.log(`[SDK] Found pending interrupt, resolving...`);
+                    pending.resolve(response);
+                    this.pendingInterrupts.delete(interruptId);
+                } else {
+                    console.log(
+                        `[SDK] No pending interrupt found for: ${interruptId}`,
+                    );
+                }
+            }
+        });
     }
 
     private getSnowflakeConnectionOptions(
@@ -777,6 +831,78 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                 error: `Request failed: ${errorMessage}`,
             };
         }
+    }
+
+    /**
+     * Pauses workflow execution and waits for human input.
+     *
+     * Sends an interrupt message to the parent process and waits for a resume message.
+     * The workflow will block until a human provides input via the controld API.
+     *
+     * @param payload - JSON-serializable value to surface (question, form data, etc.)
+     * @param options - Optional configuration
+     * @returns The response provided by the human
+     * @throws Error if timeout is reached (when specified) or if not running in child process
+     */
+    async interrupt<T = unknown>(
+        payload: unknown,
+        options?: InterruptOptions,
+    ): Promise<T> {
+        const interruptId = crypto.randomUUID();
+        const timestamp = new Date().toISOString();
+
+        // Create and send interrupt message to parent
+        const message: InterruptMessage = makeInterruptMessage({
+            interruptId,
+            payload,
+            nodeId: options?.nodeId,
+            timestamp,
+        });
+
+        if (!process.send) {
+            throw new Error(
+                'interrupt() can only be called from a workflow running in a child process',
+            );
+        }
+
+        console.log(`[SDK] Sending interrupt message: ${interruptId}`);
+        process.send(message);
+
+        // Wait for response (long-poll pattern)
+        // Use setInterval to keep the event loop alive while waiting
+        return new Promise<T>((resolve, reject) => {
+            // Keep-alive interval to prevent Node from exiting
+            const keepAlive = setInterval(() => {
+                // This keeps the event loop active
+            }, 1000);
+
+            this.pendingInterrupts.set(interruptId, {
+                resolve: (value: unknown) => {
+                    clearInterval(keepAlive);
+                    console.log(`[SDK] Interrupt resolved: ${interruptId}`);
+                    resolve(value as T);
+                },
+                reject: (error: Error) => {
+                    clearInterval(keepAlive);
+                    reject(error);
+                },
+            });
+
+            // Optional timeout
+            if (options?.timeout) {
+                setTimeout(() => {
+                    if (this.pendingInterrupts.has(interruptId)) {
+                        clearInterval(keepAlive);
+                        this.pendingInterrupts.delete(interruptId);
+                        reject(
+                            new Error(
+                                `Interrupt timed out after ${options.timeout}ms`,
+                            ),
+                        );
+                    }
+                }, options.timeout);
+            }
+        });
     }
 }
 

@@ -1,3 +1,4 @@
+import type { ChildProcess } from 'node:child_process';
 import { fork } from 'node:child_process';
 import * as fs from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
@@ -6,8 +7,11 @@ import type { LogService } from '@controld/lib/LogService.js';
 import type { Manifest } from '@controld/lib/manifest.js';
 import { parseManifest } from '@controld/lib/manifest.js';
 import {
+    type InterruptMessage,
+    InterruptMessageSchema,
     MessageSchema,
     MessageType,
+    makeResumeInterruptMessage,
     makeRunWorkflowMessage,
     type SerializedP67Config,
     type WorkflowError,
@@ -17,7 +21,9 @@ import {
 import { hydrateConfig } from '@controld/lib/sdk-impl.js';
 import { ValueManager } from '@controld/lib/value-manager.js';
 import type { PrismaClient } from '@p67/db';
-import type { P67Config } from '@p67/workflow-sdk';
+import type { InterruptPayload, P67Config } from '@p67/workflow-sdk';
+
+export type RunStatus = 'running' | 'completed' | 'interrupted' | 'failed';
 
 export type RunResult = {
     stdout: string[];
@@ -26,6 +32,8 @@ export type RunResult = {
     exitCode: number;
     errors: Array<{ error: WorkflowError; message: string }>;
     runId: string;
+    status: RunStatus;
+    pendingInterrupt?: InterruptPayload;
 };
 
 export class Logger {
@@ -60,6 +68,12 @@ export class Logger {
 
 export class Runner {
     private workflowId: string;
+    private proc: ChildProcess | null = null;
+    private currentRunId: string = 'unknown';
+    private pendingInterrupt: InterruptPayload | null = null;
+    private interruptResolve: ((value: RunResult) => void) | null = null;
+    private completionPromise: Promise<RunResult> | null = null;
+    private completionResolve: ((value: RunResult) => void) | null = null;
 
     constructor(
         private readonly workflowDir: string,
@@ -71,6 +85,78 @@ export class Runner {
         // Extract workflow ID from directory name (e.g., "wf-abc123")
         this.workflowId = basename(workflowDir);
         this.params = params;
+    }
+
+    /**
+     * Returns the current pending interrupt, if any
+     */
+    public getPendingInterrupt(): InterruptPayload | null {
+        return this.pendingInterrupt;
+    }
+
+    /**
+     * Returns whether the workflow is currently paused waiting for human input
+     */
+    public isInterrupted(): boolean {
+        return this.pendingInterrupt !== null;
+    }
+
+    /**
+     * Returns the current run ID
+     */
+    public getRunId(): string {
+        return this.currentRunId;
+    }
+
+    /**
+     * Returns the workflow ID
+     */
+    public getWorkflowId(): string {
+        return this.workflowId;
+    }
+
+    /**
+     * Resume a paused workflow with human input
+     * @param interruptId - The ID of the interrupt to resume
+     * @param response - The response from the human
+     * @throws Error if no interrupt is pending or IDs don't match
+     */
+    public resume(interruptId: string, response: unknown): void {
+        if (!this.pendingInterrupt) {
+            throw new Error('No pending interrupt to resume');
+        }
+
+        if (this.pendingInterrupt.interruptId !== interruptId) {
+            throw new Error(
+                `Interrupt ID mismatch: expected ${this.pendingInterrupt.interruptId}, got ${interruptId}`,
+            );
+        }
+
+        if (!this.proc) {
+            throw new Error('No active workflow process to resume');
+        }
+
+        const message = makeResumeInterruptMessage({
+            interruptId,
+            response,
+        });
+
+        this.proc.send(message);
+        this.pendingInterrupt = null;
+    }
+
+    /**
+     * Wait for workflow completion after resuming from an interrupt
+     * @returns Promise that resolves with the final RunResult
+     * @throws Error if no completion promise is available (workflow not started or already completed)
+     */
+    public waitForCompletion(): Promise<RunResult> {
+        if (!this.completionPromise) {
+            throw new Error(
+                'No active workflow to wait for completion. Either start() was not called or workflow already completed.',
+            );
+        }
+        return this.completionPromise;
     }
 
     /**
@@ -95,6 +181,7 @@ export class Runner {
             );
             runId = run.id;
         }
+        this.currentRunId = runId;
 
         // Helper to write logs to the database
         const writeLog = async (
@@ -136,6 +223,7 @@ export class Runner {
                     },
                 ],
                 runId,
+                status: 'failed',
             };
         }
 
@@ -164,6 +252,7 @@ export class Runner {
                     },
                 ],
                 runId,
+                status: 'failed',
             };
         }
 
@@ -192,6 +281,7 @@ export class Runner {
                     },
                 ],
                 runId,
+                status: 'failed',
             };
         }
 
@@ -233,6 +323,7 @@ export class Runner {
                     },
                 ],
                 runId,
+                status: 'failed',
             };
         }
 
@@ -243,6 +334,7 @@ export class Runner {
         const proc = fork(hostPath, [], {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
         });
+        this.proc = proc;
 
         const stdout: string[] = [];
         const stderr: string[] = [];
@@ -312,10 +404,66 @@ export class Runner {
                     );
                     break;
                 }
+                case MessageType.Interrupt: {
+                    const pm = InterruptMessageSchema.safeParse(message);
+                    if (!pm.success) {
+                        console.log(
+                            `Failed to parse InterruptMessage: ${JSON.stringify(message)}`,
+                        );
+                        logger.debug(
+                            `Runner received invalid InterruptMessage from child process`,
+                        );
+                        return;
+                    }
+                    const interruptData = pm.data as InterruptMessage;
+                    logger.debug(
+                        `Workflow interrupted: ${interruptData.interruptId}`,
+                    );
+
+                    // Store the pending interrupt
+                    this.pendingInterrupt = {
+                        interruptId: interruptData.interruptId,
+                        value: interruptData.payload,
+                        timestamp: interruptData.timestamp,
+                        nodeId: interruptData.nodeId,
+                    };
+
+                    writeLog(
+                        'RuntimeHost',
+                        `Workflow waiting for human input: ${interruptData.interruptId}`,
+                        {
+                            interruptId: interruptData.interruptId,
+                            payload: interruptData.payload,
+                            nodeId: interruptData.nodeId,
+                        },
+                    );
+
+                    // If we have an interrupt resolver, call it to return early
+                    if (this.interruptResolve) {
+                        this.interruptResolve({
+                            stdout,
+                            stderr,
+                            log: logger.dump(),
+                            errors,
+                            exitCode: -1, // Special code indicating interrupted
+                            runId,
+                            status: 'interrupted',
+                            pendingInterrupt: this.pendingInterrupt,
+                        });
+                    }
+                    break;
+                }
                 case MessageType.RunWorkflow:
                     console.log('Received unexpected RunWorkflow message');
                     logger.debug(
                         `Runner received unexpected RunWorkflow message from child process: ${JSON.stringify(m.data)}`,
+                    );
+                    break;
+                case MessageType.ResumeInterrupt:
+                    // This shouldn't happen - ResumeInterrupt goes parent -> child
+                    console.log('Received unexpected ResumeInterrupt message');
+                    logger.debug(
+                        `Runner received unexpected ResumeInterrupt message from child process`,
                     );
                     break;
             }
@@ -326,7 +474,16 @@ export class Runner {
             config: this.serializeConfig(hydratedConfig),
         });
 
-        const getExitCode = new Promise<number>((resolve) => {
+        // Create a completion promise that resolves only when process exits
+        this.completionPromise = new Promise<RunResult>((resolve) => {
+            this.completionResolve = resolve;
+        });
+
+        // Create a promise that resolves on exit OR on interrupt (for early return from start())
+        const getResult = new Promise<RunResult>((resolve) => {
+            // Store resolve for interrupt handler to use
+            this.interruptResolve = resolve;
+
             proc.on('error', (error) => {
                 console.error('child process error:', error);
                 logger.debug(
@@ -335,7 +492,17 @@ export class Runner {
                 writeLog('RuntimeHost', `Process error: ${error}`, {
                     error: 'ProcessError',
                 });
-                resolve(1);
+                const result: RunResult = {
+                    stdout,
+                    stderr,
+                    log: logger.dump(),
+                    errors,
+                    exitCode: 1,
+                    runId,
+                    status: 'failed',
+                };
+                resolve(result);
+                this.completionResolve?.(result);
             });
 
             proc.on('uncaughtException', (error) => {
@@ -346,7 +513,17 @@ export class Runner {
                 writeLog('RuntimeHost', `Uncaught exception: ${error}`, {
                     error: 'UncaughtException',
                 });
-                resolve(1);
+                const result: RunResult = {
+                    stdout,
+                    stderr,
+                    log: logger.dump(),
+                    errors,
+                    exitCode: 1,
+                    runId,
+                    status: 'failed',
+                };
+                resolve(result);
+                this.completionResolve?.(result);
             });
 
             proc.on('exit', (code) => {
@@ -359,25 +536,34 @@ export class Runner {
                         exitCode: code,
                     },
                 );
-                resolve(code || 0);
+                const result: RunResult = {
+                    stdout,
+                    stderr,
+                    log: logger.dump(),
+                    errors,
+                    exitCode: code || 0,
+                    runId,
+                    status: code === 0 ? 'completed' : 'failed',
+                };
+                // Always resolve the completion promise on exit
+                this.completionResolve?.(result);
+                // Only resolve getResult if we haven't already resolved due to interrupt
+                if (!this.pendingInterrupt) {
+                    resolve(result);
+                }
+                // Clean up process reference
+                this.proc = null;
             });
         });
 
         proc.send(m);
-        const exitCode = await getExitCode;
+        const result = await getResult;
 
-        // Complete the run record
-        if (this.logService) {
-            await this.logService.completeRun(runId, exitCode);
+        // Complete the run record only if workflow completed (not interrupted)
+        if (this.logService && result.status !== 'interrupted') {
+            await this.logService.completeRun(runId, result.exitCode);
         }
 
-        return {
-            stdout,
-            stderr,
-            log: logger.dump(),
-            errors,
-            exitCode,
-            runId,
-        };
+        return result;
     }
 }

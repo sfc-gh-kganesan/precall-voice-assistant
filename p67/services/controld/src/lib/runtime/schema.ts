@@ -6,6 +6,8 @@ import { z } from 'zod';
 enum MessageType {
     RunWorkflow = 'RunWorkflow',
     ThrowError = 'ThrowError',
+    Interrupt = 'Interrupt',
+    ResumeInterrupt = 'ResumeInterrupt',
 }
 
 // WorkflowError defines the set of possible errors that may be encountered
@@ -51,14 +53,36 @@ const ThrowErrorMessageSchema = BaseMessageSchema.extend({
     message: z.string(),
 });
 
+// InterruptMessageSchema defines messages sent from the child process to the parent
+// when a workflow calls sdk.interrupt() to pause and wait for human input.
+const InterruptMessageSchema = BaseMessageSchema.extend({
+    type: z.literal(MessageType.Interrupt),
+    interruptId: z.string().uuid(),
+    payload: z.unknown(),
+    nodeId: z.string().optional(),
+    timestamp: z.string(),
+});
+
+// ResumeInterruptMessageSchema defines messages sent from the parent to the child
+// to resume a paused workflow with human-provided input.
+const ResumeInterruptMessageSchema = BaseMessageSchema.extend({
+    type: z.literal(MessageType.ResumeInterrupt),
+    interruptId: z.string(),
+    response: z.unknown(),
+});
+
 // Union type for all messages
 const MessageSchema = z.discriminatedUnion('type', [
     RunWorkflowMessageSchema,
     ThrowErrorMessageSchema,
+    InterruptMessageSchema,
+    ResumeInterruptMessageSchema,
 ]);
 
 type RunWorkflowMessage = z.infer<typeof RunWorkflowMessageSchema>;
 type ThrowErrorMessage = z.infer<typeof ThrowErrorMessageSchema>;
+type InterruptMessage = z.infer<typeof InterruptMessageSchema>;
+type ResumeInterruptMessage = z.infer<typeof ResumeInterruptMessageSchema>;
 type Message = z.infer<typeof MessageSchema>;
 
 function makeThrowErrorMessage(
@@ -79,18 +103,42 @@ function makeRunWorkflowMessage(
     };
 }
 
+function makeInterruptMessage(
+    args: Omit<InterruptMessage, 'type'>,
+): InterruptMessage {
+    return {
+        type: MessageType.Interrupt,
+        ...args,
+    };
+}
+
+function makeResumeInterruptMessage(
+    args: Omit<ResumeInterruptMessage, 'type'>,
+): ResumeInterruptMessage {
+    return {
+        type: MessageType.ResumeInterrupt,
+        ...args,
+    };
+}
+
 export {
     MessageSchema,
     RunWorkflowMessageSchema,
     ThrowErrorMessageSchema as WorkflowErrorMessageSchema,
+    InterruptMessageSchema,
+    ResumeInterruptMessageSchema,
     MessageType,
     WorkflowError,
     makeThrowErrorMessage,
     makeRunWorkflowMessage,
+    makeInterruptMessage,
+    makeResumeInterruptMessage,
 };
 
 export type {
     ThrowErrorMessage as WorkflowErrorMessage,
     RunWorkflowMessage,
+    InterruptMessage,
+    ResumeInterruptMessage,
     Message,
 };

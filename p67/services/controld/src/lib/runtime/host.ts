@@ -15,6 +15,9 @@ import {
 import { WorkflowSDKImpl } from '@controld/lib/sdk-impl.js';
 import type { P67Config } from '@p67/workflow-sdk';
 
+// Track if we've started the workflow (RunWorkflow only processed once)
+let workflowStarted = false;
+
 function sendError(error: WorkflowError, message: string | Error | unknown) {
     if (message instanceof Error) {
         message = message.message;
@@ -52,6 +55,12 @@ async function handleMessage(message: Message) {
         return;
     }
 
+    // ResumeInterrupt messages are handled by the SDK's listener, not here
+    if (m.data?.type === MessageType.ResumeInterrupt) {
+        // SDK handles this via its setupResumeListener()
+        return;
+    }
+
     if (m.data?.type !== MessageType.RunWorkflow) {
         sendError(
             WorkflowError.MessageInvalidType,
@@ -59,6 +68,13 @@ async function handleMessage(message: Message) {
         );
         return;
     }
+
+    // Prevent processing RunWorkflow multiple times
+    if (workflowStarted) {
+        console.warn('RunWorkflow already processed, ignoring duplicate');
+        return;
+    }
+    workflowStarted = true;
 
     const data = m.data as RunWorkflowMessage;
 

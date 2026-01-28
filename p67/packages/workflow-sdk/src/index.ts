@@ -149,6 +149,30 @@ export interface HttpResponse {
 }
 
 /**
+ * Options for interrupt calls
+ */
+export interface InterruptOptions {
+    /** Optional timeout in ms (default: no timeout - waits indefinitely) */
+    timeout?: number;
+    /** Optional node identifier for debugging */
+    nodeId?: string;
+}
+
+/**
+ * Interrupt payload that surfaces to the caller
+ */
+export interface InterruptPayload<T = unknown> {
+    /** Unique identifier for this interrupt */
+    interruptId: string;
+    /** The value passed to interrupt() */
+    value: T;
+    /** When the interrupt was triggered */
+    timestamp: string;
+    /** Optional node identifier */
+    nodeId?: string;
+}
+
+/**
  * Interface for the P67 Agent SDK
  * Defines the public API for interacting with Snowflake and Cortex services
  */
@@ -378,4 +402,41 @@ export interface WorkflowSDK {
      * });
      */
     httpRequest(options: HttpRequestOptions): Promise<HttpResponse>;
+
+    /**
+     * Pauses workflow execution and waits for human input.
+     *
+     * The payload is surfaced to callers who can then provide a response
+     * via the controld API. Execution resumes when a response is provided.
+     *
+     * @param payload - JSON-serializable value to surface (question, form data, etc.)
+     * @param options - Optional configuration
+     *   - `timeout`: Optional timeout in ms (default: no timeout - waits indefinitely)
+     *   - `nodeId`: Optional node identifier for debugging
+     * @returns The response provided by the human
+     * @throws Error if timeout is reached (when specified)
+     *
+     * @example
+     * // Simple approval flow
+     * const approved = await sdk.interrupt({
+     *   question: "Approve this action?",
+     *   details: { amount: 500, recipient: "vendor@example.com" }
+     * });
+     *
+     * if (approved) {
+     *   await sdk.executeQueryReadOnly({ sqlText: 'SELECT 1' });
+     * }
+     *
+     * @example
+     * // Collecting user input
+     * const userLocation = await sdk.interrupt<string>({
+     *   type: "input",
+     *   prompt: "What city are you in?"
+     * });
+     * console.log(`User is in: ${userLocation}`);
+     */
+    interrupt<T = unknown>(
+        payload: unknown,
+        options?: InterruptOptions,
+    ): Promise<T>;
 }

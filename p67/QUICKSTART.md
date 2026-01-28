@@ -387,6 +387,72 @@ export async function main(sdk: WorkflowSDK) {
 }
 ```
 
+### Human-in-the-Loop (HITL) Interrupts
+
+Pause workflow execution and wait for human input before continuing. This is useful for approval workflows, collecting user input, or any scenario requiring human decision-making.
+
+#### Basic Usage
+
+```typescript
+export async function main(sdk: WorkflowSDK) {
+    // Pause and wait for human approval
+    const approved = await sdk.interrupt({
+        question: "Approve this action?",
+        details: { amount: 50000, recipient: "vendor@example.com" }
+    });
+
+    if (approved) {
+        console.log("Action approved, proceeding...");
+        // Continue with the approved action
+    } else {
+        console.log("Action rejected");
+    }
+}
+```
+
+#### With Timeout
+
+```typescript
+export async function main(sdk: WorkflowSDK) {
+    try {
+        // Wait up to 5 minutes for human input
+        const response = await sdk.interrupt<string>(
+            { type: "input", prompt: "What city are you in?" },
+            { timeout: 300000 } // 5 minutes in milliseconds
+        );
+        console.log(`User is in: ${response}`);
+    } catch (error) {
+        console.log("Timed out waiting for input");
+    }
+}
+```
+
+#### Resuming Interrupts via API
+
+When a workflow hits an interrupt, it pauses and the run returns with status `interrupted`. You can then resume it via the API:
+
+```bash
+# List pending interrupts
+curl http://localhost:3002/api/workflow/interrupts?status=Pending
+
+# Get details of a specific interrupt
+curl http://localhost:3002/api/workflow/interrupts/<interrupt-id>
+
+# Resume the interrupt with a response
+curl -X POST http://localhost:3002/api/workflow/interrupts/<interrupt-id>/resume \
+  -H "Content-Type: application/json" \
+  -d '{"response": true}'
+```
+
+The `response` value in the resume request becomes the return value of the `sdk.interrupt()` call in your workflow.
+
+#### Interrupt Options
+
+| Option    | Type     | Description                                      |
+| --------- | -------- | ------------------------------------------------ |
+| `timeout` | `number` | Timeout in milliseconds (default: no timeout)    |
+| `nodeId`  | `string` | Optional node identifier for debugging/filtering |
+
 ## Managing Secrets
 
 Store sensitive values securely:

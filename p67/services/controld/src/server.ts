@@ -2,6 +2,7 @@ import { loadConfig, type ServerConfig } from '@controld/config.js';
 import { initCrypto } from '@controld/lib/crypto.js';
 import { LogService } from '@controld/lib/LogService.js';
 import userPlugin from '@controld/lib/plugins/user.js';
+import type { Runner } from '@controld/lib/runner.js';
 import { SecretService } from '@controld/lib/SecretService.js';
 import { WorkflowService } from '@controld/lib/WorkflowService.js';
 import cors from '@fastify/cors';
@@ -22,6 +23,7 @@ declare module 'fastify' {
         workflowService: WorkflowService;
         secretService: SecretService;
         logService: LogService;
+        runnerRegistry: Map<string, Runner>;
     }
 }
 
@@ -83,6 +85,9 @@ export async function buildServer(): Promise<FastifyInstance> {
             db: server.db,
         }),
     );
+
+    // Register runner registry for tracking active workflow runners (used by HITL interrupts)
+    server.decorate('runnerRegistry', new Map<string, Runner>());
 
     await server.register(multipart);
 

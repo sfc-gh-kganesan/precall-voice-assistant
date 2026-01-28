@@ -388,7 +388,8 @@ export const ModelName = {
   Workflow: 'Workflow',
   WorkflowRun: 'WorkflowRun',
   Log: 'Log',
-  Secret: 'Secret'
+  Secret: 'Secret',
+  WorkflowInterrupt: 'WorkflowInterrupt'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -404,7 +405,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "workflow" | "workflowRun" | "log" | "secret"
+    modelProps: "user" | "workflow" | "workflowRun" | "log" | "secret" | "workflowInterrupt"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -778,6 +779,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    WorkflowInterrupt: {
+      payload: Prisma.$WorkflowInterruptPayload<ExtArgs>
+      fields: Prisma.WorkflowInterruptFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WorkflowInterruptFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WorkflowInterruptFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>
+        }
+        findFirst: {
+          args: Prisma.WorkflowInterruptFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WorkflowInterruptFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>
+        }
+        findMany: {
+          args: Prisma.WorkflowInterruptFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>[]
+        }
+        create: {
+          args: Prisma.WorkflowInterruptCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>
+        }
+        createMany: {
+          args: Prisma.WorkflowInterruptCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WorkflowInterruptCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>[]
+        }
+        delete: {
+          args: Prisma.WorkflowInterruptDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>
+        }
+        update: {
+          args: Prisma.WorkflowInterruptUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>
+        }
+        deleteMany: {
+          args: Prisma.WorkflowInterruptDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WorkflowInterruptUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WorkflowInterruptUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>[]
+        }
+        upsert: {
+          args: Prisma.WorkflowInterruptUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WorkflowInterruptPayload>
+        }
+        aggregate: {
+          args: Prisma.WorkflowInterruptAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWorkflowInterrupt>
+        }
+        groupBy: {
+          args: Prisma.WorkflowInterruptGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkflowInterruptGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WorkflowInterruptCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WorkflowInterruptCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -879,6 +954,21 @@ export const SecretScalarFieldEnum = {
 export type SecretScalarFieldEnum = (typeof SecretScalarFieldEnum)[keyof typeof SecretScalarFieldEnum]
 
 
+export const WorkflowInterruptScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  workflowId: 'workflowId',
+  payload: 'payload',
+  nodeId: 'nodeId',
+  status: 'status',
+  response: 'response',
+  createdAt: 'createdAt',
+  resumedAt: 'resumedAt'
+} as const
+
+export type WorkflowInterruptScalarFieldEnum = (typeof WorkflowInterruptScalarFieldEnum)[keyof typeof WorkflowInterruptScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -892,6 +982,14 @@ export const JsonNullValueInput = {
 } as const
 
 export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
 export const QueryMode = {
@@ -1038,6 +1136,20 @@ export type ListEnumSecretTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$P
 
 
 /**
+ * Reference to a field of type 'InterruptStatus'
+ */
+export type EnumInterruptStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InterruptStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'InterruptStatus[]'
+ */
+export type ListEnumInterruptStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InterruptStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -1150,6 +1262,7 @@ export type GlobalOmitConfig = {
   workflowRun?: Prisma.WorkflowRunOmit
   log?: Prisma.LogOmit
   secret?: Prisma.SecretOmit
+  workflowInterrupt?: Prisma.WorkflowInterruptOmit
 }
 
 /* Types for Logging */

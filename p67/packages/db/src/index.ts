@@ -1,10 +1,12 @@
 export type {
+    InterruptStatus,
     Log,
     LogSource,
     PrismaClient,
     Secret,
     SecretType,
     Workflow,
+    WorkflowInterrupt,
     WorkflowRun,
     WorkflowRunStatus,
 } from './generated/prisma/client.js';

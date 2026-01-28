@@ -50,6 +50,7 @@ enum WorkflowRunStatus {
     Completed        // Workflow finished successfully
     Failed           // Workflow finished with an error
     Cancelled        // Workflow was manually cancelled
+    Interrupted      // Workflow is paused waiting for human input
 }
 
 model WorkflowRun {
@@ -63,6 +64,7 @@ model WorkflowRun {
     exitCode    Int?
     status      WorkflowRunStatus @default(Running)
     logs        Log[]
+    interrupts  WorkflowInterrupt[]
 
     @@index([workflowId])
     @@index([userId])
@@ -104,4 +106,27 @@ model Secret {
   // TODO: sharing
 
   @@unique([ownerId, name])
+}
+
+enum InterruptStatus {
+    Pending          // Waiting for human input
+    Resumed          // Human provided input, workflow resumed
+    Expired          // Interrupt timed out or was cancelled
+}
+
+model WorkflowInterrupt {
+    id          String          @id @default(uuid())
+    runId       String
+    run         WorkflowRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+    workflowId  String          // Denormalized for efficient querying
+    payload     Json            // The interrupt payload (question, form data, etc.)
+    nodeId      String?         // Optional node identifier for debugging
+    status      InterruptStatus @default(Pending)
+    response    Json?           // The human's response (populated when resumed)
+    createdAt   DateTime        @default(now())
+    resumedAt   DateTime?       // When the interrupt was resumed
+
+    @@index([runId])
+    @@index([workflowId])
+    @@index([status])
 }

@@ -64,3 +64,8 @@ export type Log = Prisma.LogModel
  * 
  */
 export type Secret = Prisma.SecretModel
+/**
+ * Model WorkflowInterrupt
+ * 
+ */
+export type WorkflowInterrupt = Prisma.WorkflowInterruptModel

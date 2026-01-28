@@ -235,6 +235,7 @@ export type WorkflowRunWhereInput = {
   workflow?: Prisma.XOR<Prisma.WorkflowScalarRelationFilter, Prisma.WorkflowWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   logs?: Prisma.LogListRelationFilter
+  interrupts?: Prisma.WorkflowInterruptListRelationFilter
 }
 
 export type WorkflowRunOrderByWithRelationInput = {
@@ -248,6 +249,7 @@ export type WorkflowRunOrderByWithRelationInput = {
   workflow?: Prisma.WorkflowOrderByWithRelationInput
   user?: Prisma.UserOrderByWithRelationInput
   logs?: Prisma.LogOrderByRelationAggregateInput
+  interrupts?: Prisma.WorkflowInterruptOrderByRelationAggregateInput
 }
 
 export type WorkflowRunWhereUniqueInput = Prisma.AtLeast<{
@@ -264,6 +266,7 @@ export type WorkflowRunWhereUniqueInput = Prisma.AtLeast<{
   workflow?: Prisma.XOR<Prisma.WorkflowScalarRelationFilter, Prisma.WorkflowWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   logs?: Prisma.LogListRelationFilter
+  interrupts?: Prisma.WorkflowInterruptListRelationFilter
 }, "id">
 
 export type WorkflowRunOrderByWithAggregationInput = {
@@ -303,6 +306,7 @@ export type WorkflowRunCreateInput = {
   workflow: Prisma.WorkflowCreateNestedOneWithoutRunsInput
   user: Prisma.UserCreateNestedOneWithoutWorkflowRunsInput
   logs?: Prisma.LogCreateNestedManyWithoutRunInput
+  interrupts?: Prisma.WorkflowInterruptCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunUncheckedCreateInput = {
@@ -314,6 +318,7 @@ export type WorkflowRunUncheckedCreateInput = {
   exitCode?: number | null
   status?: $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedCreateNestedManyWithoutRunInput
+  interrupts?: Prisma.WorkflowInterruptUncheckedCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunUpdateInput = {
@@ -325,6 +330,7 @@ export type WorkflowRunUpdateInput = {
   workflow?: Prisma.WorkflowUpdateOneRequiredWithoutRunsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
   logs?: Prisma.LogUpdateManyWithoutRunNestedInput
+  interrupts?: Prisma.WorkflowInterruptUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunUncheckedUpdateInput = {
@@ -336,6 +342,7 @@ export type WorkflowRunUncheckedUpdateInput = {
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedUpdateManyWithoutRunNestedInput
+  interrupts?: Prisma.WorkflowInterruptUncheckedUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunCreateManyInput = {
@@ -533,6 +540,20 @@ export type WorkflowRunUpdateOneRequiredWithoutLogsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WorkflowRunUpdateToOneWithWhereWithoutLogsInput, Prisma.WorkflowRunUpdateWithoutLogsInput>, Prisma.WorkflowRunUncheckedUpdateWithoutLogsInput>
 }
 
+export type WorkflowRunCreateNestedOneWithoutInterruptsInput = {
+  create?: Prisma.XOR<Prisma.WorkflowRunCreateWithoutInterruptsInput, Prisma.WorkflowRunUncheckedCreateWithoutInterruptsInput>
+  connectOrCreate?: Prisma.WorkflowRunCreateOrConnectWithoutInterruptsInput
+  connect?: Prisma.WorkflowRunWhereUniqueInput
+}
+
+export type WorkflowRunUpdateOneRequiredWithoutInterruptsNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkflowRunCreateWithoutInterruptsInput, Prisma.WorkflowRunUncheckedCreateWithoutInterruptsInput>
+  connectOrCreate?: Prisma.WorkflowRunCreateOrConnectWithoutInterruptsInput
+  upsert?: Prisma.WorkflowRunUpsertWithoutInterruptsInput
+  connect?: Prisma.WorkflowRunWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkflowRunUpdateToOneWithWhereWithoutInterruptsInput, Prisma.WorkflowRunUpdateWithoutInterruptsInput>, Prisma.WorkflowRunUncheckedUpdateWithoutInterruptsInput>
+}
+
 export type WorkflowRunCreateWithoutUserInput = {
   id?: string
   startedAt?: Date | string
@@ -541,6 +562,7 @@ export type WorkflowRunCreateWithoutUserInput = {
   status?: $Enums.WorkflowRunStatus
   workflow: Prisma.WorkflowCreateNestedOneWithoutRunsInput
   logs?: Prisma.LogCreateNestedManyWithoutRunInput
+  interrupts?: Prisma.WorkflowInterruptCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunUncheckedCreateWithoutUserInput = {
@@ -551,6 +573,7 @@ export type WorkflowRunUncheckedCreateWithoutUserInput = {
   exitCode?: number | null
   status?: $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedCreateNestedManyWithoutRunInput
+  interrupts?: Prisma.WorkflowInterruptUncheckedCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunCreateOrConnectWithoutUserInput = {
@@ -600,6 +623,7 @@ export type WorkflowRunCreateWithoutWorkflowInput = {
   status?: $Enums.WorkflowRunStatus
   user: Prisma.UserCreateNestedOneWithoutWorkflowRunsInput
   logs?: Prisma.LogCreateNestedManyWithoutRunInput
+  interrupts?: Prisma.WorkflowInterruptCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunUncheckedCreateWithoutWorkflowInput = {
@@ -610,6 +634,7 @@ export type WorkflowRunUncheckedCreateWithoutWorkflowInput = {
   exitCode?: number | null
   status?: $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedCreateNestedManyWithoutRunInput
+  interrupts?: Prisma.WorkflowInterruptUncheckedCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunCreateOrConnectWithoutWorkflowInput = {
@@ -646,6 +671,7 @@ export type WorkflowRunCreateWithoutLogsInput = {
   status?: $Enums.WorkflowRunStatus
   workflow: Prisma.WorkflowCreateNestedOneWithoutRunsInput
   user: Prisma.UserCreateNestedOneWithoutWorkflowRunsInput
+  interrupts?: Prisma.WorkflowInterruptCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunUncheckedCreateWithoutLogsInput = {
@@ -656,6 +682,7 @@ export type WorkflowRunUncheckedCreateWithoutLogsInput = {
   completedAt?: Date | string | null
   exitCode?: number | null
   status?: $Enums.WorkflowRunStatus
+  interrupts?: Prisma.WorkflowInterruptUncheckedCreateNestedManyWithoutRunInput
 }
 
 export type WorkflowRunCreateOrConnectWithoutLogsInput = {
@@ -682,6 +709,7 @@ export type WorkflowRunUpdateWithoutLogsInput = {
   status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   workflow?: Prisma.WorkflowUpdateOneRequiredWithoutRunsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
+  interrupts?: Prisma.WorkflowInterruptUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunUncheckedUpdateWithoutLogsInput = {
@@ -692,6 +720,67 @@ export type WorkflowRunUncheckedUpdateWithoutLogsInput = {
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+  interrupts?: Prisma.WorkflowInterruptUncheckedUpdateManyWithoutRunNestedInput
+}
+
+export type WorkflowRunCreateWithoutInterruptsInput = {
+  id?: string
+  startedAt?: Date | string
+  completedAt?: Date | string | null
+  exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
+  workflow: Prisma.WorkflowCreateNestedOneWithoutRunsInput
+  user: Prisma.UserCreateNestedOneWithoutWorkflowRunsInput
+  logs?: Prisma.LogCreateNestedManyWithoutRunInput
+}
+
+export type WorkflowRunUncheckedCreateWithoutInterruptsInput = {
+  id?: string
+  workflowId: string
+  userId: string
+  startedAt?: Date | string
+  completedAt?: Date | string | null
+  exitCode?: number | null
+  status?: $Enums.WorkflowRunStatus
+  logs?: Prisma.LogUncheckedCreateNestedManyWithoutRunInput
+}
+
+export type WorkflowRunCreateOrConnectWithoutInterruptsInput = {
+  where: Prisma.WorkflowRunWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkflowRunCreateWithoutInterruptsInput, Prisma.WorkflowRunUncheckedCreateWithoutInterruptsInput>
+}
+
+export type WorkflowRunUpsertWithoutInterruptsInput = {
+  update: Prisma.XOR<Prisma.WorkflowRunUpdateWithoutInterruptsInput, Prisma.WorkflowRunUncheckedUpdateWithoutInterruptsInput>
+  create: Prisma.XOR<Prisma.WorkflowRunCreateWithoutInterruptsInput, Prisma.WorkflowRunUncheckedCreateWithoutInterruptsInput>
+  where?: Prisma.WorkflowRunWhereInput
+}
+
+export type WorkflowRunUpdateToOneWithWhereWithoutInterruptsInput = {
+  where?: Prisma.WorkflowRunWhereInput
+  data: Prisma.XOR<Prisma.WorkflowRunUpdateWithoutInterruptsInput, Prisma.WorkflowRunUncheckedUpdateWithoutInterruptsInput>
+}
+
+export type WorkflowRunUpdateWithoutInterruptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+  workflow?: Prisma.WorkflowUpdateOneRequiredWithoutRunsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
+  logs?: Prisma.LogUpdateManyWithoutRunNestedInput
+}
+
+export type WorkflowRunUncheckedUpdateWithoutInterruptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workflowId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+  logs?: Prisma.LogUncheckedUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunCreateManyUserInput = {
@@ -711,6 +800,7 @@ export type WorkflowRunUpdateWithoutUserInput = {
   status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   workflow?: Prisma.WorkflowUpdateOneRequiredWithoutRunsNestedInput
   logs?: Prisma.LogUpdateManyWithoutRunNestedInput
+  interrupts?: Prisma.WorkflowInterruptUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunUncheckedUpdateWithoutUserInput = {
@@ -721,6 +811,7 @@ export type WorkflowRunUncheckedUpdateWithoutUserInput = {
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedUpdateManyWithoutRunNestedInput
+  interrupts?: Prisma.WorkflowInterruptUncheckedUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunUncheckedUpdateManyWithoutUserInput = {
@@ -749,6 +840,7 @@ export type WorkflowRunUpdateWithoutWorkflowInput = {
   status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   user?: Prisma.UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
   logs?: Prisma.LogUpdateManyWithoutRunNestedInput
+  interrupts?: Prisma.WorkflowInterruptUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunUncheckedUpdateWithoutWorkflowInput = {
@@ -759,6 +851,7 @@ export type WorkflowRunUncheckedUpdateWithoutWorkflowInput = {
   exitCode?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   status?: Prisma.EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
   logs?: Prisma.LogUncheckedUpdateManyWithoutRunNestedInput
+  interrupts?: Prisma.WorkflowInterruptUncheckedUpdateManyWithoutRunNestedInput
 }
 
 export type WorkflowRunUncheckedUpdateManyWithoutWorkflowInput = {
@@ -777,10 +870,12 @@ export type WorkflowRunUncheckedUpdateManyWithoutWorkflowInput = {
 
 export type WorkflowRunCountOutputType = {
   logs: number
+  interrupts: number
 }
 
 export type WorkflowRunCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   logs?: boolean | WorkflowRunCountOutputTypeCountLogsArgs
+  interrupts?: boolean | WorkflowRunCountOutputTypeCountInterruptsArgs
 }
 
 /**
@@ -800,6 +895,13 @@ export type WorkflowRunCountOutputTypeCountLogsArgs<ExtArgs extends runtime.Type
   where?: Prisma.LogWhereInput
 }
 
+/**
+ * WorkflowRunCountOutputType without action
+ */
+export type WorkflowRunCountOutputTypeCountInterruptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WorkflowInterruptWhereInput
+}
+
 
 export type WorkflowRunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -812,6 +914,7 @@ export type WorkflowRunSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   workflow?: boolean | Prisma.WorkflowDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   logs?: boolean | Prisma.WorkflowRun$logsArgs<ExtArgs>
+  interrupts?: boolean | Prisma.WorkflowRun$interruptsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkflowRunCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workflowRun"]>
 
@@ -854,6 +957,7 @@ export type WorkflowRunInclude<ExtArgs extends runtime.Types.Extensions.Internal
   workflow?: boolean | Prisma.WorkflowDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   logs?: boolean | Prisma.WorkflowRun$logsArgs<ExtArgs>
+  interrupts?: boolean | Prisma.WorkflowRun$interruptsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkflowRunCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WorkflowRunIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -871,6 +975,7 @@ export type $WorkflowRunPayload<ExtArgs extends runtime.Types.Extensions.Interna
     workflow: Prisma.$WorkflowPayload<ExtArgs>
     user: Prisma.$UserPayload<ExtArgs>
     logs: Prisma.$LogPayload<ExtArgs>[]
+    interrupts: Prisma.$WorkflowInterruptPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1277,6 +1382,7 @@ export interface Prisma__WorkflowRunClient<T, Null = never, ExtArgs extends runt
   workflow<T extends Prisma.WorkflowDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkflowDefaultArgs<ExtArgs>>): Prisma.Prisma__WorkflowClient<runtime.Types.Result.GetResult<Prisma.$WorkflowPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   logs<T extends Prisma.WorkflowRun$logsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkflowRun$logsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  interrupts<T extends Prisma.WorkflowRun$interruptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkflowRun$interruptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowInterruptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1730,6 +1836,30 @@ export type WorkflowRun$logsArgs<ExtArgs extends runtime.Types.Extensions.Intern
   take?: number
   skip?: number
   distinct?: Prisma.LogScalarFieldEnum | Prisma.LogScalarFieldEnum[]
+}
+
+/**
+ * WorkflowRun.interrupts
+ */
+export type WorkflowRun$interruptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkflowInterrupt
+   */
+  select?: Prisma.WorkflowInterruptSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WorkflowInterrupt
+   */
+  omit?: Prisma.WorkflowInterruptOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WorkflowInterruptInclude<ExtArgs> | null
+  where?: Prisma.WorkflowInterruptWhereInput
+  orderBy?: Prisma.WorkflowInterruptOrderByWithRelationInput | Prisma.WorkflowInterruptOrderByWithRelationInput[]
+  cursor?: Prisma.WorkflowInterruptWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WorkflowInterruptScalarFieldEnum | Prisma.WorkflowInterruptScalarFieldEnum[]
 }
 
 /**

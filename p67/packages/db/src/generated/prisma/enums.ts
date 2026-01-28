@@ -30,7 +30,8 @@ export const WorkflowRunStatus = {
   Running: 'Running',
   Completed: 'Completed',
   Failed: 'Failed',
-  Cancelled: 'Cancelled'
+  Cancelled: 'Cancelled',
+  Interrupted: 'Interrupted'
 } as const
 
 export type WorkflowRunStatus = (typeof WorkflowRunStatus)[keyof typeof WorkflowRunStatus]
@@ -42,3 +43,12 @@ export const SecretType = {
 } as const
 
 export type SecretType = (typeof SecretType)[keyof typeof SecretType]
+
+
+export const InterruptStatus = {
+  Pending: 'Pending',
+  Resumed: 'Resumed',
+  Expired: 'Expired'
+} as const
+
+export type InterruptStatus = (typeof InterruptStatus)[keyof typeof InterruptStatus]

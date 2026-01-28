@@ -55,7 +55,8 @@ export const ModelName = {
   Workflow: 'Workflow',
   WorkflowRun: 'WorkflowRun',
   Log: 'Log',
-  Secret: 'Secret'
+  Secret: 'Secret',
+  WorkflowInterrupt: 'WorkflowInterrupt'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -136,6 +137,21 @@ export const SecretScalarFieldEnum = {
 export type SecretScalarFieldEnum = (typeof SecretScalarFieldEnum)[keyof typeof SecretScalarFieldEnum]
 
 
+export const WorkflowInterruptScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  workflowId: 'workflowId',
+  payload: 'payload',
+  nodeId: 'nodeId',
+  status: 'status',
+  response: 'response',
+  createdAt: 'createdAt',
+  resumedAt: 'resumedAt'
+} as const
+
+export type WorkflowInterruptScalarFieldEnum = (typeof WorkflowInterruptScalarFieldEnum)[keyof typeof WorkflowInterruptScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -149,6 +165,14 @@ export const JsonNullValueInput = {
 } as const
 
 export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: 'DbNull',
+  JsonNull: 'JsonNull'
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
 export const QueryMode = {
