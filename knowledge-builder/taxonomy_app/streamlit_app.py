@@ -32,6 +32,7 @@ from data import (
     compute_kpis,
     filter_data,
     get_answerable_options,
+    get_backfillable_options,
     get_merged_data,
     get_resolution_options,
     get_session,
@@ -62,6 +63,7 @@ def main():
         source_types = get_source_types(session)
         answerable_options = get_answerable_options(session)
         resolution_options = get_resolution_options()
+        backfillable_options = get_backfillable_options()
     except Exception as e:
         st.error(f"Error loading data: {e}")
         st.stop()
@@ -71,7 +73,7 @@ def main():
         st.stop()
 
     # Initialize store filters from actual data (only on first load when empty)
-    dispatch(InitializeFiltersAction(source_types=source_types, answerable_options=answerable_options, resolution_options=resolution_options))
+    dispatch(InitializeFiltersAction(source_types=source_types, answerable_options=answerable_options, resolution_options=resolution_options, backfillable_options=backfillable_options))
 
     # Re-fetch store after potential initialization
     store = get_store()
@@ -86,22 +88,31 @@ def main():
     st.divider()
 
     # Filters at the top
-    render_filters(source_types, answerable_options, resolution_options)
+    render_filters(source_types, answerable_options, resolution_options, backfillable_options)
 
-    # Apply filters to get filtered dataset
-    filtered_df = filter_data(
+    # Apply dropdown filters once (shared by taxonomy selector and main data)
+    base_filtered_df = filter_data(
         df=merged_df,
         source_types=store.source_types,
         answerable_filter=store.answerable_filter,
         resolution_filter=store.resolution_filter,
-        selected_l1=store.selected_l1,
-        selected_l2=store.selected_l2,
-        selected_l3=store.selected_l3,
-        selected_l4=store.selected_l4,
+        backfillable_filter=store.backfillable_filter,
+        all_source_types=source_types,
+        all_answerable_options=answerable_options,
     )
 
+    # Apply taxonomy selection on top for main data
+    filtered_df = base_filtered_df
+    if store.selected_l1:
+        filtered_df = filtered_df[filtered_df["L1_TAG"] == store.selected_l1]
+    if store.selected_l2:
+        filtered_df = filtered_df[filtered_df["L2_TAG"] == store.selected_l2]
+    if store.selected_l3:
+        filtered_df = filtered_df[filtered_df["L3_TAG"] == store.selected_l3]
+    if store.selected_l4:
+        filtered_df = filtered_df[filtered_df["L4_TAG"] == store.selected_l4]
+
     # Prepare sunburst data - filtered by taxonomy selection to "zoom in"
-    # Sunburst shows the selected subtree (or all data if nothing selected)
     grouped_df, path_cols = prepare_sunburst_data(
         df=filtered_df,
         show_l1=True,
@@ -110,15 +121,26 @@ def main():
         show_l4=True,
     )
 
-    # Taxonomy drill-down selector (cascading dropdowns)
-    # Uses unfiltered data (by taxonomy) to show all options
-    taxonomy_df = filter_data(
-        df=merged_df,
-        source_types=store.source_types,
-        answerable_filter=store.answerable_filter,
-        resolution_filter=store.resolution_filter,
-    )
-    render_taxonomy_selector(taxonomy_df)
+    # Taxonomy selector uses base_filtered_df (without taxonomy filter) to show all options
+    render_taxonomy_selector(base_filtered_df)
+
+    # Glossary
+    with st.expander("📖 Glossary", expanded=True):
+        st.markdown(
+            "- **Level (L1-L4)**: Bottom-up ontology for a ticket, from broad category (L1) to specific issue type (L4).\n"
+            "- **Self Serve Candidate**: Whether this ticket type *could potentially* be resolved "
+            "via self-service (knowledge base, chatbot, FAQ). Values: `full` (fully self-serve), "
+            "`partial` (needs some human help), `no` (requires human intervention). "
+            "This is about the *nature* of the issue, not whether KB articles currently exist.\n"
+            "- **Backfillable**: Incidents with non-trivial resolution notes that could be used to create or improve KB articles. "
+            "These notes document how issues were resolved and can serve as source material for knowledge. "
+            "(Applies to incidents only; service requests don't have resolution notes.)\n"
+            "- **Coverage**: Percentage of tickets where retrieval found relevant knowledge (context relevance ≥ 0.8).\n"
+            "- **Context Relevance**: How relevant the retrieved knowledge articles are to the query (0-1 scale).\n"
+            "- **Unresolved / Cancelled**: Tickets closed without resolution (aged out, duplicates, or user-cancelled)."
+        )
+
+    st.divider()
 
     # Sunburst visualization - zooms based on taxonomy selection
     render_sunburst(grouped_df, path_cols)
@@ -139,7 +161,7 @@ def main():
 
     # KPI Bento boxes
     st.subheader("Key Metrics")
-    render_kpi_bento(kpis, resolution_filter=store.resolution_filter)
+    render_kpi_bento(kpis, resolution_filter=store.resolution_filter, backfillable_filter=store.backfillable_filter)
 
     st.divider()
 

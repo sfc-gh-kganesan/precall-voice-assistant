@@ -11,6 +11,7 @@ import streamlit as st
 from store import (
     ClearSelectionAction,
     SetAnswerableFilterAction,
+    SetBackfillableFilterAction,
     SetResolutionFilterAction,
     SetSelectedPathAction,
     SetSourceTypesAction,
@@ -64,8 +65,6 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         st.session_state["sel_l3"] = "All"
         st.session_state["sel_l4"] = "All"
 
-    st.markdown("**Filter by Taxonomy:**")
-
     col1, col2, col3, col4, col_clear = st.columns([2, 2, 2, 2, 1])
 
     # L1 selector
@@ -75,7 +74,7 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         l1_index = l1_options.index(l1_default) if l1_default in l1_options else 0
 
         st.selectbox(
-            "L1",
+            "Level 1",
             options=l1_options,
             index=l1_index,
             key="sel_l1",
@@ -100,7 +99,7 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         l2_index = l2_options.index(l2_default) if l2_default in l2_options else 0
 
         st.selectbox(
-            "L2",
+            "Level 2",
             options=l2_options,
             index=l2_index,
             key="sel_l2",
@@ -126,7 +125,7 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         l3_index = l3_options.index(l3_default) if l3_default in l3_options else 0
 
         st.selectbox(
-            "L3",
+            "Level 3",
             options=l3_options,
             index=l3_index,
             key="sel_l3",
@@ -152,7 +151,7 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         l4_index = l4_options.index(l4_default) if l4_default in l4_options else 0
 
         st.selectbox(
-            "L4",
+            "Level 4",
             options=l4_options,
             index=l4_index,
             key="sel_l4",
@@ -191,11 +190,11 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         st.caption(f"📍 {' > '.join(selection_parts)}")
 
 
-def render_filters(source_types: list[str], answerable_options: list[str], resolution_options: list[str]) -> None:
-    """Render filter controls for source type, answerable_with_kb, and resolution status."""
+def render_filters(source_types: list[str], answerable_options: list[str], resolution_options: list[str], backfillable_options: list[str]) -> None:
+    """Render filter controls for source type, answerable_with_kb, resolution status, and backfillable."""
     store = get_store()
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         # Use store values only if they're valid options, otherwise use all options
@@ -211,7 +210,7 @@ def render_filters(source_types: list[str], answerable_options: list[str], resol
         if not answerable_default:
             answerable_default = answerable_options
 
-        st.multiselect("Answerable by KB", options=answerable_options, default=answerable_default, key="ms_answerable", on_change=lambda: dispatch(SetAnswerableFilterAction(values=st.session_state.ms_answerable)))
+        st.multiselect("Self Serve Candidate", options=answerable_options, default=answerable_default, key="ms_answerable", on_change=lambda: dispatch(SetAnswerableFilterAction(values=st.session_state.ms_answerable)))
 
     with col3:
         # Use store values only if they're valid options, otherwise use all options
@@ -220,6 +219,14 @@ def render_filters(source_types: list[str], answerable_options: list[str], resol
             resolution_default = resolution_options
 
         st.multiselect("Resolution Status", options=resolution_options, default=resolution_default, key="ms_resolution", on_change=lambda: dispatch(SetResolutionFilterAction(values=st.session_state.ms_resolution)))
+
+    with col4:
+        # Use store values only if they're valid options, otherwise use all options
+        backfillable_default = [b for b in store.backfillable_filter if b in backfillable_options]
+        if not backfillable_default:
+            backfillable_default = backfillable_options
+
+        st.multiselect("Backfillable", options=backfillable_options, default=backfillable_default, key="ms_backfillable", on_change=lambda: dispatch(SetBackfillableFilterAction(values=st.session_state.ms_backfillable)))
 
 
 def inject_app_styles() -> None:
@@ -290,12 +297,16 @@ def _bento_box_html(label: str, value: str, subtitle: str | None = None, small_v
     return f'<div class="bento-box"><div class="bento-label">{label}</div><div class="{value_class}">{value}</div>{subtitle_html}</div>'
 
 
-def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None) -> None:
+def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None, backfillable_filter: list[str] | None = None) -> None:
     """Render KPI metrics as bento box cards using pure HTML flexbox."""
 
     # Determine if we should show the unresolved bento
     # Hide if resolution filter has only one value selected (trivially 100% or 0%)
     show_unresolved_bento = resolution_filter is None or len(resolution_filter) != 1
+
+    # Determine if we should show the backfillable bento
+    # Hide if backfillable filter has only one value selected (trivially 100% or 0%)
+    show_backfillable_bento = backfillable_filter is None or len(backfillable_filter) != 1
 
     # Answerable breakdown (only show if multiple values)
     breakdown = kpis.get("answerable_breakdown", {})
@@ -315,15 +326,16 @@ def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None) -> 
     relevance_display = f"{relevance:.2f}" if relevance is not None and not pd.isna(relevance) else "N/A"
     boxes_html.append(_bento_box_html(label="Avg Context Relevance", value=relevance_display))
 
-    # Avg Cosine Similarity
-    cosine_sim = kpis.get("avg_cosine_similarity")
-    cosine_display = f"{cosine_sim:.3f}" if cosine_sim is not None and not pd.isna(cosine_sim) else "N/A"
-    boxes_html.append(_bento_box_html(label="Avg Cosine Similarity", value=cosine_display))
+    # Coverage (context relevance >= 0.8)
+    coverage_count = kpis.get("coverage_count", 0)
+    coverage_pct = kpis.get("coverage_pct", 0.0)
+    boxes_html.append(_bento_box_html(label="Coverage", value=f"{coverage_pct:.1f}%", subtitle=f"{coverage_count:,} with CR ≥ 0.8"))
 
-    # Avg Text Match
-    text_match = kpis.get("avg_text_match")
-    text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
-    boxes_html.append(_bento_box_html(label="Avg Text Match", value=text_match_display))
+    # Backfillable (conditional) - incidents only
+    if show_backfillable_bento:
+        backfillable_count = kpis.get("backfillable_count", 0)
+        backfillable_pct = kpis.get("backfillable_pct", 0.0)
+        boxes_html.append(_bento_box_html(label="Backfillable", value=f"{backfillable_pct:.1f}%", subtitle=f"{backfillable_count:,} incidents"))
 
     # Unresolved / Cancelled (conditional)
     if show_unresolved_bento:
@@ -335,7 +347,17 @@ def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None) -> 
     if show_answerable_breakdown:
         for value, pct in sorted(breakdown.items()):
             label = value.capitalize() if value else "Unknown"
-            boxes_html.append(_bento_box_html(label=f"Answerable: {label}", value=f"{pct:.1f}%", small_value=True))
+            boxes_html.append(_bento_box_html(label=f"Self Serve: {label}", value=f"{pct:.1f}%", small_value=True))
+
+    # Avg Cosine Similarity
+    cosine_sim = kpis.get("avg_cosine_similarity")
+    cosine_display = f"{cosine_sim:.3f}" if cosine_sim is not None and not pd.isna(cosine_sim) else "N/A"
+    boxes_html.append(_bento_box_html(label="Avg Cosine Similarity", value=cosine_display))
+
+    # Avg Text Match
+    text_match = kpis.get("avg_text_match")
+    text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
+    boxes_html.append(_bento_box_html(label="Avg Text Match", value=text_match_display))
 
     # Render all boxes in a single HTML flexbox container
     st.markdown(f'<div class="bento-container">{"".join(boxes_html)}</div>', unsafe_allow_html=True)
@@ -364,7 +386,7 @@ def render_data_table(df: pd.DataFrame) -> None:
     # Rename columns for display
     column_rename_map = {
         "query": "Service Ticket",
-        "answerable_with_kb": "Answerable by KB",
+        "answerable_with_kb": "Self Serve Candidate",
         "CONTEXT_RELEVANCE_SCORE": "Context Relevance",
         "estimated_complexity": "Complexity",
         "SOURCE_TABLE": "Source Type",
@@ -405,7 +427,7 @@ def render_data_table(df: pd.DataFrame) -> None:
         query_preview = str(row.get("query", ""))[:80] + "..." if len(str(row.get("query", ""))) > 80 else row.get("query", "")
         score = row.get("CONTEXT_RELEVANCE_SCORE", "N/A")
         score_display = f"{score:.2f}" if pd.notna(score) and score != "N/A" else "N/A"
-        st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Answerable:** {row.get('answerable_with_kb', 'N/A')}")
+        st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Self Serve:** {row.get('answerable_with_kb', 'N/A')}")
 
         # Tabs for different data sources
         tab_eval, tab_articles, tab_generated, tab_attrs = st.tabs(["📊 Evaluation", "📚 Retrieved Articles", "🤖 Generated", "📋 Ticket Metadata"])
@@ -518,33 +540,19 @@ def render_data_table(df: pd.DataFrame) -> None:
 
         with tab_generated:
             st.markdown("**Synthetic Pair Generation Output**")
-
-            generated_data = {
-                "query": row.get("query", ""),
-                "answerable_with_kb": row.get("answerable_with_kb", ""),
-                "rationale": row.get("rationale", ""),
-                "expected_response": row.get("expected_response", ""),
-                "estimated_complexity": row.get("estimated_complexity", ""),
-                "recommendation": row.get("recommendation", ""),
-            }
-            # Filter out empty values
-            generated_data = {k: v for k, v in generated_data.items() if pd.notna(v) and v != ""}
-            st.json(generated_data)
+            generated_json = row.get("GENERATED_JSON", {})
+            if generated_json and isinstance(generated_json, dict):
+                st.json(generated_json)
+            else:
+                st.caption("No generated data available")
 
         with tab_attrs:
             st.markdown("**ServiceNow Ticket Metadata**")
-
-            attrs_data = {
-                "SHORT_DESCRIPTION": row.get("SHORT_DESCRIPTION", ""),
-                "CATEGORY": row.get("CATEGORY", ""),
-                "U_ITS_SYMPTOM_BTS": row.get("U_ITS_SYMPTOM_BTS", ""),
-                "U_RESOLUTION_CODE_BTS": row.get("U_RESOLUTION_CODE_BTS", ""),
-                "U_RESOLUTION_BTS": row.get("U_RESOLUTION_BTS", ""),
-                "U_RESOLUTION_NOTES_BTS": row.get("U_RESOLUTION_NOTES_BTS", ""),
-            }
-            # Filter out empty values
-            attrs_data = {k: v for k, v in attrs_data.items() if pd.notna(v) and v != ""}
-            st.json(attrs_data)
+            attrs_json = row.get("ATTRS_JSON", {})
+            if attrs_json and isinstance(attrs_json, dict):
+                st.json(attrs_json)
+            else:
+                st.caption("No ticket metadata available")
 
             # Taxonomy path
             taxonomy = f"{row.get('L1_TAG', '')} > {row.get('L2_TAG', '')} > {row.get('L3_TAG', '')} > {row.get('L4_TAG', '')}"

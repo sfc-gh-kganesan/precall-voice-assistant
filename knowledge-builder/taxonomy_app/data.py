@@ -109,7 +109,7 @@ def expand_generated_col(df: pd.DataFrame) -> pd.DataFrame:
 
     parsed = df["GENERATED"].apply(parse_generated)
 
-    # Extract key fields
+    # Extract key fields for filtering and display
     df = df.copy()
     df["query"] = parsed.apply(lambda x: x.get("query", ""))
     df["answerable_with_kb"] = parsed.apply(lambda x: x.get("answerable_with_kb", ""))
@@ -118,7 +118,10 @@ def expand_generated_col(df: pd.DataFrame) -> pd.DataFrame:
     df["estimated_complexity"] = parsed.apply(lambda x: x.get("estimated_complexity", ""))
     df["recommendation"] = parsed.apply(lambda x: x.get("recommendation", ""))
 
-    # Drop original GENERATED column
+    # Keep parsed dict for full JSON display in UI
+    df["GENERATED_JSON"] = parsed
+
+    # Drop original column
     df = df.drop("GENERATED", axis=1)
 
     return df
@@ -171,7 +174,10 @@ def expand_attrs_col(df: pd.DataFrame) -> pd.DataFrame:
     # STATE field for service requests (sc_req_item)
     df["REQ_STATE"] = parsed.apply(lambda x: x.get("STATE", ""))
 
-    # Drop original ATTRS column (it's large and no longer needed)
+    # Keep parsed dict for full JSON display in UI
+    df["ATTRS_JSON"] = parsed
+
+    # Drop original column
     df = df.drop("ATTRS", axis=1)
 
     return df
@@ -251,6 +257,10 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
     if "INPUT_QUERY_y" in merged.columns:
         merged = merged.rename(columns={"INPUT_QUERY_y": "INPUT_QUERY"})
 
+    # Precompute expensive boolean masks (avoids re-computing on every filter)
+    merged["IS_UNRESOLVED"] = merged.apply(_is_unresolved, axis=1)
+    merged["IS_BACKFILLABLE"] = merged.apply(_is_backfillable, axis=1)
+
     return merged
 
 
@@ -273,37 +283,57 @@ def get_resolution_options() -> list[str]:
     return ["Resolved", "Unresolved"]
 
 
+def get_backfillable_options() -> list[str]:
+    """Get backfillable status options (Yes / No)."""
+    return ["Yes", "No"]
+
+
 def filter_data(
     df: pd.DataFrame,
     source_types: list[str],
     answerable_filter: list[str],
     resolution_filter: list[str] | None = None,
+    backfillable_filter: list[str] | None = None,
     selected_l1: str | None = None,
     selected_l2: str | None = None,
     selected_l3: str | None = None,
     selected_l4: str | None = None,
+    all_source_types: list[str] | None = None,
+    all_answerable_options: list[str] | None = None,
 ) -> pd.DataFrame:
     """
     Apply filters to the merged dataset.
+
+    When a filter list matches all available options (or is empty), no filtering is applied.
+    This ensures consistent behavior between "all selected" and "none selected".
     """
     filtered = df.copy()
 
-    # Filter by source type
-    if source_types:
+    # Filter by source type (only if proper subset selected)
+    if source_types and (all_source_types is None or set(source_types) != set(all_source_types)):
         filtered = filtered[filtered["SOURCE_TABLE"].isin(source_types)]
 
-    # Filter by answerable_with_kb
-    if answerable_filter:
+    # Filter by answerable_with_kb (only if proper subset selected)
+    if answerable_filter and (all_answerable_options is None or set(answerable_filter) != set(all_answerable_options)):
         filtered = filtered[filtered["answerable_with_kb"].isin(answerable_filter)]
 
     # Filter by resolution status (Resolved/Unresolved)
-    if resolution_filter and len(resolution_filter) < 2:
-        # Only apply filter if not "all" (both selected)
-        unresolved_mask = filtered.apply(_is_unresolved, axis=1)
+    # Only apply filter if exactly one option selected (not both, not none)
+    # Uses precomputed IS_UNRESOLVED column for performance
+    if resolution_filter and len(resolution_filter) == 1:
         if "Unresolved" in resolution_filter:
-            filtered = filtered[unresolved_mask]
+            filtered = filtered[filtered["IS_UNRESOLVED"]]
         elif "Resolved" in resolution_filter:
-            filtered = filtered[~unresolved_mask]
+            filtered = filtered[~filtered["IS_UNRESOLVED"]]
+
+    # Filter by backfillable status (Yes / No)
+    # Only apply filter if exactly one option selected (not both, not none)
+    # Uses precomputed IS_BACKFILLABLE column for performance
+    if backfillable_filter and len(backfillable_filter) == 1:
+        if "Yes" in backfillable_filter:
+            filtered = filtered[filtered["IS_BACKFILLABLE"]]
+        elif "No" in backfillable_filter:
+            filtered = filtered[~filtered["IS_BACKFILLABLE"]]
 
     # Filter by sunburst selection (hierarchical)
     if selected_l1:
@@ -337,6 +367,45 @@ def _is_unresolved(row: pd.Series) -> bool:
     return False
 
 
+def _is_backfillable(row: pd.Series) -> bool:
+    """
+    Determine if a ticket has substantive resolution notes that could be used to backfill knowledge.
+
+    For incidents (dmt_fct_incident): U_RESOLUTION_NOTES_BTS is non-empty and non-trivial
+    For service requests (sc_req_item): Currently no equivalent field, returns False
+
+    Excludes trivial notes like aging/stale closures, very short notes, or boilerplate.
+    """
+    source = row.get("SOURCE_TABLE", "")
+    if source == "dmt_fct_incident":
+        notes = row.get("U_RESOLUTION_NOTES_BTS", "")
+        if pd.notna(notes) and notes:
+            notes_str = str(notes).strip()
+            # Exclude trivial/boilerplate notes
+            if len(notes_str) < 50:
+                return False
+            notes_lower = notes_str.lower()
+            trivial_patterns = [
+                "due to aging",
+                "lack of updates",
+                "no response from user",
+                "no response from customer",
+                "closed due to inactivity",
+                "auto-closed",
+                "autoclosed",
+                "duplicate incident",
+                "duplicate ticket",
+                "transferred to",
+                "reassigned to",
+            ]
+            for pattern in trivial_patterns:
+                if pattern in notes_lower:
+                    return False
+            return True
+    # sc_req_item doesn't have resolution notes field
+    return False
+
+
 def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
     """
     Compute KPI metrics from filtered dataframe.
@@ -356,6 +425,10 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
             "answerable_breakdown": {},
             "unresolved_count": 0,
             "unresolved_pct": 0.0,
+            "coverage_count": 0,
+            "coverage_pct": 0.0,
+            "backfillable_count": 0,
+            "backfillable_pct": 0.0,
         }
 
     total = len(df)
@@ -376,12 +449,18 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
     total_pop = total_population or total
     ticket_pct = (total / total_pop * 100) if total_pop > 0 else 0.0
 
-    # Unresolved/Cancelled tickets
-    # For incidents: U_RESOLUTION_BTS starts with "Cancelled"
-    # For service requests: REQ_STATE == "Closed Incomplete"
-    unresolved_mask = df.apply(_is_unresolved, axis=1)
-    unresolved_count = unresolved_mask.sum()
+    # Unresolved/Cancelled tickets (uses precomputed column)
+    unresolved_count = df["IS_UNRESOLVED"].sum()
     unresolved_pct = (unresolved_count / total * 100) if total > 0 else 0.0
+
+    # Coverage: tickets with context_relevance >= 0.8
+    coverage_mask = df["CONTEXT_RELEVANCE_SCORE"] >= 0.8
+    coverage_count = coverage_mask.sum()
+    coverage_pct = (coverage_count / total * 100) if total > 0 else 0.0
+
+    # Backfillable: tickets with resolution notes (uses precomputed column)
+    backfillable_count = df["IS_BACKFILLABLE"].sum()
+    backfillable_pct = (backfillable_count / total * 100) if total > 0 else 0.0
 
     return {
         "ticket_count": total,
@@ -393,6 +472,10 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
         "answerable_breakdown": answerable_breakdown,
         "unresolved_count": unresolved_count,
         "unresolved_pct": unresolved_pct,
+        "coverage_count": coverage_count,
+        "coverage_pct": coverage_pct,
+        "backfillable_count": backfillable_count,
+        "backfillable_pct": backfillable_pct,
     }
 
 
@@ -501,72 +584,6 @@ def prepare_sunburst_data(
         grouped[col] = grouped[col].fillna("(empty)")
 
     return grouped, path_cols
-
-
-def fetch_full_article(session: Session, kb_sys_id: str) -> dict | None:
-    """
-    Fetch full article text using LUMA_KB_GET_V2 stored procedure.
-
-    Args:
-        session: Snowpark session
-        kb_sys_id: The KB_SYS_ID of the knowledge article
-
-    Returns:
-        Dict with article data (summary, text, kb_number, etc.) or None if not found
-    """
-    try:
-        result = session.call("EMEA_ELEMENTUM_ACE_DEV.SRV_ELEMENTUM_ACE_RO.LUMA_KB_GET_V2", kb_sys_id, None, None)
-        if result:
-            # Result is already a dict/variant from the procedure
-            if isinstance(result, str):
-                return json.loads(result)
-            return result
-    except Exception as e:
-        return {"error": str(e)}
-    return None
-
-
-def fetch_articles_for_chunks(session: Session, chunks: list) -> list[dict]:
-    """
-    Given a list of chunks, deduplicate by KB_SYS_ID and fetch full articles.
-
-    Args:
-        session: Snowpark session
-        chunks: List of chunk dicts from CHUNKS column
-
-    Returns:
-        List of full article dicts with metadata
-    """
-    if not chunks:
-        return []
-
-    # Extract unique KB_SYS_IDs from chunks
-    kb_sys_ids = set()
-    chunk_metadata = {}  # Store chunk-level info like scores
-
-    for chunk in chunks:
-        if isinstance(chunk, dict):
-            kb_sys_id = chunk.get("kb_sys_id") or chunk.get("KB_SYS_ID") or chunk.get("@id")
-            if kb_sys_id:
-                kb_sys_ids.add(kb_sys_id)
-                # Store scores from first chunk of this article
-                if kb_sys_id not in chunk_metadata:
-                    chunk_metadata[kb_sys_id] = {
-                        "scores": chunk.get("@scores", {}),
-                        "chunk_text": chunk.get("chunk_text") or chunk.get("content") or chunk.get("text"),
-                    }
-
-    # Fetch full article for each unique KB_SYS_ID
-    articles = []
-    for kb_sys_id in kb_sys_ids:
-        article = fetch_full_article(session, kb_sys_id)
-        if article:
-            # Add chunk-level metadata (scores)
-            article["_scores"] = chunk_metadata.get(kb_sys_id, {}).get("scores", {})
-            article["_kb_sys_id"] = kb_sys_id
-            articles.append(article)
-
-    return articles
 
 
 def generate_knowledge_gap_summary(session: Session, filtered_df: pd.DataFrame) -> str:

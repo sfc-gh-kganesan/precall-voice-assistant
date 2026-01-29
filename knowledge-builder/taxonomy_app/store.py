@@ -22,6 +22,8 @@ class Store(BaseModel):
     source_types: list[str] = Field(default_factory=list)
     answerable_filter: list[str] = Field(default_factory=list)
     resolution_filter: list[str] = Field(default_factory=list)  # "Resolved" or "Unresolved"
+    backfillable_filter: list[str] = Field(default_factory=list)  # "Yes" or "No"
+    filters_initialized: bool = Field(default=False)  # Track if filters have been initialized
 
     # AI-generated summary (on-demand)
     ai_summary: str | None = Field(default=None)
@@ -68,12 +70,20 @@ class InitializeFiltersAction(BaseModel):
     source_types: list[str]
     answerable_options: list[str]
     resolution_options: list[str] = Field(default_factory=lambda: ["Resolved", "Unresolved"])
+    backfillable_options: list[str] = Field(default_factory=lambda: ["Yes", "No"])
 
 
 class SetResolutionFilterAction(BaseModel):
     """Set resolution status filter values (Resolved/Unresolved)."""
 
     type: Literal["set_resolution_filter"] = "set_resolution_filter"
+    values: list[str]
+
+
+class SetBackfillableFilterAction(BaseModel):
+    """Set backfillable status filter values (Yes / No)."""
+
+    type: Literal["set_backfillable_filter"] = "set_backfillable_filter"
     values: list[str]
 
 
@@ -85,7 +95,7 @@ class SetAISummaryAction(BaseModel):
     loading: bool = False
 
 
-Action = Annotated[SetSelectedPathAction | ClearSelectionAction | SetSourceTypesAction | SetAnswerableFilterAction | SetResolutionFilterAction | InitializeFiltersAction | SetAISummaryAction, Field(discriminator="type")]
+Action = Annotated[SetSelectedPathAction | ClearSelectionAction | SetSourceTypesAction | SetAnswerableFilterAction | SetResolutionFilterAction | SetBackfillableFilterAction | InitializeFiltersAction | SetAISummaryAction, Field(discriminator="type")]
 
 
 def reducer(state: Store, action: Action) -> Store:
@@ -113,16 +123,20 @@ def reducer(state: Store, action: Action) -> Store:
     elif action.type == "set_resolution_filter":
         new_state.resolution_filter = action.values
 
+    elif action.type == "set_backfillable_filter":
+        new_state.backfillable_filter = action.values
+
     elif action.type == "initialize_filters":
-        # Only initialize if empty (first load)
-        if not new_state.source_types:
+        # Only initialize once on first load
+        if not new_state.filters_initialized:
             new_state.source_types = action.source_types
-        if not new_state.answerable_filter:
             # Default to 'yes' to show cases that could be solved by knowledge base
             new_state.answerable_filter = ["yes"] if "yes" in action.answerable_options else action.answerable_options
-        if not new_state.resolution_filter:
             # Default to all resolution statuses
             new_state.resolution_filter = action.resolution_options
+            # Default to all backfillable statuses
+            new_state.backfillable_filter = action.backfillable_options
+            new_state.filters_initialized = True
 
     elif action.type == "set_ai_summary":
         new_state.ai_summary = action.summary
