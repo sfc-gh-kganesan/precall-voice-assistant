@@ -228,6 +228,11 @@ def inject_app_styles() -> None:
     st.markdown(
         """
     <style>
+    .bento-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem;
+    }
     .bento-box {
         background-color: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -235,6 +240,7 @@ def inject_app_styles() -> None:
         padding: 16px 20px;
         text-align: center;
         height: 130px;
+        min-width: 180px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -271,100 +277,66 @@ def inject_app_styles() -> None:
     )
 
 
-def render_bento_box(label: str, value: str, subtitle: str | None = None, small_value: bool = False, hidden: bool = False) -> None:
+def _bento_box_html(label: str, value: str, subtitle: str | None = None, small_value: bool = False) -> str:
     """
-    Render a single bento box with consistent structure.
-    Pure render function - requires inject_app_styles() to be called first.
-
-    Args:
-        label: The header label text
-        value: The main value to display
-        subtitle: Optional subtitle text below the value
-        small_value: If True, use smaller font for value
-        hidden: If True, render invisible placeholder for grid alignment
+    Generate HTML for a single bento box.
+    Returns HTML string to be combined with other boxes in a grid container.
     """
-    box_style = "visibility: hidden;" if hidden else ""
     value_class = "bento-value-small" if small_value else "bento-value"
-    # Always render 3 rows for consistent height
-    # Use opacity: 0 (not visibility: hidden) to ensure space is reserved
-    subtitle_content = subtitle if subtitle else "&nbsp;"
-    subtitle_style = "" if subtitle else "opacity: 0;"
+    subtitle_html = f'<div class="bento-subtitle">{subtitle}</div>' if subtitle else ""
 
-    st.markdown(
-        f"""
-    <div class="bento-box" style="{box_style}">
-        <div class="bento-label">{label}</div>
-        <div class="{value_class}">{value}</div>
-        <div class="bento-subtitle" style="{subtitle_style}">{subtitle_content}</div>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
+    return f'<div class="bento-box"><div class="bento-label">{label}</div><div class="{value_class}">{value}</div>{subtitle_html}</div>'
 
 
 def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None) -> None:
-    """Render KPI metrics as bento box cards with visual styling."""
+    """Render KPI metrics as bento box cards using pure HTML flexbox."""
 
     # Determine if we should show the unresolved bento
     # Hide if resolution filter has only one value selected (trivially 100% or 0%)
     show_unresolved_bento = resolution_filter is None or len(resolution_filter) != 1
 
-    # First row: Ticket Count, Context Relevance, Cosine Similarity, Text Match, (optionally) Unresolved
-    if show_unresolved_bento:
-        col1, col2, col3, col4, col5 = st.columns(5, vertical_alignment="center")
-    else:
-        col1, col2, col3, col4 = st.columns(4, vertical_alignment="center")
+    # Answerable breakdown (only show if multiple values)
+    breakdown = kpis.get("answerable_breakdown", {})
+    show_answerable_breakdown = len(breakdown) > 1
 
-    # Calculate ticket count and percentage of total
+    # Build all bento box HTML
+    boxes_html = []
+
+    # Ticket Count
     ticket_count = kpis["ticket_count"]
     total_population = kpis.get("total_population", ticket_count)
     ticket_pct = kpis.get("ticket_pct_of_total", 100.0)
+    boxes_html.append(_bento_box_html(label="Ticket Count", value=f"{ticket_count:,}", subtitle=f"({ticket_pct:.1f}% of {total_population:,} total)"))
 
-    with col1:
-        render_bento_box(label="Ticket Count", value=f"{ticket_count:,}", subtitle=f"({ticket_pct:.1f}% of {total_population:,} total)")
+    # Avg Context Relevance
+    relevance = kpis["avg_context_relevance"]
+    relevance_display = f"{relevance:.2f}" if relevance is not None and not pd.isna(relevance) else "N/A"
+    boxes_html.append(_bento_box_html(label="Avg Context Relevance", value=relevance_display))
 
-    with col2:
-        relevance = kpis["avg_context_relevance"]
-        relevance_display = f"{relevance:.2f}" if relevance is not None and not pd.isna(relevance) else "N/A"
-        render_bento_box(label="Avg Context Relevance", value=relevance_display)
+    # Avg Cosine Similarity
+    cosine_sim = kpis.get("avg_cosine_similarity")
+    cosine_display = f"{cosine_sim:.3f}" if cosine_sim is not None and not pd.isna(cosine_sim) else "N/A"
+    boxes_html.append(_bento_box_html(label="Avg Cosine Similarity", value=cosine_display))
 
-    with col3:
-        cosine_sim = kpis.get("avg_cosine_similarity")
-        cosine_display = f"{cosine_sim:.3f}" if cosine_sim is not None and not pd.isna(cosine_sim) else "N/A"
-        render_bento_box(label="Avg Cosine Similarity", value=cosine_display)
+    # Avg Text Match
+    text_match = kpis.get("avg_text_match")
+    text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
+    boxes_html.append(_bento_box_html(label="Avg Text Match", value=text_match_display))
 
-    with col4:
-        text_match = kpis.get("avg_text_match")
-        text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
-        render_bento_box(label="Avg Text Match", value=text_match_display)
-
+    # Unresolved / Cancelled (conditional)
     if show_unresolved_bento:
-        with col5:
-            unresolved_pct = kpis.get("unresolved_pct", 0.0)
-            unresolved_count = kpis.get("unresolved_count", 0)
-            render_bento_box(
-                label="Unresolved / Cancelled",
-                value=f"{unresolved_count:,}",
-                subtitle=f"({unresolved_pct:.1f}% of selection)",
-            )
+        unresolved_pct = kpis.get("unresolved_pct", 0.0)
+        unresolved_count = kpis.get("unresolved_count", 0)
+        boxes_html.append(_bento_box_html(label="Unresolved / Cancelled", value=f"{unresolved_count:,}", subtitle=f"({unresolved_pct:.1f}% of selection)"))
 
-    # Second row: Answerable by KB breakdown (only show if multiple values)
-    breakdown = kpis.get("answerable_breakdown", {})
+    # Answerable breakdown (conditional)
+    if show_answerable_breakdown:
+        for value, pct in sorted(breakdown.items()):
+            label = value.capitalize() if value else "Unknown"
+            boxes_html.append(_bento_box_html(label=f"Answerable: {label}", value=f"{pct:.1f}%", small_value=True))
 
-    # Hide the row if only one option selected (100% is redundant)
-    if len(breakdown) > 1:
-        st.markdown("<br>", unsafe_allow_html=True)
-        cols = st.columns(5, vertical_alignment="center")
-        sorted_breakdown = sorted(breakdown.items())
-
-        for i in range(5):
-            with cols[i]:
-                if i < len(sorted_breakdown):
-                    value, pct = sorted_breakdown[i]
-                    label = value.capitalize() if value else "Unknown"
-                    render_bento_box(label=f"Answerable: {label}", value=f"{pct:.1f}%", small_value=True)
-                else:
-                    render_bento_box(label="&nbsp;", value="&nbsp;", hidden=True)
+    # Render all boxes in a single HTML flexbox container
+    st.markdown(f'<div class="bento-container">{"".join(boxes_html)}</div>', unsafe_allow_html=True)
 
 
 def render_data_table(df: pd.DataFrame) -> None:
