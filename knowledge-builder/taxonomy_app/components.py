@@ -79,9 +79,11 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
             on_change=lambda: dispatch(
                 SetSelectedPathAction(
                     l1=st.session_state.sel_l1 if st.session_state.sel_l1 != "All" else None,
-                    l2=None, l3=None, l4=None  # Reset children on parent change
+                    l2=None,
+                    l3=None,
+                    l4=None,  # Reset children on parent change
                 )
-            )
+            ),
         )
 
     # L2 selector - filtered by L1
@@ -104,9 +106,10 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
                 SetSelectedPathAction(
                     l1=store.selected_l1,
                     l2=st.session_state.sel_l2 if st.session_state.sel_l2 != "All" else None,
-                    l3=None, l4=None  # Reset children
+                    l3=None,
+                    l4=None,  # Reset children
                 )
-            )
+            ),
         )
 
     # L3 selector - filtered by L1 + L2
@@ -130,19 +133,15 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
                     l1=store.selected_l1,
                     l2=store.selected_l2,
                     l3=st.session_state.sel_l3 if st.session_state.sel_l3 != "All" else None,
-                    l4=None  # Reset child
+                    l4=None,  # Reset child
                 )
-            )
+            ),
         )
 
     # L4 selector - filtered by L1 + L2 + L3
     with col4:
         if store.selected_l1 and store.selected_l2 and store.selected_l3:
-            l4_df = df[
-                (df["L1_TAG"] == store.selected_l1) &
-                (df["L2_TAG"] == store.selected_l2) &
-                (df["L3_TAG"] == store.selected_l3)
-            ]
+            l4_df = df[(df["L1_TAG"] == store.selected_l1) & (df["L2_TAG"] == store.selected_l2) & (df["L3_TAG"] == store.selected_l3)]
         else:
             l4_df = pd.DataFrame()
         l4_options = ["All"] + sorted(l4_df["L4_TAG"].dropna().unique().tolist()) if not l4_df.empty else ["All"]
@@ -162,7 +161,7 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
                     l3=store.selected_l3,
                     l4=st.session_state.sel_l4 if st.session_state.sel_l4 != "All" else None,
                 )
-            )
+            ),
         )
 
     # Clear button
@@ -201,15 +200,7 @@ def render_filters(source_types: list[str], answerable_options: list[str]) -> No
         if not source_default:
             source_default = source_types
 
-        st.multiselect(
-            "Source Type",
-            options=source_types,
-            default=source_default,
-            key="ms_source_types",
-            on_change=lambda: dispatch(
-                SetSourceTypesAction(source_types=st.session_state.ms_source_types)
-            )
-        )
+        st.multiselect("Source Type", options=source_types, default=source_default, key="ms_source_types", on_change=lambda: dispatch(SetSourceTypesAction(source_types=st.session_state.ms_source_types)))
 
     with col2:
         # Use store values only if they're valid options, otherwise use all options
@@ -217,15 +208,7 @@ def render_filters(source_types: list[str], answerable_options: list[str]) -> No
         if not answerable_default:
             answerable_default = answerable_options
 
-        st.multiselect(
-            "Answerable by KB",
-            options=answerable_options,
-            default=answerable_default,
-            key="ms_answerable",
-            on_change=lambda: dispatch(
-                SetAnswerableFilterAction(values=st.session_state.ms_answerable)
-            )
-        )
+        st.multiselect("Answerable by KB", options=answerable_options, default=answerable_default, key="ms_answerable", on_change=lambda: dispatch(SetAnswerableFilterAction(values=st.session_state.ms_answerable)))
 
 
 def inject_app_styles() -> None:
@@ -233,7 +216,8 @@ def inject_app_styles() -> None:
     Inject all application CSS styles.
     Call once at the top of the main app, before any UI rendering.
     """
-    st.markdown("""
+    st.markdown(
+        """
     <style>
     .bento-box {
         background-color: rgba(255, 255, 255, 0.05);
@@ -273,7 +257,9 @@ def inject_app_styles() -> None:
         line-height: 1.2;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_bento_box(label: str, value: str, subtitle: str | None = None, small_value: bool = False, hidden: bool = False) -> None:
@@ -295,13 +281,16 @@ def render_bento_box(label: str, value: str, subtitle: str | None = None, small_
     subtitle_content = subtitle if subtitle else "&nbsp;"
     subtitle_style = "" if subtitle else "opacity: 0;"
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="bento-box" style="{box_style}">
         <div class="bento-label">{label}</div>
         <div class="{value_class}">{value}</div>
         <div class="bento-subtitle" style="{subtitle_style}">{subtitle_content}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_kpi_bento(kpis: dict) -> None:
@@ -311,43 +300,30 @@ def render_kpi_bento(kpis: dict) -> None:
     col1, col2, col3, col4 = st.columns(4, vertical_alignment="center")
 
     # Calculate ticket count and percentage of total
-    ticket_count = kpis['ticket_count']
-    total_population = kpis.get('total_population', ticket_count)
-    ticket_pct = kpis.get('ticket_pct_of_total', 100.0)
+    ticket_count = kpis["ticket_count"]
+    total_population = kpis.get("total_population", ticket_count)
+    ticket_pct = kpis.get("ticket_pct_of_total", 100.0)
 
     with col1:
-        render_bento_box(
-            label="Ticket Count",
-            value=f"{ticket_count:,}",
-            subtitle=f"({ticket_pct:.1f}% of {total_population:,} total)"
-        )
+        render_bento_box(label="Ticket Count", value=f"{ticket_count:,}", subtitle=f"({ticket_pct:.1f}% of {total_population:,} total)")
 
     with col2:
-        relevance = kpis['avg_context_relevance']
+        relevance = kpis["avg_context_relevance"]
         relevance_display = f"{relevance:.2f}" if relevance is not None and not pd.isna(relevance) else "N/A"
-        render_bento_box(
-            label="Avg Context Relevance",
-            value=relevance_display
-        )
+        render_bento_box(label="Avg Context Relevance", value=relevance_display)
 
     with col3:
-        cosine_sim = kpis.get('avg_cosine_similarity')
+        cosine_sim = kpis.get("avg_cosine_similarity")
         cosine_display = f"{cosine_sim:.3f}" if cosine_sim is not None and not pd.isna(cosine_sim) else "N/A"
-        render_bento_box(
-            label="Avg Cosine Similarity",
-            value=cosine_display
-        )
+        render_bento_box(label="Avg Cosine Similarity", value=cosine_display)
 
     with col4:
-        text_match = kpis.get('avg_text_match')
+        text_match = kpis.get("avg_text_match")
         text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
-        render_bento_box(
-            label="Avg Text Match",
-            value=text_match_display
-        )
+        render_bento_box(label="Avg Text Match", value=text_match_display)
 
     # Second row: Answerable by KB breakdown (only show if multiple values)
-    breakdown = kpis.get('answerable_breakdown', {})
+    breakdown = kpis.get("answerable_breakdown", {})
 
     # Hide the row if only one option selected (100% is redundant)
     if len(breakdown) > 1:
@@ -360,17 +336,9 @@ def render_kpi_bento(kpis: dict) -> None:
                 if i < len(sorted_breakdown):
                     value, pct = sorted_breakdown[i]
                     label = value.capitalize() if value else "Unknown"
-                    render_bento_box(
-                        label=f"Answerable: {label}",
-                        value=f"{pct:.1f}%",
-                        small_value=True
-                    )
+                    render_bento_box(label=f"Answerable: {label}", value=f"{pct:.1f}%", small_value=True)
                 else:
-                    render_bento_box(
-                        label="&nbsp;",
-                        value="&nbsp;",
-                        hidden=True
-                    )
+                    render_bento_box(label="&nbsp;", value="&nbsp;", hidden=True)
 
 
 def render_data_table(df: pd.DataFrame) -> None:
@@ -434,9 +402,9 @@ def render_data_table(df: pd.DataFrame) -> None:
         st.subheader("🔍 Selected Record Details")
 
         # Summary line
-        query_preview = str(row.get('query', ''))[:80] + "..." if len(str(row.get('query', ''))) > 80 else row.get('query', '')
-        score = row.get('CONTEXT_RELEVANCE_SCORE', 'N/A')
-        score_display = f"{score:.2f}" if pd.notna(score) and score != 'N/A' else 'N/A'
+        query_preview = str(row.get("query", ""))[:80] + "..." if len(str(row.get("query", ""))) > 80 else row.get("query", "")
+        score = row.get("CONTEXT_RELEVANCE_SCORE", "N/A")
+        score_display = f"{score:.2f}" if pd.notna(score) and score != "N/A" else "N/A"
         st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Answerable:** {row.get('answerable_with_kb', 'N/A')}")
 
         # Tabs for different data sources
@@ -446,7 +414,7 @@ def render_data_table(df: pd.DataFrame) -> None:
             st.markdown("**Context Relevance Evaluation**")
             st.markdown(f"**Score:** {score_display}")
 
-            reason = row.get('CONTEXT_RELEVANCE_REASON', '')
+            reason = row.get("CONTEXT_RELEVANCE_REASON", "")
             if pd.notna(reason) and reason:
                 st.markdown("**Chain of Thought Reasoning:**")
                 st.markdown(f'<div style="background-color: rgba(128, 128, 128, 0.1); padding: 1rem; border-radius: 0.5rem; white-space: pre-wrap; word-wrap: break-word;">{str(reason)}</div>', unsafe_allow_html=True)
@@ -457,30 +425,30 @@ def render_data_table(df: pd.DataFrame) -> None:
             st.markdown("**Synthetic Pair Generation Output**")
 
             generated_data = {
-                "query": row.get('query', ''),
-                "answerable_with_kb": row.get('answerable_with_kb', ''),
-                "rationale": row.get('rationale', ''),
-                "expected_response": row.get('expected_response', ''),
-                "estimated_complexity": row.get('estimated_complexity', ''),
-                "recommendation": row.get('recommendation', ''),
+                "query": row.get("query", ""),
+                "answerable_with_kb": row.get("answerable_with_kb", ""),
+                "rationale": row.get("rationale", ""),
+                "expected_response": row.get("expected_response", ""),
+                "estimated_complexity": row.get("estimated_complexity", ""),
+                "recommendation": row.get("recommendation", ""),
             }
             # Filter out empty values
-            generated_data = {k: v for k, v in generated_data.items() if pd.notna(v) and v != ''}
+            generated_data = {k: v for k, v in generated_data.items() if pd.notna(v) and v != ""}
             st.json(generated_data)
 
         with tab_attrs:
             st.markdown("**ServiceNow Ticket Metadata**")
 
             attrs_data = {
-                "SHORT_DESCRIPTION": row.get('SHORT_DESCRIPTION', ''),
-                "CATEGORY": row.get('CATEGORY', ''),
-                "U_ITS_SYMPTOM_BTS": row.get('U_ITS_SYMPTOM_BTS', ''),
-                "U_RESOLUTION_CODE_BTS": row.get('U_RESOLUTION_CODE_BTS', ''),
-                "U_RESOLUTION_BTS": row.get('U_RESOLUTION_BTS', ''),
-                "U_RESOLUTION_NOTES_BTS": row.get('U_RESOLUTION_NOTES_BTS', ''),
+                "SHORT_DESCRIPTION": row.get("SHORT_DESCRIPTION", ""),
+                "CATEGORY": row.get("CATEGORY", ""),
+                "U_ITS_SYMPTOM_BTS": row.get("U_ITS_SYMPTOM_BTS", ""),
+                "U_RESOLUTION_CODE_BTS": row.get("U_RESOLUTION_CODE_BTS", ""),
+                "U_RESOLUTION_BTS": row.get("U_RESOLUTION_BTS", ""),
+                "U_RESOLUTION_NOTES_BTS": row.get("U_RESOLUTION_NOTES_BTS", ""),
             }
             # Filter out empty values
-            attrs_data = {k: v for k, v in attrs_data.items() if pd.notna(v) and v != ''}
+            attrs_data = {k: v for k, v in attrs_data.items() if pd.notna(v) and v != ""}
             st.json(attrs_data)
 
             # Taxonomy path
@@ -503,7 +471,8 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
     # If loading, trigger the actual generation (after showing loading UI)
     if store.ai_summary_loading:
         # Show loading state
-        st.markdown("""
+        st.markdown(
+            """
         <div style="
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -519,7 +488,9 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
                 Analyzing evaluations with AI_AGG...
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
         # Run the generation
         try:
@@ -532,7 +503,8 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
 
     if store.ai_summary:
         # Filled state: Show the AI summary
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -557,7 +529,9 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
                 {store.ai_summary}
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
         # Buttons directly below with minimal spacing
         col1, col2, col3 = st.columns([1, 1, 6])
@@ -572,7 +546,8 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
 
     else:
         # Empty state with centered button
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -588,7 +563,9 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
                 Analyze {len(filtered_df):,} service tickets
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
         # Centered button directly below
         col1, col2, col3 = st.columns([2, 1, 2])

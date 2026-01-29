@@ -37,12 +37,7 @@ def get_search_queries(_session: Session) -> pd.DataFrame:
     Columns: SEARCH_ID, INPUT_TYPE, INPUT_ARGS, RESPONSE, CREATED_BY, CREATED_ON
     """
     input_type_expr = F.col("INPUT_TYPE") == "SYNTHETIC_PAIR"
-    search_queries = (
-        _session
-        .table("SEARCH_QUERIES")
-        .filter(input_type_expr)
-        .select("SEARCH_ID", "RESPONSE")
-    )
+    search_queries = _session.table("SEARCH_QUERIES").filter(input_type_expr).select("SEARCH_ID", "RESPONSE")
     return search_queries.to_pandas()
 
 
@@ -56,17 +51,13 @@ def get_evaluation_results(_session: Session) -> pd.DataFrame:
     context_relevance_reason_expr = context_relevance_expr["reasons"]["reason"].cast(T.StringType())
     context_relevance_score_expr = context_relevance_expr["score"].cast(T.FloatType())
 
-    evaluation_results = (
-        _session
-        .table("EVALUATION_RESULTS")
-        .select(
-            "SEARCH_ID",
-            "INPUT_QUERY",
-            "CHUNKS",
-            "EVALUATION_MODEL",
-            context_relevance_reason_expr.alias("CONTEXT_RELEVANCE_REASON"),
-            context_relevance_score_expr.alias("CONTEXT_RELEVANCE_SCORE"),
-        )
+    evaluation_results = _session.table("EVALUATION_RESULTS").select(
+        "SEARCH_ID",
+        "INPUT_QUERY",
+        "CHUNKS",
+        "EVALUATION_MODEL",
+        context_relevance_reason_expr.alias("CONTEXT_RELEVANCE_REASON"),
+        context_relevance_score_expr.alias("CONTEXT_RELEVANCE_SCORE"),
     )
     return evaluation_results.to_pandas()
 
@@ -246,19 +237,10 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
     expanded_df = expand_attrs_col(expanded_df)
 
     # First join: synthetic pairs to evaluation results on query
-    merged = expanded_df.merge(
-        evaluation_results_df,
-        how="inner",
-        left_on="query",
-        right_on="INPUT_QUERY"
-    )
+    merged = expanded_df.merge(evaluation_results_df, how="inner", left_on="query", right_on="INPUT_QUERY")
 
     # Second join: add search queries for response data
-    merged = merged.merge(
-        search_queries_df,
-        how="inner",
-        on="SEARCH_ID"
-    )
+    merged = merged.merge(search_queries_df, how="inner", on="SEARCH_ID")
 
     # Clean up duplicate INPUT_QUERY columns
     if "INPUT_QUERY_x" in merged.columns:
@@ -349,10 +331,7 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
 
     # Answerable breakdown - compute percentages for all actual values
     answerable_counts = df["answerable_with_kb"].value_counts()
-    answerable_breakdown = {
-        value: (count / total * 100)
-        for value, count in answerable_counts.items()
-    }
+    answerable_breakdown = {value: (count / total * 100) for value, count in answerable_counts.items()}
 
     # Calculate percentage of total population
     total_pop = total_population or total
@@ -450,21 +429,24 @@ def prepare_sunburst_data(
 
     # Group by the visible levels and compute metrics
     grouped = (
-        df
-        .groupby(path_cols, dropna=False)
-        .agg({
-            "CONTEXT_RELEVANCE_SCORE": "mean",
-            "query": "count",
-            "_cosine_scores": _flatten_and_mean,
-            "_text_match_scores": _flatten_and_mean,
-        })
+        df.groupby(path_cols, dropna=False)
+        .agg(
+            {
+                "CONTEXT_RELEVANCE_SCORE": "mean",
+                "query": "count",
+                "_cosine_scores": _flatten_and_mean,
+                "_text_match_scores": _flatten_and_mean,
+            }
+        )
         .reset_index()
     )
-    grouped = grouped.rename(columns={
-        "query": "TICKET_COUNT",
-        "_cosine_scores": "AVG_COSINE_SIMILARITY",
-        "_text_match_scores": "AVG_TEXT_MATCH",
-    })
+    grouped = grouped.rename(
+        columns={
+            "query": "TICKET_COUNT",
+            "_cosine_scores": "AVG_COSINE_SIMILARITY",
+            "_text_match_scores": "AVG_TEXT_MATCH",
+        }
+    )
 
     # Fill NaN values for path columns
     for col in path_cols:
@@ -557,9 +539,7 @@ def generate_knowledge_gap_summary(session: Session, filtered_df: pd.DataFrame) 
         "Be concise (3-4 sentences). Focus on patterns, not individual cases."
     )
 
-    result = snowpark_df.select(
-        F.call_function("AI_AGG", F.col("EVALUATION_TEXT"), F.lit(instruction))
-    ).collect()
+    result = snowpark_df.select(F.call_function("AI_AGG", F.col("EVALUATION_TEXT"), F.lit(instruction))).collect()
 
     if result and result[0][0]:
         return result[0][0]

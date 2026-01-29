@@ -52,10 +52,7 @@ def main():
 
     # Header
     st.title("Knowledge Base Gap Analysis")
-    st.markdown(
-        "Identify gaps in the knowledge base by analyzing synthetic ticket queries, "
-        "context relevance scores, and deflection potential."
-    )
+    st.markdown("Identify gaps in the knowledge base by analyzing synthetic ticket queries, context relevance scores, and deflection potential.")
 
     # Load data
     try:
@@ -72,10 +69,7 @@ def main():
         st.stop()
 
     # Initialize store filters from actual data (only on first load when empty)
-    dispatch(InitializeFiltersAction(
-        source_types=source_types,
-        answerable_options=answerable_options
-    ))
+    dispatch(InitializeFiltersAction(source_types=source_types, answerable_options=answerable_options))
 
     # Re-fetch store after potential initialization
     store = get_store()

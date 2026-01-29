@@ -29,8 +29,10 @@ class Store(BaseModel):
 
 # Action Types
 
+
 class SetSelectedPathAction(BaseModel):
     """Set the selected path from sunburst click."""
+
     type: Literal["set_selected_path"] = "set_selected_path"
     l1: str | None = None
     l2: str | None = None
@@ -40,23 +42,27 @@ class SetSelectedPathAction(BaseModel):
 
 class ClearSelectionAction(BaseModel):
     """Clear all sunburst selections."""
+
     type: Literal["clear_selection"] = "clear_selection"
 
 
 class SetSourceTypesAction(BaseModel):
     """Set which source types to include (incident/request)."""
+
     type: Literal["set_source_types"] = "set_source_types"
     source_types: list[str]
 
 
 class SetAnswerableFilterAction(BaseModel):
     """Set answerable_with_kb filter values."""
+
     type: Literal["set_answerable_filter"] = "set_answerable_filter"
     values: list[str]
 
 
 class InitializeFiltersAction(BaseModel):
     """Initialize filters from actual data options (first load only)."""
+
     type: Literal["initialize_filters"] = "initialize_filters"
     source_types: list[str]
     answerable_options: list[str]
@@ -64,15 +70,13 @@ class InitializeFiltersAction(BaseModel):
 
 class SetAISummaryAction(BaseModel):
     """Set the AI-generated knowledge gap summary."""
+
     type: Literal["set_ai_summary"] = "set_ai_summary"
     summary: str | None = None
     loading: bool = False
 
 
-Action = Annotated[
-    SetSelectedPathAction | ClearSelectionAction | SetSourceTypesAction | SetAnswerableFilterAction | InitializeFiltersAction | SetAISummaryAction,
-    Field(discriminator="type")
-]
+Action = Annotated[SetSelectedPathAction | ClearSelectionAction | SetSourceTypesAction | SetAnswerableFilterAction | InitializeFiltersAction | SetAISummaryAction, Field(discriminator="type")]
 
 
 def reducer(state: Store, action: Action) -> Store:
@@ -103,7 +107,7 @@ def reducer(state: Store, action: Action) -> Store:
             new_state.source_types = action.source_types
         if not new_state.answerable_filter:
             # Default to 'yes' to show cases that could be solved by knowledge base
-            new_state.answerable_filter = ['yes'] if 'yes' in action.answerable_options else action.answerable_options
+            new_state.answerable_filter = ["yes"] if "yes" in action.answerable_options else action.answerable_options
 
     elif action.type == "set_ai_summary":
         new_state.ai_summary = action.summary
