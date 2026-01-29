@@ -8,7 +8,7 @@ Before you begin, ensure you have the following installed:
 
 -   **Node.js** (v20 or later)
 -   **Bun** (v1.1 or later) - [Install Bun](https://bun.sh/docs/installation)
--   **pnpm** (v10 or later) - `npm install -g pnpm`
+-   **pnpm** (v10 or later) - `npm install -g pnpm`| [Install pnpm](https://pnpm.io/installation)
 -   **Docker** and **Docker Compose** - for running the local development environment
 
 ## Setting Up the Development Environment
@@ -18,6 +18,7 @@ Before you begin, ensure you have the following installed:
 In one terminal, start the development environment:
 
 ```bash
+./configure.sh
 make dev
 ```
 
@@ -38,11 +39,18 @@ In another terminal, build and install the P67 CLI:
 make install-cli
 ```
 
-This compiles the CLI and stores the `p67` binary, by default, in `$REPO/p67/bin`. Either put this in your path or
+You'll be prompted for an install directory:
 
-```bash
-alias p67=$REPO/p67/bin/p67
 ```
+Install directory [/usr/local/bin]:
+```
+
+Press **Enter** to accept the default (`/usr/local/bin`), or type a custom path (e.g., `~/.local/bin`).
+
+> **Note:** Ensure the install directory is in your `$PATH`. If it's not, add it to your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
+> ```bash
+> export PATH="$PATH:/usr/local/bin"
+> ```
 
 ### 3. Configure a Connection
 
@@ -51,6 +59,7 @@ Set up a connection to your local controld instance:
 ```bash
 p67 connection add p67 --endpoint http://localhost:3002
 ```
+You will be prompted to enter your Snowflake PAT.
 
 ## Your First Workflow
 
@@ -89,6 +98,8 @@ This uploads your workflow to controld and returns a workflow ID.
 ```bash
 p67 workflow run <workflow-id>
 ```
+Workflow ID can be found in returned content from prior command.
+
 
 Or run the most recently deployed workflow:
 
