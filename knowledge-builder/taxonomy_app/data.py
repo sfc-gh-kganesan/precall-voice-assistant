@@ -503,6 +503,72 @@ def prepare_sunburst_data(
     return grouped, path_cols
 
 
+def fetch_full_article(session: Session, kb_sys_id: str) -> dict | None:
+    """
+    Fetch full article text using LUMA_KB_GET_V2 stored procedure.
+
+    Args:
+        session: Snowpark session
+        kb_sys_id: The KB_SYS_ID of the knowledge article
+
+    Returns:
+        Dict with article data (summary, text, kb_number, etc.) or None if not found
+    """
+    try:
+        result = session.call("EMEA_ELEMENTUM_ACE_DEV.SRV_ELEMENTUM_ACE_RO.LUMA_KB_GET_V2", kb_sys_id, None, None)
+        if result:
+            # Result is already a dict/variant from the procedure
+            if isinstance(result, str):
+                return json.loads(result)
+            return result
+    except Exception as e:
+        return {"error": str(e)}
+    return None
+
+
+def fetch_articles_for_chunks(session: Session, chunks: list) -> list[dict]:
+    """
+    Given a list of chunks, deduplicate by KB_SYS_ID and fetch full articles.
+
+    Args:
+        session: Snowpark session
+        chunks: List of chunk dicts from CHUNKS column
+
+    Returns:
+        List of full article dicts with metadata
+    """
+    if not chunks:
+        return []
+
+    # Extract unique KB_SYS_IDs from chunks
+    kb_sys_ids = set()
+    chunk_metadata = {}  # Store chunk-level info like scores
+
+    for chunk in chunks:
+        if isinstance(chunk, dict):
+            kb_sys_id = chunk.get("kb_sys_id") or chunk.get("KB_SYS_ID") or chunk.get("@id")
+            if kb_sys_id:
+                kb_sys_ids.add(kb_sys_id)
+                # Store scores from first chunk of this article
+                if kb_sys_id not in chunk_metadata:
+                    chunk_metadata[kb_sys_id] = {
+                        "scores": chunk.get("@scores", {}),
+                        "chunk_text": chunk.get("chunk_text") or chunk.get("content") or chunk.get("text"),
+                    }
+
+    # Fetch full article for each unique KB_SYS_ID
+    articles = []
+    for kb_sys_id in kb_sys_ids:
+        article = fetch_full_article(session, kb_sys_id)
+        if article:
+            # Add chunk-level metadata (scores)
+            article["_scores"] = chunk_metadata.get(kb_sys_id, {}).get("scores", {})
+            article["_kb_sys_id"] = kb_sys_id
+            articles.append(article)
+
+    return articles
+
+
 def generate_knowledge_gap_summary(session: Session, filtered_df: pd.DataFrame) -> str:
     """
     Generate an AI summary of knowledge gaps using AI_AGG.

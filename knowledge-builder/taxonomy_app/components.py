@@ -3,6 +3,8 @@ UI components for the Sunburst Push-Down Taxonomy application.
 Each component is a pure function that renders UI based on state.
 """
 
+import json
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -406,7 +408,7 @@ def render_data_table(df: pd.DataFrame) -> None:
         st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Answerable:** {row.get('answerable_with_kb', 'N/A')}")
 
         # Tabs for different data sources
-        tab_eval, tab_generated, tab_attrs = st.tabs(["📊 Evaluation", "🤖 Generated", "📋 Ticket Metadata"])
+        tab_eval, tab_articles, tab_generated, tab_attrs = st.tabs(["📊 Evaluation", "📚 Retrieved Articles", "🤖 Generated", "📋 Ticket Metadata"])
 
         with tab_eval:
             st.markdown("**Context Relevance Evaluation**")
@@ -418,6 +420,101 @@ def render_data_table(df: pd.DataFrame) -> None:
                 st.markdown(f'<div style="background-color: rgba(128, 128, 128, 0.1); padding: 1rem; border-radius: 0.5rem; white-space: pre-wrap; word-wrap: break-word;">{str(reason)}</div>', unsafe_allow_html=True)
             else:
                 st.caption("No evaluation reasoning available")
+
+        with tab_articles:
+            st.markdown("**Knowledge Articles Retrieved for this Query**")
+            st.caption("These are the articles the search system found. If relevant articles exist but aren't shown here, it's a retrieval issue. If no relevant articles exist, it's a knowledge gap.")
+
+            # Use RESPONSE column (proper JSON with scores) instead of CHUNKS (concatenated text)
+            response_raw = row.get("RESPONSE", None)
+
+            if pd.notna(response_raw) and response_raw:
+                import re
+
+                # Parse RESPONSE as JSON
+                response_data = response_raw
+                if isinstance(response_raw, str):
+                    try:
+                        response_data = json.loads(response_raw)
+                    except (json.JSONDecodeError, TypeError):
+                        response_data = []
+
+                if isinstance(response_data, list) and len(response_data) > 0:
+                    # Parse each result item
+                    articles = []
+                    seen_summaries = set()
+
+                    for item in response_data:
+                        if not isinstance(item, dict):
+                            continue
+
+                        # Extract scores
+                        scores = item.get("@scores", {})
+                        cosine_sim = scores.get("cosine_similarity") if isinstance(scores, dict) else None
+                        text_match = scores.get("text_match") if isinstance(scores, dict) else None
+                        reranker = scores.get("reranker_score") if isinstance(scores, dict) else None
+
+                        # Extract chunk text (contains DOC_SUMMARY and CHUNK_TEXT tags)
+                        chunk_text_raw = item.get("CHUNK_TEXT", "")
+
+                        # Parse DOC_SUMMARY and CHUNK_TEXT from the chunk
+                        summary_match = re.search(r"<DOC_SUMMARY>(.*?)</DOC_SUMMARY>", chunk_text_raw, re.DOTALL)
+                        content_match = re.search(r"<CHUNK_TEXT>(.*?)</CHUNK_TEXT>", chunk_text_raw, re.DOTALL)
+
+                        summary = summary_match.group(1).strip() if summary_match else ""
+                        content = content_match.group(1).strip() if content_match else chunk_text_raw
+
+                        # Deduplicate by summary content (first 200 chars)
+                        dedup_key = summary[:200] if summary else content[:200]
+                        if dedup_key and dedup_key not in seen_summaries:
+                            seen_summaries.add(dedup_key)
+                            articles.append(
+                                {
+                                    "summary": summary,
+                                    "content": content,
+                                    "cosine_similarity": cosine_sim,
+                                    "text_match": text_match,
+                                    "reranker_score": reranker,
+                                }
+                            )
+
+                    if articles:
+                        st.markdown(f"**{len(articles)} unique article(s) retrieved** (from {len(response_data)} chunks):")
+
+                        for i, article in enumerate(articles):
+                            summary = article["summary"]
+                            content = article["content"]
+
+                            # Extract title from summary (first line after # if markdown)
+                            title_match = re.search(r"^#\s*(.+?)$", summary, re.MULTILINE)
+                            title = title_match.group(1).strip() if title_match else f"Article {i + 1}"
+
+                            # Build score display
+                            score_parts = []
+                            if article["cosine_similarity"] is not None:
+                                score_parts.append(f"Cosine: {article['cosine_similarity']:.3f}")
+                            if article["text_match"] is not None:
+                                score_parts.append(f"Text: {article['text_match']:.3f}")
+                            if article["reranker_score"] is not None:
+                                score_parts.append(f"Rerank: {article['reranker_score']:.2f}")
+                            score_str = f" ({' • '.join(score_parts)})" if score_parts else ""
+
+                            with st.expander(f"📄 {title}{score_str}", expanded=(i == 0)):
+                                # Show summary
+                                if summary:
+                                    st.markdown("**Summary:**")
+                                    st.markdown(summary)
+
+                                # Show content in scrollable container
+                                if content:
+                                    st.markdown("**Article Content:**")
+                                    st.markdown(f'<div style="max-height: 400px; overflow-y: auto; background-color: rgba(128, 128, 128, 0.1); padding: 1rem; border-radius: 0.5rem; white-space: pre-wrap;">{content}</div>', unsafe_allow_html=True)
+                    else:
+                        st.warning("No articles could be parsed from the response.")
+                else:
+                    st.warning("No articles were retrieved for this query. This indicates a potential knowledge gap or retrieval issue.")
+            else:
+                st.warning("No retrieval data available for this record.")
 
         with tab_generated:
             st.markdown("**Synthetic Pair Generation Output**")
