@@ -6,13 +6,16 @@
 	"image": "mcr.microsoft.com/devcontainers/base:noble",
 	"features": {
 		"ghcr.io/devcontainers/features/git-lfs:1": {},
+		"ghcr.io/devcontainers/features/python:1": {},
+		"ghcr.io/devcontainers/features/node:1": {},
 		"ghcr.io/jsburckhardt/devcontainer-features/bat:1": {},
+		// Copy ~/.codex/auth.json from your local machine to ~/.devcontainer/config/codex/auth.json
 		"ghcr.io/jsburckhardt/devcontainer-features/codex:1": {},
 		"ghcr.io/jsburckhardt/devcontainer-features/just:1": {},
 		"ghcr.io/jsburckhardt/devcontainer-features/opencode:1": {},
 		"ghcr.io/jsburckhardt/devcontainer-features/ruff:1": {},
 		"ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
-	}
+	},
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
@@ -21,7 +24,17 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "uname -a",
+	"containerEnv": {
+		"CODEX_HOME": "/home/vscode/.config/codex"
+	},
+	"postCreateCommand": "chmod +x .devcontainer/postCreate.sh && .devcontainer/postCreate.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-toolsai.jupyter"
+			]
+		}
+	},
 
 	// Configure tool-specific properties.
 	// "customizations": {},

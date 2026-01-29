@@ -298,3 +298,6 @@ support-data-agent/.claude/
 
 knowledge-builder/nltk_data/
 /knowledge-builder/output
+
+# devcontainer
+.devcontainer/config/
