@@ -33,6 +33,7 @@ from data import (
     filter_data,
     get_answerable_options,
     get_merged_data,
+    get_resolution_options,
     get_session,
     get_source_types,
     prepare_sunburst_data,
@@ -60,6 +61,7 @@ def main():
         merged_df = get_merged_data(session)
         source_types = get_source_types(session)
         answerable_options = get_answerable_options(session)
+        resolution_options = get_resolution_options()
     except Exception as e:
         st.error(f"Error loading data: {e}")
         st.stop()
@@ -69,7 +71,7 @@ def main():
         st.stop()
 
     # Initialize store filters from actual data (only on first load when empty)
-    dispatch(InitializeFiltersAction(source_types=source_types, answerable_options=answerable_options))
+    dispatch(InitializeFiltersAction(source_types=source_types, answerable_options=answerable_options, resolution_options=resolution_options))
 
     # Re-fetch store after potential initialization
     store = get_store()
@@ -84,13 +86,14 @@ def main():
     st.divider()
 
     # Filters at the top
-    render_filters(source_types, answerable_options)
+    render_filters(source_types, answerable_options, resolution_options)
 
     # Apply filters to get filtered dataset
     filtered_df = filter_data(
         df=merged_df,
         source_types=store.source_types,
         answerable_filter=store.answerable_filter,
+        resolution_filter=store.resolution_filter,
         selected_l1=store.selected_l1,
         selected_l2=store.selected_l2,
         selected_l3=store.selected_l3,
@@ -113,6 +116,7 @@ def main():
         df=merged_df,
         source_types=store.source_types,
         answerable_filter=store.answerable_filter,
+        resolution_filter=store.resolution_filter,
     )
     render_taxonomy_selector(taxonomy_df)
 
@@ -135,7 +139,7 @@ def main():
 
     # KPI Bento boxes
     st.subheader("Key Metrics")
-    render_kpi_bento(kpis)
+    render_kpi_bento(kpis, resolution_filter=store.resolution_filter)
 
     st.divider()
 

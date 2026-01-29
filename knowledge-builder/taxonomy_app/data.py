@@ -131,9 +131,10 @@ def expand_attrs_col(df: pd.DataFrame) -> pd.DataFrame:
     The ATTRS column contains nested JSON with ticket details:
     - SHORT_DESCRIPTION: ticket title
     - U_RESOLUTION_NOTES_BTS: resolution notes explaining what fixed the issue
-    - U_RESOLUTION_BTS: resolution category
+    - U_RESOLUTION_BTS: resolution category (for incidents)
     - CATEGORY: issue category
     - U_ITS_SYMPTOM_BTS: symptom classification
+    - STATE: request state (for sc_req_item)
     """
     if "ATTRS" not in df.columns:
         return df
@@ -142,7 +143,7 @@ def expand_attrs_col(df: pd.DataFrame) -> pd.DataFrame:
         if pd.isna(x):
             return {}
         if isinstance(x, dict):
-            # ATTRS is nested: {"dmt_fct_incident": {...}} or {"dmt_fct_request": {...}}
+            # ATTRS is nested: {"dmt_fct_incident": {...}} or {"sc_req_item": {...}}
             # Get the first (and usually only) value
             for key in x:
                 if isinstance(x[key], dict):
@@ -167,6 +168,8 @@ def expand_attrs_col(df: pd.DataFrame) -> pd.DataFrame:
     df["U_RESOLUTION_CODE_BTS"] = parsed.apply(lambda x: x.get("U_RESOLUTION_CODE_BTS", ""))
     df["CATEGORY"] = parsed.apply(lambda x: x.get("CATEGORY", ""))
     df["U_ITS_SYMPTOM_BTS"] = parsed.apply(lambda x: x.get("U_ITS_SYMPTOM_BTS", ""))
+    # STATE field for service requests (sc_req_item)
+    df["REQ_STATE"] = parsed.apply(lambda x: x.get("STATE", ""))
 
     # Drop original ATTRS column (it's large and no longer needed)
     df = df.drop("ATTRS", axis=1)
@@ -265,10 +268,16 @@ def get_answerable_options(_session: Session) -> list[str]:
     return sorted(merged_df["answerable_with_kb"].dropna().unique().tolist())
 
 
+def get_resolution_options() -> list[str]:
+    """Get resolution status options (Resolved/Unresolved)."""
+    return ["Resolved", "Unresolved"]
+
+
 def filter_data(
     df: pd.DataFrame,
     source_types: list[str],
     answerable_filter: list[str],
+    resolution_filter: list[str] | None = None,
     selected_l1: str | None = None,
     selected_l2: str | None = None,
     selected_l3: str | None = None,
@@ -287,6 +296,15 @@ def filter_data(
     if answerable_filter:
         filtered = filtered[filtered["answerable_with_kb"].isin(answerable_filter)]
 
+    # Filter by resolution status (Resolved/Unresolved)
+    if resolution_filter and len(resolution_filter) < 2:
+        # Only apply filter if not "all" (both selected)
+        unresolved_mask = filtered.apply(_is_unresolved, axis=1)
+        if "Unresolved" in resolution_filter:
+            filtered = filtered[unresolved_mask]
+        elif "Resolved" in resolution_filter:
+            filtered = filtered[~unresolved_mask]
+
     # Filter by sunburst selection (hierarchical)
     if selected_l1:
         filtered = filtered[filtered["L1_TAG"] == selected_l1]
@@ -298,6 +316,25 @@ def filter_data(
         filtered = filtered[filtered["L4_TAG"] == selected_l4]
 
     return filtered
+
+
+def _is_unresolved(row: pd.Series) -> bool:
+    """
+    Determine if a ticket was unresolved/cancelled based on source type.
+
+    For incidents (dmt_fct_incident): U_RESOLUTION_BTS starts with "Cancelled"
+    For service requests (sc_req_item): REQ_STATE == "Closed Incomplete"
+    """
+    source = row.get("SOURCE_TABLE", "")
+    if source == "dmt_fct_incident":
+        resolution = row.get("U_RESOLUTION_BTS", "")
+        if pd.notna(resolution) and resolution:
+            return str(resolution).startswith("Cancelled")
+    elif source == "sc_req_item":
+        state = row.get("REQ_STATE", "")
+        if pd.notna(state) and state:
+            return state == "Closed Incomplete"
+    return False
 
 
 def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
@@ -317,6 +354,8 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
             "avg_cosine_similarity": None,
             "avg_text_match": None,
             "answerable_breakdown": {},
+            "unresolved_count": 0,
+            "unresolved_pct": 0.0,
         }
 
     total = len(df)
@@ -337,6 +376,13 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
     total_pop = total_population or total
     ticket_pct = (total / total_pop * 100) if total_pop > 0 else 0.0
 
+    # Unresolved/Cancelled tickets
+    # For incidents: U_RESOLUTION_BTS starts with "Cancelled"
+    # For service requests: REQ_STATE == "Closed Incomplete"
+    unresolved_mask = df.apply(_is_unresolved, axis=1)
+    unresolved_count = unresolved_mask.sum()
+    unresolved_pct = (unresolved_count / total * 100) if total > 0 else 0.0
+
     return {
         "ticket_count": total,
         "total_population": total_pop,
@@ -345,6 +391,8 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
         "avg_cosine_similarity": avg_cosine_similarity,
         "avg_text_match": avg_text_match,
         "answerable_breakdown": answerable_breakdown,
+        "unresolved_count": unresolved_count,
+        "unresolved_pct": unresolved_pct,
     }
 
 

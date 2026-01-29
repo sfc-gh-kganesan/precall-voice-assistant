@@ -9,6 +9,7 @@ import streamlit as st
 from store import (
     ClearSelectionAction,
     SetAnswerableFilterAction,
+    SetResolutionFilterAction,
     SetSelectedPathAction,
     SetSourceTypesAction,
     dispatch,
@@ -188,11 +189,11 @@ def render_taxonomy_selector(df: pd.DataFrame) -> None:
         st.caption(f"📍 {' > '.join(selection_parts)}")
 
 
-def render_filters(source_types: list[str], answerable_options: list[str]) -> None:
-    """Render filter controls for source type and answerable_with_kb."""
+def render_filters(source_types: list[str], answerable_options: list[str], resolution_options: list[str]) -> None:
+    """Render filter controls for source type, answerable_with_kb, and resolution status."""
     store = get_store()
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         # Use store values only if they're valid options, otherwise use all options
@@ -209,6 +210,14 @@ def render_filters(source_types: list[str], answerable_options: list[str]) -> No
             answerable_default = answerable_options
 
         st.multiselect("Answerable by KB", options=answerable_options, default=answerable_default, key="ms_answerable", on_change=lambda: dispatch(SetAnswerableFilterAction(values=st.session_state.ms_answerable)))
+
+    with col3:
+        # Use store values only if they're valid options, otherwise use all options
+        resolution_default = [r for r in store.resolution_filter if r in resolution_options]
+        if not resolution_default:
+            resolution_default = resolution_options
+
+        st.multiselect("Resolution Status", options=resolution_options, default=resolution_default, key="ms_resolution", on_change=lambda: dispatch(SetResolutionFilterAction(values=st.session_state.ms_resolution)))
 
 
 def inject_app_styles() -> None:
@@ -293,11 +302,18 @@ def render_bento_box(label: str, value: str, subtitle: str | None = None, small_
     )
 
 
-def render_kpi_bento(kpis: dict) -> None:
+def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None) -> None:
     """Render KPI metrics as bento box cards with visual styling."""
 
-    # First row: Ticket Count, Context Relevance, Cosine Similarity, Text Match
-    col1, col2, col3, col4 = st.columns(4, vertical_alignment="center")
+    # Determine if we should show the unresolved bento
+    # Hide if resolution filter has only one value selected (trivially 100% or 0%)
+    show_unresolved_bento = resolution_filter is None or len(resolution_filter) != 1
+
+    # First row: Ticket Count, Context Relevance, Cosine Similarity, Text Match, (optionally) Unresolved
+    if show_unresolved_bento:
+        col1, col2, col3, col4, col5 = st.columns(5, vertical_alignment="center")
+    else:
+        col1, col2, col3, col4 = st.columns(4, vertical_alignment="center")
 
     # Calculate ticket count and percentage of total
     ticket_count = kpis["ticket_count"]
@@ -322,16 +338,26 @@ def render_kpi_bento(kpis: dict) -> None:
         text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
         render_bento_box(label="Avg Text Match", value=text_match_display)
 
+    if show_unresolved_bento:
+        with col5:
+            unresolved_pct = kpis.get("unresolved_pct", 0.0)
+            unresolved_count = kpis.get("unresolved_count", 0)
+            render_bento_box(
+                label="Unresolved / Cancelled",
+                value=f"{unresolved_count:,}",
+                subtitle=f"({unresolved_pct:.1f}% of selection)",
+            )
+
     # Second row: Answerable by KB breakdown (only show if multiple values)
     breakdown = kpis.get("answerable_breakdown", {})
 
     # Hide the row if only one option selected (100% is redundant)
     if len(breakdown) > 1:
         st.markdown("<br>", unsafe_allow_html=True)
-        cols = st.columns(4, vertical_alignment="center")
+        cols = st.columns(5, vertical_alignment="center")
         sorted_breakdown = sorted(breakdown.items())
 
-        for i in range(4):
+        for i in range(5):
             with cols[i]:
                 if i < len(sorted_breakdown):
                     value, pct = sorted_breakdown[i]
