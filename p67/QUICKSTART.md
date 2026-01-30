@@ -111,6 +111,35 @@ p67 workflow run
 
 The `manifest.yaml` file defines your Snowflake connection(s) and workflow parameters.
 
+### Bootstrap from Existing Snowflake Connection
+
+The easiest way to configure your manifest is to bootstrap it from an existing Snowflake connection in `~/.snowflake/connections.toml` or `~/.snowflake/config.toml`:
+
+```bash
+p67 manifest from-connection
+```
+
+This will:
+
+1. List your available Snowflake connections and let you select one
+2. If the connection uses `externalbrowser` authentication, offer to:
+   - Select an existing secret containing a PAT
+   - Generate a new Programmatic Access Token (PAT) via `snow sql`
+   - Skip and keep externalbrowser auth
+3. Write the configuration to `manifest.yaml`
+
+You can also specify the connection name directly:
+
+```bash
+p67 manifest from-connection default
+```
+
+Or skip the PAT prompt entirely:
+
+```bash
+p67 manifest from-connection --no-pat
+```
+
 ### Basic Structure
 
 ```yaml
