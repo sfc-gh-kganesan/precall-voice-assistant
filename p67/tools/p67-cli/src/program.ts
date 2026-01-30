@@ -5,6 +5,7 @@ import { connectionCommand } from '@p67-cli/commands/connection';
 import { createProjectRootCommand } from '@p67-cli/commands/createProjectRoot.ts';
 import { initCommand } from '@p67-cli/commands/init.ts';
 import { logsCommand } from '@p67-cli/commands/log';
+import { manifestCommand } from '@p67-cli/commands/manifest-config';
 import { oauthCommand } from '@p67-cli/commands/oauth';
 import { secretCommand } from '@p67-cli/commands/secret';
 import { workflowCommand } from '@p67-cli/commands/workflow';
@@ -20,6 +21,7 @@ export const program = new Command()
     .addCommand(workflowCommand)
     .addCommand(logsCommand)
     .addCommand(secretCommand)
+    .addCommand(manifestCommand)
     .addCommand(oauthCommand)
     .addCommand(cocoCommand)
     .addCommand(buildCommand)
