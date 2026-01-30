@@ -2,7 +2,7 @@ SNOW_CONNECTION?=<<snow_connection>>
 SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
 CONTROLD_IMAGE=controld
 .PHONY: help build build-controld ci deploy describe dev fix \
-init-provider-account install-cli list-services login logs push push-controld \
+ensure-encryption-key init-provider-account install-cli list-services login logs push push-controld \
 url dbmigrate
 
 .DEFAULT_GOAL := help
@@ -38,7 +38,7 @@ deploy: login build push ## Deploy to Snowflake (login, build, push, and run app
 describe: ## Describe the p67.app.controld service
 	snow spcs service describe p67.app.controld --format json -c $(SNOW_CONNECTION)
 
-dev: ## Start local development environment with Docker Compose
+dev: ensure-encryption-key ## Start local development environment with Docker Compose
 	$(MAKE) -C packages/db init
 	$(MAKE) -C services/controld init
 	docker compose up --build -d
@@ -49,6 +49,16 @@ dev: ## Start local development environment with Docker Compose
 	@echo "Postgres is ready!"
 	$(MAKE) -C packages/db deploy
 	docker compose logs -f
+
+ensure-encryption-key: ## Generate ENCRYPTION_KEY in .env if not set
+	@grep -q '^ENCRYPTION_KEY=.' .env 2>/dev/null || { \
+		echo "Generating ENCRYPTION_KEY..."; \
+		grep -v '^ENCRYPTION_KEY=' .env > .env.tmp 2>/dev/null || true; \
+		echo "ENCRYPTION_KEY=$$(openssl rand -base64 32)" >> .env.tmp; \
+		mv .env.tmp .env; \
+		echo "ENCRYPTION_KEY added to .env"; \
+	}
+
 
 fix: ## Fix linting and formatting issues
 	pnpm lint:fix
