@@ -41,14 +41,14 @@ export const createProjectRootCommand = new Command('createProjectRoot')
             }
         }
 
-        // Copy workflow_editor_ui.html
+        // Copy buildflow.html
         try {
             const editorContent = await file(workflowEditorUi).text();
-            const editorPath = path.join(targetDir, 'workflow_editor_ui.html');
+            const editorPath = path.join(targetDir, 'buildflow.html');
             await Bun.write(editorPath, editorContent);
-            console.log('✓ Copied workflow_editor_ui.html');
+            console.log('✓ Copied buildflow.html');
         } catch (error) {
-            console.error('✗ Error copying workflow_editor_ui.html:', error);
+            console.error('✗ Error copying buildflow.html:', error);
             return;
         }
 
@@ -66,7 +66,7 @@ export const createProjectRootCommand = new Command('createProjectRoot')
         console.log('\n✓ Project root created successfully!');
         console.log(`  Location: ${targetDir}`);
         console.log('\nFiles created:');
-        console.log('  - workflow_editor_ui.html');
+        console.log('  - buildflow.html');
         console.log('  - workflow_server.py');
 
         // Check if uv is available
