@@ -230,7 +230,7 @@ def main():
     print(f"Serving files from: {script_dir}")
     print(f"Server running at: http://localhost:{PORT}")
     print(f"\nOpen the workflow browser at:")
-    print(f"  http://localhost:{PORT}/workflow_browser.html")
+    print(f"  http://localhost:{PORT}/workflow_editor_ui.html")
     print(f"\nPress Ctrl+C to stop the server\n")
 
     try:

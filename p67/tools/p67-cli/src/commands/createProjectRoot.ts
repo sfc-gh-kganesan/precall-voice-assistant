@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
 import { confirm } from '@inquirer/prompts';
 import { Command } from '@p67-cli/Command';
-import workflowEditorUi from '@p67-cli/project-root-template/workflow_editor_ui.html.src' with {
+import workflowEditorUi from '@p67-cli/project-root-template/buildflow.html.src' with {
     type: 'file',
 };
 import workflowServer from '@p67-cli/project-root-template/workflow_server.py.src' with {
