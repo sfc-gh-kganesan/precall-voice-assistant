@@ -4,6 +4,7 @@ Main document parsing API.
 
 import logging
 from pathlib import Path
+from itertools import groupby
 from typing import Any
 
 from .pdf import extract_text_and_lines_with_bboxes
@@ -14,11 +15,63 @@ from .schemas import (
     DocumentContent,
     Word,
     Line,
+    Block,
     BoundingBox,
     PageDimensions,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def aggregate_blocks(words: list[Word]) -> list[Block]:
+    """
+    Aggregate words into blocks based on page and block_no.
+
+    Args:
+        words: List of Word objects
+
+    Returns:
+        List of Block objects with combined bounding boxes
+    """
+    # Sort words by page, block_no, y0, x0 for proper grouping and reading order
+    sorted_words = sorted(
+        words,
+        key=lambda w: (
+            w.page,
+            w.block_no if w.block_no is not None else float('inf'),
+            w.bbox.y0,
+            w.bbox.x0,
+        ),
+    )
+
+    blocks = []
+    for (page, block_no), group in groupby(
+        sorted_words, key=lambda w: (w.page, w.block_no)
+    ):
+        group_words = list(group)
+
+        # Compute combined bounding box
+        combined_bbox = BoundingBox(
+            x0=min(w.bbox.x0 for w in group_words),
+            y0=min(w.bbox.y0 for w in group_words),
+            x1=max(w.bbox.x1 for w in group_words),
+            y1=max(w.bbox.y1 for w in group_words),
+        )
+
+        # Concatenate text in reading order (already sorted)
+        text = " ".join(w.text for w in group_words)
+
+        blocks.append(
+            Block(
+                text=text,
+                bbox=combined_bbox,
+                page=page,
+                block_no=block_no,
+                word_count=len(group_words),
+            )
+        )
+
+    return blocks
 
 
 def parse_document(
@@ -128,11 +181,15 @@ def parse_document(
         for k, v in page_dimensions.items()
     }
 
-    logger.info(f"Parsing complete: {page_count} pages, {len(words)} words")
+    # Step 6: Aggregate words into blocks
+    blocks = aggregate_blocks(words)
+
+    logger.info(f"Parsing complete: {page_count} pages, {len(words)} words, {len(blocks)} blocks")
 
     return DocumentContent(
         words=words,
         lines=lines,
+        blocks=blocks,
         full_text=full_text,
         page_count=page_count,
         page_dimensions=page_dims,

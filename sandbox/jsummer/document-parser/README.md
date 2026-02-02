@@ -23,11 +23,22 @@ sudo apt-get install tesseract-ocr tesseract-ocr-all poppler-utils
 
 # Python dependencies
 uv sync
+
+# To use the document-parser CLI directly
+uv pip install -e .
 ```
 
 ## Usage
 
 ### CLI
+
+First, activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+Then run the CLI:
 
 ```bash
 # Parse and output JSON
@@ -64,6 +75,10 @@ for word in result.words:
 for line in result.lines:
     print(f"{line.text} @ page {line.page}")
 
+# Blocks (paragraphs/sections) with combined bounding boxes
+for block in result.blocks:
+    print(f"Block {block.block_no} @ page {block.page}: {block.text[:50]}...")
+
 # Page dimensions
 print(result.page_dimensions)
 ```
@@ -74,6 +89,7 @@ print(result.page_dimensions)
 DocumentContent:
   words: list[Word]           # Words with bbox, page, source, confidence
   lines: list[Line]           # Lines with bbox, page, source
+  blocks: list[Block]         # Blocks with combined bbox for paragraphs/sections
   full_text: str              # Reconstructed document text
   page_count: int
   page_dimensions: dict[int, PageDimensions]

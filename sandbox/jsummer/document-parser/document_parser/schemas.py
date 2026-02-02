@@ -38,6 +38,16 @@ class Line(BaseModel):
     line_no: Optional[int] = None
 
 
+class Block(BaseModel):
+    """A block of text (paragraph/section) with combined bounding box."""
+
+    text: str
+    bbox: BoundingBox
+    page: int
+    block_no: Optional[int]  # None for ungrouped words
+    word_count: int
+
+
 class PageDimensions(BaseModel):
     """Dimensions of a PDF page in points."""
 
@@ -50,6 +60,7 @@ class DocumentContent(BaseModel):
 
     words: list[Word]
     lines: list[Line]
+    blocks: list[Block]
     full_text: str
     page_count: int
     page_dimensions: dict[int, PageDimensions]
