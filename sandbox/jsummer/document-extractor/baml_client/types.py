@@ -37,24 +37,61 @@ def get_checks(checks: typing.Dict[CheckName, Check]) -> typing.List[Check]:
 def all_succeeded(checks: typing.Dict[CheckName, Check]) -> bool:
     return all(check.status == "succeeded" for check in get_checks(checks))
 # #########################################################################
-# Generated enums (0)
+# Generated enums (2)
 # #########################################################################
 
+class ContractTermCategory(str, Enum):
+    Payment = "Payment"
+    Delivery = "Delivery"
+    Quality = "Quality"
+    Pricing = "Pricing"
+    FeeOrPenalty = "FeeOrPenalty"
+    Reporting = "Reporting"
+    CreditOrSecurity = "CreditOrSecurity"
+    Operational = "Operational"
+    ForceMajeureOrException = "ForceMajeureOrException"
+    Other = "Other"
+
+class PartyRole(str, Enum):
+    Buyer = "Buyer"
+    Seller = "Seller"
+    Operator = "Operator"
+    Other = "Other"
+
 # #########################################################################
-# Generated classes (3)
+# Generated classes (5)
 # #########################################################################
 
-class Company(BaseModel):
-    name: str
-    signature_date: "Date"
+class Citation(BaseModel):
+    source_text: str = Field(description='The text from the document')
+    bounding_box_dimensions: typing.Optional[str] = Field(default=None, description='The dimensions of the bounding box of the relevant text in the document.\n    If the relevant sections span multiple bounding boxes, the dimensions should encapsulate the entire relevant area. \n    For example, if the relevant text spans from the top of the first bounding box to the bottom of the second bounding box, the dimensions should be the union of the two bounding boxes.')
 
 class ContractMetadata(BaseModel):
-    companies: typing.List["Company"]
+    document_id: str = Field(description='The unique identifier for the document if available. Otherwise, create a unique identifier based on the document content.')
+    document_title: str = Field(description='The title of the document if available. Otherwise, create a short title based on the document content.')
+    document_date: typing.Optional["Date"] = Field(default=None, description='The date of the document, if provided')
+    effective_start: "Date" = Field(description='The effective start date of the contract')
+    effective_end: "Date" = Field(description='The effective end date of the contract')
+    parties: typing.List["Party"]
+    terms: typing.List["ContractTerm"]
+
+class ContractTerm(BaseModel):
+    title: str = Field(description='The title of the term')
+    summary: str = Field(description='The summary of the term')
+    category: ContractTermCategory = Field(description='The category of the term')
+    citation: "Citation" = Field(description='The citation from the document to the term')
 
 class Date(BaseModel):
     day: int = Field(description='The 2-digit day of the signature date')
     month: int = Field(description='The 2-digit month of the signature date')
     year: int = Field(description='The full 4-digit year of the signature date')
+    citation: "Citation" = Field(description='The citations from the document to the date')
+
+class Party(BaseModel):
+    name: str = Field(description='Legal or business name of a party in the contract')
+    signature_date: "Date" = Field(description='The signature date of the party')
+    role: PartyRole = Field(description='The role of the party in the contract')
+    citation: "Citation" = Field(description='The citation from the document to the party')
 
 # #########################################################################
 # Generated type aliases (0)

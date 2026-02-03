@@ -12,13 +12,15 @@ import argparse
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 from rich.console import Console
 
 import os
+load_dotenv()
 os.environ["BAML_LOG"] = "error" # To suppress BAML logs
 
-from .run import extract_metadata
-from .utility import extract_text_from_file
+from .run import content_blocks_extract
+from .utility import extract_content_from_file
 
 __all__ = [
     "extract_text_from_file",
@@ -35,23 +37,32 @@ def main():
         description="Extract structured data from text documents",
     )
     parser.add_argument(
-        "txt_path",
+        "file_path",
         type=Path,
-        help="Path to the .txt file to extract",
+        help="Path to the file to extract",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        type=Path,
+        help="Output JSON file path (default: stdout)",
     )
 
     args = parser.parse_args()
 
     # Read content from file
-    console.print(f"[blue]Reading:[/blue] {args.txt_path}")
-    content = extract_text_from_file(args.txt_path)
+    console.print(f"[blue]Reading:[/blue] {args.file_path}")
+    content = extract_content_from_file(args.file_path)
 
     # Extract metadata using BAML
     console.print("[blue]Extracting metadata...[/blue]")
-    metadata = extract_metadata(content)
+    metadata = content_blocks_extract(content)
 
     # Output results
-    print(metadata.model_dump_json(indent=2))
+    if args.output:
+        args.output.write_text(metadata.model_dump_json(indent=2))
+        console.print(f"[green]Output written to:[/green] {args.output}")
+    else:
+        print(metadata.model_dump_json(indent=2))
 
 
 if __name__ == "__main__":

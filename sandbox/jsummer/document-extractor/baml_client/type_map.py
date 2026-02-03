@@ -16,14 +16,24 @@ from . import stream_types
 
 type_map = {
 
-    "types.Company": types.Company,
-    "stream_types.Company": stream_types.Company,
+    "types.Citation": types.Citation,
+    "stream_types.Citation": stream_types.Citation,
 
     "types.ContractMetadata": types.ContractMetadata,
     "stream_types.ContractMetadata": stream_types.ContractMetadata,
 
+    "types.ContractTerm": types.ContractTerm,
+    "stream_types.ContractTerm": stream_types.ContractTerm,
+
     "types.Date": types.Date,
     "stream_types.Date": stream_types.Date,
 
+    "types.Party": types.Party,
+    "stream_types.Party": stream_types.Party,
+
+
+    "types.ContractTermCategory": types.ContractTermCategory,
+
+    "types.PartyRole": types.PartyRole,
 
 }

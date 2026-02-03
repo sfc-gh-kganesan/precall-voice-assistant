@@ -20,59 +20,199 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(type_builder.TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["Company","ContractMetadata","Date",]
+          ["Citation","ContractMetadata","ContractTerm","Date","Party",]
         ), enums=set(
-          []
+          ["ContractTermCategory","PartyRole",]
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
 
     # #########################################################################
-    # Generated enums 0
-    # #########################################################################
-
-
-    # #########################################################################
-    # Generated classes 3
+    # Generated enums 2
     # #########################################################################
 
     @property
-    def Company(self) -> "CompanyViewer":
-        return CompanyViewer(self)
+    def ContractTermCategory(self) -> "ContractTermCategoryViewer":
+        return ContractTermCategoryViewer(self)
+
+    @property
+    def PartyRole(self) -> "PartyRoleViewer":
+        return PartyRoleViewer(self)
+
+
+    # #########################################################################
+    # Generated classes 5
+    # #########################################################################
+
+    @property
+    def Citation(self) -> "CitationViewer":
+        return CitationViewer(self)
 
     @property
     def ContractMetadata(self) -> "ContractMetadataViewer":
         return ContractMetadataViewer(self)
 
     @property
+    def ContractTerm(self) -> "ContractTermViewer":
+        return ContractTermViewer(self)
+
+    @property
     def Date(self) -> "DateViewer":
         return DateViewer(self)
 
+    @property
+    def Party(self) -> "PartyViewer":
+        return PartyViewer(self)
+
 
 
 # #########################################################################
-# Generated enums 0
+# Generated enums 2
 # #########################################################################
 
-
-# #########################################################################
-# Generated classes 3
-# #########################################################################
-
-class CompanyAst:
+class ContractTermCategoryAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("Company")
-        self._properties: typing.Set[str] = set([  "name",  "signature_date",  ])
-        self._props = CompanyProperties(self._bldr, self._properties)
+        self._bldr = _tb.enum("ContractTermCategory")
+        self._values: typing.Set[str] = set([  "Payment",  "Delivery",  "Quality",  "Pricing",  "FeeOrPenalty",  "Reporting",  "CreditOrSecurity",  "Operational",  "ForceMajeureOrException",  "Other",  ])
+        self._vals = ContractTermCategoryValues(self._bldr, self._values)
 
     def type(self) -> baml_py.FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "CompanyProperties":
+    def values(self) -> "ContractTermCategoryValues":
+        return self._vals
+
+
+class ContractTermCategoryViewer(ContractTermCategoryAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_values(self) -> typing.List[typing.Tuple[str, type_builder.EnumValueViewer]]:
+        return [(name, type_builder.EnumValueViewer(self._bldr.value(name))) for name in self._values]
+    
+
+class ContractTermCategoryValues:
+    def __init__(self, enum_bldr: baml_py.EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def Payment(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Payment"))
+    
+    @property
+    def Delivery(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Delivery"))
+    
+    @property
+    def Quality(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Quality"))
+    
+    @property
+    def Pricing(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Pricing"))
+    
+    @property
+    def FeeOrPenalty(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("FeeOrPenalty"))
+    
+    @property
+    def Reporting(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Reporting"))
+    
+    @property
+    def CreditOrSecurity(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("CreditOrSecurity"))
+    
+    @property
+    def Operational(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Operational"))
+    
+    @property
+    def ForceMajeureOrException(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("ForceMajeureOrException"))
+    
+    @property
+    def Other(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Other"))
+    
+    
+
+
+class PartyRoleAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("PartyRole")
+        self._values: typing.Set[str] = set([  "Buyer",  "Seller",  "Operator",  "Other",  ])
+        self._vals = PartyRoleValues(self._bldr, self._values)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "PartyRoleValues":
+        return self._vals
+
+
+class PartyRoleViewer(PartyRoleAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_values(self) -> typing.List[typing.Tuple[str, type_builder.EnumValueViewer]]:
+        return [(name, type_builder.EnumValueViewer(self._bldr.value(name))) for name in self._values]
+    
+
+class PartyRoleValues:
+    def __init__(self, enum_bldr: baml_py.EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def Buyer(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Buyer"))
+    
+    @property
+    def Seller(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Seller"))
+    
+    @property
+    def Operator(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Operator"))
+    
+    @property
+    def Other(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Other"))
+    
+    
+
+
+
+# #########################################################################
+# Generated classes 5
+# #########################################################################
+
+class CitationAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("Citation")
+        self._properties: typing.Set[str] = set([  "source_text",  "bounding_box_dimensions",  ])
+        self._props = CitationProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "CitationProperties":
         return self._props
 
 
-class CompanyViewer(CompanyAst):
+class CitationViewer(CitationAst):
     def __init__(self, tb: type_builder.TypeBuilder):
         super().__init__(tb)
 
@@ -82,7 +222,7 @@ class CompanyViewer(CompanyAst):
     
 
 
-class CompanyProperties:
+class CitationProperties:
     def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
@@ -90,12 +230,12 @@ class CompanyProperties:
     
     
     @property
-    def name(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("name"))
+    def source_text(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("source_text"))
     
     @property
-    def signature_date(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("signature_date"))
+    def bounding_box_dimensions(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("bounding_box_dimensions"))
     
     
 
@@ -104,7 +244,7 @@ class ContractMetadataAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("ContractMetadata")
-        self._properties: typing.Set[str] = set([  "companies",  ])
+        self._properties: typing.Set[str] = set([  "document_id",  "document_title",  "document_date",  "effective_start",  "effective_end",  "parties",  "terms",  ])
         self._props = ContractMetadataProperties(self._bldr, self._properties)
 
     def type(self) -> baml_py.FieldType:
@@ -133,8 +273,83 @@ class ContractMetadataProperties:
     
     
     @property
-    def companies(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("companies"))
+    def document_id(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("document_id"))
+    
+    @property
+    def document_title(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("document_title"))
+    
+    @property
+    def document_date(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("document_date"))
+    
+    @property
+    def effective_start(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("effective_start"))
+    
+    @property
+    def effective_end(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("effective_end"))
+    
+    @property
+    def parties(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("parties"))
+    
+    @property
+    def terms(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("terms"))
+    
+    
+
+
+class ContractTermAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("ContractTerm")
+        self._properties: typing.Set[str] = set([  "title",  "summary",  "category",  "citation",  ])
+        self._props = ContractTermProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "ContractTermProperties":
+        return self._props
+
+
+class ContractTermViewer(ContractTermAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class ContractTermProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def title(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("title"))
+    
+    @property
+    def summary(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("summary"))
+    
+    @property
+    def category(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("category"))
+    
+    @property
+    def citation(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("citation"))
     
     
 
@@ -143,7 +358,7 @@ class DateAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("Date")
-        self._properties: typing.Set[str] = set([  "day",  "month",  "year",  ])
+        self._properties: typing.Set[str] = set([  "day",  "month",  "year",  "citation",  ])
         self._props = DateProperties(self._bldr, self._properties)
 
     def type(self) -> baml_py.FieldType:
@@ -182,6 +397,61 @@ class DateProperties:
     @property
     def year(self) -> type_builder.ClassPropertyViewer:
         return type_builder.ClassPropertyViewer(self.__bldr.property("year"))
+    
+    @property
+    def citation(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("citation"))
+    
+    
+
+
+class PartyAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("Party")
+        self._properties: typing.Set[str] = set([  "name",  "signature_date",  "role",  "citation",  ])
+        self._props = PartyProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "PartyProperties":
+        return self._props
+
+
+class PartyViewer(PartyAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class PartyProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def name(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("name"))
+    
+    @property
+    def signature_date(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("signature_date"))
+    
+    @property
+    def role(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("role"))
+    
+    @property
+    def citation(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("citation"))
     
     
 

@@ -94,18 +94,32 @@ class BamlSyncClient:
     def parse_stream(self):
       return self.__llm_stream_parser
 
-    def ExtractMetadata(self, content: str,
+    def BaseExtract(self, content: str,
         baml_options: BamlCallOptions = {},
     ) -> types.ContractMetadata:
         # Check if on_tick is provided
         if 'on_tick' in baml_options:
-            __stream__ = self.stream.ExtractMetadata(content=content,
+            __stream__ = self.stream.BaseExtract(content=content,
                 baml_options=baml_options)
             return __stream__.get_final_response()
         else:
             # Original non-streaming code
-            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="ExtractMetadata", args={
+            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="BaseExtract", args={
                 "content": content,
+            })
+            return typing.cast(types.ContractMetadata, __result__.cast_to(types, types, stream_types, False, __runtime__))
+    def ContentBlocksExtract(self, content_string: str,content_blocks: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.ContractMetadata:
+        # Check if on_tick is provided
+        if 'on_tick' in baml_options:
+            __stream__ = self.stream.ContentBlocksExtract(content_string=content_string,content_blocks=content_blocks,
+                baml_options=baml_options)
+            return __stream__.get_final_response()
+        else:
+            # Original non-streaming code
+            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="ContentBlocksExtract", args={
+                "content_string": content_string,"content_blocks": content_blocks,
             })
             return typing.cast(types.ContractMetadata, __result__.cast_to(types, types, stream_types, False, __runtime__))
     
@@ -117,11 +131,23 @@ class BamlStreamClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
-    def ExtractMetadata(self, content: str,
+    def BaseExtract(self, content: str,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[stream_types.ContractMetadata, types.ContractMetadata]:
-        __ctx__, __result__ = self.__options.merge_options(baml_options).create_sync_stream(function_name="ExtractMetadata", args={
+        __ctx__, __result__ = self.__options.merge_options(baml_options).create_sync_stream(function_name="BaseExtract", args={
             "content": content,
+        })
+        return baml_py.BamlSyncStream[stream_types.ContractMetadata, types.ContractMetadata](
+          __result__,
+          lambda x: typing.cast(stream_types.ContractMetadata, x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(types.ContractMetadata, x.cast_to(types, types, stream_types, False, __runtime__)),
+          __ctx__,
+        )
+    def ContentBlocksExtract(self, content_string: str,content_blocks: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[stream_types.ContractMetadata, types.ContractMetadata]:
+        __ctx__, __result__ = self.__options.merge_options(baml_options).create_sync_stream(function_name="ContentBlocksExtract", args={
+            "content_string": content_string,"content_blocks": content_blocks,
         })
         return baml_py.BamlSyncStream[stream_types.ContractMetadata, types.ContractMetadata](
           __result__,
@@ -137,11 +163,18 @@ class BamlHttpRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
-    def ExtractMetadata(self, content: str,
+    def BaseExtract(self, content: str,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = self.__options.merge_options(baml_options).create_http_request_sync(function_name="ExtractMetadata", args={
+        __result__ = self.__options.merge_options(baml_options).create_http_request_sync(function_name="BaseExtract", args={
             "content": content,
+        }, mode="request")
+        return __result__
+    def ContentBlocksExtract(self, content_string: str,content_blocks: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.baml_py.HTTPRequest:
+        __result__ = self.__options.merge_options(baml_options).create_http_request_sync(function_name="ContentBlocksExtract", args={
+            "content_string": content_string,"content_blocks": content_blocks,
         }, mode="request")
         return __result__
     
@@ -152,11 +185,18 @@ class BamlHttpStreamRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
-    def ExtractMetadata(self, content: str,
+    def BaseExtract(self, content: str,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = self.__options.merge_options(baml_options).create_http_request_sync(function_name="ExtractMetadata", args={
+        __result__ = self.__options.merge_options(baml_options).create_http_request_sync(function_name="BaseExtract", args={
             "content": content,
+        }, mode="stream")
+        return __result__
+    def ContentBlocksExtract(self, content_string: str,content_blocks: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.baml_py.HTTPRequest:
+        __result__ = self.__options.merge_options(baml_options).create_http_request_sync(function_name="ContentBlocksExtract", args={
+            "content_string": content_string,"content_blocks": content_blocks,
         }, mode="stream")
         return __result__
     

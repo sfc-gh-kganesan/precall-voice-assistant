@@ -1,4 +1,4 @@
-.PHONY: install parse test clean help
+.PHONY: install parse clean help
 
 # Default PDF for testing
 PDF ?= sample.pdf
@@ -9,7 +9,6 @@ help:
 	@echo "  make install     Install dependencies with uv"
 	@echo "  make parse       Parse a PDF (use PDF=path/to/file.pdf)"
 	@echo "  make parse-text  Parse and output text only"
-	@echo "  make test        Run tests"
 	@echo "  make clean       Remove build artifacts"
 	@echo ""
 	@echo "Examples:"
@@ -32,9 +31,6 @@ parse-text:
 
 parse-fast:
 	uv run python -m document_parser $(PDF) --skip-ocr
-
-test:
-	uv run pytest -v
 
 clean:
 	rm -rf __pycache__ .pytest_cache

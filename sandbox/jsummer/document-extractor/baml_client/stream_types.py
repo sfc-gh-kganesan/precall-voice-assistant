@@ -23,20 +23,39 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
     value: StreamStateValueT
     state: typing_extensions.Literal["Pending", "Incomplete", "Complete"]
 # #########################################################################
-# Generated classes (3)
+# Generated classes (5)
 # #########################################################################
 
-class Company(BaseModel):
-    name: typing.Optional[str] = None
-    signature_date: typing.Optional["Date"] = None
+class Citation(BaseModel):
+    source_text: typing.Optional[str] = Field(default=None, description='The text from the document')
+    bounding_box_dimensions: typing.Optional[str] = Field(default=None, description='The dimensions of the bounding box of the relevant text in the document.\n    If the relevant sections span multiple bounding boxes, the dimensions should encapsulate the entire relevant area. \n    For example, if the relevant text spans from the top of the first bounding box to the bottom of the second bounding box, the dimensions should be the union of the two bounding boxes.')
 
 class ContractMetadata(BaseModel):
-    companies: typing.List["Company"]
+    document_id: typing.Optional[str] = Field(default=None, description='The unique identifier for the document if available. Otherwise, create a unique identifier based on the document content.')
+    document_title: typing.Optional[str] = Field(default=None, description='The title of the document if available. Otherwise, create a short title based on the document content.')
+    document_date: typing.Optional["Date"] = Field(default=None, description='The date of the document, if provided')
+    effective_start: typing.Optional["Date"] = Field(default=None, description='The effective start date of the contract')
+    effective_end: typing.Optional["Date"] = Field(default=None, description='The effective end date of the contract')
+    parties: typing.List["Party"]
+    terms: typing.List["ContractTerm"]
+
+class ContractTerm(BaseModel):
+    title: typing.Optional[str] = Field(default=None, description='The title of the term')
+    summary: typing.Optional[str] = Field(default=None, description='The summary of the term')
+    category: typing.Optional[types.ContractTermCategory] = Field(default=None, description='The category of the term')
+    citation: typing.Optional["Citation"] = Field(default=None, description='The citation from the document to the term')
 
 class Date(BaseModel):
     day: typing.Optional[int] = Field(default=None, description='The 2-digit day of the signature date')
     month: typing.Optional[int] = Field(default=None, description='The 2-digit month of the signature date')
     year: typing.Optional[int] = Field(default=None, description='The full 4-digit year of the signature date')
+    citation: typing.Optional["Citation"] = Field(default=None, description='The citations from the document to the date')
+
+class Party(BaseModel):
+    name: typing.Optional[str] = Field(default=None, description='Legal or business name of a party in the contract')
+    signature_date: typing.Optional["Date"] = Field(default=None, description='The signature date of the party')
+    role: typing.Optional[types.PartyRole] = Field(default=None, description='The role of the party in the contract')
+    citation: typing.Optional["Citation"] = Field(default=None, description='The citation from the document to the party')
 
 # #########################################################################
 # Generated type aliases (0)
