@@ -20,6 +20,7 @@ from store import (
 )
 
 
+@st.fragment
 def render_sunburst(grouped_df: pd.DataFrame, path_cols: list[str]) -> None:
     """
     Render the interactive sunburst chart (visualization only).
@@ -380,142 +381,106 @@ def render_data_table(df: pd.DataFrame) -> None:
         row = df.iloc[row_idx]
 
         st.divider()
-        st.subheader("🔍 Selected Record Details")
+        render_detail_panel(row)
 
-        # Summary line
-        query_preview = str(row.get("query", ""))[:80] + "..." if len(str(row.get("query", ""))) > 80 else row.get("query", "")
-        score = row.get("CONTEXT_RELEVANCE_SCORE", "N/A")
-        score_display = f"{score:.2f}" if pd.notna(score) and score != "N/A" else "N/A"
-        st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Self Serve:** {row.get('answerable_with_kb', 'N/A')}")
 
-        # Tabs for different data sources
-        tab_eval, tab_articles, tab_generated, tab_attrs = st.tabs(["📊 Evaluation", "📚 Retrieved Articles", "🤖 Generated", "📋 Ticket Metadata"])
+@st.fragment
+def render_detail_panel(row: pd.Series) -> None:
+    """
+    Render the selected record details panel as a fragment.
+    """
+    st.subheader("🔍 Selected Record Details")
 
-        with tab_eval:
-            st.markdown("**Context Relevance Evaluation**")
-            st.markdown(f"**Score:** {score_display}")
+    # Summary line
+    query_preview = str(row.get("query", ""))[:80] + "..." if len(str(row.get("query", ""))) > 80 else row.get("query", "")
+    score = row.get("CONTEXT_RELEVANCE_SCORE", "N/A")
+    score_display = f"{score:.2f}" if pd.notna(score) and score != "N/A" else "N/A"
+    st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Self Serve:** {row.get('answerable_with_kb', 'N/A')}")
 
-            reason = row.get("CONTEXT_RELEVANCE_REASON", "")
-            if pd.notna(reason) and reason:
-                st.markdown("**Chain of Thought Reasoning:**")
-                st.markdown(f'<div class="theme-box">{str(reason)}</div>', unsafe_allow_html=True)
-            else:
-                st.caption("No evaluation reasoning available")
+    # Tabs for different data sources
+    tab_eval, tab_articles, tab_generated, tab_attrs = st.tabs(["📊 Evaluation", "📚 Retrieved Articles", "🤖 Generated", "📋 Ticket Metadata"])
 
-        with tab_articles:
-            st.markdown("**Knowledge Articles Retrieved for this Query**")
-            st.caption("These are the articles the search system found. If relevant articles exist but aren't shown here, it's a retrieval issue. If no relevant articles exist, it's a knowledge gap.")
+    with tab_eval:
+        st.markdown("**Context Relevance Evaluation**")
+        st.markdown(f"**Score:** {score_display}")
 
-            # Use RESPONSE column (proper JSON with scores) instead of CHUNKS (concatenated text)
+        reason = row.get("CONTEXT_RELEVANCE_REASON", "")
+        if pd.notna(reason) and reason:
+            st.markdown("**Chain of Thought Reasoning:**")
+            st.markdown(f'<div class="theme-box">{str(reason)}</div>', unsafe_allow_html=True)
+        else:
+            st.caption("No evaluation reasoning available")
+
+    with tab_articles:
+        st.markdown("**Knowledge Articles Retrieved for this Query**")
+        st.caption("These are the articles the search system found. If relevant articles exist but aren't shown here, it's a retrieval issue. If no relevant articles exist, it's a knowledge gap.")
+
+        articles = row.get("PARSED_ARTICLES", [])
+
+        if articles and len(articles) > 0:
+            # Get raw chunk count for display
             response_raw = row.get("RESPONSE", None)
-
+            chunk_count = 0
             if pd.notna(response_raw) and response_raw:
-                import re
-
-                # Parse RESPONSE as JSON
-                response_data = response_raw
                 if isinstance(response_raw, str):
                     try:
-                        response_data = json.loads(response_raw)
+                        chunk_count = len(json.loads(response_raw))
                     except (json.JSONDecodeError, TypeError):
-                        response_data = []
-
-                if isinstance(response_data, list) and len(response_data) > 0:
-                    # Parse each result item
-                    articles = []
-                    seen_summaries = set()
-
-                    for item in response_data:
-                        if not isinstance(item, dict):
-                            continue
-
-                        # Extract scores
-                        scores = item.get("@scores", {})
-                        cosine_sim = scores.get("cosine_similarity") if isinstance(scores, dict) else None
-                        text_match = scores.get("text_match") if isinstance(scores, dict) else None
-                        reranker = scores.get("reranker_score") if isinstance(scores, dict) else None
-
-                        # Extract chunk text (contains DOC_SUMMARY and CHUNK_TEXT tags)
-                        chunk_text_raw = item.get("CHUNK_TEXT", "")
-
-                        # Parse DOC_SUMMARY and CHUNK_TEXT from the chunk
-                        summary_match = re.search(r"<DOC_SUMMARY>(.*?)</DOC_SUMMARY>", chunk_text_raw, re.DOTALL)
-                        content_match = re.search(r"<CHUNK_TEXT>(.*?)</CHUNK_TEXT>", chunk_text_raw, re.DOTALL)
-
-                        summary = summary_match.group(1).strip() if summary_match else ""
-                        content = content_match.group(1).strip() if content_match else chunk_text_raw
-
-                        # Deduplicate by summary content (first 200 chars)
-                        dedup_key = summary[:200] if summary else content[:200]
-                        if dedup_key and dedup_key not in seen_summaries:
-                            seen_summaries.add(dedup_key)
-                            articles.append(
-                                {
-                                    "summary": summary,
-                                    "content": content,
-                                    "cosine_similarity": cosine_sim,
-                                    "text_match": text_match,
-                                    "reranker_score": reranker,
-                                }
-                            )
-
-                    if articles:
-                        st.markdown(f"**{len(articles)} unique article(s) retrieved** (from {len(response_data)} chunks):")
-
-                        for i, article in enumerate(articles):
-                            summary = article["summary"]
-                            content = article["content"]
-
-                            # Extract title from summary (first line after # if markdown)
-                            title_match = re.search(r"^#\s*(.+?)$", summary, re.MULTILINE)
-                            title = title_match.group(1).strip() if title_match else f"Article {i + 1}"
-
-                            # Build score display
-                            score_parts = []
-                            if article["cosine_similarity"] is not None:
-                                score_parts.append(f"Cosine: {article['cosine_similarity']:.3f}")
-                            if article["text_match"] is not None:
-                                score_parts.append(f"Text: {article['text_match']:.3f}")
-                            if article["reranker_score"] is not None:
-                                score_parts.append(f"Rerank: {article['reranker_score']:.2f}")
-                            score_str = f" ({' • '.join(score_parts)})" if score_parts else ""
-
-                            with st.expander(f"📄 {title}{score_str}", expanded=(i == 0)):
-                                # Show summary
-                                if summary:
-                                    st.markdown("**Summary:**")
-                                    st.markdown(summary)
-
-                                # Show content in scrollable container
-                                if content:
-                                    st.markdown("**Article Content:**")
-                                    st.markdown(f'<div class="scrollable-content">{content}</div>', unsafe_allow_html=True)
-                    else:
-                        st.warning("No articles could be parsed from the response.")
-                else:
-                    st.warning("No articles were retrieved for this query. This indicates a potential knowledge gap or retrieval issue.")
+                        chunk_count = len(articles)
+                elif isinstance(response_raw, list):
+                    chunk_count = len(response_raw)
             else:
-                st.warning("No retrieval data available for this record.")
+                chunk_count = len(articles)
 
-        with tab_generated:
-            st.markdown("**Synthetic Pair Generation Output**")
-            generated_json = row.get("GENERATED_JSON", {})
-            if generated_json and isinstance(generated_json, dict):
-                st.json(generated_json)
-            else:
-                st.caption("No generated data available")
+            st.markdown(f"**{len(articles)} unique article(s) retrieved** (from {chunk_count} chunks):")
 
-        with tab_attrs:
-            st.markdown("**ServiceNow Ticket Metadata**")
-            attrs_json = row.get("ATTRS_JSON", {})
-            if attrs_json and isinstance(attrs_json, dict):
-                st.json(attrs_json)
-            else:
-                st.caption("No ticket metadata available")
+            for i, article in enumerate(articles):
+                summary = article.get("summary", "")
+                content = article.get("content", "")
+                title = article.get("title") or f"Article {i + 1}"
 
-            # Taxonomy path
-            taxonomy = f"{row.get('L1_TAG', '')} > {row.get('L2_TAG', '')} > {row.get('L3_TAG', '')} > {row.get('L4_TAG', '')}"
-            st.markdown(f"**Taxonomy:** {taxonomy}")
+                # Build score display
+                score_parts = []
+                if article.get("cosine_similarity") is not None:
+                    score_parts.append(f"Cosine: {article['cosine_similarity']:.3f}")
+                if article.get("text_match") is not None:
+                    score_parts.append(f"Text: {article['text_match']:.3f}")
+                if article.get("reranker_score") is not None:
+                    score_parts.append(f"Rerank: {article['reranker_score']:.3f}")
+                score_str = f" ({' • '.join(score_parts)})" if score_parts else ""
+
+                with st.expander(f"📄 {title}{score_str}", expanded=(i == 0)):
+                    # Show summary
+                    if summary:
+                        st.markdown("**Summary:**")
+                        st.markdown(summary)
+
+                    # Show content in scrollable container
+                    if content:
+                        st.markdown("**Article Content:**")
+                        st.markdown(f'<div class="scrollable-content">{content}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("No articles were retrieved for this query. This indicates a potential knowledge gap or retrieval issue.")
+
+    with tab_generated:
+        st.markdown("**Synthetic Pair Generation Output**")
+        generated_json = row.get("GENERATED_JSON", {})
+        if generated_json and isinstance(generated_json, dict):
+            st.json(generated_json)
+        else:
+            st.caption("No generated data available")
+
+    with tab_attrs:
+        st.markdown("**ServiceNow Ticket Metadata**")
+        attrs_json = row.get("ATTRS_JSON", {})
+        if attrs_json and isinstance(attrs_json, dict):
+            st.json(attrs_json)
+        else:
+            st.caption("No ticket metadata available")
+
+        # Taxonomy path
+        taxonomy = f"{row.get('L1_TAG', '')} > {row.get('L2_TAG', '')} > {row.get('L3_TAG', '')} > {row.get('L4_TAG', '')}"
+        st.markdown(f"**Taxonomy:** {taxonomy}")
 
 
 def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -> None:

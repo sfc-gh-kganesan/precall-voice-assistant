@@ -4,6 +4,7 @@ Uses Snowpark for data access with caching for performance.
 """
 
 import json
+import re
 
 import pandas as pd
 import streamlit as st
@@ -225,6 +226,79 @@ def extract_response_scores(df: pd.DataFrame) -> tuple[list[float], list[float]]
     return all_cosine_scores, all_text_match_scores
 
 
+def parse_response_articles(response_raw) -> list[dict]:
+    """
+    Parse and deduplicate articles from RESPONSE JSON.
+
+    Pre-computes the article parsing that was previously done in the UI render loop.
+    This allows caching at the data layer and avoids re-parsing on every row selection.
+
+    Args:
+        response_raw: Raw RESPONSE column value (JSON string or parsed list)
+
+    Returns:
+        List of article dicts with keys: summary, content, title, cosine_similarity,
+        text_match, reranker_score
+    """
+    if pd.isna(response_raw) or not response_raw:
+        return []
+
+    # Parse RESPONSE as JSON if needed
+    response_data = response_raw
+    if isinstance(response_raw, str):
+        try:
+            response_data = json.loads(response_raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    if not isinstance(response_data, list) or len(response_data) == 0:
+        return []
+
+    articles = []
+    seen_summaries = set()
+
+    for item in response_data:
+        if not isinstance(item, dict):
+            continue
+
+        # Extract scores
+        scores = item.get("@scores", {})
+        cosine_sim = scores.get("cosine_similarity") if isinstance(scores, dict) else None
+        text_match = scores.get("text_match") if isinstance(scores, dict) else None
+        reranker = scores.get("reranker_score") if isinstance(scores, dict) else None
+
+        # Extract chunk text (contains DOC_SUMMARY and CHUNK_TEXT tags)
+        chunk_text_raw = item.get("CHUNK_TEXT", "")
+
+        # Parse DOC_SUMMARY and CHUNK_TEXT from the chunk
+        summary_match = re.search(r"<DOC_SUMMARY>(.*?)</DOC_SUMMARY>", chunk_text_raw, re.DOTALL)
+        content_match = re.search(r"<CHUNK_TEXT>(.*?)</CHUNK_TEXT>", chunk_text_raw, re.DOTALL)
+
+        summary = summary_match.group(1).strip() if summary_match else ""
+        content = content_match.group(1).strip() if content_match else chunk_text_raw
+
+        # Extract title from summary (first line after # if markdown)
+        title_match = re.search(r"^#\s*(.+?)$", summary, re.MULTILINE)
+        title = title_match.group(1).strip() if title_match else None
+
+        # Deduplicate by summary content (first 200 chars)
+        dedup_key = summary[:200] if summary else content[:200]
+        if dedup_key and dedup_key not in seen_summaries:
+            seen_summaries.add(dedup_key)
+            articles.append(
+                {
+                    "summary": summary,
+                    "content": content,
+                    "title": title,
+                    "cosine_similarity": cosine_sim,
+                    "text_match": text_match,
+                    "reranker_score": reranker,
+                }
+            )
+
+    return articles
+
+
 @st.cache_data(ttl=300)
 def get_merged_data(_session: Session) -> pd.DataFrame:
     """
@@ -260,6 +334,9 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
     # Precompute expensive boolean masks (avoids re-computing on every filter)
     merged["IS_UNRESOLVED"] = merged.apply(_is_unresolved, axis=1)
     merged["IS_BACKFILLABLE"] = merged.apply(_is_backfillable, axis=1)
+
+    # Precompute parsed articles from RESPONSE (avoids re-parsing on every row selection)
+    merged["PARSED_ARTICLES"] = merged["RESPONSE"].apply(parse_response_articles)
 
     return merged
 

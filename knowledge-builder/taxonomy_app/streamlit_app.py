@@ -121,11 +121,7 @@ def main():
         show_l4=True,
     )
 
-    # Taxonomy selector uses base_filtered_df (without taxonomy filter) to show all options
-    render_taxonomy_selector(base_filtered_df)
-
-    # Glossary
-    with st.expander("📖 Glossary", expanded=True):
+    with st.expander("📖 Glossary", expanded=False):
         st.markdown(
             "- **Level (L1-L4)**: Bottom-up ontology for a ticket, from broad category (L1) to specific issue type (L4).\n"
             "- **Self Serve Candidate**: Whether this ticket type *could potentially* be resolved "
@@ -139,6 +135,9 @@ def main():
             "- **Context Relevance**: How relevant the retrieved knowledge articles are to the query (0-1 scale).\n"
             "- **Unresolved / Cancelled**: Tickets closed without resolution (aged out, duplicates, or user-cancelled)."
         )
+
+    # Taxonomy selector uses base_filtered_df (without taxonomy filter) to show all options
+    render_taxonomy_selector(base_filtered_df)
 
     st.divider()
 
