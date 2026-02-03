@@ -1,0 +1,9 @@
+---
+login_name: cxu
+display_name: cxu
+first_name: Charles
+last_name: Xu
+email: charles.xu@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

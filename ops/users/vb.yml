@@ -1,0 +1,9 @@
+---
+login_name: vb
+display_name: vb
+first_name: Vara
+last_name: B
+email: vara.b@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

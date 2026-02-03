@@ -1,0 +1,9 @@
+---
+login_name: mngan
+display_name: mngan
+first_name: Macy
+last_name: Ngan
+email: macy.ngan@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin

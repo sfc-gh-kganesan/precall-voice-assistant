@@ -1,0 +1,9 @@
+---
+login_name: cnivera
+display_name: cnivera
+first_name: Chris
+last_name: Nivera
+email: chris.nivera@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: accountadmin
