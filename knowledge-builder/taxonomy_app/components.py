@@ -38,12 +38,14 @@ def render_sunburst(grouped_df: pd.DataFrame, path_cols: list[str]) -> None:
         color="CONTEXT_RELEVANCE_SCORE",
         color_continuous_scale=purple_gradient,
         title="Taxonomy Distribution by Ticket Count",
-        labels={"CONTEXT_RELEVANCE_SCORE": "Context Relevance"},
     )
+
+    fig.update_traces(hovertemplate=("<b>%{label}</b><br>%{id}<br>Ticket Count: %{value}<br>Context Relevance: %{color:.3f}<extra></extra>"))
 
     fig.update_layout(
         height=600,
         margin={"t": 50, "l": 0, "r": 0, "b": 0},
+        coloraxis_colorbar_title="Context Relevance Score",
     )
 
     # Render chart (visualization only, no click handling)
