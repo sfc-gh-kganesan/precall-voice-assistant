@@ -1,0 +1,160 @@
+/* Theme-aware CSS variables */
+:root {
+    --bento-bg: rgba(0, 0, 0, 0.05);
+    --bento-border: rgba(0, 0, 0, 0.1);
+    --bento-text-primary: #1f1f1f;
+    --bento-text-secondary: rgba(0, 0, 0, 0.7);
+    --bento-text-muted: rgba(0, 0, 0, 0.5);
+    --panel-bg: rgba(0, 0, 0, 0.05);
+    --panel-border: rgba(0, 0, 0, 0.1);
+    /* Purple theme colors */
+    --purple-lightest: #E5CCFA;
+    --purple-light: #CB99F5;
+    --purple-medium: #B066F0;
+    --purple-dark: #9533EB;
+    --purple-darkest: #7A00E6;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bento-bg: rgba(255, 255, 255, 0.05);
+        --bento-border: rgba(255, 255, 255, 0.1);
+        --bento-text-primary: white;
+        --bento-text-secondary: rgba(255, 255, 255, 0.7);
+        --bento-text-muted: rgba(255, 255, 255, 0.5);
+        --panel-bg: rgba(255, 255, 255, 0.05);
+        --panel-border: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Streamlit dark theme override */
+[data-testid="stAppViewContainer"][data-theme="dark"],
+.stApp[data-theme="dark"] {
+    --bento-bg: rgba(255, 255, 255, 0.05);
+    --bento-border: rgba(255, 255, 255, 0.1);
+    --bento-text-primary: white;
+    --bento-text-secondary: rgba(255, 255, 255, 0.7);
+    --bento-text-muted: rgba(255, 255, 255, 0.5);
+    --panel-bg: rgba(255, 255, 255, 0.05);
+    --panel-border: rgba(255, 255, 255, 0.1);
+}
+
+/* Bento box grid layout */
+.bento-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.bento-box {
+    background-color: var(--bento-bg);
+    border: 1px solid var(--bento-border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    text-align: center;
+    height: 130px;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.bento-box:hover {
+    box-shadow: 0 4px 12px rgba(122, 0, 230, 0.3);
+}
+
+.bento-label {
+    font-size: 14px;
+    color: var(--bento-text-secondary);
+    margin-bottom: 8px;
+    line-height: 1.2;
+}
+
+.bento-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--bento-text-primary);
+    line-height: 1.2;
+}
+
+.bento-value-small {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--bento-text-primary);
+    line-height: 1.2;
+}
+
+.bento-subtitle {
+    font-size: 12px;
+    color: var(--bento-text-muted);
+    margin-top: 4px;
+    line-height: 1.2;
+}
+
+/* Knowledge gap panel styles */
+.kg-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 8px;
+}
+
+.kg-panel-loading {
+    padding: 40px;
+    text-align: center;
+}
+
+.kg-panel-empty {
+    padding: 32px;
+    text-align: center;
+}
+
+.kg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.kg-title {
+    font-size: 14px;
+    color: var(--bento-text-secondary);
+}
+
+.kg-meta {
+    font-size: 12px;
+    color: var(--bento-text-muted);
+}
+
+.kg-content {
+    color: var(--bento-text-primary);
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.kg-subtitle {
+    font-size: 13px;
+    color: var(--bento-text-muted);
+}
+
+/* Theme-adaptive containers for inline usage */
+.theme-box {
+    background-color: rgba(128, 128, 128, 0.1);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.scrollable-content {
+    max-height: 400px;
+    overflow-y: auto;
+    background-color: rgba(128, 128, 128, 0.1);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    white-space: pre-wrap;
+}

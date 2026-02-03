@@ -29,13 +29,14 @@ def render_sunburst(grouped_df: pd.DataFrame, path_cols: list[str]) -> None:
         st.warning("No data available for sunburst visualization.")
         return
 
-    # Create sunburst
+    # Create sunburst with custom purple gradient (white to dark purple = better relevance)
+    purple_gradient = ["#FFFFFF", "#E5CCFA", "#CB99F5", "#B066F0", "#9533EB", "#7A00E6"]
     fig = px.sunburst(
         grouped_df,
         path=path_cols,
         values="TICKET_COUNT",
         color="CONTEXT_RELEVANCE_SCORE",
-        color_continuous_scale="Blues",
+        color_continuous_scale=purple_gradient,
         title="Taxonomy Distribution by Ticket Count",
         labels={"CONTEXT_RELEVANCE_SCORE": "Context Relevance"},
     )
@@ -231,59 +232,15 @@ def render_filters(source_types: list[str], answerable_options: list[str], resol
 
 def inject_app_styles() -> None:
     """
-    Inject all application CSS styles.
+    Inject application CSS styles from external file.
     Call once at the top of the main app, before any UI rendering.
+    Uses CSS variables for theme-aware colors (light/dark mode support).
     """
-    st.markdown(
-        """
-    <style>
-    .bento-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 1rem;
-    }
-    .bento-box {
-        background-color: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        padding: 16px 20px;
-        text-align: center;
-        height: 130px;
-        min-width: 180px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        box-sizing: border-box;
-    }
-    .bento-label {
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.7);
-        margin-bottom: 8px;
-        line-height: 1.2;
-    }
-    .bento-value {
-        font-size: 32px;
-        font-weight: bold;
-        color: white;
-        line-height: 1.2;
-    }
-    .bento-value-small {
-        font-size: 24px;
-        font-weight: bold;
-        color: white;
-        line-height: 1.2;
-    }
-    .bento-subtitle {
-        font-size: 12px;
-        color: rgba(255, 255, 255, 0.5);
-        margin-top: 4px;
-        line-height: 1.2;
-    }
-    </style>
-    """,
-        unsafe_allow_html=True,
-    )
+    from pathlib import Path
+
+    css_path = Path(__file__).parent / "styles.css"
+    css = css_path.read_text()
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 def _bento_box_html(label: str, value: str, subtitle: str | None = None, small_value: bool = False) -> str:
@@ -439,7 +396,7 @@ def render_data_table(df: pd.DataFrame) -> None:
             reason = row.get("CONTEXT_RELEVANCE_REASON", "")
             if pd.notna(reason) and reason:
                 st.markdown("**Chain of Thought Reasoning:**")
-                st.markdown(f'<div style="background-color: rgba(128, 128, 128, 0.1); padding: 1rem; border-radius: 0.5rem; white-space: pre-wrap; word-wrap: break-word;">{str(reason)}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="theme-box">{str(reason)}</div>', unsafe_allow_html=True)
             else:
                 st.caption("No evaluation reasoning available")
 
@@ -530,7 +487,7 @@ def render_data_table(df: pd.DataFrame) -> None:
                                 # Show content in scrollable container
                                 if content:
                                     st.markdown("**Article Content:**")
-                                    st.markdown(f'<div style="max-height: 400px; overflow-y: auto; background-color: rgba(128, 128, 128, 0.1); padding: 1rem; border-radius: 0.5rem; white-space: pre-wrap;">{content}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div class="scrollable-content">{content}</div>', unsafe_allow_html=True)
                     else:
                         st.warning("No articles could be parsed from the response.")
                 else:
@@ -576,18 +533,12 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
         # Show loading state
         st.markdown(
             """
-        <div style="
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-        ">
-            <div style="font-size: 14px; color: rgba(255, 255, 255, 0.7);">
+        <div class="kg-panel kg-panel-loading">
+            <div class="kg-title">
                 🤖 Knowledge Gap Analysis
             </div>
             <div style="font-size: 24px; margin: 20px 0;">⏳</div>
-            <div style="color: rgba(255, 255, 255, 0.6); font-size: 14px;">
+            <div class="kg-subtitle">
                 Analyzing evaluations with AI_AGG...
             </div>
         </div>
@@ -608,27 +559,16 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
         # Filled state: Show the AI summary
         st.markdown(
             f"""
-        <div style="
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 24px;
-            margin-bottom: 8px;
-        ">
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 16px;
-            ">
-                <div style="font-size: 14px; color: rgba(255, 255, 255, 0.7);">
+        <div class="kg-panel">
+            <div class="kg-header">
+                <div class="kg-title">
                     🤖 Knowledge Gap Analysis
                 </div>
-                <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5);">
+                <div class="kg-meta">
                     {len(filtered_df):,} tickets • Avg Score: {avg_score:.2f}
                 </div>
             </div>
-            <div style="color: white; font-size: 15px; line-height: 1.8;">
+            <div class="kg-content">
                 {store.ai_summary}
             </div>
         </div>
@@ -651,18 +591,11 @@ def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -
         # Empty state with centered button
         st.markdown(
             f"""
-        <div style="
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 32px;
-            text-align: center;
-            margin-bottom: 8px;
-        ">
-            <div style="font-size: 14px; color: rgba(255, 255, 255, 0.7); margin-bottom: 8px;">
+        <div class="kg-panel kg-panel-empty">
+            <div class="kg-title" style="margin-bottom: 8px;">
                 🤖 Knowledge Gap Analysis
             </div>
-            <div style="font-size: 13px; color: rgba(255, 255, 255, 0.5);">
+            <div class="kg-subtitle">
                 Analyze {len(filtered_df):,} service tickets
             </div>
         </div>
