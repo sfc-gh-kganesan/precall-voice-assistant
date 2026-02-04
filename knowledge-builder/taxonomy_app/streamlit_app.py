@@ -10,7 +10,6 @@ Schema: sf_fde
 
 import streamlit as st
 
-# Configure page
 st.set_page_config(
     page_title="KB Gap Analysis",
     page_icon="🔍",
@@ -23,12 +22,14 @@ from components import (
     render_data_table,
     render_debug_panel,
     render_filters,
+    render_kb_leaderboard,
     render_knowledge_gap_panel,
     render_kpi_bento,
     render_sunburst,
     render_taxonomy_selector,
 )
 from data import (
+    compute_kb_leaderboard,
     compute_kpis,
     filter_data,
     get_answerable_options,
@@ -52,11 +53,9 @@ def main():
     # Inject CSS styles (once, before any UI)
     inject_app_styles()
 
-    # Header
     st.title("Knowledge Base Gap Analysis")
     st.markdown("Identify gaps in the knowledge base by analyzing synthetic ticket queries, context relevance scores, and deflection potential.")
 
-    # Load data
     try:
         session = get_session()
         merged_df = get_merged_data(session)
@@ -78,7 +77,6 @@ def main():
     # Re-fetch store after potential initialization
     store = get_store()
 
-    # Refresh button
     col_refresh, col_spacer = st.columns([1, 5])
     with col_refresh:
         if st.button("🔄 Refresh Data"):
@@ -87,7 +85,6 @@ def main():
 
     st.divider()
 
-    # Filters at the top
     render_filters(source_types, answerable_options, resolution_options, backfillable_options)
 
     # Apply dropdown filters once (shared by taxonomy selector and main data)
@@ -144,13 +141,11 @@ def main():
     # Sunburst visualization - zooms based on taxonomy selection
     render_sunburst(grouped_df, path_cols)
 
-    # Show selection info
     if any([store.selected_l1, store.selected_l2, store.selected_l3, store.selected_l4]):
         st.info(f"Showing {len(filtered_df):,} tickets for selected taxonomy path")
     else:
         st.caption(f"Showing all {len(filtered_df):,} tickets")
 
-    # Data table
     render_data_table(filtered_df)
 
     st.divider()
@@ -158,9 +153,13 @@ def main():
     # Compute KPIs once for reuse (pass total population for percentage calculation)
     kpis = compute_kpis(filtered_df, total_population=len(merged_df))
 
-    # KPI Bento boxes
     st.subheader("Key Metrics")
     render_kpi_bento(kpis, resolution_filter=store.resolution_filter, backfillable_filter=store.backfillable_filter)
+
+    st.divider()
+
+    leaderboard_df = compute_kb_leaderboard(filtered_df)
+    render_kb_leaderboard(leaderboard_df)
 
     st.divider()
 

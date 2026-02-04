@@ -63,6 +63,15 @@ def get_evaluation_results(_session: Session) -> pd.DataFrame:
     return evaluation_results.to_pandas()
 
 
+@st.cache_data(ttl=600)
+def get_kb_chunks(_session: Session) -> pd.DataFrame:
+    """
+    Load KB_CHUNKS for KB_NUMBER lookup.
+    """
+    kb_chunks = _session.table("KB_CHUNKS_V").select("KB_NUMBER", "CHUNK_TEXT")
+    return kb_chunks.to_pandas()
+
+
 def expand_col(df: pd.DataFrame, col: str) -> pd.DataFrame:
     """
     Expand a JSON/VARIANT column into normalized columns.
@@ -299,6 +308,61 @@ def parse_response_articles(response_raw) -> list[dict]:
     return articles
 
 
+def parse_response_chunks(response_raw, chunk_to_kb: dict) -> list[dict]:
+    """
+    Parse chunks from RESPONSE JSON with KB_NUMBER mapping.
+
+    Unlike parse_response_articles which deduplicates, this returns all chunks
+    for accurate frequency counts in the leaderboard.
+
+    Args:
+        response_raw: Raw RESPONSE column value (JSON string or parsed list)
+        chunk_to_kb: Dict mapping CHUNK_TEXT to KB_NUMBER
+
+    Returns:
+        List of chunk dicts with keys: CHUNK_TEXT, KB_NUMBER, COSINE_SIMILARITY,
+        RERANKER_SCORE, TEXT_MATCH
+    """
+    if pd.isna(response_raw) or not response_raw:
+        return []
+
+    # Parse RESPONSE as JSON if needed
+    response_data = response_raw
+    if isinstance(response_raw, str):
+        try:
+            response_data = json.loads(response_raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    if not isinstance(response_data, list) or len(response_data) == 0:
+        return []
+
+    chunks = []
+    for item in response_data:
+        if not isinstance(item, dict):
+            continue
+
+        chunk_text = item.get("CHUNK_TEXT", "")
+        if not chunk_text:
+            continue
+
+        scores = item.get("@scores", {})
+        if not isinstance(scores, dict):
+            scores = {}
+
+        chunks.append(
+            {
+                "CHUNK_TEXT": chunk_text,
+                "KB_NUMBER": chunk_to_kb.get(chunk_text),
+                "COSINE_SIMILARITY": scores.get("cosine_similarity"),
+                "RERANKER_SCORE": scores.get("reranker_score"),
+                "TEXT_MATCH": scores.get("text_match"),
+            }
+        )
+
+    return chunks
+
+
 @st.cache_data(ttl=300)
 def get_merged_data(_session: Session) -> pd.DataFrame:
     """
@@ -312,6 +376,10 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
     synthetic_pairs_df = get_synthetic_pairs(_session)
     search_queries_df = get_search_queries(_session)
     evaluation_results_df = get_evaluation_results(_session)
+
+    # Load KB_CHUNKS for chunk-to-article mapping (used for leaderboard)
+    kb_chunks_df = get_kb_chunks(_session)
+    chunk_to_kb = dict(zip(kb_chunks_df["CHUNK_TEXT"], kb_chunks_df["KB_NUMBER"], strict=False))
 
     # Expand GENERATED column to get the query field
     expanded_df = expand_generated_col(synthetic_pairs_df)
@@ -337,6 +405,9 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
 
     # Precompute parsed articles from RESPONSE (avoids re-parsing on every row selection)
     merged["PARSED_ARTICLES"] = merged["RESPONSE"].apply(parse_response_articles)
+
+    # Precompute parsed chunks with KB_NUMBER for leaderboard (not deduplicated)
+    merged["PARSED_CHUNKS"] = merged["RESPONSE"].apply(lambda r: parse_response_chunks(r, chunk_to_kb))
 
     return merged
 
@@ -661,6 +732,69 @@ def prepare_sunburst_data(
         grouped[col] = grouped[col].fillna("(empty)")
 
     return grouped, path_cols
+
+
+def compute_kb_leaderboard(merged_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute KB article leaderboard from precomputed PARSED_CHUNKS column.
+
+    Aggregates retrieval frequency and average scores per KB article.
+
+    Args:
+        merged_df: The merged dataframe with PARSED_CHUNKS and CONTEXT_RELEVANCE_SCORE
+
+    Returns:
+        DataFrame with columns: KB_NUMBER, FREQUENCY, AVG_COSINE_SIMILARITY,
+        AVG_RERANKER_SCORE, AVG_TEXT_MATCH, AVG_CONTEXT_RELEVANCE
+    """
+    empty_result = pd.DataFrame(columns=["KB_NUMBER", "FREQUENCY", "AVG_COSINE_SIMILARITY", "AVG_RERANKER_SCORE", "AVG_TEXT_MATCH", "AVG_CONTEXT_RELEVANCE"])
+
+    if merged_df.empty or "PARSED_CHUNKS" not in merged_df.columns:
+        return empty_result
+
+    # Flatten PARSED_CHUNKS and add context relevance from each row
+    rows = []
+    for _, row in merged_df.iterrows():
+        chunks = row.get("PARSED_CHUNKS", [])
+        context_relevance = row.get("CONTEXT_RELEVANCE_SCORE")
+
+        if not chunks:
+            continue
+
+        for chunk in chunks:
+            if chunk.get("KB_NUMBER"):  # Only include chunks with KB mapping
+                rows.append(
+                    {
+                        "KB_NUMBER": chunk["KB_NUMBER"],
+                        "COSINE_SIMILARITY": chunk.get("COSINE_SIMILARITY"),
+                        "RERANKER_SCORE": chunk.get("RERANKER_SCORE"),
+                        "TEXT_MATCH": chunk.get("TEXT_MATCH"),
+                        "CONTEXT_RELEVANCE": context_relevance,
+                    }
+                )
+
+    if not rows:
+        return empty_result
+
+    flattened_df = pd.DataFrame(rows)
+
+    # Aggregate by KB_NUMBER
+    leaderboard = (
+        flattened_df.groupby("KB_NUMBER")
+        .agg(
+            FREQUENCY=("KB_NUMBER", "count"),
+            AVG_COSINE_SIMILARITY=("COSINE_SIMILARITY", "mean"),
+            AVG_RERANKER_SCORE=("RERANKER_SCORE", "mean"),
+            AVG_TEXT_MATCH=("TEXT_MATCH", "mean"),
+            AVG_CONTEXT_RELEVANCE=("CONTEXT_RELEVANCE", "mean"),
+        )
+        .reset_index()
+    )
+
+    # Sort by frequency descending
+    leaderboard = leaderboard.sort_values("FREQUENCY", ascending=False)
+
+    return leaderboard
 
 
 def generate_knowledge_gap_summary(session: Session, filtered_df: pd.DataFrame) -> str:

@@ -323,6 +323,49 @@ def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None, bac
     st.markdown(f'<div class="bento-container">{"".join(boxes_html)}</div>', unsafe_allow_html=True)
 
 
+def render_kb_leaderboard(leaderboard_df: pd.DataFrame) -> None:
+    """
+    Render the KB Article Leaderboard showing retrieval frequency and average scores.
+
+    Displays articles ranked by how often they were retrieved in searches,
+    along with their average performance metrics.
+    """
+    st.subheader("KB Article Leaderboard")
+    st.caption("Articles ranked by retrieval frequency with average performance scores")
+
+    if leaderboard_df.empty:
+        st.info("No KB article data available for the current selection.")
+        return
+
+    # Prepare display dataframe with formatted columns
+    display_df = leaderboard_df.copy()
+
+    # Rename columns for display
+    display_df = display_df.rename(
+        columns={
+            "KB_NUMBER": "KB Article",
+            "FREQUENCY": "Times Retrieved",
+            "AVG_COSINE_SIMILARITY": "Avg Cosine",
+            "AVG_RERANKER_SCORE": "Avg Reranker",
+            "AVG_TEXT_MATCH": "Avg Text Match",
+            "AVG_CONTEXT_RELEVANCE": "Avg Context Rel.",
+        }
+    )
+
+    # Format numeric columns
+    numeric_cols = ["Avg Cosine", "Avg Reranker", "Avg Text Match", "Avg Context Rel."]
+    for col in numeric_cols:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(lambda x: f"{x:.3f}" if pd.notna(x) else "N/A")
+
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        height=min(400, 35 * (len(display_df) + 1)),
+    )
+
+
 def render_data_table(df: pd.DataFrame) -> None:
     """Render the filtered data table with row selection for detail inspection."""
 
@@ -391,13 +434,11 @@ def render_detail_panel(row: pd.Series) -> None:
     """
     st.subheader("🔍 Selected Record Details")
 
-    # Summary line
     query_preview = str(row.get("query", ""))[:80] + "..." if len(str(row.get("query", ""))) > 80 else row.get("query", "")
     score = row.get("CONTEXT_RELEVANCE_SCORE", "N/A")
     score_display = f"{score:.2f}" if pd.notna(score) and score != "N/A" else "N/A"
     st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Self Serve:** {row.get('answerable_with_kb', 'N/A')}")
 
-    # Tabs for different data sources
     tab_eval, tab_articles, tab_generated, tab_attrs = st.tabs(["📊 Evaluation", "📚 Retrieved Articles", "🤖 Generated", "📋 Ticket Metadata"])
 
     with tab_eval:
