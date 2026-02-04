@@ -8,6 +8,7 @@ import re
 
 import pandas as pd
 import streamlit as st
+from config import config
 from snowflake.snowpark import Session
 from snowflake.snowpark import functions as F
 from snowflake.snowpark import types as T
@@ -26,7 +27,7 @@ def get_synthetic_pairs(_session: Session) -> pd.DataFrame:
     Load synthetic pairs from the SYNTHETIC_PAIRS table.
     Contains ticket data with LLM-generated taxonomy and features.
     """
-    synthetic_pairs = _session.table("SYNTHETIC_PAIRS")
+    synthetic_pairs = _session.table(config.SYNTHETIC_PAIRS_TABLE)
     return synthetic_pairs.to_pandas()
 
 
@@ -38,7 +39,7 @@ def get_search_queries(_session: Session) -> pd.DataFrame:
     Columns: SEARCH_ID, INPUT_TYPE, INPUT_ARGS, RESPONSE, CREATED_BY, CREATED_ON
     """
     input_type_expr = F.col("INPUT_TYPE") == "SYNTHETIC_PAIR"
-    search_queries = _session.table("SEARCH_QUERIES").filter(input_type_expr).select("SEARCH_ID", "RESPONSE")
+    search_queries = _session.table(config.SEARCH_QUERIES_TABLE).filter(input_type_expr).select("SEARCH_ID", "RESPONSE")
     return search_queries.to_pandas()
 
 
@@ -52,7 +53,7 @@ def get_evaluation_results(_session: Session) -> pd.DataFrame:
     context_relevance_reason_expr = context_relevance_expr["reasons"]["reason"].cast(T.StringType())
     context_relevance_score_expr = context_relevance_expr["score"].cast(T.FloatType())
 
-    evaluation_results = _session.table("EVALUATION_RESULTS").select(
+    evaluation_results = _session.table(config.EVALUATION_RESULTS_TABLE).select(
         "SEARCH_ID",
         "INPUT_QUERY",
         "CHUNKS",
@@ -68,7 +69,7 @@ def get_kb_chunks(_session: Session) -> pd.DataFrame:
     """
     Load KB_CHUNKS for KB_NUMBER lookup.
     """
-    kb_chunks = _session.table("KB_CHUNKS_V").select("KB_NUMBER", "CHUNK_TEXT")
+    kb_chunks = _session.table(config.KB_CHUNKS_VIEW).select("KB_NUMBER", "CHUNK_TEXT")
     return kb_chunks.to_pandas()
 
 

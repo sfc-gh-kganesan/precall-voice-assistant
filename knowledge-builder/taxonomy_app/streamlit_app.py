@@ -4,8 +4,7 @@ Sunburst Push-Down Taxonomy Application
 Interactive Streamlit application for exploring synthetic pair evaluation data
 with hierarchical taxonomy drill-down capabilities.
 
-Database: emea_elementum_ace_dev
-Schema: sf_fde
+Configuration is managed via environment variables. See config.py for details.
 """
 
 import streamlit as st
