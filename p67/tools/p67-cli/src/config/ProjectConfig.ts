@@ -3,11 +3,15 @@ import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { z } from 'zod';
 
+export type WorkflowLanguage = 'typescript' | 'python';
+
+const LanguageSchema = z.enum(['typescript', 'python']).optional();
+
 const ProjectConfigSchema = z.object({
-    entrypoint: z
-        .string()
-        .describe('Workflow entrypoint path')
-        .default('./src/index.ts'),
+    language: LanguageSchema.describe(
+        'Workflow language (typescript or python)',
+    ),
+    entrypoint: z.string().describe('Workflow entrypoint path').optional(),
     buildDir: z.string().describe('Build output directory').default('build'),
 });
 
@@ -118,10 +122,40 @@ export class ProjectConfig {
     }
 
     /**
+     * Detect workflow language from config or file system
+     */
+    public get language(): WorkflowLanguage {
+        const configLang = this.get().language;
+        if (configLang) {
+            return configLang;
+        }
+
+        // File-based detection
+        if (fs.existsSync(path.join(this.projectDir, 'src', 'main.py'))) {
+            return 'python';
+        }
+        if (fs.existsSync(path.join(this.projectDir, 'src', 'index.ts'))) {
+            return 'typescript';
+        }
+
+        // Default to typescript for backwards compatibility
+        return 'typescript';
+    }
+
+    /**
      * Get the entrypoint file path
      */
     public get entrypoint(): string {
-        return this.resolveProjectPath(this.get().entrypoint);
+        const configEntrypoint = this.get().entrypoint;
+        if (configEntrypoint) {
+            return this.resolveProjectPath(configEntrypoint);
+        }
+
+        // Language-aware default entrypoint
+        if (this.language === 'python') {
+            return this.resolveProjectPath('./src/main.py');
+        }
+        return this.resolveProjectPath('./src/index.ts');
     }
 
     /**

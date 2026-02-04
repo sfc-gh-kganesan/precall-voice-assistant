@@ -1,15 +1,17 @@
 import type { ChildProcess } from 'node:child_process';
-import { fork } from 'node:child_process';
 import * as fs from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, resolve } from 'node:path';
 import type { LogService } from '@controld/lib/LogService.js';
 import type { Manifest } from '@controld/lib/manifest.js';
-import { parseManifest } from '@controld/lib/manifest.js';
+import { detectLanguage, parseManifest } from '@controld/lib/manifest.js';
+import {
+    createAdapter,
+    type RuntimeAdapter,
+} from '@controld/lib/runtime/adapter.js';
 import {
     type InterruptMessage,
     InterruptMessageSchema,
-    MessageSchema,
+    type Message,
     MessageType,
     makeResumeInterruptMessage,
     makeRunWorkflowMessage,
@@ -69,6 +71,7 @@ export class Logger {
 export class Runner {
     private workflowId: string;
     private proc: ChildProcess | null = null;
+    private adapter: RuntimeAdapter | null = null;
     private currentRunId: string = 'unknown';
     private pendingInterrupt: InterruptPayload | null = null;
     private interruptResolve: ((value: RunResult) => void) | null = null;
@@ -132,7 +135,7 @@ export class Runner {
             );
         }
 
-        if (!this.proc) {
+        if (!this.proc || !this.adapter) {
             throw new Error('No active workflow process to resume');
         }
 
@@ -141,7 +144,7 @@ export class Runner {
             response,
         });
 
-        this.proc.send(message);
+        this.adapter.sendMessage(this.proc, message);
         this.pendingInterrupt = null;
     }
 
@@ -327,13 +330,14 @@ export class Runner {
             };
         }
 
-        const __filename = fileURLToPath(import.meta.url);
-        const __dirname = dirname(__filename);
-        const hostPath = resolve(__dirname, 'runtime', 'host.js');
+        // Detect workflow language and create appropriate adapter
+        const language = detectLanguage(this.workflowDir, manifest);
+        const adapter = createAdapter(language);
+        this.adapter = adapter;
 
-        const proc = fork(hostPath, [], {
-            stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-        });
+        console.log(`Detected workflow language: ${language}`);
+
+        const proc = adapter.spawn();
         this.proc = proc;
 
         const stdout: string[] = [];
@@ -341,15 +345,22 @@ export class Runner {
         const errors: WorkflowErrorMessage[] = [];
         const logger = new Logger();
 
-        await writeLog('RuntimeHost', 'Starting workflow execution');
+        await writeLog(
+            'RuntimeHost',
+            `Starting ${language} workflow execution`,
+        );
 
         if (proc.stdout) {
             proc.stdout.on('data', (data: Buffer) => {
                 const text = data.toString();
-                console.log('[Child stdout]:', text);
-                stdout.push(text);
-                logger.stdout(text.trim());
-                writeLog('RuntimeHost', text.trim(), { stream: 'stdout' });
+                // For Python adapter, stdout is used for IPC, so don't log raw data
+                // The adapter handles message parsing
+                if (language === 'typescript') {
+                    console.log('[Child stdout]:', text);
+                    stdout.push(text);
+                    logger.stdout(text.trim());
+                    writeLog('RuntimeHost', text.trim(), { stream: 'stdout' });
+                }
             });
         }
 
@@ -363,25 +374,31 @@ export class Runner {
             });
         }
 
-        proc.on('message', (message) => {
-            const m = MessageSchema.safeParse(message);
-            if (!m.success) {
-                console.log(
-                    `Failed to parse message: ${JSON.stringify(message)}`,
-                );
-
-                logger.debug(
-                    `Runner received invalid message from child process: ${JSON.stringify(message)}`,
-                );
+        // Use adapter's message handling
+        const handleMessage = (message: Message) => {
+            // Handle 'result' messages (workflow completion)
+            const msgAny = message as { type: string; data?: unknown };
+            if (msgAny.type === 'result') {
+                logger.debug('Received result message from child process');
+                const resultData = msgAny.data;
+                logger.debug(`Workflow result: ${JSON.stringify(resultData)}`);
+                writeLog('RuntimeHost', 'Workflow completed with result', {
+                    result: resultData,
+                });
+                // For Python workflows, stdout contains IPC messages, so capture result in stdout
+                if (language === 'python') {
+                    stdout.push(`Result: ${JSON.stringify(resultData)}`);
+                }
                 return;
             }
 
-            console.log(`Received message of type ${m.data.type}`);
+            const msgType = msgAny.type;
+            console.log(`Received message of type ${msgType}`);
             logger.debug(
-                `Runner received ${m.data.type} message from child process`,
+                `Runner received ${msgType} message from child process`,
             );
 
-            switch (m.data.type) {
+            switch (msgType) {
                 case MessageType.ThrowError: {
                     const pm = WorkflowErrorMessageSchema.safeParse(message);
                     if (!pm.success) {
@@ -456,7 +473,7 @@ export class Runner {
                 case MessageType.RunWorkflow:
                     console.log('Received unexpected RunWorkflow message');
                     logger.debug(
-                        `Runner received unexpected RunWorkflow message from child process: ${JSON.stringify(m.data)}`,
+                        `Runner received unexpected RunWorkflow message from child process: ${JSON.stringify(message)}`,
                     );
                     break;
                 case MessageType.ResumeInterrupt:
@@ -467,7 +484,10 @@ export class Runner {
                     );
                     break;
             }
-        });
+        };
+
+        // Register the message handler with the adapter
+        adapter.onMessage(proc, handleMessage);
 
         const m = makeRunWorkflowMessage({
             dir: this.workflowDir,
@@ -553,10 +573,11 @@ export class Runner {
                 }
                 // Clean up process reference
                 this.proc = null;
+                this.adapter = null;
             });
         });
 
-        proc.send(m);
+        adapter.sendMessage(proc, m);
         const result = await getResult;
 
         // Complete the run record only if workflow completed (not interrupted)

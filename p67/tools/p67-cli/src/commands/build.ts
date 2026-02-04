@@ -1,17 +1,96 @@
 import * as fs from 'node:fs';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, cp, mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Command } from '@p67-cli/Command.ts';
 import { ctx } from '@p67-cli/context';
 import { projectConfig } from '@p67-cli/middleware/project-config';
 import { zipSync } from 'fflate';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+async function buildTypeScript(
+    entrypoint: string,
+    buildDir: string,
+): Promise<void> {
+    const result = await Bun.build({
+        entrypoints: [entrypoint],
+        target: 'node',
+        format: 'esm',
+        outdir: buildDir,
+        sourcemap: true,
+    });
+
+    if (result.success && result.outputs.length) {
+        for (const output of result.outputs) {
+            console.log(`✔︎ Created ${output.path}`);
+        }
+    }
+}
+
+async function buildPython(
+    projectDir: string,
+    buildDir: string,
+): Promise<void> {
+    // Copy src/ directory to build/
+    const srcDir = path.join(projectDir, 'src');
+    if (fs.existsSync(srcDir)) {
+        await cp(srcDir, buildDir, { recursive: true });
+        console.log(`✔︎ Copied src/ to ${buildDir}`);
+    } else {
+        throw new Error(`Source directory not found: ${srcDir}`);
+    }
+
+    // Copy requirements.txt if it exists
+    const requirementsSrc = path.join(projectDir, 'requirements.txt');
+    if (fs.existsSync(requirementsSrc)) {
+        const requirementsDest = path.join(buildDir, 'requirements.txt');
+        await copyFile(requirementsSrc, requirementsDest);
+        console.log(`✔︎ Copied requirements.txt to ${buildDir}`);
+    }
+
+    // Bundle the p67_sdk package (full implementation) with the workflow
+    // In compiled Bun binaries, __dirname returns a virtual path (/$bunfs/root).
+    // Use process.execPath to get the actual binary location.
+    const binaryDir = path.dirname(process.execPath);
+    let sdkSrcDir: string | null = null;
+    let currentDir = binaryDir;
+
+    // Walk up from the binary location to find the packages directory
+    for (let i = 0; i < 10; i++) {
+        const candidateSdk = path.join(
+            currentDir,
+            'packages',
+            'workflow-sdk-python',
+            'p67_sdk',
+        );
+        if (fs.existsSync(candidateSdk)) {
+            sdkSrcDir = candidateSdk;
+            break;
+        }
+        const parent = path.dirname(currentDir);
+        if (parent === currentDir) break; // Hit filesystem root
+        currentDir = parent;
+    }
+
+    if (sdkSrcDir) {
+        const sdkDestDir = path.join(buildDir, 'p67_sdk');
+        await cp(sdkSrcDir, sdkDestDir, { recursive: true });
+        console.log(`✔︎ Bundled p67_sdk with workflow`);
+    } else {
+        console.warn('⚠ Could not find p67_sdk package to bundle');
+    }
+}
 
 export const buildCommand = new Command('build')
     .description('Build the project')
     .use(projectConfig)
     .action(async () => {
         const config = ctx().projectConfig;
-        const { entrypoint, buildDir, projectDir } = config;
+        const { entrypoint, buildDir, projectDir, language } = config;
+
+        console.log(`Building ${language} workflow...`);
 
         // Clean buildDir if it exists
         if (fs.existsSync(buildDir)) {
@@ -23,25 +102,17 @@ export const buildCommand = new Command('build')
         await mkdir(buildDir, { recursive: true });
 
         try {
-            const result = await Bun.build({
-                entrypoints: [entrypoint],
-                target: 'node',
-                format: 'esm',
-                outdir: buildDir,
-                sourcemap: true,
-            });
-
-            if (result.success && result.outputs.length) {
-                for (const output of result.outputs) {
-                    console.log(`✔︎ Created ${output.path}`);
-                }
+            if (language === 'python') {
+                await buildPython(projectDir, buildDir);
+            } else {
+                await buildTypeScript(entrypoint, buildDir);
             }
         } catch (error) {
             console.error('Build failed:', error);
             throw error;
         }
 
-        // Copy manifest.yalml to buildDir
+        // Copy manifest.yaml to buildDir
         const manifestSrc = path.join(projectDir, 'manifest.yaml');
         const manifestDest = path.join(buildDir, 'manifest.yaml');
 
@@ -50,7 +121,7 @@ export const buildCommand = new Command('build')
             console.log(`✔︎ Copied manifest.yaml to ${buildDir}`);
         } else {
             console.warn(
-                `⚠ manifest.yml not found in ${projectDir}. Skipping copy.`,
+                `⚠ manifest.yaml not found in ${projectDir}. Skipping copy.`,
             );
         }
 

@@ -6,7 +6,7 @@
     "main": "dist/index.js",
     "scripts": {
         "dev": "tsx watch src/index.ts",
-        "build": "tsc && tsc-alias",
+        "build": "tsc && tsc-alias && cp src/lib/runtime/host.py dist/lib/runtime/host.py",
         "start": "node dist/index.js",
         "tst": "vitest",
         "test": "vitest run",

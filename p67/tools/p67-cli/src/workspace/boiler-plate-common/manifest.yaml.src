@@ -1,0 +1,49 @@
+---
+# Snowflake connection configuration
+#
+# The manifest format is:
+#   config:
+#     - config_name: <string>           # Required: name of this configuration
+#       account:                         # Snowflake account identifier
+#         value: <string>                # Direct value, OR
+#         valueRef: <string>             # Reference to a KV store value, OR
+#         secretRef: <string>            # Reference to an encrypted secret
+#       username:
+#         value: <string>
+#       authenticator:
+#         value: <string>
+#       accessUrl:
+#         value: <string>
+#       token:
+#         secretRef: <string>            # Recommended for tokens
+#       password:
+#         secretRef: <string>            # Recommended for passwords
+#       warehouse:
+#         value: <string>
+#       database:
+#         value: <string>
+#       schema:
+#         value: <string>
+#       parameters:
+#         any_param_name:
+#           value: <string>
+#
+# Example:
+#   config:
+#     - config_name: default
+#       account:
+#         value: MYORG-MYACCOUNT
+#       username:
+#         value: myuser
+#       token:
+#         secretRef: snowflake_token
+#       database:
+#         value: MY_DATABASE
+#       schema:
+#         value: PUBLIC
+#       parameters:
+#         email_recipient:
+#           secretRef: workflow_recipient_secret
+
+config:
+  - config_name: default

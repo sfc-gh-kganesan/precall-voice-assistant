@@ -1,0 +1,157 @@
+# P67 Python Workflow
+
+A P67 workflow written in Python.
+
+## Getting Started
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Configure your manifest.yaml with Snowflake connection details
+
+3. Build and deploy:
+   ```bash
+   p67 build
+   p67 workflow deploy
+   ```
+
+4. Run your workflow:
+   ```bash
+   p67 workflow run <workflow-id>
+   ```
+
+## Project Structure
+
+- `src/main.py` - Main workflow entry point
+- `manifest.yaml` - Snowflake connection configuration
+- `requirements.txt` - Python dependencies
+- `p67.yml` - Project build configuration
+
+## SDK Reference
+
+The `WorkflowSDK` provides access to Snowflake and external services.
+
+### Parameters
+
+```python
+# Get a parameter defined in manifest.yaml
+value = sdk.get_parameter("my_param")
+
+# Get from a specific config
+value = sdk.get_parameter("my_param", config_name="production")
+```
+
+### SQL Queries
+
+```python
+# Execute a read-only query
+result = sdk.execute_query_read_only(
+    "SELECT * FROM customers WHERE region = ?",
+    binds=["US"]
+)
+
+# Access results
+for row in result.rows:
+    print(row[0], row[1])
+
+# Get column names
+print(result.columns)  # ["id", "name", "region"]
+```
+
+### Cortex Analyst
+
+```python
+# Natural language query using a semantic model
+response = sdk.query_cortex_analyst(
+    question="What were total sales last month?",
+    semantic_model="sales_model"
+)
+
+# Execute the generated SQL
+if response.sql:
+    result = sdk.execute_query_read_only(response.sql)
+```
+
+### Cortex Agent
+
+```python
+# Call a Cortex Agent
+response = sdk.call_cortex_agent(
+    question="Analyze customer churn patterns",
+    options={
+        "agent_name": "analytics_agent",
+        "context": {"timeframe": "Q4"}
+    }
+)
+print(response.content)
+```
+
+### HTTP Requests
+
+```python
+# GET request
+response = sdk.http_request({
+    "url": "https://api.example.com/data",
+    "method": "GET",
+    "headers": {"Authorization": "Bearer token"}
+})
+
+# POST request with JSON body
+response = sdk.http_request({
+    "url": "https://api.example.com/webhook",
+    "method": "POST",
+    "body": {"event": "workflow_complete"},
+    "headers": {"Content-Type": "application/json"}
+})
+
+print(response.status_code)
+print(response.body)
+```
+
+### Email
+
+```python
+# Send an email
+sdk.email({
+    "to": "user@example.com",
+    "subject": "Report Ready",
+    "body": "<h1>Your report is ready</h1>",
+    "content_type": "text/html"
+})
+```
+
+### Human-in-the-Loop (Interrupts)
+
+```python
+# Pause workflow for human input
+approval = sdk.interrupt(
+    payload={
+        "type": "approval",
+        "question": "Approve this action?",
+        "data": {"amount": 5000}
+    },
+    options={"timeout_hours": 24}
+)
+
+if approval.get("approved"):
+    print("User approved!")
+else:
+    print("User declined:", approval.get("reason"))
+```
+
+## Type Hints
+
+The SDK includes full type hints for IDE support:
+
+```python
+from p67_sdk import WorkflowSDK
+from p67_sdk.types import QueryResult, HttpResponse, CortexAnalystResponse
+
+def main(sdk: WorkflowSDK) -> dict:
+    result: QueryResult = sdk.execute_query_read_only("SELECT 1")
+    return {"status": "ok"}
+```
+
+See the [P67 documentation](https://docs.snowflake.com) for more details.

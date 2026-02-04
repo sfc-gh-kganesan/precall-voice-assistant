@@ -118,11 +118,22 @@ export class WorkflowSDKImpl implements WorkflowSDK {
     private getSnowflakeConnectionOptions(
         cfg: P67ConfigValue,
     ): snowflake.ConnectionOptions {
+        // Ensure accessUrl has protocol prefix - snowflake-sdk's url.parse() returns
+        // hostname: null without it, breaking account extraction logic
+        let accessUrl = cfg.accessUrl;
+        if (
+            accessUrl &&
+            !accessUrl.startsWith('https://') &&
+            !accessUrl.startsWith('http://')
+        ) {
+            accessUrl = `https://${accessUrl}`;
+        }
+
         return {
             account: cfg.account ?? '',
             username: cfg.username ?? '',
             authenticator: cfg.authenticator ?? '',
-            accessUrl: cfg.accessUrl,
+            accessUrl,
             token: cfg.token ?? undefined,
             password: cfg.password ?? undefined,
             warehouse: cfg.warehouse ?? '',
@@ -203,6 +214,10 @@ export class WorkflowSDKImpl implements WorkflowSDK {
 
         this.isConnecting = true;
         this.connectionPromise = new Promise((resolve, reject) => {
+            console.log(
+                `🔥[SDK] Creating Snowflake connection with options:`,
+                this.getSnowflakeConnectionOptions(cfg),
+            );
             const connection = snowflake.createConnection(
                 this.getSnowflakeConnectionOptions(cfg),
             );

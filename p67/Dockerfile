@@ -26,6 +26,17 @@ FROM base AS runner
 ARG SERVICE_NAME
 ARG SERVICE_PORT=3000
 
+# Install Python for multilingual workflow support
+# Build tools needed for snowflake-connector-python native extensions
+RUN apk add --no-cache --virtual .build-deps \
+        python3-dev \
+        g++ \
+        gcc \
+        musl-dev \
+    && apk add --no-cache python3 py3-pip \
+    && pip3 install --no-cache-dir --break-system-packages snowflake-connector-python \
+    && apk del .build-deps
+
 # Copy workspace config
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 

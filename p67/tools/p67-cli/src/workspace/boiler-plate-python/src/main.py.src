@@ -1,0 +1,43 @@
+"""
+P67 Workflow - Main Entry Point
+
+This is the main entry point for your workflow.
+The `main` function receives the WorkflowSDK which provides
+access to Snowflake, Cortex services, and more.
+"""
+
+from p67_sdk import WorkflowSDK
+
+
+def main(sdk: WorkflowSDK):
+    """
+    Main workflow function.
+    
+    Args:
+        sdk: The P67 WorkflowSDK instance
+        
+    Returns:
+        Any JSON-serializable result
+    """
+    # Example: Get a parameter from the manifest
+    # my_param = sdk.get_parameter("my_param")
+    
+    # Example: Execute a read-only SQL query
+    # result = sdk.execute_query_read_only("SELECT CURRENT_TIMESTAMP()")
+    # print(f"Current time: {result.rows[0][0]}")
+    
+    # Example: Make an HTTP request
+    # response = sdk.http_request({
+    #     "url": "https://api.example.com/data",
+    #     "method": "GET",
+    # })
+    
+    # Example: Pause for human input
+    # approval = sdk.interrupt({
+    #     "question": "Continue with this action?",
+    #     "details": {"info": "Some context"}
+    # })
+    
+    print("Hello from P67 Python workflow!")
+    
+    return {"status": "completed", "message": "Workflow executed successfully"}
