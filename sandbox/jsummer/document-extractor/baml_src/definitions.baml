@@ -36,6 +36,7 @@ class Date {
 class Party {
   name string @description("Legal or business name of a party in the contract")
   signature_date Date @description("The signature date of the party")
+  signatory_name string? @description("The name of the signatory of the party")
   role PartyRole @description("The role of the party in the contract")
   citation Citation @description("The citation from the document to the party")
 }
@@ -44,8 +45,9 @@ class ContractMetadata {
     document_id string @description("The unique identifier for the document if available. Otherwise, create a unique identifier based on the document content.")
     document_title string @description("The title of the document if available. Otherwise, create a short title based on the document content.")
     document_date Date? @description("The date of the document, if provided")
-    effective_start Date @description("The effective start date of the contract")
-    effective_end Date @description("The effective end date of the contract")
+    effective_start_date Date @description("The effective start date of the contract")
+    expiration_date Date @description("The expiration date of the contract")
+    renewal_date Date? @description("The renewal date of the contract if available")
     parties Party[]
     terms ContractTerm[]
 }

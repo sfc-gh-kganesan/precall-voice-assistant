@@ -244,7 +244,7 @@ class ContractMetadataAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("ContractMetadata")
-        self._properties: typing.Set[str] = set([  "document_id",  "document_title",  "document_date",  "effective_start",  "effective_end",  "parties",  "terms",  ])
+        self._properties: typing.Set[str] = set([  "document_id",  "document_title",  "document_date",  "effective_start_date",  "expiration_date",  "renewal_date",  "parties",  "terms",  ])
         self._props = ContractMetadataProperties(self._bldr, self._properties)
 
     def type(self) -> baml_py.FieldType:
@@ -285,12 +285,16 @@ class ContractMetadataProperties:
         return type_builder.ClassPropertyViewer(self.__bldr.property("document_date"))
     
     @property
-    def effective_start(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("effective_start"))
+    def effective_start_date(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("effective_start_date"))
     
     @property
-    def effective_end(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("effective_end"))
+    def expiration_date(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("expiration_date"))
+    
+    @property
+    def renewal_date(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("renewal_date"))
     
     @property
     def parties(self) -> type_builder.ClassPropertyViewer:
@@ -409,7 +413,7 @@ class PartyAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("Party")
-        self._properties: typing.Set[str] = set([  "name",  "signature_date",  "role",  "citation",  ])
+        self._properties: typing.Set[str] = set([  "name",  "signature_date",  "signatory_name",  "role",  "citation",  ])
         self._props = PartyProperties(self._bldr, self._properties)
 
     def type(self) -> baml_py.FieldType:
@@ -444,6 +448,10 @@ class PartyProperties:
     @property
     def signature_date(self) -> type_builder.ClassPropertyViewer:
         return type_builder.ClassPropertyViewer(self.__bldr.property("signature_date"))
+    
+    @property
+    def signatory_name(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("signatory_name"))
     
     @property
     def role(self) -> type_builder.ClassPropertyViewer:

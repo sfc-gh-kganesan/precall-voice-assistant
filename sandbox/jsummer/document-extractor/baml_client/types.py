@@ -70,8 +70,9 @@ class ContractMetadata(BaseModel):
     document_id: str = Field(description='The unique identifier for the document if available. Otherwise, create a unique identifier based on the document content.')
     document_title: str = Field(description='The title of the document if available. Otherwise, create a short title based on the document content.')
     document_date: typing.Optional["Date"] = Field(default=None, description='The date of the document, if provided')
-    effective_start: "Date" = Field(description='The effective start date of the contract')
-    effective_end: "Date" = Field(description='The effective end date of the contract')
+    effective_start_date: "Date" = Field(description='The effective start date of the contract')
+    expiration_date: "Date" = Field(description='The expiration date of the contract')
+    renewal_date: typing.Optional["Date"] = Field(default=None, description='The renewal date of the contract if available')
     parties: typing.List["Party"]
     terms: typing.List["ContractTerm"]
 
@@ -90,6 +91,7 @@ class Date(BaseModel):
 class Party(BaseModel):
     name: str = Field(description='Legal or business name of a party in the contract')
     signature_date: "Date" = Field(description='The signature date of the party')
+    signatory_name: typing.Optional[str] = Field(default=None, description='The name of the signatory of the party')
     role: PartyRole = Field(description='The role of the party in the contract')
     citation: "Citation" = Field(description='The citation from the document to the party')
 
