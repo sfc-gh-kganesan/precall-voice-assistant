@@ -602,8 +602,8 @@ def compute_kpis(df: pd.DataFrame, total_population: int | None = None) -> dict:
     unresolved_count = df["IS_UNRESOLVED"].sum()
     unresolved_pct = (unresolved_count / total * 100) if total > 0 else 0.0
 
-    # Coverage: tickets with context_relevance >= 0.8
-    coverage_mask = df["CONTEXT_RELEVANCE_SCORE"] >= 0.8
+    # Coverage: tickets with context_relevance >= 0.66 (2/3 on TruLens 0-3 scale)
+    coverage_mask = df["CONTEXT_RELEVANCE_SCORE"] >= 0.66
     coverage_count = coverage_mask.sum()
     coverage_pct = (coverage_count / total * 100) if total > 0 else 0.0
 

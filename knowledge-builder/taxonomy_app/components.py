@@ -286,10 +286,10 @@ def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None, bac
     relevance_display = f"{relevance:.2f}" if relevance is not None and not pd.isna(relevance) else "N/A"
     boxes_html.append(_bento_box_html(label="Avg Context Relevance", value=relevance_display))
 
-    # Coverage (context relevance >= 0.8)
+    # Coverage (context relevance >= 0.66, i.e. 2/3 on TruLens scale)
     coverage_count = kpis.get("coverage_count", 0)
     coverage_pct = kpis.get("coverage_pct", 0.0)
-    boxes_html.append(_bento_box_html(label="Coverage", value=f"{coverage_pct:.1f}%", subtitle=f"{coverage_count:,} with CR ≥ 0.8"))
+    boxes_html.append(_bento_box_html(label="Coverage", value=f"{coverage_pct:.1f}%", subtitle=f"{coverage_count:,} scoring ≥ 2/3"))
 
     # Backfillable (conditional) - incidents only
     if show_backfillable_bento:
