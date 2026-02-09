@@ -479,6 +479,7 @@ def render_detail_panel(row: pd.Series) -> None:
                 summary = article.get("summary", "")
                 content = article.get("content", "")
                 title = article.get("title") or f"Article {i + 1}"
+                kb_number = article.get("kb_number")
 
                 # Build score display
                 score_parts = []
@@ -490,7 +491,9 @@ def render_detail_panel(row: pd.Series) -> None:
                     score_parts.append(f"Rerank: {article['reranker_score']:.3f}")
                 score_str = f" ({' • '.join(score_parts)})" if score_parts else ""
 
-                with st.expander(f"📄 {title}{score_str}", expanded=(i == 0)):
+                # Include KB number in expander title if available
+                kb_str = f" [{kb_number}]" if kb_number else ""
+                with st.expander(f"📄 {title}{kb_str}{score_str}", expanded=(i == 0)):
                     # Show summary
                     if summary:
                         st.markdown("**Summary:**")

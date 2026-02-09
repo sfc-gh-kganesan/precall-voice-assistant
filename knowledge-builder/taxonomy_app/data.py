@@ -236,7 +236,7 @@ def extract_response_scores(df: pd.DataFrame) -> tuple[list[float], list[float]]
     return all_cosine_scores, all_text_match_scores
 
 
-def parse_response_articles(response_raw) -> list[dict]:
+def parse_response_articles(response_raw, chunk_to_kb: dict | None = None) -> list[dict]:
     """
     Parse and deduplicate articles from RESPONSE JSON.
 
@@ -245,10 +245,11 @@ def parse_response_articles(response_raw) -> list[dict]:
 
     Args:
         response_raw: Raw RESPONSE column value (JSON string or parsed list)
+        chunk_to_kb: Optional dict mapping CHUNK_TEXT to KB_NUMBER
 
     Returns:
         List of article dicts with keys: summary, content, title, cosine_similarity,
-        text_match, reranker_score
+        text_match, reranker_score, kb_number
     """
     if pd.isna(response_raw) or not response_raw:
         return []
@@ -280,6 +281,9 @@ def parse_response_articles(response_raw) -> list[dict]:
         # Extract chunk text (contains DOC_SUMMARY and CHUNK_TEXT tags)
         chunk_text_raw = item.get("CHUNK_TEXT", "")
 
+        # Look up KB_NUMBER from chunk_to_kb mapping
+        kb_number = chunk_to_kb.get(chunk_text_raw) if chunk_to_kb else None
+
         # Parse DOC_SUMMARY and CHUNK_TEXT from the chunk
         summary_match = re.search(r"<DOC_SUMMARY>(.*?)</DOC_SUMMARY>", chunk_text_raw, re.DOTALL)
         content_match = re.search(r"<CHUNK_TEXT>(.*?)</CHUNK_TEXT>", chunk_text_raw, re.DOTALL)
@@ -300,6 +304,7 @@ def parse_response_articles(response_raw) -> list[dict]:
                     "summary": summary,
                     "content": content,
                     "title": title,
+                    "kb_number": kb_number,
                     "cosine_similarity": cosine_sim,
                     "text_match": text_match,
                     "reranker_score": reranker,
@@ -404,8 +409,8 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
     merged["IS_UNRESOLVED"] = merged.apply(_is_unresolved, axis=1)
     merged["IS_BACKFILLABLE"] = merged.apply(_is_backfillable, axis=1)
 
-    # Precompute parsed articles from RESPONSE (avoids re-parsing on every row selection)
-    merged["PARSED_ARTICLES"] = merged["RESPONSE"].apply(parse_response_articles)
+    # Precompute parsed articles from RESPONSE with KB_NUMBER mapping
+    merged["PARSED_ARTICLES"] = merged["RESPONSE"].apply(lambda r: parse_response_articles(r, chunk_to_kb))
 
     # Precompute parsed chunks with KB_NUMBER for leaderboard (not deduplicated)
     merged["PARSED_CHUNKS"] = merged["RESPONSE"].apply(lambda r: parse_response_chunks(r, chunk_to_kb))
