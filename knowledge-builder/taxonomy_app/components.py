@@ -8,6 +8,7 @@ import json
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from config import COLOR_SCALE
 from store import (
     ClearSelectionAction,
     SetAnswerableFilterAction,
@@ -30,14 +31,12 @@ def render_sunburst(grouped_df: pd.DataFrame, path_cols: list[str]) -> None:
         st.warning("No data available for sunburst visualization.")
         return
 
-    # Create sunburst with custom purple gradient (white to dark purple = better relevance)
-    purple_gradient = ["#FFFFFF", "#E5CCFA", "#CB99F5", "#B066F0", "#9533EB", "#7A00E6"]
     fig = px.sunburst(
         grouped_df,
         path=path_cols,
         values="TICKET_COUNT",
         color="CONTEXT_RELEVANCE_SCORE",
-        color_continuous_scale=purple_gradient,
+        color_continuous_scale=COLOR_SCALE,
         title="Taxonomy Distribution by Ticket Count",
     )
 
