@@ -1,0 +1,72 @@
+CREATE OR REPLACE PROCEDURE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_SYNTHETIC_PAIRS()
+RETURNS STRING
+LANGUAGE PYTHON
+VOLATILE
+RUNTIME_VERSION=3.10
+PACKAGES=('snowflake==1.10.0','snowflake-snowpark-python==1.43.0','cloudpickle==3.1.1')
+HANDLER='compute'
+EXECUTE AS OWNER
+AS $$
+import datetime
+import json
+import snowflake.snowpark as sp
+import snowflake.snowpark.functions as F
+import snowflake.snowpark.types as T
+from snowflake.core import Root
+
+def search_on_pairs(session: sp.Session) -> str:
+    root = Root(session)
+    database = root.databases[session.get_current_database()]
+    schema = database.schemas[session.get_current_schema()]
+    css = schema.cortex_search_services["KB_SEARCH"]
+    css_desc = session.call("DESCRIBE_SEARCH_SERVICE", "KB_SEARCH")
+    css_desc_dict = json.loads(css_desc)
+    search_queries = session.table("SEARCH_QUERIES")
+    synthetic_pairs = (
+        session
+        .table("SYNTHETIC_PAIRS")
+        .join(
+            search_queries
+            .filter(F.col("INPUT_TYPE") == F.lit("SYNTHETIC_PAIR")),
+            how="anti"
+        )
+        .select(
+            F.lit("SYNTHETIC_PAIR").alias("INPUT_TYPE"),
+            F.col("GENERATED")["query"].cast(T.StringType()).alias("INPUT_QUERY")
+        )
+    )
+    df = synthetic_pairs.to_pandas()
+    for i, row in df.iterrows():
+        input_query = row["INPUT_QUERY"]
+        input_type = row["INPUT_TYPE"]
+        search_args = dict(query=input_query, columns=["CHUNK_TEXT"], filter={}, limit=5)
+        resp = css.search(**search_args)
+        results = resp.results
+        data = [
+            [
+                "SYNTHETIC_PAIR",
+                css_desc_dict,
+                search_args,
+                results,
+                "SYSTEM",
+                datetime.datetime.now(),
+            ]
+        ]
+        session.create_dataframe(
+            data,
+            schema=[
+                "INPUT_TYPE",
+                "SEARCH_DESCRIPTION",
+                "INPUT_ARGS",
+                "RESPONSE",
+                "CREATED_BY",
+                "CREATED_ON",
+            ],
+        ).write.save_as_table(
+            "SEARCH_QUERIES", mode="append", column_order="name"
+        )
+    return "Completed searches."
+
+def compute(session):
+    return search_on_pairs(session)
+$$;

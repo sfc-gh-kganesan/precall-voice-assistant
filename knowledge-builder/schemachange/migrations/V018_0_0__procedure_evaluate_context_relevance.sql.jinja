@@ -1,0 +1,87 @@
+USE SCHEMA KNOWLEDGE_BUILDER.PUBLIC;
+
+CREATE OR REPLACE PROCEDURE EVALUATE_CONTEXT_RELEVANCE(
+    EVALUATION_MODEL STRING, 
+    CURRENT_USERNAME STRING
+)
+RETURNS STRING
+LANGUAGE PYTHON 
+VOLATILE
+RUNTIME_VERSION=3.10
+PACKAGES=('snowflake-snowpark-python==1.43.0','cloudpickle==3.1.1', 'trulens-core==2.4.2', 'trulens-providers-cortex==2.4.2')
+HANDLER='compute'
+EXECUTE AS OWNER
+AS $$
+import datetime
+import snowflake.snowpark as sp
+import snowflake.snowpark.functions as F
+import snowflake.snowpark.types as T
+from trulens.providers.cortex import Cortex
+
+
+def evaluate(session: sp.Session, model_engine: str, query: str, context: str, types: tuple) -> dict:
+    provider = Cortex(session, model_engine=model_engine)
+    results = {}
+    if "context_relevance" in types:
+        score, reasons = provider.context_relevance_with_cot_reasons(
+            question=query,
+            context=context
+        )
+        results["context_relevance"] = dict(score=score, reasons=reasons)
+    return results
+def eval_context_relevance_on_searches(
+    session: sp.Session, evaluation_model: str, current_user: str
+) -> str:
+    er = session.table("EVALUATION_RESULTS").select("SEARCH_ID")
+    sqr = (
+        session
+        .table("SEARCH_QUERIES")
+        .join_table_function("FLATTEN", F.col("RESPONSE"))
+        .select(
+            "SEARCH_ID",
+            F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY"),
+            F.col("VALUE")["CHUNK_TEXT"].cast(T.StringType()).alias("CHUNK_TEXT"),
+        )
+        .join(er, on="SEARCH_ID", how="anti")
+        .group_by("SEARCH_ID", "INPUT_QUERY")
+        .agg(
+            F.listagg("CHUNK_TEXT", delimiter="\n\n").alias("AGGREGATED_CHUNKS")
+        )
+        .to_pandas()
+    )
+    for i, row in sqr.iterrows():
+        search_id = row.SEARCH_ID
+        query = row.INPUT_QUERY
+        chunks = row.AGGREGATED_CHUNKS
+        evaluation = evaluate(session, evaluation_model, query, chunks, ("context_relevance"))
+        session.create_dataframe(
+            [
+                [
+                    search_id, 
+                    query, 
+                    evaluation_model,
+                    [evaluation],
+                    current_user, 
+                    datetime.datetime.now(),
+                ]
+            ],
+            schema=T.StructType(
+                [
+                    T.StructField("SEARCH_ID", T.LongType()),
+                    T.StructField("INPUT_QUERY", T.StringType()),
+                    T.StructField("EVALUATION_MODEL", T.StringType()),
+                    T.StructField("EVALUATION", T.VariantType()),
+                    T.StructField("CREATED_BY", T.StringType()),
+                    T.StructField("CREATED_ON", T.TimestampType()),
+                ]
+            )
+    ).write.save_as_table(
+        "EVALUATION_RESULTS", mode="append", column_order="name"
+    )
+    return "Evaluation completed."
+
+func = eval_context_relevance_on_searches
+
+def compute(session,arg1,arg2):
+    return func(session,arg1,arg2)
+$$;

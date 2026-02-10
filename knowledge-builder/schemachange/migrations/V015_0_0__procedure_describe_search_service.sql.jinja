@@ -1,0 +1,45 @@
+CREATE OR REPLACE PROCEDURE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.DESCRIBE_SEARCH_SERVICE(SERVICE_NAME VARCHAR)
+RETURNS VARIANT
+LANGUAGE PYTHON
+VOLATILE
+RUNTIME_VERSION=3.10
+PACKAGES=('snowflake==1.10.0','snowflake-snowpark-python==1.43.0','cloudpickle==3.1.1')
+HANDLER='describe_search_service'
+EXECUTE AS OWNER
+AS $$
+import datetime
+from operator import itemgetter
+
+import snowflake.snowpark as sp
+import snowflake.snowpark.functions as F
+import snowflake.snowpark.types as T
+from snowflake.core import Root
+
+
+def describe_search_service(session: sp.Session, name: str) -> dict:
+    root = Root(session)
+    database = root.databases[session.get_current_database()]
+    schema = database.schemas[session.get_current_schema()]
+    css = schema.cortex_search_services[name]
+    css_desc = session.sql(
+        "DESCRIBE CORTEX SEARCH SERVICE IDENTIFIER(:1)", 
+        params=[css.fully_qualified_name]
+    ).collect()[0].as_dict()
+    
+    keys = (
+        "name",
+        "database_name",
+        "schema_name",
+        "search_column",
+        "definition",
+        "source_data_num_rows",
+        "created_on",
+        "embedding_model",
+        "scoring_profile_count",
+        "vector_indexes",
+    )
+    
+    values = list(itemgetter(*keys)(css_desc))
+    values[6] = values[6].isoformat() if values[6] else None
+    return dict(zip(keys, values))
+$$;

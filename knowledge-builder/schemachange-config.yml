@@ -1,8 +1,8 @@
 config-version: 2
 
 schemachange:
-  root-folder: './database/migrations'
-  change-history-table: 'SCHEMACHANGE.CHANGE_HISTORY'
+  root-folder: './schemachange'
+  change-history-table: 'KNOWLEDGE_BUILDER.SCHEMACHANGE.CHANGE_HISTORY'
   create-change-history-table: true
   log-level: 'INFO'
   query-tag: 'knowledge-builder'

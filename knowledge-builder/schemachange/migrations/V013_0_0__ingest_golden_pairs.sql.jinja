@@ -1,0 +1,9 @@
+INSERT OVERWRITE INTO {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.GOLDEN_PAIRS
+VALUES
+    ('INC0010234', 'I cannot connect to the VPN while working from home.', 'Ensure Cisco AnyConnect is updated. Reset your AD password and try reconnecting via the ''Full Tunnel'' gateway.'),
+    ('INC0010567', 'Outlook keeps crashing when I try to open calendar invites.', 'Run Outlook in Safe Mode, disable the ''Teams Meeting'' add-in, and clear the local AppData cache for Microsoft Office.'),
+    ('INC0010890', 'Requesting admin access for software installation on Macbook.', 'Check if the software is in the Self-Service portal. If not, manager approval is required before granting temporary SUDO rights.'),
+    ('INC0011221', 'Printer in the London office (2nd floor) is jammed and showing error 404.', 'On-site facilities notified. Hardware reset performed; confirmed paper tray 2 was overloaded with A3 paper.'),
+    ('INC0011456', 'New hire needs access to the Snowflake production warehouse.', 'Assign the user to the ''SNOWFLAKE_PROD_READ'' Okta group. Sync may take up to 30 minutes to reflect in the Cortex search role.'),
+    ('INC0011789', 'My laptop battery drains completely within 2 hours even when plugged in.', 'Run battery diagnostics via Dell SupportAssist or Apple Diagnostics. If battery health is below 80%, submit a hardware replacement request through the IT portal. Ensure power adapter wattage matches device requirements.'),
+    ('INC0012034', 'Teams calls keep dropping after exactly 30 minutes.', 'This is typically caused by VPN idle timeout settings. Switch to split-tunnel VPN profile for Teams traffic, or adjust the VPN client keep-alive settings. Verify Teams is excluded from VPN routing in the network configuration.');
