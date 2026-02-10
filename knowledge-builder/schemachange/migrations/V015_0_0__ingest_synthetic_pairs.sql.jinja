@@ -1,0 +1,19 @@
+COPY INTO {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SYNTHETIC_PAIRS
+FROM (
+    SELECT
+        $1 AS SOURCE_TABLE,
+        PARSE_JSON($2) AS ATTRS,
+        PARSE_JSON($3) AS SCORING,
+        PARSE_JSON($4) AS GENERATED,
+        $5 AS L1_RAW,
+        $6 AS L2_RAW,
+        $7 AS L3_RAW,
+        $8 AS L4_RAW,
+        $9 AS L1_TAG,
+        $10 AS L2_TAG,
+        $11 AS L3_TAG,
+        $12 AS L4_TAG
+    FROM @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KNOWLEDGE/synthetic_pairs.csv
+)
+FILE_FORMAT = {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_KNOWLEDGE_CSV
+ON_ERROR = CONTINUE;

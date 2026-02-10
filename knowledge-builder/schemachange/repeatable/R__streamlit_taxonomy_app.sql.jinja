@@ -1,28 +1,26 @@
-USE SCHEMA KNOWLEDGE_BUILDER.PUBLIC;
-
-CREATE STAGE IF NOT EXISTS TAXONOMY_APP
+CREATE STAGE IF NOT EXISTS {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_APP
   DIRECTORY = (ENABLE = TRUE);
 
-ALTER STAGE TAXONOMY_APP REFRESH;
+ALTER STAGE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_APP REFRESH;
 
-PUT file://../../apps/taxonomy_app/*.py @taxonomy_app/taxonomy_app/ 
+PUT file://./apps/taxonomy_app/*.py @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.taxonomy_app/taxonomy_app/ 
   OVERWRITE=true
   AUTO_COMPRESS = FALSE;
 
-PUT file://../../apps/taxonomy_app/environment.yml @taxonomy_app/taxonomy_app/
+PUT file://./apps/taxonomy_app/environment.yml @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.taxonomy_app/taxonomy_app/
   OVERWRITE=true
   AUTO_COMPRESS = FALSE;
 
-PUT file://../../apps/taxonomy_app/styles.css @taxonomy_app/taxonomy_app/
+PUT file://./apps/taxonomy_app/styles.css @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.taxonomy_app/taxonomy_app/
   OVERWRITE=true
   AUTO_COMPRESS = FALSE;
 
-LS @TAXONOMY_APP;
+LS @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_APP;
 
-CREATE OR REPLACE STREAMLIT TAXONOMY_APP
-  FROM '@TAXONOMY_APP/taxonomy_app/'
+CREATE OR REPLACE STREAMLIT {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_APP
+  FROM '@{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_APP/taxonomy_app/'
   MAIN_FILE = 'streamlit_app.py'
   QUERY_WAREHOUSE = COMPUTE_WH
   TITLE = 'Taxonomy Review';
 
-ALTER STREAMLIT TAXONOMY_APP ADD LIVE VERSION FROM LAST;
+ALTER STREAMLIT {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_APP ADD LIVE VERSION FROM LAST;

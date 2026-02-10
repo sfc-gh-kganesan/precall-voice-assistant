@@ -126,13 +126,16 @@ check:
     uv run ruff check
     @echo "🔍 Checking formatting..."
     uv run ruff format --check
+    @echo "🔍 Checking SQL..."
+    uv run sqlfluff lint schemachange/
     @echo "✅ All checks passed"
 
-# Format and lint Python code (auto-fix)
+# Format and lint code (auto-fix)
 fmt:
     uv run ruff check --select I --fix .
     uv run ruff format .
     uv run ruff check --fix .
+    uv run sqlfluff fix schemachange/
     @echo "✅ Code formatted and linted"
 
 alias format := fmt

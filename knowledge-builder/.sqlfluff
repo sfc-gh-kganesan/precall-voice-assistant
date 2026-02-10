@@ -1,0 +1,38 @@
+[sqlfluff]
+dialect = snowflake
+templater = jinja
+sql_file_exts = .sql,.sql.jinja
+max_line_length = 320
+exclude_rules = layout.indent, structure.column_order
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = false
+
+[sqlfluff:templater:jinja:context]
+KB_DATABASE_NAME = KNOWLEDGE_BUILDER
+KB_SCHEMA_NAME = PUBLIC
+
+[sqlfluff:indentation]
+indent_unit = space
+tab_space_size = 4
+
+[sqlfluff:layout:type:comma]
+line_position = trailing
+
+[sqlfluff:rules:references.keywords]
+ignore_words = number,text,roles,version,source,topic,comment
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.identifiers]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.functions]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.types]
+capitalisation_policy = upper

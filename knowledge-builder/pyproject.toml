@@ -21,6 +21,8 @@ dependencies = [
 dev = [
     "jupyter>=1.1.1",
     "ruff>=0.14.5",
+    "sqlfluff>=4.0.4",
+    "sqlfluff-templater-dbt>=4.0.4",
 ]
 eda = [
     "streamlit>=1.28.0",

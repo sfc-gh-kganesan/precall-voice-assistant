@@ -1,0 +1,6 @@
+# Procedures with embedded Python - cannot parse $$ blocks
+schemachange/migrations/V016_0_0__procedure_describe_search_service.sql.jinja
+schemachange/migrations/V017_0_0__procedure_search_on_golden_pairs.sql.jinja
+schemachange/migrations/V018_0_0__procedure_search_on_synthetic_pairs.sql.jinja
+schemachange/migrations/V019_0_0__procedure_evaluate_context_relevance.sql.jinja
+schemachange/repeatable/R__streamlit_taxonomy_app.sql.jinja
