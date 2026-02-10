@@ -2,27 +2,15 @@ config-version: 2
 
 schemachange:
   root-folder: './schemachange'
-  change-history-table: 'KNOWLEDGE_BUILDER.SCHEMACHANGE.CHANGE_HISTORY'
+  change-history-table: 'KNOWLEDGE_BUILDER.PUBLIC.CHANGE_HISTORY'
   create-change-history-table: true
   log-level: 'INFO'
   query-tag: 'knowledge-builder'
 
   vars:
-    ROLE_NAME: '{{ env_var("ROLE_NAME") }}'
     KB_DATABASE_NAME: '{{ env_var("KB_DATABASE_NAME") }}'
     KB_SCHEMA_NAME: '{{ env_var("KB_SCHEMA_NAME") }}'
-    KB_TABLE_NAME: '{{ env_var("KB_TABLE_NAME") }}'
-    KB_WAREHOUSE_NAME: '{{ env_var("KB_WAREHOUSE_NAME", env_var("SPCS_WAREHOUSE_NAME")) }}'
-    SPCS_COMPUTE_POOL_NAME: '{{ env_var("SPCS_COMPUTE_POOL_NAME") }}'
-    SPCS_IMAGE_REPO_NAME: '{{ env_var("SPCS_IMAGE_REPO_NAME") }}'
-    SPCS_STAGE_NAME: '{{ env_var("SPCS_STAGE_NAME") }}'
-    SPCS_DATABASE_NAME: '{{ env_var("SPCS_DATABASE_NAME") }}'
-    SPCS_SCHEMA_NAME: '{{ env_var("SPCS_SCHEMA_NAME") }}'
-    SPCS_WAREHOUSE_NAME: '{{ env_var("SPCS_WAREHOUSE_NAME") }}'
-    SPCS_EAI_NAME: '{{ env_var("SPCS_EAI_NAME") }}'
     SERVICENOW_INSTANCE_HOST: '{{ env_var("SERVICENOW_INSTANCE_HOST", "instance.service-now.com") }}'
 
 snowflake:
   database: '{{ env_var("KB_DATABASE_NAME") }}'
-  warehouse: '{{ env_var("SPCS_WAREHOUSE_NAME") }}'
-  role: '{{ env_var("ROLE_NAME") }}'
