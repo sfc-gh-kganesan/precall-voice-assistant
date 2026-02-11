@@ -42,11 +42,11 @@ flowchart TB
     subgraph UI["Streamlit Applications"]
         FEEDBACK_APP[Feedback App]
         TAXONOMY_APP[Taxonomy App]
-        
+
         SEARCH_QUERIES --> FEEDBACK_APP
         EVALUATION_RESULTS --> FEEDBACK_APP
         FEEDBACK_APP --> SEARCH_FEEDBACK[(SEARCH_FEEDBACK)]
-        
+
         SYNTHETIC_PAIRS --> TAXONOMY_APP
         EVALUATION_RESULTS --> TAXONOMY_APP
         SEARCH_QUERIES --> TAXONOMY_APP

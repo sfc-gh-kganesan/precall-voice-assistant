@@ -22,10 +22,10 @@ def describe_search_service(session: sp.Session, name: str) -> dict:
     schema = database.schemas[session.get_current_schema()]
     css = schema.cortex_search_services[name]
     css_desc = session.sql(
-        "DESCRIBE CORTEX SEARCH SERVICE IDENTIFIER(:1)", 
+        "DESCRIBE CORTEX SEARCH SERVICE IDENTIFIER(:1)",
         params=[css.fully_qualified_name]
     ).collect()[0].as_dict()
-    
+
     keys = (
         "name",
         "database_name",
@@ -38,7 +38,7 @@ def describe_search_service(session: sp.Session, name: str) -> dict:
         "scoring_profile_count",
         "vector_indexes",
     )
-    
+
     values = list(itemgetter(*keys)(css_desc))
     values[6] = values[6].isoformat() if values[6] else None
     return dict(zip(keys, values))

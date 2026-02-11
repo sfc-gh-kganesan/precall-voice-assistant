@@ -1,9 +1,9 @@
 CREATE PROCEDURE IF NOT EXISTS {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.EVALUATE_CONTEXT_RELEVANCE(
-    EVALUATION_MODEL STRING, 
+    EVALUATION_MODEL STRING,
     CURRENT_USERNAME STRING
 )
 RETURNS STRING
-LANGUAGE PYTHON 
+LANGUAGE PYTHON
 VOLATILE
 RUNTIME_VERSION=3.10
 PACKAGES=('snowflake-snowpark-python==1.43.0','cloudpickle==3.1.1', 'trulens-core==2.4.2', 'trulens-providers-cortex==2.4.2')
@@ -55,11 +55,11 @@ def eval_context_relevance_on_searches(
         session.create_dataframe(
             [
                 [
-                    search_id, 
-                    query, 
+                    search_id,
+                    query,
                     evaluation_model,
                     [evaluation],
-                    current_user, 
+                    current_user,
                     datetime.datetime.now(),
                 ]
             ],

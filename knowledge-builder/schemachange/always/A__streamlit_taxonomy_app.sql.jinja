@@ -3,7 +3,7 @@ CREATE STAGE IF NOT EXISTS {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_
 
 ALTER STAGE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.TAXONOMY_APP REFRESH;
 
-PUT file://./apps/taxonomy_app/*.py @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.taxonomy_app/taxonomy_app/ 
+PUT file://./apps/taxonomy_app/*.py @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.taxonomy_app/taxonomy_app/
   OVERWRITE=true
   AUTO_COMPRESS = FALSE;
 
