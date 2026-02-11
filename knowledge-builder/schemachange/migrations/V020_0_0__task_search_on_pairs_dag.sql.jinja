@@ -1,0 +1,30 @@
+-- DAG task to execute search procedures in parallel
+-- Root task serves as the trigger, child tasks run concurrently
+
+-- Root task with schedule (required for DAG enablement)
+-- After enabling, we suspend the root to prevent scheduled runs; use EXECUTE TASK for manual runs
+CREATE OR REPLACE TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_PAIRS_ROOT
+    WAREHOUSE = 'COMPUTE_WH'
+    SCHEDULE = 'USING CRON 0 0 1 1 * UTC'
+    AS
+    SELECT 1;
+
+-- Child task for golden pairs (runs in parallel with synthetic pairs task)
+CREATE OR REPLACE TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_GOLDEN_PAIRS_TASK
+    WAREHOUSE = 'COMPUTE_WH'
+    AFTER {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_PAIRS_ROOT
+    AS
+    CALL {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_GOLDEN_PAIRS();
+
+-- Child task for synthetic pairs (runs in parallel with golden pairs task)
+CREATE OR REPLACE TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_SYNTHETIC_PAIRS_TASK
+    WAREHOUSE = 'COMPUTE_WH'
+    AFTER {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_PAIRS_ROOT
+    AS
+    CALL {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_SYNTHETIC_PAIRS();
+
+-- Recursively resume all tasks in the DAG
+SELECT SYSTEM$TASK_DEPENDENTS_ENABLE ('{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_PAIRS_ROOT');
+
+-- Suspend root task to prevent scheduled runs (use EXECUTE TASK for manual execution)
+ALTER TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SEARCH_ON_PAIRS_ROOT SUSPEND;

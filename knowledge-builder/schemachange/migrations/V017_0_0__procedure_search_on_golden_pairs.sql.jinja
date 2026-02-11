@@ -36,22 +36,13 @@ def search_on_pairs(session: sp.Session) -> str:
         )
     )
     df = golden_pairs.to_pandas()
-    for i, row in df.iterrows():
-        input_query = row["INPUT_QUERY"]
-        input_type = row["INPUT_TYPE"]
-        search_args = dict(query=input_query, columns=["CHUNK_TEXT"], filter={}, limit=5)
-        resp = css.search(**search_args)
-        results = resp.results
-        data = [
-            [
-                "GOLDEN_PAIR",
-                css_desc_dict,
-                search_args,
-                results,
-                "SYSTEM",
-                datetime.datetime.now(),
-            ]
-        ]
+    batch_size = 100
+    batch = []
+    total_saved = 0
+    
+    def save_batch(data):
+        if not data:
+            return 0
         session.create_dataframe(
             data,
             schema=[
@@ -65,7 +56,27 @@ def search_on_pairs(session: sp.Session) -> str:
         ).write.save_as_table(
             "SEARCH_QUERIES", mode="append", column_order="name"
         )
-    return "Completed searches."
+        return len(data)
+    
+    for i, row in df.iterrows():
+        input_query = row["INPUT_QUERY"]
+        search_args = dict(query=input_query, columns=["CHUNK_TEXT"], filter={}, limit=5)
+        resp = css.search(**search_args)
+        results = resp.results
+        batch.append([
+            "GOLDEN_PAIR",
+            css_desc_dict,
+            search_args,
+            results,
+            "SYSTEM",
+            datetime.datetime.now(),
+        ])
+        if len(batch) >= batch_size:
+            total_saved += save_batch(batch)
+            batch = []
+    
+    total_saved += save_batch(batch)
+    return f"Completed {total_saved} searches."
 
 def compute(session):
     return search_on_pairs(session)
