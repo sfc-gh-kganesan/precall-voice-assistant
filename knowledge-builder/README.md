@@ -12,9 +12,7 @@ This project provides tools for:
 
 ## Data Pipeline
 
-This repo implements a knowledge processing pipeline that transforms KB articles into search-ready chunks for Cortex Search.
-
-### Pipeline Stages
+This repo implements a knowledge processing pipeline that transforms KB articles into search-ready chunks for Cortex Search. See [docs/diagrams/pipeline.md](docs/diagrams/pipeline.md) for the complete pipeline diagram.
 
 ```mermaid
 graph LR
