@@ -143,26 +143,36 @@ export class WorkflowSDKImpl implements WorkflowSDK {
     }
 
     private cfg(config_name?: string): P67ConfigValue {
+        let config: P67ConfigValue;
         if (config_name) {
             if (!this.config.snowflakeConfig.has(config_name)) {
                 throw new Error(`Config ${config_name} not found`);
             }
-            return P67ConfigValueSchema.parse(
+            config = P67ConfigValueSchema.parse(
                 this.config.snowflakeConfig.get(config_name),
             );
-        }
-        // Get the only one if it exists
-        if (this.config.snowflakeConfig.size === 0) {
+        } else if (this.config.snowflakeConfig.size === 0) {
             throw new Error('No Snowflake configurations available');
-        }
-        if (this.config.snowflakeConfig.size === 1) {
-            return P67ConfigValueSchema.parse(
+        } else if (this.config.snowflakeConfig.size === 1) {
+            config = P67ConfigValueSchema.parse(
                 this.config.snowflakeConfig.values().next().value,
             );
+        } else {
+            throw new Error(
+                'Multiple Snowflake configs found, but no config name provided',
+            );
         }
-        throw new Error(
-            'Multiple Snowflake configs found, but no config name provided',
-        );
+
+        // Ensure accessUrl has protocol prefix for HTTP calls
+        if (
+            config.accessUrl &&
+            !config.accessUrl.startsWith('https://') &&
+            !config.accessUrl.startsWith('http://')
+        ) {
+            config = { ...config, accessUrl: `https://${config.accessUrl}` };
+        }
+
+        return config;
     }
 
     /**
@@ -872,6 +882,7 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             payload,
             nodeId: options?.nodeId,
             timestamp,
+            notify: options?.notify,
         });
 
         if (!process.send) {

@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
     Message,
+    OAuthTokenResponseMessage,
     RunWorkflowMessage,
     SerializedP67Config,
     WorkflowErrorMessage,
@@ -9,6 +11,7 @@ import type {
 import {
     MessageSchema,
     MessageType,
+    makeRequestOAuthTokenMessage,
     makeThrowErrorMessage,
     WorkflowError,
 } from '@controld/lib/runtime/schema.js';
@@ -17,6 +20,80 @@ import type { P67Config } from '@p67/workflow-sdk';
 
 // Track if we've started the workflow (RunWorkflow only processed once)
 let workflowStarted = false;
+
+// Pending OAuth token requests (requestId -> { resolve, reject })
+const pendingOAuthRequests = new Map<
+    string,
+    {
+        resolve: (token: string) => void;
+        reject: (error: Error) => void;
+    }
+>();
+
+/**
+ * Create an OAuth token resolver that uses IPC to request tokens from the parent process
+ */
+function createIPCOAuthTokenResolver(): (oauthRef: string) => Promise<string> {
+    return (oauthRef: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            if (!process.send) {
+                reject(
+                    new Error(
+                        'Cannot request OAuth token: not running as child process',
+                    ),
+                );
+                return;
+            }
+
+            const requestId = randomUUID();
+            pendingOAuthRequests.set(requestId, { resolve, reject });
+
+            const message = makeRequestOAuthTokenMessage({
+                requestId,
+                oauthRef,
+            });
+
+            process.send(message);
+
+            // Timeout after 30 seconds
+            setTimeout(() => {
+                if (pendingOAuthRequests.has(requestId)) {
+                    pendingOAuthRequests.delete(requestId);
+                    reject(
+                        new Error(
+                            `OAuth token request timed out for: ${oauthRef}`,
+                        ),
+                    );
+                }
+            }, 30000);
+        });
+    };
+}
+
+/**
+ * Handle OAuthTokenResponse messages from the parent process
+ */
+function handleOAuthTokenResponse(message: OAuthTokenResponseMessage): void {
+    const pending = pendingOAuthRequests.get(message.requestId);
+    if (!pending) {
+        console.warn(
+            `Received OAuthTokenResponse for unknown requestId: ${message.requestId}`,
+        );
+        return;
+    }
+
+    pendingOAuthRequests.delete(message.requestId);
+
+    if (message.error) {
+        pending.reject(new Error(message.error));
+    } else if (message.accessToken) {
+        pending.resolve(message.accessToken);
+    } else {
+        pending.reject(
+            new Error('Invalid OAuthTokenResponse: no token or error'),
+        );
+    }
+}
 
 function sendError(error: WorkflowError, message: string | Error | unknown) {
     if (message instanceof Error) {
@@ -58,6 +135,12 @@ async function handleMessage(message: Message) {
     // ResumeInterrupt messages are handled by the SDK's listener, not here
     if (m.data?.type === MessageType.ResumeInterrupt) {
         // SDK handles this via its setupResumeListener()
+        return;
+    }
+
+    // OAuthTokenResponse messages are handled by the pending requests map
+    if (m.data?.type === MessageType.OAuthTokenResponse) {
+        handleOAuthTokenResponse(m.data as OAuthTokenResponseMessage);
         return;
     }
 
@@ -107,9 +190,12 @@ async function handleMessage(message: Message) {
     }
 
     try {
-        // Deserialize the config from the message and create the SDK
+        // Deserialize the config from the message and create the SDK with OAuth support
         const config = deserializeConfig(data.config);
-        const sdk = new WorkflowSDKImpl(config);
+        const sdk = new WorkflowSDKImpl({
+            config,
+            oauthTokenResolver: createIPCOAuthTokenResolver(),
+        });
         const result = await script.main(sdk);
         process.send?.({ type: 'result', data: result });
         process.exit(0);

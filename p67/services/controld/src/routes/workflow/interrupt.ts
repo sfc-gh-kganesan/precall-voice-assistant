@@ -199,8 +199,9 @@ export function registerInterruptRoutes(server: FastifyInstance) {
                     });
                 }
 
-                // Resume the workflow
+                // Resume the workflow and wait for next event (interrupt or completion)
                 runner.resume(interruptId, response);
+                const nextResult = await runner.waitForNextEvent();
 
                 // Update the interrupt record
                 const resumedAt = new Date();
@@ -213,17 +214,60 @@ export function registerInterruptRoutes(server: FastifyInstance) {
                     },
                 });
 
-                // Update the workflow run status back to Running
-                await fastify.db.workflowRun.update({
-                    where: { id: interrupt.runId },
-                    data: { status: 'Running' },
-                });
+                // Handle the next state
+                if (
+                    nextResult.status === 'interrupted' &&
+                    nextResult.pendingInterrupt
+                ) {
+                    // Workflow hit another interrupt - save it to database
+                    await fastify.db.workflowInterrupt.create({
+                        data: {
+                            id: nextResult.pendingInterrupt.interruptId,
+                            runId: interrupt.runId,
+                            workflowId: interrupt.workflowId,
+                            payload: nextResult.pendingInterrupt
+                                .value as object,
+                            nodeId: nextResult.pendingInterrupt.nodeId,
+                            status: 'Pending',
+                        },
+                    });
 
-                return reply.code(200).send({
-                    success: true,
-                    interruptId,
-                    resumedAt: resumedAt.toISOString(),
-                });
+                    // Update run status to Interrupted
+                    await fastify.db.workflowRun.update({
+                        where: { id: interrupt.runId },
+                        data: { status: 'Interrupted' },
+                    });
+
+                    return reply.code(200).send({
+                        success: true,
+                        interruptId,
+                        resumedAt: resumedAt.toISOString(),
+                        nextInterrupt: nextResult.pendingInterrupt,
+                        status: 'interrupted',
+                    });
+                } else {
+                    // Workflow completed or failed
+                    await fastify.db.workflowRun.update({
+                        where: { id: interrupt.runId },
+                        data: {
+                            status:
+                                nextResult.status === 'completed'
+                                    ? 'Completed'
+                                    : 'Failed',
+                            completedAt: new Date(),
+                        },
+                    });
+
+                    // Clean up runner from registry
+                    fastify.runnerRegistry.delete(interrupt.runId);
+
+                    return reply.code(200).send({
+                        success: true,
+                        interruptId,
+                        resumedAt: resumedAt.toISOString(),
+                        status: nextResult.status,
+                    });
+                }
             } catch (error) {
                 console.error('Error resuming interrupt:', error);
                 return reply.code(500).send({

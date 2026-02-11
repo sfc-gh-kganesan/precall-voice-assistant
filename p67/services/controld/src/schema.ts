@@ -280,6 +280,8 @@ export const InterruptResumeResponseSchema = z.object({
     success: z.boolean(),
     interruptId: z.string(),
     resumedAt: z.string(),
+    nextInterrupt: PendingInterruptSchema.optional(),
+    status: RunStatusSchema.optional(),
 });
 
 export type Interrupt = z.infer<typeof InterruptSchema>;

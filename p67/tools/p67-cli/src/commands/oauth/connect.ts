@@ -1,13 +1,19 @@
 import { randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import {
     createServer as createHttpsServer,
     type Server as HttpsServer,
 } from 'node:https';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Command } from '@p67-cli/Command.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { ctx } from '@p67-cli/context';
 import selfsigned from 'selfsigned';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Known OAuth provider configurations
@@ -130,12 +136,54 @@ function buildAuthorizationUrl(
 }
 
 /**
- * Generate a self-signed certificate for HTTPS localhost
+ * Find the project root by looking for package.json with workspaces
  */
-async function generateSelfSignedCert(): Promise<{
+function findProjectRoot(): string | null {
+    let dir = __dirname;
+    // Walk up from tools/p67-cli/src/commands/oauth to find root
+    for (let i = 0; i < 10; i++) {
+        const pkgPath = join(dir, 'package.json');
+        if (existsSync(pkgPath)) {
+            try {
+                const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+                if (pkg.workspaces || pkg.name === 'p67') {
+                    return dir;
+                }
+            } catch {
+                // ignore
+            }
+        }
+        const parent = dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return null;
+}
+
+/**
+ * Load mkcert certificates from .certs directory, or generate self-signed
+ */
+async function loadOrGenerateCert(): Promise<{
     key: string;
     cert: string;
+    isTrusted: boolean;
 }> {
+    // Try to find mkcert certificates in project root
+    const projectRoot = findProjectRoot();
+    if (projectRoot) {
+        const certPath = join(projectRoot, '.certs', 'localhost.pem');
+        const keyPath = join(projectRoot, '.certs', 'localhost-key.pem');
+
+        if (existsSync(certPath) && existsSync(keyPath)) {
+            return {
+                key: readFileSync(keyPath, 'utf-8'),
+                cert: readFileSync(certPath, 'utf-8'),
+                isTrusted: true,
+            };
+        }
+    }
+
+    // Fall back to self-signed certificate
     const attrs = [{ name: 'commonName', value: 'localhost' }];
     const now = new Date();
     const notAfter = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
@@ -158,6 +206,7 @@ async function generateSelfSignedCert(): Promise<{
     return {
         key: pems.private,
         cert: pems.cert,
+        isTrusted: false,
     };
 }
 
@@ -426,12 +475,24 @@ export const connectCommand = new Command('connect')
 
                 // Start the server (HTTP or HTTPS)
                 let server: Server | HttpsServer;
+                let usingTrustedCert = false;
 
                 if (useHttps) {
-                    console.log(
-                        'Generating self-signed certificate for HTTPS...',
-                    );
-                    const { key, cert } = await generateSelfSignedCert();
+                    const { key, cert, isTrusted } = await loadOrGenerateCert();
+                    usingTrustedCert = isTrusted;
+
+                    if (isTrusted) {
+                        console.log(
+                            'Using trusted mkcert certificate from .certs/',
+                        );
+                    } else {
+                        console.log(
+                            'Using self-signed certificate (browser will show warning)',
+                        );
+                        console.log(
+                            'Tip: Run "make cert" to generate trusted certificates\n',
+                        );
+                    }
                     server = createHttpsServer({ key, cert }, handler);
                 } else {
                     server = createHttpServer(handler);
@@ -464,7 +525,7 @@ export const connectCommand = new Command('connect')
                     'Make sure this URL is registered in your OAuth app settings.\n',
                 );
 
-                if (useHttps) {
+                if (useHttps && !usingTrustedCert) {
                     console.log(
                         'Note: Your browser may show a security warning for the self-signed certificate.',
                     );

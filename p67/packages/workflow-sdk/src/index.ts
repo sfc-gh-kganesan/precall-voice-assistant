@@ -148,6 +148,146 @@ export interface HttpResponse {
     error?: string;
 }
 
+// ============================================================================
+// Slack Block Kit Types (subset for interrupt notifications)
+// ============================================================================
+
+/**
+ * Slack text object
+ */
+export interface SlackTextObject {
+    type: 'plain_text' | 'mrkdwn';
+    text: string;
+    emoji?: boolean;
+}
+
+/**
+ * Slack button element
+ */
+export interface SlackButtonElement {
+    type: 'button';
+    text: { type: 'plain_text'; text: string; emoji?: boolean };
+    action_id?: string;
+    value?: string;
+    style?: 'primary' | 'danger';
+    url?: string;
+}
+
+/**
+ * Slack header block
+ */
+export interface SlackHeaderBlock {
+    type: 'header';
+    text: { type: 'plain_text'; text: string; emoji?: boolean };
+    block_id?: string;
+}
+
+/**
+ * Slack section block
+ */
+export interface SlackSectionBlock {
+    type: 'section';
+    text?: SlackTextObject;
+    fields?: SlackTextObject[];
+    accessory?: SlackButtonElement;
+    block_id?: string;
+}
+
+/**
+ * Slack divider block
+ */
+export interface SlackDividerBlock {
+    type: 'divider';
+    block_id?: string;
+}
+
+/**
+ * Slack actions block (contains interactive elements)
+ */
+export interface SlackActionsBlock {
+    type: 'actions';
+    elements: SlackButtonElement[];
+    block_id?: string;
+}
+
+/**
+ * Slack context block
+ */
+export interface SlackContextBlock {
+    type: 'context';
+    elements: Array<
+        SlackTextObject | { type: 'image'; image_url: string; alt_text: string }
+    >;
+    block_id?: string;
+}
+
+/**
+ * Slack image block
+ */
+export interface SlackImageBlock {
+    type: 'image';
+    image_url: string;
+    alt_text: string;
+    title?: { type: 'plain_text'; text: string };
+    block_id?: string;
+}
+
+/**
+ * Union type for all supported Slack blocks
+ */
+export type SlackBlock =
+    | SlackHeaderBlock
+    | SlackSectionBlock
+    | SlackDividerBlock
+    | SlackActionsBlock
+    | SlackContextBlock
+    | SlackImageBlock;
+
+// ============================================================================
+// Interrupt Notification Types
+// ============================================================================
+
+/**
+ * Simple button configuration for interrupt notifications
+ */
+export interface InterruptButton {
+    /** Button label text */
+    label: string;
+    /** Value returned when button is clicked */
+    value: string;
+    /** Button style */
+    style?: 'primary' | 'danger';
+}
+
+/**
+ * Preset button configurations
+ */
+export type ButtonPreset = 'approve_reject' | 'yes_no' | 'continue_cancel';
+
+/**
+ * Slack notification configuration for interrupts
+ */
+export interface SlackNotifyConfig {
+    type: 'slack';
+    /** OAuth token reference (from p67 oauth connect) */
+    oauthRef: string;
+    /** Recipient: 'self' for DM to token owner, or user/channel ID */
+    recipient?: 'self' | string;
+    /** Simple text message (supports Slack mrkdwn) */
+    text?: string;
+    /** Simple button configuration */
+    buttons?: InterruptButton[];
+    /** Use a preset button configuration */
+    buttonPreset?: ButtonPreset;
+    /** Full Block Kit blocks for complete control */
+    blocks?: SlackBlock[];
+}
+
+/**
+ * Union type for all notification configurations (extensible for future channels)
+ */
+export type NotifyConfig = SlackNotifyConfig;
+
 /**
  * Options for interrupt calls
  */
@@ -156,6 +296,8 @@ export interface InterruptOptions {
     timeout?: number;
     /** Optional node identifier for debugging */
     nodeId?: string;
+    /** Optional notification configuration (e.g., send Slack message) */
+    notify?: NotifyConfig;
 }
 
 /**

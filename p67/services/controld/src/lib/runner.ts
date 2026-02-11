@@ -13,8 +13,12 @@ import {
     InterruptMessageSchema,
     type Message,
     MessageType,
+    makeOAuthTokenResponseMessage,
     makeResumeInterruptMessage,
     makeRunWorkflowMessage,
+    type NotifyConfig,
+    type RequestOAuthTokenMessage,
+    RequestOAuthTokenMessageSchema,
     type SerializedP67Config,
     type WorkflowError,
     type WorkflowErrorMessage,
@@ -68,6 +72,154 @@ export class Logger {
     }
 }
 
+/**
+ * Button presets for common interrupt scenarios
+ */
+const BUTTON_PRESETS = {
+    approve_reject: [
+        { label: 'Approve', value: 'approve', style: 'primary' as const },
+        { label: 'Reject', value: 'reject', style: 'danger' as const },
+    ],
+    yes_no: [
+        { label: 'Yes', value: 'yes', style: 'primary' as const },
+        { label: 'No', value: 'no' },
+    ],
+    continue_cancel: [
+        { label: 'Continue', value: 'continue', style: 'primary' as const },
+        { label: 'Cancel', value: 'cancel', style: 'danger' as const },
+    ],
+};
+
+/**
+ * Sends a Slack notification for an interrupt
+ */
+async function sendSlackNotification(
+    notify: NotifyConfig,
+    interruptId: string,
+    payload: unknown,
+    valueManager: ValueManager,
+    logger: Logger,
+): Promise<void> {
+    if (notify.type !== 'slack') {
+        return;
+    }
+
+    try {
+        // Resolve the OAuth token
+        const accessToken = await valueManager.getOAuthToken(notify.oauthRef);
+
+        // Get user info to determine recipient
+        let channel: string;
+        if (notify.recipient === 'self' || !notify.recipient) {
+            // Get the user's Slack ID
+            const userResponse = await fetch(
+                'https://slack.com/api/users.identity',
+                {
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                },
+            );
+            const userData = (await userResponse.json()) as {
+                ok: boolean;
+                user?: { id: string };
+                error?: string;
+            };
+            if (!userData.ok || !userData.user?.id) {
+                throw new Error(
+                    `Failed to get user ID: ${userData.error || 'Unknown error'}`,
+                );
+            }
+            channel = userData.user.id;
+        } else {
+            // Use the specified channel/user ID
+            channel = notify.recipient;
+        }
+
+        // Build the message blocks
+        const blocks: unknown[] = [];
+
+        // If custom blocks are provided, use them
+        if (notify.blocks && notify.blocks.length > 0) {
+            blocks.push(...notify.blocks);
+        } else {
+            // Build default blocks from text and buttons
+            if (notify.text) {
+                blocks.push({
+                    type: 'section',
+                    text: {
+                        type: 'mrkdwn',
+                        text: notify.text,
+                    },
+                });
+            } else if (payload) {
+                // Use payload as text if no text specified
+                blocks.push({
+                    type: 'section',
+                    text: {
+                        type: 'mrkdwn',
+                        text:
+                            typeof payload === 'string'
+                                ? payload
+                                : JSON.stringify(payload, null, 2),
+                    },
+                });
+            }
+        }
+
+        // Add buttons (from preset or custom)
+        const buttons =
+            notify.buttons ||
+            (notify.buttonPreset ? BUTTON_PRESETS[notify.buttonPreset] : null);
+
+        if (buttons && buttons.length > 0) {
+            blocks.push({
+                type: 'actions',
+                block_id: `interrupt_${interruptId}`,
+                elements: buttons.map((btn, idx) => ({
+                    type: 'button',
+                    text: {
+                        type: 'plain_text',
+                        text: btn.label,
+                        emoji: true,
+                    },
+                    value: JSON.stringify({
+                        interruptId,
+                        value: btn.value,
+                    }),
+                    action_id: `interrupt_action_${idx}`,
+                    ...(btn.style && { style: btn.style }),
+                })),
+            });
+        }
+
+        // Send the message
+        const response = await fetch('https://slack.com/api/chat.postMessage', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                channel,
+                text: notify.text || 'Workflow requires input',
+                blocks,
+            }),
+        });
+
+        const result = (await response.json()) as {
+            ok: boolean;
+            error?: string;
+        };
+        if (!result.ok) {
+            throw new Error(`Slack API error: ${result.error}`);
+        }
+
+        logger.debug(`Slack notification sent for interrupt ${interruptId}`);
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error(`Failed to send Slack notification: ${errorMsg}`);
+    }
+}
+
 export class Runner {
     private workflowId: string;
     private proc: ChildProcess | null = null;
@@ -77,6 +229,7 @@ export class Runner {
     private interruptResolve: ((value: RunResult) => void) | null = null;
     private completionPromise: Promise<RunResult> | null = null;
     private completionResolve: ((value: RunResult) => void) | null = null;
+    private valueManager: ValueManager | null = null;
 
     constructor(
         private readonly workflowDir: string,
@@ -160,6 +313,32 @@ export class Runner {
             );
         }
         return this.completionPromise;
+    }
+
+    /**
+     * Wait for the next workflow event (interrupt or completion) after resuming.
+     * This sets up a new interrupt resolver that will be called when either:
+     * 1. The workflow hits another interrupt
+     * 2. The workflow completes or fails
+     * @returns Promise that resolves with RunResult indicating next state
+     */
+    public waitForNextEvent(): Promise<RunResult> {
+        return new Promise((resolve) => {
+            // Set up interrupt resolver for next interrupt
+            this.interruptResolve = resolve;
+
+            // Also listen to completion promise in case workflow ends
+            if (this.completionPromise) {
+                this.completionPromise.then((result) => {
+                    // Only resolve if we haven't already resolved via interrupt
+                    // The interruptResolve will be nulled out once called
+                    if (this.interruptResolve === resolve) {
+                        this.interruptResolve = null;
+                        resolve(result);
+                    }
+                });
+            }
+        });
     }
 
     /**
@@ -302,8 +481,8 @@ export class Runner {
         // Hydrate config using ValueManager
         let hydratedConfig: P67Config;
         try {
-            const valueManager = new ValueManager(this.db, this.userId);
-            hydratedConfig = await hydrateConfig(manifest, valueManager);
+            this.valueManager = new ValueManager(this.db, this.userId);
+            hydratedConfig = await hydrateConfig(manifest, this.valueManager);
         } catch (err) {
             const message =
                 err instanceof Error ? err.message : 'Unknown error';
@@ -455,6 +634,21 @@ export class Runner {
                         },
                     );
 
+                    // Send Slack notification if configured
+                    if (interruptData.notify && this.valueManager) {
+                        sendSlackNotification(
+                            interruptData.notify,
+                            interruptData.interruptId,
+                            interruptData.payload,
+                            this.valueManager,
+                            logger,
+                        ).catch((error) => {
+                            logger.error(
+                                `Slack notification error: ${error instanceof Error ? error.message : String(error)}`,
+                            );
+                        });
+                    }
+
                     // If we have an interrupt resolver, call it to return early
                     if (this.interruptResolve) {
                         this.interruptResolve({
@@ -481,6 +675,61 @@ export class Runner {
                     console.log('Received unexpected ResumeInterrupt message');
                     logger.debug(
                         `Runner received unexpected ResumeInterrupt message from child process`,
+                    );
+                    break;
+                case MessageType.RequestOAuthToken: {
+                    const pm =
+                        RequestOAuthTokenMessageSchema.safeParse(message);
+                    if (!pm.success) {
+                        console.log(
+                            `Failed to parse RequestOAuthTokenMessage: ${JSON.stringify(message)}`,
+                        );
+                        return;
+                    }
+                    const oauthRequest = pm.data as RequestOAuthTokenMessage;
+                    logger.debug(
+                        `Resolving OAuth token: ${oauthRequest.oauthRef}`,
+                    );
+
+                    // Resolve the OAuth token using ValueManager
+                    (async () => {
+                        try {
+                            if (!this.valueManager) {
+                                throw new Error('ValueManager not initialized');
+                            }
+                            const accessToken =
+                                await this.valueManager.getOAuthToken(
+                                    oauthRequest.oauthRef,
+                                );
+                            const response = makeOAuthTokenResponseMessage({
+                                requestId: oauthRequest.requestId,
+                                accessToken,
+                            });
+                            adapter.sendMessage(proc, response);
+                        } catch (error) {
+                            const errorMsg =
+                                error instanceof Error
+                                    ? error.message
+                                    : String(error);
+                            logger.error(
+                                `Failed to resolve OAuth token: ${errorMsg}`,
+                            );
+                            const response = makeOAuthTokenResponseMessage({
+                                requestId: oauthRequest.requestId,
+                                error: errorMsg,
+                            });
+                            adapter.sendMessage(proc, response);
+                        }
+                    })();
+                    break;
+                }
+                case MessageType.OAuthTokenResponse:
+                    // This shouldn't happen - OAuthTokenResponse goes parent -> child
+                    console.log(
+                        'Received unexpected OAuthTokenResponse message',
+                    );
+                    logger.debug(
+                        `Runner received unexpected OAuthTokenResponse message from child process`,
                     );
                     break;
             }
