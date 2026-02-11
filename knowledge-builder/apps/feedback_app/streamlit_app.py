@@ -1,118 +1,77 @@
 import streamlit as st
-from config import db_config, ui_config
+from config import config
 
 st.set_page_config(
-    page_title=ui_config.page_title,
-    page_icon=ui_config.page_icon,
+    page_title=config.PAGE_TITLE,
+    page_icon=config.PAGE_ICON,
     layout="wide",
 )
 
-from data_operations import SnowflakeDataOperations  # noqa: E402
-from eda import render_eda_tab  # noqa: E402
-from evaluation import render_evaluation_tab  # noqa: E402
-from seeding import get_sync_status, sync_searches  # noqa: E402
-from snowflake.snowpark.context import get_active_session  # noqa: E402
-from taxonomy import render_taxonomy_tab  # noqa: E402
-from ui_components import render_feedback_tab, render_playground_tab  # noqa: E402
+from components import render_feedback_tab, render_playground_tab  # noqa: E402
+from store import InitializeFiltersAction, SetInputTypeAction, dispatch, get_store, init_store  # noqa: E402
+
+from data import get_feedback_counts, get_input_types, get_search_results, get_session, get_sync_status  # noqa: E402
 
 
-@st.cache_resource
-def get_session():
-    return get_active_session()
+def render_sidebar() -> None:
+    """Render sidebar with search status."""
+    with st.sidebar:
+        st.header("Search Status")
+        session = get_session()
+        sync_status = get_sync_status(session)
 
-
-@st.cache_resource
-def get_data_operations():
-    session = get_session()
-    return SnowflakeDataOperations(session)
-
-
-def render_header_metrics(data_ops: SnowflakeDataOperations) -> None:
-    """Render prominent dashboard metrics at the top of the app."""
-    stats = data_ops.get_dashboard_stats()
-
-    eval_pct = stats["eval_pct"]
-    st.metric(
-        "Evaluation Progress",
-        f"{stats['eval_completed']}/{stats['eval_total']}",
-        delta=f"{eval_pct:.3f}% complete",
-        delta_color="normal" if eval_pct < 100 else "off",
-    )
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Golden", sync_status["total_golden_pairs"])
+        col2.metric("Synthetic", sync_status["total_synthetic_pairs"])
+        col3.metric("Adhoc", sync_status["total_adhoc_queries"])
 
 
 def main() -> None:
-    st.title(ui_config.page_title)
-    st.markdown("Evaluate and improve your Cortex Search retrieval quality through human feedback, LLM-as-a-judge metrics, and taxonomy analysis.")
-    st.caption(f"Connected to `{db_config.database}.{db_config.schema}` | Search Service: `{db_config.search_service}`")
+    st.title(config.PAGE_TITLE)
+    st.markdown("Provide feedback on Cortex Search retrieval quality.")
+    st.caption(f"Connected to `{config.DATABASE}.{config.SCHEMA}` | Search Service: `{config.SEARCH_SERVICE}`")
 
+    # Initialize state
+    init_store()
     session = get_session()
-    data_ops = get_data_operations()
 
-    with st.sidebar:
-        st.image("sanofi-600px.jpg")
-        st.header("Search Status")
-        sync_status = get_sync_status(session)
-        unsearched_golden = sync_status["unsearched_golden_pairs"]
-        unsearched_synthetic = sync_status["unsearched_synthetic_pairs"]
-        total_golden = sync_status["total_golden_pairs"]
-        total_synthetic = sync_status["total_synthetic_pairs"]
-        total_adhoc = sync_status["total_adhoc_queries"]
+    # Sidebar
+    render_sidebar()
 
-        st.subheader("Totals")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Golden", total_golden)
-        col2.metric("Synthetic", total_synthetic)
-        col3.metric("Adhoc", total_adhoc)
+    # Get available input types for filtering
+    input_types = get_input_types(session)
 
-        st.subheader("Pending Sync")
-        col1, col2 = st.columns(2)
-        col1.metric("Golden", unsearched_golden)
-        col2.metric("Synthetic", unsearched_synthetic)
+    # Initialize filters on first load
+    store = get_store()
+    if not store.filters_initialized and input_types:
+        dispatch(InitializeFiltersAction(default_input_type=input_types[0]))
 
-        if unsearched_golden > 0 or unsearched_synthetic > 0:
-            sync_golden = st.checkbox("Sync Golden Pairs", value=unsearched_golden > 0, disabled=unsearched_golden == 0)
-            sync_synthetic = st.checkbox("Sync Synthetic Pairs", value=unsearched_synthetic > 0, disabled=unsearched_synthetic == 0)
-
-            if st.button("Sync Now", type="primary"):
-                with st.spinner("Syncing searches..."):
-                    results = sync_searches(session, data_ops, sync_golden=sync_golden, sync_synthetic=sync_synthetic)
-                    st.success(f"Synced {results['golden_pairs']} golden pairs and {results['synthetic_pairs']} synthetic pairs")
-                    st.rerun()
-        else:
-            st.info("All pairs are synced.")
-
-    is_valid, missing_resources = data_ops.validate_environment()
-    if not is_valid:
-        st.error("Missing required resources:")
-        for resource in missing_resources:
-            st.error(f"  - {resource}")
-        st.info("Please ensure all required tables and services exist before using this application.")
-        st.stop()
-
-    render_header_metrics(data_ops)
-    st.divider()
-
-    input_types = data_ops.get_input_types()
-
-    def load_results_by_type(_data_ops, result_type):
-        return _data_ops.extract_search_results(result_type, ["SEARCH_ID"])
-
-    tab_coverage, tab_eval, tab_playground, tab_feedback, tab_eda = st.tabs(["Quality Coverage", "Evaluation", "Playground", "Feedback", "EDA"])
-
-    with tab_coverage:
-        render_taxonomy_tab(get_session())
-
-    with tab_eval:
-        render_evaluation_tab(data_ops)
+    # Tabs
+    tab_playground, tab_feedback = st.tabs(["Playground", "Feedback"])
 
     with tab_playground:
-        render_playground_tab(data_ops)
+        render_playground_tab(session)
 
     with tab_feedback:
-        render_feedback_tab(data_ops, input_types, load_results_by_type)
+        # Input type filter
+        selected_type = st.selectbox(
+            "Query Type",
+            options=input_types,
+            index=input_types.index(store.selected_input_type) if store.selected_input_type in input_types else 0,
+            key="input_type_selector",
+        )
 
-    with tab_eda:
-        render_eda_tab(data_ops)
+        if selected_type != store.selected_input_type:
+            dispatch(SetInputTypeAction(input_type=selected_type))
+            st.rerun()
+
+        # Load data for selected type
+        if selected_type:
+            source_df = get_search_results(session, selected_type)
+            feedback_counts = get_feedback_counts(session)
+            render_feedback_tab(session, source_df, feedback_counts)
+        else:
+            st.info("Select a query type to review results.")
 
 
 main()

@@ -1,69 +1,48 @@
-import re
+"""
+Application configuration from environment variables.
+"""
+
+import os
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class DatabaseConfig:
-    database: str = "KNOWLEDGE_BUILDER"
-    schema: str = "PUBLIC"
-    search_service: str = "KB_SEARCH"
-    target_table: str = "SEARCH_FEEDBACK"
-    results_table: str = "SEARCH_QUERIES"
-    evaluation_results_table: str = "EVALUATION_RESULTS"
-    golden_pairs_table: str = "GOLDEN_PAIRS"
-    synthetic_pairs_table: str = "SYNTHETIC_PAIRS"
-    kb_knowledge_table: str = "KB_KNOWLEDGE"
-    kb_chunks_table: str = "KB_CHUNKS"
+class Config:
+    """Application configuration."""
 
-    def get_table_name(self, table: str) -> str:
-        return f"{self.database}.{self.schema}.{table}"
+    DATABASE: str
+    SCHEMA: str
+    SEARCH_SERVICE: str
+    SEARCH_FEEDBACK_TABLE: str
+    SEARCH_QUERIES_TABLE: str
+    GOLDEN_PAIRS_TABLE: str
+    SYNTHETIC_PAIRS_TABLE: str
 
-
-@dataclass(frozen=True)
-class ChunkingConfig:
-    chunk_size: int = 1800
-    chunk_overlap: int = 300
-    processing_version: str = "v1"
-    text_column: str = "TEXT"
-    id_column: str = "NUMBER"
+    # UI settings
+    PAGE_TITLE: str
+    PAGE_ICON: str
+    RATING_ADJUSTMENT: int
+    SEARCH_LIMIT: int
 
 
-@dataclass(frozen=True)
-class SearchConfig:
-    columns: tuple = ("CHUNK_TEXT",)
-    filter: dict = None
-    limit: int = 5
-
-    def __post_init__(self):
-        if self.filter is None:
-            object.__setattr__(self, "filter", {})
-
-    def to_dict(self):
-        return {
-            "columns": list(self.columns),
-            "filter": self.filter,
-            "limit": self.limit,
-        }
+config = Config(
+    DATABASE=os.environ.get("KB_DATABASE_NAME", "KNOWLEDGE_BUILDER"),
+    SCHEMA=os.environ.get("KB_SCHEMA_NAME", "PUBLIC"),
+    SEARCH_SERVICE=os.environ.get("KB_SEARCH_SERVICE", "KB_SEARCH"),
+    SEARCH_FEEDBACK_TABLE=os.environ.get("SEARCH_FEEDBACK_TABLE", "SEARCH_FEEDBACK"),
+    SEARCH_QUERIES_TABLE=os.environ.get("SEARCH_QUERIES_TABLE", "SEARCH_QUERIES"),
+    GOLDEN_PAIRS_TABLE=os.environ.get("GOLDEN_PAIRS_TABLE", "GOLDEN_PAIRS"),
+    SYNTHETIC_PAIRS_TABLE=os.environ.get("SYNTHETIC_PAIRS_TABLE", "SYNTHETIC_PAIRS"),
+    PAGE_TITLE="Feedback App",
+    PAGE_ICON="📝",
+    RATING_ADJUSTMENT=1,
+    SEARCH_LIMIT=5,
+)
 
 
-@dataclass(frozen=True)
-class UIConfig:
-    page_title: str = "Knowledge Builder"
-    page_icon: str = "books"
-    sidebar_logo: str = "snowflake-logo-color-rgb@1x.png"
-    rating_adjustment: int = 1
-    feedback_placeholder: str = "I wished this came back with..."
-    feedback_textarea_height: int = 100
-
-
-@dataclass(frozen=True)
-class EDAConfig:
-    href_pattern: re.Pattern = re.compile(r'href=["\']?([^"\'>\s]+)', flags=re.IGNORECASE)
-    url_pattern: re.Pattern = re.compile(r'https?://[^\s"\'>]+', flags=re.IGNORECASE)
-
-
-db_config = DatabaseConfig()
-search_config = SearchConfig()
-ui_config = UIConfig()
-eda_config = EDAConfig()
-chunking_config = ChunkingConfig()
+# LLM models for playground responses
+LLM_MODELS = (
+    "llama3.1-8b",
+    "llama3.1-70b",
+    "mistral-large2",
+)
