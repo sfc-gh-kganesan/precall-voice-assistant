@@ -34,6 +34,8 @@ services:
             NODE_ENV: development
             DEBUG_ENABLE_DEFAULT_USER: true
             DEBUG_DEFAULT_USER: bobthebuilder
+            # Slack Socket Mode - get app token from Slack app settings → App-Level Tokens
+            SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
         volumes:
             - ./services/controld/.data_root:/app/services/controld/.local-storage
         depends_on:

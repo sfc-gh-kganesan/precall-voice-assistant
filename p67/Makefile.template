@@ -3,7 +3,7 @@ SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_r
 CONTROLD_IMAGE=controld
 .PHONY: help build build-controld ci deploy describe dev fix \
 ensure-encryption-key init-provider-account install-cli list-services login logs push push-controld \
-url dbmigrate
+url dbmigrate cert
 
 .DEFAULT_GOAL := help
 
@@ -93,3 +93,13 @@ url: ## Print the ingress URL for the running SPCS service
 		--format json | \
 		jq '.[] | select(.name == "web") | .ingress_url' -r | \
 		xargs -I {} echo "https://{}"
+
+
+cert: ## Generate locally-trusted HTTPS certificates using mkcert
+	@command -v mkcert >/dev/null 2>&1 || { echo "mkcert not found. Install with: brew install mkcert"; exit 1; }
+	@mkdir -p .certs
+	@mkcert -install 2>/dev/null || true
+	@mkcert -cert-file .certs/localhost.pem -key-file .certs/localhost-key.pem localhost 127.0.0.1 ::1
+	@echo "Certificates generated in .certs/"
+	@echo "  - .certs/localhost.pem (certificate)"
+	@echo "  - .certs/localhost-key.pem (private key)"

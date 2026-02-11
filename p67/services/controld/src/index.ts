@@ -1,12 +1,23 @@
+import { SlackSocketModeService } from '@controld/lib/slack-socket-mode.js';
 import apiRouter from '@controld/routes/api.js';
 import { buildServer } from '@controld/server.js';
 
 const server = await buildServer();
 await server.register(apiRouter, { prefix: '/api' });
 
+// Initialize Slack Socket Mode service for handling interactive events
+const slackSocketMode = new SlackSocketModeService(
+    server.db,
+    server.runnerRegistry,
+);
+
 const start = async () => {
     try {
         await server.listen({ port: server.config.port, host: '0.0.0.0' });
+
+        // Start Slack Socket Mode after server is listening
+        await slackSocketMode.start();
+
         server.log.debug(
             `Google Client ID: ${server.config.oauth.google.clientId.slice(0, 5)}...`,
         );
@@ -36,6 +47,7 @@ const start = async () => {
 process.on('SIGTERM', async () => {
     server.log.info('SIGTERM received, shutting down gracefully');
     try {
+        await slackSocketMode.stop();
         await server.close();
         server.log.info('Server closed successfully');
         process.exit(0);
@@ -48,6 +60,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     server.log.info('SIGINT received, shutting down gracefully');
     try {
+        await slackSocketMode.stop();
         await server.close();
         server.log.info('Server closed successfully');
         process.exit(0);
