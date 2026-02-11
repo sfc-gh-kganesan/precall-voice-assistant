@@ -7,12 +7,13 @@
     --bento-text-muted: rgba(0, 0, 0, 0.5);
     --panel-bg: rgba(0, 0, 0, 0.05);
     --panel-border: rgba(0, 0, 0, 0.1);
-    /* Purple theme colors */
-    --purple-lightest: #E5CCFA;
-    --purple-light: #CB99F5;
-    --purple-medium: #B066F0;
-    --purple-dark: #9533EB;
-    --purple-darkest: #7A00E6;
+    /* Theme colors (overridden at runtime from config.py) */
+    --primary-lightest: #E5CCFA;
+    --primary-light: #CB99F5;
+    --primary-medium: #B066F0;
+    --primary-dark: #9533EB;
+    --primary-darkest: #7A00E6;
+    --primary-shadow: rgba(122, 0, 230, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -63,7 +64,7 @@
 }
 
 .bento-box:hover {
-    box-shadow: 0 4px 12px rgba(122, 0, 230, 0.3);
+    box-shadow: 0 4px 12px var(--primary-shadow);
 }
 
 .bento-label {

@@ -237,12 +237,30 @@ def inject_app_styles() -> None:
     Inject application CSS styles from external file.
     Call once at the top of the main app, before any UI rendering.
     Uses CSS variables for theme-aware colors (light/dark mode support).
+    Color theme is dynamically injected from config.py PRIMARY_COLOR.
     """
     from pathlib import Path
 
+    from config import COLOR_SCALE, PRIMARY_COLOR
+
     css_path = Path(__file__).parent / "styles.css"
     css = css_path.read_text()
-    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+    # Generate dynamic color overrides from config
+    # COLOR_SCALE is a 6-step gradient from white to PRIMARY_COLOR
+    # Map to CSS variables: lightest (index 1) to darkest (index 5), skip white (index 0)
+    dynamic_css = f"""
+    :root {{
+        --primary-lightest: {COLOR_SCALE[1]};
+        --primary-light: {COLOR_SCALE[2]};
+        --primary-medium: {COLOR_SCALE[3]};
+        --primary-dark: {COLOR_SCALE[4]};
+        --primary-darkest: {COLOR_SCALE[5]};
+        --primary-shadow: {PRIMARY_COLOR}4D;
+    }}
+    """
+
+    st.markdown(f"<style>{css}{dynamic_css}</style>", unsafe_allow_html=True)
 
 
 def _bento_box_html(label: str, value: str, subtitle: str | None = None, small_value: bool = False) -> str:
