@@ -47,7 +47,7 @@ def get_search_queries(_session: Session) -> pd.DataFrame:
 def get_evaluation_results(_session: Session) -> pd.DataFrame:
     """
     Load evaluation results with extracted context relevance fields.
-    This is where the context_relevance_score lives.
+    INPUT_QUERY is derived from SEARCH_QUERIES via SEARCH_ID join.
     """
     context_relevance_expr = F.col("EVALUATION")[0]["context_relevance"]
     context_relevance_reason_expr = context_relevance_expr["reasons"]["reason"].cast(T.StringType())
@@ -59,7 +59,14 @@ def get_evaluation_results(_session: Session) -> pd.DataFrame:
         context_relevance_reason_expr.alias("CONTEXT_RELEVANCE_REASON"),
         context_relevance_score_expr.alias("CONTEXT_RELEVANCE_SCORE"),
     )
-    return evaluation_results.to_pandas()
+
+    search_queries = _session.table(config.SEARCH_QUERIES_TABLE).select(
+        "SEARCH_ID",
+        F.col("INPUT_ARGS")["query"].cast(T.StringType()).alias("INPUT_QUERY"),
+    )
+
+    joined = evaluation_results.join(search_queries, on="SEARCH_ID", how="inner")
+    return joined.to_pandas()
 
 
 @st.cache_data(ttl=600)
@@ -373,7 +380,7 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
     Join all three tables to create the complete dataset for visualization.
 
     Join flow:
-    SYNTHETIC_PAIRS.GENERATED['query'] = EVALUATION_RESULTS.INPUT_QUERY
+    SYNTHETIC_PAIRS.GENERATED['query'] = SEARCH_QUERIES.INPUT_ARGS['query'] (via EVALUATION_RESULTS)
     EVALUATION_RESULTS.SEARCH_ID = SEARCH_QUERIES.SEARCH_ID
     """
     # Load base dataframes
@@ -396,12 +403,6 @@ def get_merged_data(_session: Session) -> pd.DataFrame:
 
     # Second join: add search queries for response data
     merged = merged.merge(search_queries_df, how="inner", on="SEARCH_ID")
-
-    # Clean up duplicate INPUT_QUERY columns
-    if "INPUT_QUERY_x" in merged.columns:
-        merged = merged.drop("INPUT_QUERY_x", axis=1)
-    if "INPUT_QUERY_y" in merged.columns:
-        merged = merged.rename(columns={"INPUT_QUERY_y": "INPUT_QUERY"})
 
     # Precompute expensive boolean masks (avoids re-computing on every filter)
     merged["IS_UNRESOLVED"] = merged.apply(_is_unresolved, axis=1)

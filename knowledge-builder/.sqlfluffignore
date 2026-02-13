@@ -1,5 +1,6 @@
 # Procedures with embedded Python - cannot parse $$ blocks or PUTs
 schemachange/migrations/V005_0_0__ingest_kb_knowledge.sql.jinja
+schemachange/migrations/V015_0_0__ingest_synthetic_pairs.sql.jinja
 schemachange/migrations/V016_0_0__procedure_describe_search_service.sql.jinja
 schemachange/migrations/V017_0_0__procedure_search_on_golden_pairs.sql.jinja
 schemachange/migrations/V018_0_0__procedure_search_on_synthetic_pairs.sql.jinja

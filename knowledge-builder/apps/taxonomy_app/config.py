@@ -2,7 +2,7 @@
 Application configuration from environment variables.
 
 Environment variables (with defaults):
-- KB_SCHEMA_NAME: Schema name (default: CORE)
+- KB_SCHEMA_NAME: Schema name (default: PUBLIC)
 - SYNTHETIC_PAIRS_TABLE: Synthetic pairs table (default: SYNTHETIC_PAIRS)
 - SEARCH_QUERIES_TABLE: Search queries table (default: SEARCH_QUERIES)
 - EVALUATION_RESULTS_TABLE: Evaluation results table (default: EVALUATION_RESULTS)
@@ -27,11 +27,11 @@ class Config:
 
 
 config = Config(
-    SCHEMA=os.environ.get("KB_SCHEMA_NAME", "CORE"),
+    SCHEMA=os.environ.get("KB_SCHEMA_NAME", "PUBLIC"),
     SYNTHETIC_PAIRS_TABLE=os.environ.get("SYNTHETIC_PAIRS_TABLE", "SYNTHETIC_PAIRS"),
     SEARCH_QUERIES_TABLE=os.environ.get("SEARCH_QUERIES_TABLE", "SEARCH_QUERIES"),
     EVALUATION_RESULTS_TABLE=os.environ.get("EVALUATION_RESULTS_TABLE", "EVALUATION_RESULTS"),
-    KB_CHUNKS_VIEW=os.environ.get("KB_CHUNKS_VIEW", "KB_CHUNKS_V"),
+    KB_CHUNKS_VIEW=os.environ.get("KB_CHUNKS_VIEW", "KB_CHUNKS"),
     KB_SEARCH_SERVICE=os.environ.get("KB_SEARCH_SERVICE", "KB_SEARCH"),
 )
 
@@ -62,5 +62,5 @@ def generate_gradient(primary_color: str, steps: int = 6) -> list[str]:
     return gradient
 
 
-PRIMARY_COLOR = "#7A00E6"
+PRIMARY_COLOR = "#29B5E8"
 COLOR_SCALE = generate_gradient(PRIMARY_COLOR)

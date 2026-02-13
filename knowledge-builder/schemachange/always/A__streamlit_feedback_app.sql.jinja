@@ -11,6 +11,10 @@ PUT file://./apps/feedback_app/environment.yml @{{ KB_DATABASE_NAME }}.{{ KB_SCH
   OVERWRITE=true
   AUTO_COMPRESS = FALSE;
 
+  PUT file://./apps/feedback_app/styles.css @{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.feedback_app/feedback_app/
+  OVERWRITE=true
+  AUTO_COMPRESS = FALSE;
+
 CREATE OR REPLACE STREAMLIT {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FEEDBACK_APP
   FROM '@{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.FEEDBACK_APP/feedback_app/'
   MAIN_FILE = 'streamlit_app.py'

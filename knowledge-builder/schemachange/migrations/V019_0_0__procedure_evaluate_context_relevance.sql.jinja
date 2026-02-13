@@ -56,7 +56,6 @@ def eval_context_relevance_on_searches(
             [
                 [
                     search_id,
-                    query,
                     evaluation_model,
                     [evaluation],
                     current_user,
@@ -66,7 +65,6 @@ def eval_context_relevance_on_searches(
             schema=T.StructType(
                 [
                     T.StructField("SEARCH_ID", T.LongType()),
-                    T.StructField("INPUT_QUERY", T.StringType()),
                     T.StructField("EVALUATION_MODEL", T.StringType()),
                     T.StructField("EVALUATION", T.VariantType()),
                     T.StructField("CREATED_BY", T.StringType()),
