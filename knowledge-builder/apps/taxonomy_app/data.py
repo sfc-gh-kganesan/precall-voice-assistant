@@ -55,8 +55,6 @@ def get_evaluation_results(_session: Session) -> pd.DataFrame:
 
     evaluation_results = _session.table(config.EVALUATION_RESULTS_TABLE).select(
         "SEARCH_ID",
-        "INPUT_QUERY",
-        "CHUNKS",
         "EVALUATION_MODEL",
         context_relevance_reason_expr.alias("CONTEXT_RELEVANCE_REASON"),
         context_relevance_score_expr.alias("CONTEXT_RELEVANCE_SCORE"),
