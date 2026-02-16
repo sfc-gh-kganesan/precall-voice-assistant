@@ -10,6 +10,9 @@ schemachange:
   vars:
     KB_DATABASE_NAME: '{{ env_var("KB_DATABASE_NAME") }}'
     KB_SCHEMA_NAME: '{{ env_var("KB_SCHEMA_NAME") }}'
+    KB_WAREHOUSE_NAME: '{{ env_var("KB_WAREHOUSE_NAME", "COMPUTE_WH") }}'
+    KB_SN_EAI_NAME: '{{ env_var("KB_SN_EAI_NAME", "KB_SERVICENOW_EAI") }}'
+    KB_SN_SECRET_NAME: '{{ env_var("KB_SN_SECRET_NAME", "KB_SERVICENOW_SECRET") }}'
     SERVICENOW_INSTANCE_HOST: '{{ env_var("SERVICENOW_INSTANCE_HOST", "instance.service-now.com") }}'
 
 snowflake:

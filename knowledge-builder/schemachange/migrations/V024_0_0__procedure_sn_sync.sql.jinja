@@ -1,0 +1,792 @@
+CREATE OR REPLACE PROCEDURE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_SYNC(
+    instance_hostname STRING,
+    table_name STRING,
+    batch_size INT DEFAULT 500,
+    query_filter STRING DEFAULT NULL
+)
+RETURNS VARIANT
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.10'
+PACKAGES = ('snowflake-snowpark-python', 'requests', 'tenacity')
+HANDLER = 'run_sync'
+EXTERNAL_ACCESS_INTEGRATIONS = ( {{ KB_SN_EAI_NAME }} )
+SECRETS = ( 'auth' = {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.{{ KB_SN_SECRET_NAME }} )
+EXECUTE AS OWNER
+AS
+$$
+import json
+import logging
+import requests
+import time
+import _snowflake
+from datetime import datetime, timedelta
+from tenacity import retry, stop_after_attempt, wait_exponential
+from snowflake.snowpark import Session
+from snowflake.snowpark.functions import col, max as max_
+
+logger = logging.getLogger("SN_SYNC")
+
+def run_sync(session: Session,
+             instance_hostname: str,
+             table_name: str,
+             batch_size: int,
+             query_filter: str):
+
+    cred = _snowflake.get_username_password('auth')
+    auth = (cred.username, cred.password)
+    base_url = f"https://{instance_hostname}/api/now/table/{table_name}"
+    datetime_now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # we use a simple schema: SYS_ID, SYS_UPDATED_ON, RAW_JSON
+    target_table = f"{table_name}_RAW"
+    session.sql(f"""
+      CREATE TABLE IF NOT EXISTS {target_table} (
+        SYS_ID         STRING,
+        SYS_UPDATED_ON TIMESTAMP,
+        RAW_JSON       VARIANT,
+        PRIMARY KEY (SYS_ID)
+      )
+    """).collect()
+
+    # keyset cursor initialization
+    cursor_df = session.table(target_table).select(max_(col("SYS_ID")))
+    first_row = cursor_df.first()
+    start_cursor = first_row[0] if first_row else None
+
+    query_parts = [
+        f"sys_updated_on<={datetime_now}",
+        "ORDERBYsys_id"
+    ]
+    if start_cursor:
+        query_parts.insert(0, f"sys_id>{start_cursor}")
+    if query_filter:
+        query_parts.insert(0, query_filter)
+
+    params = {
+        "sysparm_query": "^".join(query_parts),
+        "sysparm_limit": batch_size,
+        "sysparm_exclude_reference_link": "true",
+        "sysparm_query_no_domain": "false",
+        "sysparm_default_export_fields": "all"
+    }
+    
+    req_session = requests.Session()
+    req_session.headers.update({"Accept": "application/json"})
+    req_session.auth = auth
+
+    # Container for retry logs to avoid calling session.sql inside callback
+    batch_retry_logs = []
+
+    def log_retry_attempt(retry_state):
+        exc = retry_state.outcome.exception()
+        error_details = {
+            "event": "BATCH_RETRY_ATTEMPT",
+            "attempt": retry_state.attempt_number,
+            "error": str(exc),
+            "error_type": type(exc).__name__
+        }
+        if isinstance(exc, requests.exceptions.HTTPError) and hasattr(exc, 'response') and exc.response:
+            error_details['status'] = exc.response.status_code
+            try:
+                error_details['response_text'] = exc.response.text[:1000]
+                error_details['retry_after'] = exc.response.headers.get('Retry-After')
+            except:
+                pass
+        batch_retry_logs.append(error_details)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10), before_sleep=log_retry_attempt, reraise=True)
+    def fetch_batch(url, params):
+        start_req = time.time()
+        response = req_session.get(url, params=params, timeout=120)
+        duration = time.time() - start_req
+        response.raise_for_status()
+        return response, duration
+
+    total_fetched = 0
+    
+    logger.info("SYNC_START", extra={"table": table_name, "cursor": start_cursor})
+
+    try:
+        while True:
+            batch_retry_logs.clear()
+            # Log Batch Start
+            logger.info("BATCH_START", extra={
+                "url": base_url,
+                "params": params,
+                "total_fetched_so_far": total_fetched
+            })
+            # Execute Request
+            try:
+                resp, duration = fetch_batch(base_url, params)
+                # If we had retries but eventually succeeded, log them
+                if batch_retry_logs:
+                    logger.warning("BATCH_SUCCEEDED_WITH_RETRIES", extra={
+                        "url": base_url,
+                        "retry_count": len(batch_retry_logs),
+                        "retry_history": batch_retry_logs
+                    })
+            except Exception as e:
+                # Log the final failure including retry history
+                logger.error("BATCH_FAILED_FINAL", extra={
+                    "url": base_url,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "retry_count": len(batch_retry_logs),
+                    "retry_history": batch_retry_logs
+                })
+                raise e
+            # Log Total Count on first batch
+            if total_fetched == 0:
+                total_count = resp.headers.get('x-total-count')
+                if total_count:
+                    logger.info("SYNC_METADATA", extra={"x_total_count": total_count})
+            # Parse Response
+            data = resp.json()
+            result = data.get("result", [])
+            if result:
+                # Use FLATTEN to avoid temp tables
+                batch_json_str = json.dumps(result)
+                merge_sql = f"""
+                    MERGE INTO {target_table} AS tgt
+                    USING (
+                        SELECT 
+                            value:sys_id::STRING as SYS_ID,
+                            to_timestamp(value:sys_updated_on::STRING) as SYS_UPDATED_ON,
+                            value as RAW_JSON
+                        FROM TABLE(FLATTEN(input => PARSE_JSON(?)))
+                        WHERE SYS_ID IS NOT NULL
+                    ) AS src
+                    ON tgt.SYS_ID = src.SYS_ID
+                    WHEN MATCHED THEN UPDATE SET
+                        tgt.RAW_JSON = src.RAW_JSON,
+                        tgt.SYS_UPDATED_ON = src.SYS_UPDATED_ON
+                    WHEN NOT MATCHED THEN INSERT (SYS_ID, SYS_UPDATED_ON, RAW_JSON)
+                    VALUES (src.SYS_ID, src.SYS_UPDATED_ON, src.RAW_JSON)
+                """
+                session.sql(merge_sql, params=[batch_json_str]).collect()
+                total_fetched += len(result)
+
+                # Reset batch size if it was increased
+                if params['sysparm_limit'] != batch_size:
+                    params['sysparm_limit'] = batch_size
+                    logger.info("BATCH_SIZE_RESET", extra={
+                        "new_limit": batch_size,
+                        "reason": "Resetting to original batch size after successful fetch"
+                    })
+
+            # Pagination
+            if len(result) == 0:
+                current_limit = int(params.get('sysparm_limit', batch_size))
+                if current_limit < 100000:
+                    # Exponentially increase batch size to bypass potential ACL hiding entire pages
+                    new_limit = min(current_limit * 2, 100000)
+                    params['sysparm_limit'] = new_limit
+                    logger.info("BATCH_SIZE_INCREASE", extra={
+                        "old_limit": current_limit,
+                        "new_limit": new_limit,
+                        "reason": "Empty result set, increasing limit to bypass potential ACL hiding entire pages"
+                    })
+                    continue
+                break
+            # Prepare Next Cursor
+            last_rec = result[-1]
+            last_date = last_rec.get('sys_updated_on')
+            last_id = last_rec.get('sys_id')
+            if not last_date or not last_id:
+                raise Exception("Missing sys_updated_on or sys_id in last result in response")
+            next_query_parts = [
+                f"sys_updated_on<={datetime_now}",
+                f"sys_id>{last_id}",
+                "ORDERBYsys_id"
+            ]
+            if query_filter:
+                next_query_parts.insert(0, query_filter)
+            params['sysparm_query'] = "^".join(next_query_parts)
+            # Log Batch Done
+            logger.info("BATCH_DONE", extra={
+                "fetched_in_batch": len(result),
+                "total_fetched_so_far": total_fetched,
+                "duration_sec": round(duration, 2),
+                "next_cursor": f"{last_date} / {last_id}"
+            })
+            
+    except Exception as e:
+        logger.error("SYNC_FAILED", extra={"error": str(e)})
+        raise e
+
+    logger.info("SYNC_COMPLETE", extra={"rows_fetched": total_fetched})
+    return {"status": "SUCCESS", "rows_fetched": total_fetched}
+$$;
+
+CREATE OR REPLACE TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_SYNC_TASK_SYS_ATTACHMENT
+    WAREHOUSE = {{ KB_WAREHOUSE_NAME }}
+    SCHEDULE = '24 HOUR' 
+AS
+CALL {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_SYNC(
+    '{{ SERVICENOW_INSTANCE_HOST }}',
+    'sys_attachment',
+    200, -- Batch Size (keep low to avoid timeouts)
+    'table_nameINkb_knowledge,ZZ_YYkb_knowledge' -- filtering params
+);
+
+ALTER TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_SYNC_TASK_SYS_ATTACHMENT RESUME;
+
+-- ==============================================================================
+-- ServiceNow Attachment Downloader (Stored Procedure)
+--
+-- Purpose:
+--   Download attachment binaries referenced in SYS_ATTACHMENT_RAW.RAW_JSON:download_link
+--   into a Snowflake stage.
+--
+-- Assumptions:
+--   - SYS_ATTACHMENT_RAW is already being populated with attachment metadata (e.g. via SN_SYNC)
+--   - RAW_JSON contains: file_name, download_link, content_type, size_bytes, table_sys_id, etc.
+--
+-- Notes:
+--   - Designed for periodic execution via TASK (small-ish batches to stay within task runtime limits)
+--   - Uses EXTERNAL_ACCESS_INTEGRATIONS + SECRETS 
+-- ==============================================================================
+
+CREATE OR REPLACE PROCEDURE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_DOWNLOAD_ATTACHMENTS(
+    instance_hostname STRING, -- ServiceNow hostname
+    raw_table STRING, -- e.g. 'DB.SCHEMA.SYS_ATTACHMENT_RAW'
+    target_stage STRING, -- e.g. 'DB.SCHEMA.SYS_ATTACHMENT_STG' (NO leading '@')
+    max_to_process INT, -- e.g. 200
+    max_size_bytes INT, -- e.g. 5000000 (5MB)
+    content_type_prefix STRING -- e.g. 'image/'
+)
+RETURNS VARIANT
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.10'
+PACKAGES = ('snowflake-snowpark-python', 'requests', 'tenacity')
+HANDLER = 'run_download'
+EXTERNAL_ACCESS_INTEGRATIONS = ( {{ KB_SN_EAI_NAME }} )
+SECRETS = ( 'auth' = {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.{{ KB_SN_SECRET_NAME }} )
+EXECUTE AS OWNER
+AS
+$$
+import io
+import json
+import logging
+import requests
+import _snowflake
+from datetime import datetime
+from tenacity import Retrying, stop_after_attempt, wait_exponential
+from snowflake.snowpark import Session
+
+logger = logging.getLogger("SN_DOWNLOAD_ATTACHMENTS")
+
+
+def _ensure_stage(session: Session, target_stage: str) -> None:
+    session.sql(f"""
+        CREATE STAGE IF NOT EXISTS {target_stage}
+        DIRECTORY = (ENABLE = TRUE)
+        ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE')
+        COMMENT = 'Stage for ServiceNow attachment binaries'
+    """).collect()
+
+def _refresh_directory(session: Session, target_stage: str) -> None:
+    """
+    Refresh directory table metadata for the stage.
+    """
+    session.sql(f"ALTER STAGE {target_stage} REFRESH").collect()
+
+def _normalize_base_url(instance_hostname: str) -> str:
+    # instance_hostname includes any path portion; we just need a clean https:// base.
+    return f"https://{(instance_hostname or '').strip()}".rstrip("/")
+
+def _is_already_exists_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return ("already exists" in msg) or ("file with same name already exists" in msg)
+
+def _http_status(exc: Exception):
+    """Best-effort extraction of HTTP status code from requests HTTPError."""
+    if isinstance(exc, requests.exceptions.HTTPError) and hasattr(exc, "response") and exc.response is not None:
+        return exc.response.status_code
+    return None
+
+def _http_body_text(exc: Exception, limit: int = 5000) -> str:
+    """
+    Best-effort extraction of response body text from requests HTTPError.
+    Used for detecting known terminal error payloads (e.g., SOAP faults).
+    """
+    try:
+        if isinstance(exc, requests.exceptions.HTTPError) and hasattr(exc, "response") and exc.response is not None:
+            # requests caches response text; slicing keeps this bounded.
+            return (exc.response.text or "")[:limit]
+    except Exception:
+        pass
+    return ""
+
+_POLICY_SIZE_LIMIT_MARKER = "maximum data size limit would be exceeded"
+
+def _is_terminal_size_limit_fault(exc: Exception) -> bool:
+    """
+    Some upstream gateways return HTTP 500 with a SOAP fault body indicating a hard size limit.
+    Example marker: 'the specified maximum data size limit would be exceeded'.
+    """
+    status = _http_status(exc)
+    if status not in (500, 413):
+        return False
+    body = _http_body_text(exc).lower()
+    return _POLICY_SIZE_LIMIT_MARKER in body
+
+def _tombstone_reason_after_retries(exc: Exception):
+    """
+    Decide whether a row should be tombstoned after all retries are exhausted.
+
+    Returns: (should_tombstone: bool, reason: str|None)
+
+    Notes:
+      - 404/403 are terminal-ish for our purposes.
+      - Some 5xx responses are actually terminal upstream policy errors (size limit).
+      - 429 should NOT be tombstoned (rate limiting can recover later).
+      - Other 4xx are typically permanent config/permissions/data issues; tombstone to keep the task converging.
+      - Non-HTTP errors (e.g., Snowflake PUT failures) are treated as unexpected failures.
+    """
+    status = _http_status(exc)
+    if status is None:
+        return (False, None)
+    if status == 429:
+        return (False, None)
+    if status in (404, 403):
+        return (True, "NOT_FOUND_OR_ACL" if status == 404 else "FORBIDDEN")
+    if _is_terminal_size_limit_fault(exc):
+        return (True, "UPSTREAM_SIZE_LIMIT")
+    if 400 <= status < 500:
+        return (True, f"HTTP_{status}")
+    return (False, None)
+
+_TOMBSTONE_SUFFIX = "_not_found.json"
+
+def _select_candidates(session: Session,
+                       raw_table: str,
+                       target_stage: str,
+                       max_to_process: int,
+                       max_size_bytes: int,
+                       content_type_prefix: str):
+    stage_ref = f"@{target_stage}"
+
+    sanitized_name_sql = (
+        "REGEXP_REPLACE("
+        "  COALESCE(NULLIF(TRIM(RAW_JSON:file_name::STRING), ''), SYS_ID||'.bin'),"
+        "  '[ /\\\\:;\\?&\\#%\\+\\n\\r\\t]',"
+        "  '_'"
+        ")"
+    )
+    relpath_sql = f"(SYS_ID || '/' || {sanitized_name_sql})"
+
+    where_parts = [
+        "SYS_ID IS NOT NULL",
+    ]
+    # Only download attachments belonging to KB articles.
+    # Matches the SN_SYNC filter: table_nameINkb_knowledge,ZZ_YYkb_knowledge
+    where_parts.append("RAW_JSON:table_name::STRING IN ('kb_knowledge', 'ZZ_YYkb_knowledge')")
+    # If any object exists under SYS_ID (real file or tombstone), skip the row so the task converges.
+    # This also makes us resilient to file_name changes (we don't depend on the suffix).
+    where_parts.append(
+        f"SYS_ID::STRING NOT IN (SELECT DISTINCT SPLIT_PART(RELATIVE_PATH, '/', 1) FROM DIRECTORY({stage_ref}))"
+    )
+    if max_size_bytes is not None:
+        # If size is missing/unparseable, treat as 0 so we don't accidentally exclude valid rows.
+        where_parts.append("COALESCE(TRY_TO_NUMBER(RAW_JSON:size_bytes::STRING), 0) <= ?")
+    if content_type_prefix:
+        where_parts.append("RAW_JSON:content_type::STRING ILIKE ?")
+
+    where_sql = " AND ".join(where_parts)
+    sql = f"""
+        SELECT
+            SYS_ID,
+            SYS_UPDATED_ON,
+            {relpath_sql} AS STAGE_RELPATH
+        FROM {raw_table}
+        WHERE {where_sql}
+        ORDER BY SYS_UPDATED_ON NULLS FIRST, SYS_ID
+        LIMIT ?
+    """
+
+    params = []
+    if max_size_bytes is not None:
+        params.append(max_size_bytes)
+    if content_type_prefix:
+        # prefix match e.g. 'image/'
+        params.append(f"{content_type_prefix}%")
+    params.append(max_to_process)
+    return session.sql(sql, params=params).collect()
+
+
+def run_download(session: Session,
+                 instance_hostname: str,
+                 raw_table: str,
+                 target_stage: str,
+                 max_to_process: int,
+                 max_size_bytes: int,
+                 content_type_prefix: str):
+
+    started_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    base_url = _normalize_base_url(instance_hostname)
+
+    # Validate that the source table exists and is accessible (fail fast with a clear error).
+    session.sql(f"SELECT 1 FROM {raw_table} LIMIT 1").collect()
+
+    _ensure_stage(session, target_stage)
+    _refresh_directory(session, target_stage)
+
+    cred = _snowflake.get_username_password('auth')
+    req = requests.Session()
+    req.headers.update({"Accept": "application/json"})
+    req.auth = (cred.username, cred.password)
+
+    def fetch_bytes(url: str) -> bytes:
+        r = req.get(url, timeout=120)
+        r.raise_for_status()
+        return r.content
+
+    logger.info("DOWNLOAD_START", extra={
+        "started_at_utc": started_at,
+        "raw_table": raw_table,
+        "target_stage": target_stage,
+        "max_to_process": max_to_process,
+        "max_size_bytes": max_size_bytes,
+        "content_type_prefix": content_type_prefix,
+    })
+
+    # Select up to max_to_process attachments that are not yet present in DIRECTORY(@stage).
+    try:
+        rows = _select_candidates(
+            session,
+            raw_table=raw_table,
+            target_stage=target_stage,
+            max_to_process=max_to_process,
+            max_size_bytes=max_size_bytes,
+            content_type_prefix=content_type_prefix,
+        )
+    except Exception as e:
+        logger.error("DOWNLOAD_FATAL", extra={
+            "step": "select_candidates",
+            "raw_table": raw_table,
+            "target_stage": target_stage,
+            "error": str(e),
+        })
+        raise
+
+    logger.info("DOWNLOAD_SELECTED", extra={
+        "selected": len(rows),
+        "raw_table": raw_table,
+        "target_stage": target_stage,
+    })
+
+    if not rows:
+        logger.info("DOWNLOAD_NOOP", extra={"reason": "no pending rows"})
+        return {"status": "SUCCESS", "processed": 0, "uploaded": 0, "skipped": 0, "tombstoned": 0, "failed": 0}
+
+    total = len(rows)
+
+    uploaded = 0
+    skipped = 0
+    tombstoned = 0
+    unexpected_failures = 0
+
+    stage_base = target_stage.rstrip("/")
+
+    def put_bytes(stage_location: str, content_bytes: bytes) -> str:
+        """
+        Upload bytes to a stage path.
+        Returns: 'UPLOADED' | 'EXISTS'
+        Raises on non-exists failures.
+        """
+        try:
+            session.file.put_stream(
+                input_stream=io.BytesIO(content_bytes),
+                stage_location=stage_location,
+                auto_compress=False,
+                overwrite=False,
+            )
+            return "UPLOADED"
+        except Exception as pe:
+            if _is_already_exists_error(pe):
+                return "EXISTS"
+            raise
+
+    def write_tombstone(stage_rel_path: str, attachment_sys_id: str, url: str, reason: str, http_status: int, err: Exception) -> str:
+        """
+        Write a SYS_ID-scoped marker file so we can later query/delete/analyze by suffix.
+        Returns: 'WROTE' | 'EXISTS' | 'FAILED'
+        """
+        tombstone_stage_path = f"@{stage_base}/{stage_rel_path}{_TOMBSTONE_SUFFIX}"
+        marker = json.dumps({
+            "status": reason,
+            "attachment_sys_id": attachment_sys_id,
+            "http_status": http_status,
+            "url": url,
+            "error": str(err)[:500],
+            "created_at_utc": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        }).encode("utf-8")
+        try:
+            out = put_bytes(tombstone_stage_path, marker)
+            return "WROTE" if out == "UPLOADED" else "EXISTS"
+        except Exception:
+            return "FAILED"
+
+    for r in rows:
+        attachment_id = r["SYS_ID"]
+        if not attachment_id:
+            unexpected_failures += 1
+            continue
+
+        # ServiceNow attachment download endpoint:
+        #   {instance_base}/api/now/attachment/{sys_id}/file
+        url = f"{base_url}/api/now/attachment/{attachment_id}/file"
+
+        stage_rel_path = r["STAGE_RELPATH"]
+        stage_path = f"@{stage_base}/{stage_rel_path}"
+
+        try:
+            outcome = None
+            for attempt in Retrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=1, max=10),
+                reraise=True,
+            ):
+                with attempt:
+                    content = fetch_bytes(url)
+                    outcome = put_bytes(stage_path, content)
+
+            if outcome == "EXISTS":
+                skipped += 1
+            else:
+                uploaded += 1
+        except Exception as e:
+            status = _http_status(e)
+            should_tombstone, reason = _tombstone_reason_after_retries(e)
+
+            if should_tombstone:
+                t_out = write_tombstone(stage_rel_path, attachment_id, url, reason, status, e)
+                if t_out == "WROTE":
+                    tombstoned += 1
+                elif t_out == "EXISTS":
+                    skipped += 1
+                else:
+                    unexpected_failures += 1
+                    logger.warning("DOWNLOAD_ROW_FAILED", extra={
+                        "attachment_sys_id": attachment_id,
+                        "status": status,
+                        "reason": "tombstone_failed",
+                    })
+                continue
+
+            unexpected_failures += 1
+            logger.warning("DOWNLOAD_ROW_FAILED", extra={
+                "attachment_sys_id": attachment_id,
+                "status": status,
+                "error": str(e)[:500],
+            })
+
+    result = {
+        "status": "SUCCESS" if unexpected_failures == 0 else "PARTIAL_SUCCESS",
+        "processed": total,
+        "uploaded": uploaded,
+        "skipped": skipped,
+        "tombstoned": tombstoned,
+        "unexpected_failures": unexpected_failures,
+        "raw_table": raw_table,
+        "target_stage": target_stage,
+    }
+    logger.info("DOWNLOAD_COMPLETE", extra=result)
+    return result
+$$;
+
+CREATE OR REPLACE TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_DOWNLOAD_ATTACHMENTS_TASK
+    WAREHOUSE = {{ KB_WAREHOUSE_NAME }}
+    SCHEDULE = '15 MINUTE'
+AS
+CALL {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_DOWNLOAD_ATTACHMENTS(
+    '{{ SERVICENOW_INSTANCE_HOST }}',
+    '{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SYS_ATTACHMENT_RAW',
+    '{{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SYS_ATTACHMENT_STG',
+    200,       -- max_to_process (keep modest for task runtime)
+    5000000,   -- max_size_bytes (e.g. 5000000 for 5MB)
+    'image/'   -- content_type_prefix (NULL for all)
+);
+
+ALTER TASK {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.SN_DOWNLOAD_ATTACHMENTS_TASK RESUME;
+
+-- ==============================================================================
+-- Base64 Image Extractor (Stored Procedure)
+--
+-- Purpose:
+--   Scan KB article HTML for <img src="data:image/...;base64,..."> images and
+--   upload the decoded bytes into a Snowflake stage.
+--
+-- Idempotency:
+--   Uses DIRECTORY(@stage) as the state store. Images are written to a deterministic
+--   path: BASE64/<sha256>.<ext>. If the path already exists, the upload is skipped.
+-- ============================================================================== 
+
+CREATE OR REPLACE PROCEDURE {{ KB_DATABASE_NAME }}.{{ KB_SCHEMA_NAME }}.KB_EXTRACT_BASE64_IMAGES_TO_STAGE(
+    kb_table STRING,          -- fully qualified, e.g. 'DB.SCHEMA.KB_KNOWLEDGE'
+    kb_id_col STRING,         -- e.g. 'SYS_ID'
+    kb_text_col STRING,       -- e.g. 'TEXT'
+    target_stage STRING,      -- fully qualified stage name WITHOUT leading '@'
+    max_images INT,           -- max images to upload per run
+    max_size_bytes INT        -- max decoded image size to upload
+)
+RETURNS VARIANT
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.10'
+PACKAGES = ('snowflake-snowpark-python', 'bs4')
+HANDLER = 'run'
+EXECUTE AS OWNER
+AS
+$$
+import base64
+import hashlib
+import io
+import logging
+from datetime import datetime
+from typing import Optional, Tuple
+
+from bs4 import BeautifulSoup
+from snowflake.snowpark import Session
+
+logger = logging.getLogger("KB_EXTRACT_BASE64_IMAGES")
+
+
+def _ensure_stage(session: Session, stage_name: str) -> None:
+    session.sql(f"""
+        CREATE STAGE IF NOT EXISTS {stage_name}
+        DIRECTORY = (ENABLE = TRUE)
+        ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE')
+        COMMENT = 'Stage for base64 images extracted from KB HTML'
+    """).collect()
+
+
+def _refresh_directory(session: Session, stage_name: str) -> None:
+    session.sql(f"ALTER STAGE {stage_name} REFRESH").collect()
+
+
+def _file_ext_from_mime(mime_subtype: str) -> str:
+    if not mime_subtype:
+        return "bin"
+    mt = mime_subtype.lower().strip()
+    # common aliases
+    if mt in ("jpeg", "pjpeg"):
+        return "jpg"
+    if mt == "svg+xml":
+        return "svg"
+    # keep simple, avoid path chars
+    return "".join(ch for ch in mt if ch.isalnum() or ch in ("+", "-", "."))[:16] or "bin"
+
+
+def _decode_data_uri(src: str) -> Optional[Tuple[str, bytes]]:
+    """Return (ext, bytes) if src is an image data URI, else None."""
+    if not src:
+        return None
+    if not src.startswith("data:image/"):
+        return None
+    try:
+        # format: data:image/<subtype>;base64,<data>
+        header, b64data = src.split(",", 1)
+        # e.g. "data:image/png;base64"
+        mime_part = header.split(";")[0]  # "data:image/png"
+        subtype = mime_part.split("/")[1] if "/" in mime_part else ""
+        ext = _file_ext_from_mime(subtype)
+        raw = base64.b64decode(b64data)
+        return (ext, raw)
+    except Exception:
+        return None
+
+
+def _is_already_exists_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return ("already exists" in msg) or ("file with same name already exists" in msg)
+
+
+def run(session: Session,
+        kb_table: str,
+        kb_id_col: str,
+        kb_text_col: str,
+        target_stage: str,
+        max_images: int,
+        max_size_bytes: int):
+
+    started_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    _ensure_stage(session, target_stage)
+    _refresh_directory(session, target_stage)
+
+    # Existing hashes in stage (prefix BASE64/)
+    existing_sql = f"""
+        SELECT SPLIT_PART(RELATIVE_PATH, '.', 1) AS HASH
+        FROM DIRECTORY(@{target_stage})
+        WHERE RELATIVE_PATH LIKE 'BASE64/%'
+    """
+    existing_hashes = {r["HASH"].replace("BASE64/", "") for r in session.sql(existing_sql).to_local_iterator()}
+
+    logger.info("EXTRACT_START", extra={
+        "started_at_utc": started_at,
+        "kb_table": kb_table,
+        "target_stage": target_stage,
+        "max_images": max_images,
+        "max_size_bytes": max_size_bytes,
+        "existing_hashes_count": len(existing_hashes),
+    })
+
+    # Fetch HTML rows
+    rows = session.sql(f"SELECT {kb_id_col} AS ID, {kb_text_col} AS TEXT FROM {kb_table}").to_local_iterator()
+
+    uploaded = 0
+    skipped = 0
+    too_large = 0
+    errors = 0
+
+    for row in rows:
+        if uploaded >= max_images:
+            break
+        html = row["TEXT"]
+        if not html:
+            continue
+        soup = BeautifulSoup(html, "html.parser")
+        for img in soup.find_all("img"):
+            if uploaded >= max_images:
+                break
+            src = img.get("src", "")
+            decoded = _decode_data_uri(src)
+            if not decoded:
+                continue
+            ext, raw = decoded
+            if len(raw) > max_size_bytes:
+                too_large += 1
+                continue
+            h = hashlib.sha256(raw).hexdigest()
+            if h in existing_hashes:
+                skipped += 1
+                continue
+            stage_path = f"@{target_stage}/BASE64/{h}.{ext}"
+            try:
+                session.file.put_stream(
+                    input_stream=io.BytesIO(raw),
+                    stage_location=stage_path,
+                    auto_compress=False,
+                    overwrite=False,
+                )
+                uploaded += 1
+                existing_hashes.add(h)
+            except Exception as e:
+                if _is_already_exists_error(e):
+                    skipped += 1
+                    existing_hashes.add(h)
+                else:
+                    errors += 1
+                    logger.warning("EXTRACT_PUT_FAILED", extra={"hash": h, "error": str(e)[:500]})
+
+    result = {
+        "status": "SUCCESS" if errors == 0 else "PARTIAL_SUCCESS",
+        "uploaded": uploaded,
+        "skipped": skipped,
+        "too_large": too_large,
+        "errors": errors,
+    }
+    logger.info("EXTRACT_COMPLETE", extra=result)
+    return result
+$$

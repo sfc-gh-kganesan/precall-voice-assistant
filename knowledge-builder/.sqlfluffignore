@@ -5,5 +5,11 @@ schemachange/migrations/V016_0_0__procedure_describe_search_service.sql.jinja
 schemachange/migrations/V017_0_0__procedure_search_on_golden_pairs.sql.jinja
 schemachange/migrations/V018_0_0__procedure_search_on_synthetic_pairs.sql.jinja
 schemachange/migrations/V019_0_0__procedure_evaluate_context_relevance.sql.jinja
+schemachange/migrations/V024_0_0__procedure_sn_sync.sql.jinja
 schemachange/always/A__streamlit_feedback_app.sql.jinja
 schemachange/always/A__streamlit_taxonomy_app.sql.jinja
+# Undefined var, but actually is
+schemachange/migrations/V021_0_0__network_rule_servicenow.sql.jinja
+# Cannot parse External Access Integration or secrets
+schemachange/migrations/V022_0_0__secret_servicenow.sql.jinja
+schemachange/migrations/V023_0_0__eai_servicenow.sql.jinja

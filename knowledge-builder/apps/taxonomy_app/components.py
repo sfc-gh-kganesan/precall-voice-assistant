@@ -1,668 +1,753 @@
-"""
-UI components for the Sunburst Push-Down Taxonomy application.
-Each component is a pure function that renders UI based on state.
-"""
-
-import json
+"""UI components for the Feedback application."""
 
 import pandas as pd
-import plotly.express as px
 import streamlit as st
-from config import COLOR_SCALE
+from config import LLM_MODELS, config
+from snowflake.snowpark import Session
 from store import (
-    ClearSelectionAction,
-    SetAnswerableFilterAction,
-    SetBackfillableFilterAction,
-    SetResolutionFilterAction,
-    SetSelectedPathAction,
-    SetSourceTypesAction,
+    SetCarouselIndexAction,
+    SetFeedbackAgentResponseAction,
+    SetFeedbackArticleIndexAction,
+    SetFeedbackChunkIndexAction,
+    SetPlaygroundAgentResponseAction,
+    SetPlaygroundArticleIndexAction,
+    SetPlaygroundChunkIndexAction,
+    SetPlaygroundResultsAction,
     dispatch,
     get_store,
 )
 
-
-@st.fragment
-def render_sunburst(grouped_df: pd.DataFrame, path_cols: list[str]) -> None:
-    """
-    Render the interactive sunburst chart (visualization only).
-    Selection is handled by separate breadcrumb controls.
-    """
-    if grouped_df.empty:
-        st.warning("No data available for sunburst visualization.")
-        return
-
-    fig = px.sunburst(
-        grouped_df,
-        path=path_cols,
-        values="TICKET_COUNT",
-        color="CONTEXT_RELEVANCE_SCORE",
-        color_continuous_scale=COLOR_SCALE,
-        title="Taxonomy Distribution by Ticket Count",
-    )
-
-    fig.update_traces(hovertemplate=("<b>%{label}</b><br>%{id}<br>Ticket Count: %{value}<br>Context Relevance: %{color:.3f}<extra></extra>"))
-
-    fig.update_layout(
-        height=600,
-        margin={"t": 50, "l": 0, "r": 0, "b": 0},
-        coloraxis_colorbar_title="Context Relevance Score",
-    )
-
-    # Render chart (visualization only, no click handling)
-    st.plotly_chart(fig, use_container_width=True, key="sunburst_chart")
-
-
-def render_taxonomy_selector(df: pd.DataFrame) -> None:
-    """
-    Render cascading dropdowns for taxonomy level selection.
-    Each level filters the options available in the next level.
-    """
-    store = get_store()
-
-    # Handle clear request from previous run (must happen before widgets are instantiated)
-    if st.session_state.get("_clear_taxonomy_requested"):
-        del st.session_state["_clear_taxonomy_requested"]
-        # Set widget values to "All" before widgets are created
-        st.session_state["sel_l1"] = "All"
-        st.session_state["sel_l2"] = "All"
-        st.session_state["sel_l3"] = "All"
-        st.session_state["sel_l4"] = "All"
-
-    col1, col2, col3, col4, col_clear = st.columns([2, 2, 2, 2, 1])
-
-    # L1 selector
-    with col1:
-        l1_options = ["All"] + sorted(df["L1_TAG"].dropna().unique().tolist())
-        l1_default = store.selected_l1 if store.selected_l1 in l1_options else "All"
-        l1_index = l1_options.index(l1_default) if l1_default in l1_options else 0
-
-        st.selectbox(
-            "Level 1",
-            options=l1_options,
-            index=l1_index,
-            key="sel_l1",
-            on_change=lambda: dispatch(
-                SetSelectedPathAction(
-                    l1=st.session_state.sel_l1 if st.session_state.sel_l1 != "All" else None,
-                    l2=None,
-                    l3=None,
-                    l4=None,  # Reset children on parent change
-                )
-            ),
-        )
-
-    # L2 selector - filtered by L1
-    with col2:
-        if store.selected_l1:
-            l2_df = df[df["L1_TAG"] == store.selected_l1]
-        else:
-            l2_df = df
-        l2_options = ["All"] + sorted(l2_df["L2_TAG"].dropna().unique().tolist())
-        l2_default = store.selected_l2 if store.selected_l2 in l2_options else "All"
-        l2_index = l2_options.index(l2_default) if l2_default in l2_options else 0
-
-        st.selectbox(
-            "Level 2",
-            options=l2_options,
-            index=l2_index,
-            key="sel_l2",
-            disabled=not store.selected_l1,
-            on_change=lambda: dispatch(
-                SetSelectedPathAction(
-                    l1=store.selected_l1,
-                    l2=st.session_state.sel_l2 if st.session_state.sel_l2 != "All" else None,
-                    l3=None,
-                    l4=None,  # Reset children
-                )
-            ),
-        )
-
-    # L3 selector - filtered by L1 + L2
-    with col3:
-        if store.selected_l1 and store.selected_l2:
-            l3_df = df[(df["L1_TAG"] == store.selected_l1) & (df["L2_TAG"] == store.selected_l2)]
-        else:
-            l3_df = pd.DataFrame()
-        l3_options = ["All"] + sorted(l3_df["L3_TAG"].dropna().unique().tolist()) if not l3_df.empty else ["All"]
-        l3_default = store.selected_l3 if store.selected_l3 in l3_options else "All"
-        l3_index = l3_options.index(l3_default) if l3_default in l3_options else 0
-
-        st.selectbox(
-            "Level 3",
-            options=l3_options,
-            index=l3_index,
-            key="sel_l3",
-            disabled=not store.selected_l2,
-            on_change=lambda: dispatch(
-                SetSelectedPathAction(
-                    l1=store.selected_l1,
-                    l2=store.selected_l2,
-                    l3=st.session_state.sel_l3 if st.session_state.sel_l3 != "All" else None,
-                    l4=None,  # Reset child
-                )
-            ),
-        )
-
-    # L4 selector - filtered by L1 + L2 + L3
-    with col4:
-        if store.selected_l1 and store.selected_l2 and store.selected_l3:
-            l4_df = df[(df["L1_TAG"] == store.selected_l1) & (df["L2_TAG"] == store.selected_l2) & (df["L3_TAG"] == store.selected_l3)]
-        else:
-            l4_df = pd.DataFrame()
-        l4_options = ["All"] + sorted(l4_df["L4_TAG"].dropna().unique().tolist()) if not l4_df.empty else ["All"]
-        l4_default = store.selected_l4 if store.selected_l4 in l4_options else "All"
-        l4_index = l4_options.index(l4_default) if l4_default in l4_options else 0
-
-        st.selectbox(
-            "Level 4",
-            options=l4_options,
-            index=l4_index,
-            key="sel_l4",
-            disabled=not store.selected_l3,
-            on_change=lambda: dispatch(
-                SetSelectedPathAction(
-                    l1=store.selected_l1,
-                    l2=store.selected_l2,
-                    l3=store.selected_l3,
-                    l4=st.session_state.sel_l4 if st.session_state.sel_l4 != "All" else None,
-                )
-            ),
-        )
-
-    # Clear button
-    with col_clear:
-        st.markdown("<br>", unsafe_allow_html=True)  # Align with dropdowns
-        if st.button("Clear", key="btn_clear_taxonomy"):
-            dispatch(ClearSelectionAction())
-            # Set flag to clear widget keys on next run (before widgets are instantiated)
-            st.session_state["_clear_taxonomy_requested"] = True
-            st.rerun()
-
-    # Show current selection as breadcrumb
-    selection_parts = []
-    if store.selected_l1:
-        selection_parts.append(store.selected_l1)
-    if store.selected_l2:
-        selection_parts.append(store.selected_l2)
-    if store.selected_l3:
-        selection_parts.append(store.selected_l3)
-    if store.selected_l4:
-        selection_parts.append(store.selected_l4)
-
-    if selection_parts:
-        st.caption(f"📍 {' > '.join(selection_parts)}")
-
-
-def render_filters(source_types: list[str], answerable_options: list[str], resolution_options: list[str], backfillable_options: list[str]) -> None:
-    """Render filter controls for source type, answerable_with_kb, resolution status, and backfillable."""
-    store = get_store()
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        # Use store values only if they're valid options, otherwise use all options
-        source_default = [s for s in store.source_types if s in source_types]
-        if not source_default:
-            source_default = source_types
-
-        st.multiselect("Source Type", options=source_types, default=source_default, key="ms_source_types", on_change=lambda: dispatch(SetSourceTypesAction(source_types=st.session_state.ms_source_types)))
-
-    with col2:
-        # Use store values only if they're valid options, otherwise use all options
-        answerable_default = [a for a in store.answerable_filter if a in answerable_options]
-        if not answerable_default:
-            answerable_default = answerable_options
-
-        st.multiselect("Self Serve Candidate", options=answerable_options, default=answerable_default, key="ms_answerable", on_change=lambda: dispatch(SetAnswerableFilterAction(values=st.session_state.ms_answerable)))
-
-    with col3:
-        # Use store values only if they're valid options, otherwise use all options
-        resolution_default = [r for r in store.resolution_filter if r in resolution_options]
-        if not resolution_default:
-            resolution_default = resolution_options
-
-        st.multiselect("Resolution Status", options=resolution_options, default=resolution_default, key="ms_resolution", on_change=lambda: dispatch(SetResolutionFilterAction(values=st.session_state.ms_resolution)))
-
-    with col4:
-        # Use store values only if they're valid options, otherwise use all options
-        backfillable_default = [b for b in store.backfillable_filter if b in backfillable_options]
-        if not backfillable_default:
-            backfillable_default = backfillable_options
-
-        st.multiselect("Backfillable", options=backfillable_options, default=backfillable_default, key="ms_backfillable", on_change=lambda: dispatch(SetBackfillableFilterAction(values=st.session_state.ms_backfillable)))
+from data import (
+    generate_combined_response,
+    generate_feedback_agent_response,
+    get_articles_for_chunks,
+    get_evaluation_results,
+    get_feedback_for_query,
+    run_search,
+    save_feedback,
+    save_search,
+)
 
 
 def inject_app_styles() -> None:
-    """
-    Inject application CSS styles from external file.
-    Call once at the top of the main app, before any UI rendering.
-    Uses CSS variables for theme-aware colors (light/dark mode support).
-    Color theme is dynamically injected from config.py PRIMARY_COLOR.
-    """
+    """Inject application CSS styles from external file."""
     from pathlib import Path
-
-    from config import COLOR_SCALE, PRIMARY_COLOR
 
     css_path = Path(__file__).parent / "styles.css"
     css = css_path.read_text()
-
-    # Generate dynamic color overrides from config
-    # COLOR_SCALE is a 6-step gradient from white to PRIMARY_COLOR
-    # Map to CSS variables: lightest (index 1) to darkest (index 5), skip white (index 0)
-    dynamic_css = f"""
-    :root {{
-        --primary-lightest: {COLOR_SCALE[1]};
-        --primary-light: {COLOR_SCALE[2]};
-        --primary-medium: {COLOR_SCALE[3]};
-        --primary-dark: {COLOR_SCALE[4]};
-        --primary-darkest: {COLOR_SCALE[5]};
-        --primary-shadow: {PRIMARY_COLOR}4D;
-    }}
-    """
-
-    st.markdown(f"<style>{css}{dynamic_css}</style>", unsafe_allow_html=True)
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
-def _bento_box_html(label: str, value: str, subtitle: str | None = None, small_value: bool = False) -> str:
-    """
-    Generate HTML for a single bento box.
-    Returns HTML string to be combined with other boxes in a grid container.
-    """
-    value_class = "bento-value-small" if small_value else "bento-value"
-    subtitle_html = f'<div class="bento-subtitle">{subtitle}</div>' if subtitle else ""
-
-    return f'<div class="bento-box"><div class="bento-label">{label}</div><div class="{value_class}">{value}</div>{subtitle_html}</div>'
+def render_stars(rating: int) -> str:
+    """Render star rating as unicode."""
+    return "★" * rating + "☆" * (5 - rating)
 
 
-def render_kpi_bento(kpis: dict, resolution_filter: list[str] | None = None, backfillable_filter: list[str] | None = None) -> None:
-    """Render KPI metrics as bento box cards using pure HTML flexbox."""
+def render_carousel_nav(
+    total_items: int,
+    session_key: str,
+    index_action_class,
+    current_index: int,
+    item_labels: list[str] | None = None,
+    label_prefix: str = "Item",
+) -> int:
+    """Render carousel navigation with prev/next buttons and jump-to selector."""
+    if total_items == 0:
+        return 0
 
-    # Determine if we should show the unresolved bento
-    # Hide if resolution filter has only one value selected (trivially 100% or 0%)
-    show_unresolved_bento = resolution_filter is None or len(resolution_filter) != 1
+    current_idx = min(current_index, total_items - 1)
+    col1, col2, col3, col4 = st.columns([1, 1, 2, 4])
 
-    # Determine if we should show the backfillable bento
-    # Hide if backfillable filter has only one value selected (trivially 100% or 0%)
-    show_backfillable_bento = backfillable_filter is None or len(backfillable_filter) != 1
+    with col1:
+        if st.button("Prev", icon=":material/arrow_back:", disabled=current_idx == 0, use_container_width=True, key=f"{session_key}_prev"):
+            dispatch(index_action_class(index=current_idx - 1))
+            st.rerun()
 
-    # Answerable breakdown (only show if multiple values)
-    breakdown = kpis.get("answerable_breakdown", {})
-    show_answerable_breakdown = len(breakdown) > 1
+    with col2:
+        if st.button("Next", icon=":material/arrow_forward:", disabled=current_idx >= total_items - 1, use_container_width=True, key=f"{session_key}_next"):
+            dispatch(index_action_class(index=current_idx + 1))
+            st.rerun()
 
-    # Build all bento box HTML
-    boxes_html = []
+    with col3:
+        st.container(height=42, border=False).markdown(f"**{label_prefix} {current_idx + 1} of {total_items}**")
 
-    # Ticket Count
-    ticket_count = kpis["ticket_count"]
-    total_population = kpis.get("total_population", ticket_count)
-    ticket_pct = kpis.get("ticket_pct_of_total", 100.0)
-    boxes_html.append(_bento_box_html(label="Ticket Count", value=f"{ticket_count:,}", subtitle=f"({ticket_pct:.1f}% of {total_population:,} total)"))
+    with col4:
+        labels = item_labels if item_labels and len(item_labels) == total_items else [f"{i + 1}" for i in range(total_items)]
+        jump_key = f"{session_key}_jump"
+        selected = st.selectbox(
+            "Jump to",
+            range(total_items),
+            index=current_idx,
+            format_func=lambda x: labels[x],
+            key=jump_key,
+            label_visibility="collapsed",
+        )
+        if selected != current_idx:
+            dispatch(index_action_class(index=selected))
+            st.rerun()
 
-    # Avg Context Relevance
-    relevance = kpis["avg_context_relevance"]
-    relevance_display = f"{relevance:.2f}" if relevance is not None and not pd.isna(relevance) else "N/A"
-    boxes_html.append(_bento_box_html(label="Avg Context Relevance", value=relevance_display))
-
-    # Coverage (context relevance >= 0.66, i.e. 2/3 on TruLens scale)
-    coverage_count = kpis.get("coverage_count", 0)
-    coverage_pct = kpis.get("coverage_pct", 0.0)
-    boxes_html.append(_bento_box_html(label="Coverage", value=f"{coverage_pct:.1f}%", subtitle=f"{coverage_count:,} scoring ≥ 2/3"))
-
-    # Backfillable (conditional) - incidents only
-    if show_backfillable_bento:
-        backfillable_count = kpis.get("backfillable_count", 0)
-        backfillable_pct = kpis.get("backfillable_pct", 0.0)
-        boxes_html.append(_bento_box_html(label="Backfillable", value=f"{backfillable_pct:.1f}%", subtitle=f"{backfillable_count:,} incidents"))
-
-    # Unresolved / Cancelled (conditional)
-    if show_unresolved_bento:
-        unresolved_pct = kpis.get("unresolved_pct", 0.0)
-        unresolved_count = kpis.get("unresolved_count", 0)
-        boxes_html.append(_bento_box_html(label="Unresolved / Cancelled", value=f"{unresolved_count:,}", subtitle=f"({unresolved_pct:.1f}% of selection)"))
-
-    # Answerable breakdown (conditional)
-    if show_answerable_breakdown:
-        for value, pct in sorted(breakdown.items()):
-            label = value.capitalize() if value else "Unknown"
-            boxes_html.append(_bento_box_html(label=f"Self Serve: {label}", value=f"{pct:.1f}%", small_value=True))
-
-    # Avg Cosine Similarity
-    cosine_sim = kpis.get("avg_cosine_similarity")
-    cosine_display = f"{cosine_sim:.3f}" if cosine_sim is not None and not pd.isna(cosine_sim) else "N/A"
-    boxes_html.append(_bento_box_html(label="Avg Cosine Similarity", value=cosine_display))
-
-    # Avg Text Match
-    text_match = kpis.get("avg_text_match")
-    text_match_display = f"{text_match:.3f}" if text_match is not None and not pd.isna(text_match) else "N/A"
-    boxes_html.append(_bento_box_html(label="Avg Text Match", value=text_match_display))
-
-    # Render all boxes in a single HTML flexbox container
-    st.markdown(f'<div class="bento-container">{"".join(boxes_html)}</div>', unsafe_allow_html=True)
+    return current_idx
 
 
-def render_kb_leaderboard(leaderboard_df: pd.DataFrame) -> None:
-    """
-    Render the KB Article Leaderboard showing retrieval frequency and average scores.
+def render_chunk_thumbnails(
+    group_data: pd.DataFrame,
+    current_chunk_idx: int,
+    feedback_counts: dict[int, int] | None = None,
+    session_key: str = "feedback",
+) -> int | None:
+    """Render horizontal chunk thumbnail strip with clickable cards."""
+    total_chunks = len(group_data)
+    if total_chunks == 0:
+        return None
 
-    Displays articles ranked by how often they were retrieved in searches,
-    along with their average performance metrics.
-    """
-    st.subheader("KB Article Leaderboard")
-    st.caption("Articles ranked by retrieval frequency with average performance scores")
+    visible_chunks = min(total_chunks, 10)
+    cols = st.columns(visible_chunks)
 
-    if leaderboard_df.empty:
-        st.info("No KB article data available for the current selection.")
-        return
+    clicked_idx = None
+    for i, col in enumerate(cols):
+        if i >= total_chunks:
+            break
 
-    # Prepare display dataframe with formatted columns
-    display_df = leaderboard_df.copy()
+        row = group_data.iloc[i]
+        chunk_text = row["CHUNK_TEXT"]
+        preview = chunk_text[:120] + "..." if len(chunk_text) > 120 else chunk_text
+        preview = preview.replace("<", "&lt;").replace(">", "&gt;")
+        score = row.get("COSINE_SIMILARITY", 0)
 
-    # Rename columns for display
-    display_df = display_df.rename(
-        columns={
-            "KB_NUMBER": "KB Article",
-            "FREQUENCY": "Times Retrieved",
-            "AVG_COSINE_SIMILARITY": "Avg Cosine",
-            "AVG_RERANKER_SCORE": "Avg Reranker",
-            "AVG_TEXT_MATCH": "Avg Text Match",
-            "AVG_CONTEXT_RELEVANCE": "Avg Context Rel.",
-        }
-    )
+        has_feedback = False
+        if feedback_counts and row.get("SEARCH_ID") in feedback_counts:
+            has_feedback = feedback_counts[row["SEARCH_ID"]] > 0
 
-    # Format numeric columns
-    numeric_cols = ["Avg Cosine", "Avg Reranker", "Avg Text Match", "Avg Context Rel."]
-    for col in numeric_cols:
-        if col in display_df.columns:
-            display_df[col] = display_df[col].apply(lambda x: f"{x:.3f}" if pd.notna(x) else "N/A")
+        is_active = i == current_chunk_idx
+        active_class = " active" if is_active else ""
+        badge_html = '<span class="chunk-thumb-badge">✓</span>' if has_feedback else ""
 
-    st.dataframe(
-        display_df,
-        use_container_width=True,
-        hide_index=True,
-        height=min(400, 35 * (len(display_df) + 1)),
-    )
+        with col:
+            btn_key = f"{session_key}_thumb_{i}"
+            st.markdown(
+                f"""<div class="chunk-thumb{active_class}" data-btn="{btn_key}">
+                    <div class="chunk-thumb-header">
+                        <span class="chunk-thumb-num">#{i + 1}{badge_html}</span>
+                        <span class="chunk-thumb-score">{score:.2f}</span>
+                    </div>
+                    <div class="chunk-thumb-preview">{preview}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+            # Invisible button overlays the thumbnail for click handling
+            if st.button("Select", key=btn_key, use_container_width=True, type="tertiary"):
+                clicked_idx = i
 
-
-def render_data_table(df: pd.DataFrame) -> None:
-    """Render the filtered data table with row selection for detail inspection."""
-
-    if df.empty:
-        st.info("No data matches the current filters.")
-        return
-
-    # Select columns to display in main table
-    display_cols = [
-        "L1_TAG",
-        "L2_TAG",
-        "L3_TAG",
-        "L4_TAG",
-        "query",
-        "answerable_with_kb",
-        "CONTEXT_RELEVANCE_SCORE",
-        "estimated_complexity",
-        "SOURCE_TABLE",
-    ]
-
-    # Rename columns for display
-    column_rename_map = {
-        "query": "Service Ticket",
-        "answerable_with_kb": "Self Serve Candidate",
-        "CONTEXT_RELEVANCE_SCORE": "Context Relevance",
-        "estimated_complexity": "Complexity",
-        "SOURCE_TABLE": "Source Type",
-    }
-
-    # Only include columns that exist
-    available_cols = [c for c in display_cols if c in df.columns]
-
-    st.subheader(f"Service Tickets ({len(df):,} records)")
-    st.caption("Click a row to inspect details below")
-
-    # Create display dataframe with renamed columns
-    display_df = df[available_cols].copy()
-    display_df = display_df.rename(columns={k: v for k, v in column_rename_map.items() if k in available_cols})
-
-    # Dataframe with row selection enabled
-    event = st.dataframe(
-        display_df,
-        use_container_width=True,
-        hide_index=True,
-        height=350,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="data_table_selection",
-    )
-
-    # Show detail panel if a row is selected
-    selected_rows = event.selection.rows
-
-    if selected_rows:
-        row_idx = selected_rows[0]
-        row = df.iloc[row_idx]
-
-        st.divider()
-        render_detail_panel(row)
+    return clicked_idx
 
 
 @st.fragment
-def render_detail_panel(row: pd.Series) -> None:
+def render_feedback_form(
+    session: Session,
+    search_id: int,
+    row_index: int,
+    prefix: str = "feedback",
+    label: str = "Rate This Chunk",
+    compact: bool = False,
+    feedback_type: str = "CHUNK",
+    chunk_index: int | None = None,
+) -> None:
+    """Render feedback form for a search result.
+
+    Args:
+        session: Snowpark session
+        search_id: The search query ID
+        row_index: Used for unique form keys
+        prefix: Form key prefix
+        label: Label for the rating section
+        compact: Use compact layout
+        feedback_type: 'CHUNK' or 'AGENT_RESPONSE'
+        chunk_index: 0-based index of chunk (None for agent response)
     """
-    Render the selected record details panel as a fragment.
-    """
-    st.subheader("🔍 Selected Record Details")
+    form_key = f"{prefix}_form_{search_id}_{row_index}"
+    submitted_key = f"{prefix}_submitted_{search_id}_{row_index}"
 
-    query_preview = str(row.get("query", ""))[:80] + "..." if len(str(row.get("query", ""))) > 80 else row.get("query", "")
-    score = row.get("CONTEXT_RELEVANCE_SCORE", "N/A")
-    score_display = f"{score:.2f}" if pd.notna(score) and score != "N/A" else "N/A"
-    st.markdown(f"**Query:** {query_preview}  •  **Score:** {score_display}  •  **Self Serve:** {row.get('answerable_with_kb', 'N/A')}")
-
-    tab_eval, tab_articles, tab_generated, tab_attrs = st.tabs(["📊 Evaluation", "📚 Retrieved Articles", "🤖 Generated", "📋 Ticket Metadata"])
-
-    with tab_eval:
-        st.markdown("**Context Relevance Evaluation**")
-        st.markdown(f"**Score:** {score_display}")
-
-        reason = row.get("CONTEXT_RELEVANCE_REASON", "")
-        if pd.notna(reason) and reason:
-            st.markdown("**Chain of Thought Reasoning:**")
-            st.markdown(f'<div class="theme-box">{str(reason)}</div>', unsafe_allow_html=True)
-        else:
-            st.caption("No evaluation reasoning available")
-
-    with tab_articles:
-        st.markdown("**Knowledge Articles Retrieved for this Query**")
-        st.caption("These are the articles the search system found. If relevant articles exist but aren't shown here, it's a retrieval issue. If no relevant articles exist, it's a knowledge gap.")
-
-        articles = row.get("PARSED_ARTICLES", [])
-
-        if articles and len(articles) > 0:
-            # Get raw chunk count for display
-            response_raw = row.get("RESPONSE", None)
-            chunk_count = 0
-            if pd.notna(response_raw) and response_raw:
-                if isinstance(response_raw, str):
-                    try:
-                        chunk_count = len(json.loads(response_raw))
-                    except (json.JSONDecodeError, TypeError):
-                        chunk_count = len(articles)
-                elif isinstance(response_raw, list):
-                    chunk_count = len(response_raw)
-            else:
-                chunk_count = len(articles)
-
-            st.markdown(f"**{len(articles)} unique article(s) retrieved** (from {chunk_count} chunks):")
-
-            for i, article in enumerate(articles):
-                summary = article.get("summary", "")
-                content = article.get("content", "")
-                title = article.get("title") or f"Article {i + 1}"
-                kb_number = article.get("kb_number")
-
-                # Build score display
-                score_parts = []
-                if article.get("cosine_similarity") is not None:
-                    score_parts.append(f"Cosine: {article['cosine_similarity']:.3f}")
-                if article.get("text_match") is not None:
-                    score_parts.append(f"Text: {article['text_match']:.3f}")
-                if article.get("reranker_score") is not None:
-                    score_parts.append(f"Rerank: {article['reranker_score']:.3f}")
-                score_str = f" ({' • '.join(score_parts)})" if score_parts else ""
-
-                # Include KB number in expander title if available
-                kb_str = f" [{kb_number}]" if kb_number else ""
-                with st.expander(f"📄 {title}{kb_str}{score_str}", expanded=(i == 0)):
-                    # Show summary
-                    if summary:
-                        st.markdown("**Summary:**")
-                        st.markdown(summary)
-
-                    # Show content in scrollable container
-                    if content:
-                        st.markdown("**Article Content:**")
-                        st.markdown(f'<div class="scrollable-content">{content}</div>', unsafe_allow_html=True)
-        else:
-            st.warning("No articles were retrieved for this query. This indicates a potential knowledge gap or retrieval issue.")
-
-    with tab_generated:
-        st.markdown("**Synthetic Pair Generation Output**")
-        generated_json = row.get("GENERATED_JSON", {})
-        if generated_json and isinstance(generated_json, dict):
-            st.json(generated_json)
-        else:
-            st.caption("No generated data available")
-
-    with tab_attrs:
-        st.markdown("**ServiceNow Ticket Metadata**")
-        attrs_json = row.get("ATTRS_JSON", {})
-        if attrs_json and isinstance(attrs_json, dict):
-            st.json(attrs_json)
-        else:
-            st.caption("No ticket metadata available")
-
-        # Taxonomy path
-        taxonomy = f"{row.get('L1_TAG', '')} > {row.get('L2_TAG', '')} > {row.get('L3_TAG', '')} > {row.get('L4_TAG', '')}"
-        st.markdown(f"**Taxonomy:** {taxonomy}")
-
-
-def render_knowledge_gap_panel(session, filtered_df: pd.DataFrame, kpis: dict) -> None:
-    """
-    Render the AI-generated knowledge gap summary as a bento box.
-    Empty state shows a generate button; filled state shows the AI summary.
-    Uses AI_AGG to analyze context relevance chain-of-thought evaluations on-demand.
-    """
-    from store import SetAISummaryAction
-
-    from data import generate_knowledge_gap_summary
-
-    store = get_store()
-    avg_score = kpis.get("avg_context_relevance", 0) or 0
-
-    # If loading, trigger the actual generation (after showing loading UI)
-    if store.ai_summary_loading:
-        # Show loading state
-        st.markdown(
-            """
-        <div class="kg-panel kg-panel-loading">
-            <div class="kg-title">
-                🤖 Knowledge Gap Analysis
-            </div>
-            <div style="font-size: 24px; margin: 20px 0;">⏳</div>
-            <div class="kg-subtitle">
-                Analyzing evaluations with AI_AGG...
-            </div>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-        # Run the generation
-        try:
-            summary = generate_knowledge_gap_summary(session, filtered_df)
-            dispatch(SetAISummaryAction(loading=False, summary=summary))
-        except Exception as e:
-            dispatch(SetAISummaryAction(loading=False, summary=f"Error: {str(e)}"))
-        st.rerun()
+    # Check if feedback was just submitted
+    if st.session_state.get(submitted_key):
+        st.success("Thank you for your feedback! Your input helps us improve search quality.")
+        if st.button("Submit another response", key=f"{prefix}_reset_{search_id}_{row_index}"):
+            st.session_state[submitted_key] = False
+            st.rerun()
         return
 
-    if store.ai_summary:
-        # Filled state: Show the AI summary
-        st.markdown(
-            f"""
-        <div class="kg-panel">
-            <div class="kg-header">
-                <div class="kg-title">
-                    🤖 Knowledge Gap Analysis
-                </div>
-                <div class="kg-meta">
-                    {len(filtered_df):,} tickets • Avg Score: {avg_score:.2f}
-                </div>
-            </div>
-            <div class="kg-content">
-                {store.ai_summary}
-            </div>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
+    # Rating guidance
+    with st.expander("How to rate", expanded=False, icon=":material/help:"):
+        st.markdown("""
+**Star ratings:**
+- ⭐ Poor — Not relevant to the query
+- ⭐⭐ Fair — Tangentially related
+- ⭐⭐⭐ Good — Somewhat relevant
+- ⭐⭐⭐⭐ Very Good — Mostly answers the query
+- ⭐⭐⭐⭐⭐ Excellent — Directly answers the query
 
-        # Buttons directly below with minimal spacing
-        col1, col2, col3 = st.columns([1, 1, 6])
-        with col1:
-            if st.button("🔄 Regenerate", key="btn_regenerate_summary"):
-                dispatch(SetAISummaryAction(loading=True, summary=None))
+**Comments (optional):** Describe what's missing, incorrect, or how the result could better address the query.
+""")
+
+    with st.form(key=form_key, border=False):
+        if compact:
+            col_label, col_stars = st.columns([2, 3])
+            with col_label:
+                st.markdown(f"**{label}**")
+            with col_stars:
+                rating = st.feedback("stars", key=f"{prefix}_rating_{search_id}_{row_index}")
+
+            feedback = st.text_area(
+                "Comment (optional)",
+                placeholder="Describe what's missing or how this could be improved...",
+                key=f"{prefix}_text_{search_id}_{row_index}",
+                height=60,
+                label_visibility="collapsed",
+            )
+            col_anon, col_submit = st.columns([3, 1.5])
+            with col_anon:
+                anonymous = st.checkbox("Submit anonymously", key=f"{prefix}_anon_{search_id}_{row_index}")
+            with col_submit:
+                submitted = st.form_submit_button("Save", use_container_width=True)
+        else:
+            st.markdown(f"**{label}**")
+            rating = st.feedback("stars", key=f"{prefix}_rating_{search_id}_{row_index}")
+            feedback = st.text_area(
+                "Comment (optional)",
+                placeholder="Describe what's missing or how this could be improved...",
+                key=f"{prefix}_text_{search_id}_{row_index}",
+                height=100,
+            )
+            anonymous = st.checkbox("Submit anonymously", key=f"{prefix}_anon_{search_id}_{row_index}")
+            submitted = st.form_submit_button("Save Feedback")
+
+        if submitted:
+            if rating is None:
+                st.warning("Please provide a star rating.")
+            else:
+                adjusted_rating = rating + config.RATING_ADJUSTMENT
+                save_feedback(
+                    session,
+                    search_id,
+                    adjusted_rating,
+                    feedback or "",
+                    feedback_type=feedback_type,
+                    chunk_index=chunk_index,
+                    anonymous=anonymous,
+                )
+                st.session_state[submitted_key] = True
+                st.toast("Feedback saved!")
                 st.rerun()
-        with col2:
-            if st.button("Clear", key="btn_clear_summary"):
-                dispatch(SetAISummaryAction(loading=False, summary=None))
-                st.rerun()
-
-    else:
-        # Empty state with centered button
-        st.markdown(
-            f"""
-        <div class="kg-panel kg-panel-empty">
-            <div class="kg-title" style="margin-bottom: 8px;">
-                🤖 Knowledge Gap Analysis
-            </div>
-            <div class="kg-subtitle">
-                Analyze {len(filtered_df):,} service tickets
-            </div>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-        # Centered button directly below
-        col1, col2, col3 = st.columns([2, 1, 2])
-        with col2:
-            if st.button(
-                "🔍 Analyze",
-                key="btn_generate_summary",
-                disabled=filtered_df.empty,
-                type="primary",
-                use_container_width=True,
-            ):
-                dispatch(SetAISummaryAction(loading=True, summary=None))
-                st.rerun()
 
 
-def render_debug_panel(
-    merged_df: pd.DataFrame,
-    filtered_df: pd.DataFrame,
-    grouped_df: pd.DataFrame,
+def render_existing_feedback(session: Session, query_id: int) -> None:
+    """Render existing feedback for a query."""
+    feedback_df = get_feedback_for_query(session, query_id)
+
+    if feedback_df.empty:
+        st.caption("No feedback submitted yet.")
+        return
+
+    avg_rating = feedback_df["USER_RATING"].mean()
+    st.metric("Average Rating", f"{avg_rating:.2f} / 5", delta=f"{len(feedback_df)} reviews")
+
+    for _, row in feedback_df.iterrows():
+        user = row["CREATED_BY"] or "Anonymous"
+        rating = int(row["USER_RATING"]) if pd.notna(row["USER_RATING"]) else 0
+        comment = row["USER_FEEDBACK"] or ""
+        created = row["CREATED_ON"]
+
+        with st.container(border=True):
+            c1, c2 = st.columns([3, 1])
+            c1.markdown(f"**{user}** {render_stars(rating)}")
+            c2.caption(created.strftime("%Y-%m-%d %H:%M") if pd.notna(created) else "")
+            if comment:
+                st.caption(comment)
+
+
+def render_chunk_card(
+    session: Session,
+    row: pd.Series,
+    idx: int,
+    total_chunks: int,
+    search_id: int,
+    query: str,
+    prefix: str = "feedback",
+    evaluation: dict | None = None,
+    chunk_index: int = 0,
 ) -> None:
-    """Debug panel showing intermediate data states."""
+    """Render a single chunk with content and feedback form."""
+    chunk_text = str(row["CHUNK_TEXT"]).replace("<", "&lt;").replace(">", "&gt;")
 
-    with st.expander("Debug: Data State"):
-        st.write("**Store State:**")
-        st.json(get_store().model_dump())
+    with st.container():
+        st.markdown(
+            f"""<div class="chunk-card">
+                <div class="chunk-card-label">Chunk Content</div>
+                <div class="chunk-card-content scrollable-chunk">{chunk_text}</div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
-        st.write(f"**Merged Data Shape:** {merged_df.shape}")
-        st.write(f"**Filtered Data Shape:** {filtered_df.shape}")
-        st.write(f"**Grouped Data Shape:** {grouped_df.shape}")
+        if evaluation and evaluation.get("score") is not None:
+            col_sim, col_match, col_rerank, col_rel = st.columns([1, 1, 1, 1])
+            col_sim.metric("Similarity", f"{row['COSINE_SIMILARITY']:.3f}")
+            col_match.metric("Text Match", f"{row['TEXT_MATCH']:.3f}")
+            col_rerank.metric("Reranker", f"{row.get('RERANKER_SCORE', 0):.3f}")
+            col_rel.metric("Context Relevance", f"{evaluation['score']:.2f}")
 
-        st.write("**Merged Data Sample (5 rows):**")
-        st.dataframe(merged_df.head(5))
+            if evaluation.get("reason"):
+                with st.expander("Evaluation Reasoning", expanded=False, icon=":material/psychology:"):
+                    st.caption(f"Model: {evaluation.get('model', 'Unknown')}")
+                    st.write(evaluation["reason"])
+        else:
+            col_sim, col_match, col_rerank, col_spacer = st.columns([1, 1, 1, 1])
+            col_sim.metric("Similarity", f"{row['COSINE_SIMILARITY']:.3f}")
+            col_match.metric("Text Match", f"{row['TEXT_MATCH']:.3f}")
+            col_rerank.metric("Reranker", f"{row.get('RERANKER_SCORE', 0):.3f}")
+            st.caption("*Not evaluated*")
 
-        st.write("**Grouped Data:**")
-        st.dataframe(grouped_df)
+    render_feedback_form(session, search_id, idx, prefix=prefix, label="Rate this chunk", compact=True, chunk_index=chunk_index)
+
+
+def render_articles_carousel(
+    session: Session,
+    chunk_texts: list[str],
+    search_id: int,
+    current_article_idx: int,
+    index_action_class,
+    prefix: str = "article",
+) -> None:
+    """Render articles in a carousel with navigation and rating."""
+    if not chunk_texts:
+        st.info("No chunks available to look up articles.")
+        return
+
+    articles = get_articles_for_chunks(session, tuple(chunk_texts))
+
+    if not articles:
+        st.warning("Could not find source articles for these chunks.")
+        return
+
+    total_articles = len(articles)
+    current_idx = min(current_article_idx, total_articles - 1)
+
+    st.caption(f"{total_articles} unique article(s) from {len(chunk_texts)} retrieved chunks")
+
+    # Navigation
+    if total_articles > 1:
+        col_prev, col_status, col_next = st.columns([1, 2, 1])
+        with col_prev:
+            if st.button("Prev", icon=":material/chevron_left:", disabled=current_idx == 0, key=f"{prefix}_prev", use_container_width=True):
+                dispatch(index_action_class(index=current_idx - 1))
+                st.rerun()
+        with col_status:
+            st.markdown(f"<div style='text-align:center; padding-top:6px;'><b>Article {current_idx + 1} / {total_articles}</b></div>", unsafe_allow_html=True)
+        with col_next:
+            if st.button("Next", icon=":material/chevron_right:", disabled=current_idx >= total_articles - 1, key=f"{prefix}_next", use_container_width=True):
+                dispatch(index_action_class(index=current_idx + 1))
+                st.rerun()
+
+    # Current article
+    article = articles[current_idx]
+    number = article.get("number", "Unknown")
+    title = article.get("short_description", "")
+    text = article.get("text", "")
+    chunk_indices = article.get("chunk_indices", [])
+
+    # Format chunk indices as 1-based for display
+    chunk_labels = ", ".join(str(i + 1) for i in chunk_indices)
+
+    # Escape HTML
+    title_safe = str(title).replace("<", "&lt;").replace(">", "&gt;") if title else ""
+    text_safe = str(text).replace("<", "&lt;").replace(">", "&gt;") if text else ""
+
+    st.markdown(
+        f"""<div class="article-card">
+            <div class="article-card-label">Knowledge Article</div>
+            <div class="article-card-header">
+                <span class="article-card-number">{number}</span>
+                <span class="article-card-title">{title_safe}</span>
+            </div>
+            <div class="article-card-chunks">From chunk(s): {chunk_labels}</div>
+            <div class="article-card-content">{text_safe}</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    # Rating form for this article
+    render_feedback_form(
+        session,
+        search_id,
+        row_index=current_idx,
+        prefix=f"{prefix}_{number}",
+        label="Rate This Article",
+        compact=True,
+        feedback_type="ARTICLE",
+        chunk_index=current_idx,
+    )
+
+
+def _render_feedback_agent_tab(
+    session: Session,
+    search_id: int,
+    group_data: pd.DataFrame,
+    query: str,
+    prefix: str = "feedback",
+) -> None:
+    """Render the agent response tab with on-demand generation."""
+    store = get_store()
+
+    # Check if we have a response for this search_id
+    has_response = store.feedback_agent_response is not None and store.feedback_agent_response_search_id == search_id
+
+    if not has_response:
+        st.info("Click the button below to generate an agent response using all retrieved chunks.")
+        if st.button("Generate Agent Response", type="primary", key=f"generate_agent_{search_id}"):
+            with st.spinner("Generating agent response..."):
+                response = generate_feedback_agent_response(session, group_data, query)
+                dispatch(SetFeedbackAgentResponseAction(search_id=search_id, response=response))
+            st.rerun()
+        return
+
+    response_safe = str(store.feedback_agent_response).replace("<", "&lt;").replace(">", "&gt;")
+
+    st.markdown(
+        f"""<div class="agent-response-card">
+            <div class="agent-response-label">Agent Response</div>
+            <div class="agent-response-content">{response_safe}</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    render_feedback_form(
+        session,
+        search_id,
+        row_index=0,
+        prefix=f"{prefix}_agent",
+        label="Rate This Response",
+        compact=True,
+        feedback_type="AGENT_RESPONSE",
+        chunk_index=None,
+    )
+
+
+@st.fragment
+def render_feedback_carousel(session: Session, source_df: pd.DataFrame, feedback_counts_df: pd.DataFrame | None = None) -> None:
+    """
+    Render the feedback carousel for reviewing search results.
+
+    Layout hierarchy:
+    1. Full Knowledge Article (most prominent)
+    2. Agent Response with feedback form
+    3. Retrieved Chunks (collapsible) with individual feedback
+    """
+    grouped = list(source_df.groupby("INPUT_QUERY", sort=False))
+    total_queries = len(grouped)
+
+    if total_queries == 0:
+        st.info("No queries to display.")
+        return
+
+    store = get_store()
+
+    feedback_counts_dict = {}
+    if feedback_counts_df is not None and not feedback_counts_df.empty:
+        for _, row in feedback_counts_df.iterrows():
+            feedback_counts_dict[row["SEARCH_ID"]] = row["FEEDBACK_COUNT"]
+
+    eval_df = get_evaluation_results(session)
+    eval_dict = {}
+    if not eval_df.empty:
+        for _, row in eval_df.iterrows():
+            eval_dict[row["SEARCH_ID"]] = {
+                "score": row["CONTEXT_RELEVANCE_SCORE"],
+                "reason": row["CONTEXT_RELEVANCE_REASON"],
+                "model": row["EVALUATION_MODEL"],
+            }
+
+    query_labels = []
+    for i, (query_text, group) in enumerate(grouped):
+        truncated = f"{query_text[:40]}..." if len(str(query_text)) > 40 else query_text
+        has_feedback = any(feedback_counts_dict.get(row["SEARCH_ID"], 0) > 0 for _, row in group.iterrows())
+        status = "✓ " if has_feedback else ""
+        query_labels.append(f"{status}{i + 1}. {truncated}")
+
+    current_query_idx = min(store.carousel_index, total_queries - 1)
+    input_query, group_data = grouped[current_query_idx]
+    row0 = group_data.iloc[0]
+    search_id = row0.get("SEARCH_ID")
+    prefix = row0.get("INPUT_TYPE", "feedback").lower().replace(" ", "_")
+    total_chunks = len(group_data)
+    current_chunk_idx = min(store.feedback_chunk_index, total_chunks - 1) if total_chunks > 0 else 0
+
+    # Query navigation (simplified - just query selector)
+    col_query, col_spacer = st.columns([4, 1])
+    with col_query:
+        jump_key = "feedback_query_jump"
+        selected_query = st.selectbox(
+            "Query",
+            range(total_queries),
+            index=current_query_idx,
+            format_func=lambda x: query_labels[x],
+            key=jump_key,
+            label_visibility="collapsed",
+        )
+        if selected_query != current_query_idx:
+            dispatch(SetCarouselIndexAction(index=selected_query))
+            dispatch(SetFeedbackChunkIndexAction(index=0))
+            st.rerun()
+
+    st.markdown(f"### {input_query}")
+
+    # Get all chunk texts for article lookup
+    all_chunk_texts = group_data["CHUNK_TEXT"].tolist()
+
+    # ─────────────────────────────────────────────────────────────────
+    # TABBED INTERFACE: Knowledge Feedback, Agent, Chunks
+    # ─────────────────────────────────────────────────────────────────
+    tab_knowledge, tab_agent, tab_chunks = st.tabs(["Knowledge Feedback", "Agent", "Chunks"])
+
+    with tab_knowledge:
+        render_articles_carousel(
+            session,
+            all_chunk_texts,
+            search_id,
+            current_article_idx=store.feedback_article_index,
+            index_action_class=SetFeedbackArticleIndexAction,
+            prefix="feedback_article",
+        )
+
+    with tab_agent:
+        _render_feedback_agent_tab(
+            session,
+            search_id,
+            group_data,
+            input_query,
+            prefix=prefix,
+        )
+
+    with tab_chunks:
+        # Chunk thumbnails strip
+        if total_chunks > 1:
+            st.caption("Click a chunk to view details:")
+            clicked = render_chunk_thumbnails(
+                group_data,
+                current_chunk_idx,
+                feedback_counts=feedback_counts_dict,
+            )
+            if clicked is not None and clicked != current_chunk_idx:
+                dispatch(SetFeedbackChunkIndexAction(index=clicked))
+                st.rerun()
+
+        # Chunk navigation
+        if total_chunks > 1:
+            col_prev, col_status, col_next = st.columns([1, 2, 1])
+            with col_prev:
+                if st.button("Prev", icon=":material/chevron_left:", disabled=current_chunk_idx == 0, key="chunk_prev", use_container_width=True):
+                    dispatch(SetFeedbackChunkIndexAction(index=current_chunk_idx - 1))
+                    st.rerun()
+            with col_status:
+                st.markdown(f"<div style='text-align:center; padding-top:6px;'><b>Chunk {current_chunk_idx + 1} / {total_chunks}</b></div>", unsafe_allow_html=True)
+            with col_next:
+                if st.button("Next", icon=":material/chevron_right:", disabled=current_chunk_idx >= total_chunks - 1, key="chunk_next", use_container_width=True):
+                    dispatch(SetFeedbackChunkIndexAction(index=current_chunk_idx + 1))
+                    st.rerun()
+
+        # Current chunk details
+        current_row = group_data.iloc[current_chunk_idx]
+        evaluation_data = eval_dict.get(search_id)
+        render_chunk_card(
+            session,
+            current_row,
+            current_chunk_idx + 1,
+            total_chunks,
+            search_id,
+            input_query,
+            prefix=prefix,
+            evaluation=evaluation_data,
+            chunk_index=current_chunk_idx,
+        )
+
+    # Previous feedback section
+    feedback_df = get_feedback_for_query(session, search_id)
+    if not feedback_df.empty:
+        avg = feedback_df["USER_RATING"].mean()
+        count = len(feedback_df)
+        with st.expander(f"Previous feedback ({count}) — avg {avg:.1f}/5", expanded=False, icon=":material/reviews:"):
+            render_existing_feedback(session, search_id)
+
+
+def render_playground_tab(session: Session) -> None:
+    """Render the search playground tab."""
+    st.header("Search Playground")
+    st.caption("Test queries against your knowledge base and provide feedback on results.")
+
+    with st.expander("Settings", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            num_results = st.slider(
+                "Number of results",
+                min_value=1,
+                max_value=10,
+                value=5,
+                key="playground_num_results",
+            )
+        with col2:
+            st.selectbox(
+                "LLM Model",
+                options=list(LLM_MODELS),
+                index=1,
+                key="playground_llm_model",
+            )
+
+    query = st.text_input("Search", key="playground_search")
+
+    if st.button("Search", key="playground_search_btn", type="primary") and query:
+        with st.spinner("Searching..."):
+            record, results = run_search(session, query, limit=num_results)
+            search_id = save_search(session, record)
+            dispatch(SetPlaygroundResultsAction(query=query, search_id=search_id, results=results))
+            dispatch(SetPlaygroundAgentResponseAction(response=None))
+        st.rerun()
+
+    store = get_store()
+
+    if not store.playground_results:
+        return
+
+    st.divider()
+
+    tab_knowledge, tab_agent, tab_chunks = st.tabs(["Knowledge Feedback", "Agent", "Chunks"])
+
+    with tab_knowledge:
+        all_chunk_texts = [r.get("CHUNK_TEXT") for r in store.playground_results if r.get("CHUNK_TEXT")]
+        render_articles_carousel(
+            session,
+            all_chunk_texts,
+            store.playground_search_id,
+            current_article_idx=store.playground_article_index,
+            index_action_class=SetPlaygroundArticleIndexAction,
+            prefix="playground_article",
+        )
+
+    with tab_agent:
+        _render_playground_agent_mode(session)
+
+    with tab_chunks:
+        _render_playground_chunks_mode(session)
+
+
+def _render_playground_agent_mode(session: Session) -> None:
+    """Render the agent response mode - combined response using all chunks."""
+    store = get_store()
+    llm_model = st.session_state.get("playground_llm_model", "llama3.1-70b")
+
+    st.subheader(f"Results for: {store.playground_query}")
+
+    if store.playground_agent_response is None:
+        st.info("Click the button below to generate an agent response using all retrieved chunks.")
+        if st.button("Generate Agent Response", type="primary", key="generate_agent_btn"):
+            with st.spinner("Generating agent response..."):
+                response = generate_combined_response(
+                    session,
+                    store.playground_results,
+                    store.playground_query,
+                    model=llm_model,
+                )
+                dispatch(SetPlaygroundAgentResponseAction(response=response))
+            st.rerun()
+        return
+
+    st.markdown("### Agent Response")
+    st.write(store.playground_agent_response)
+
+    with st.expander(f"Retrieved Chunks ({len(store.playground_results)})", expanded=False):
+        for idx, result in enumerate(store.playground_results, 1):
+            st.markdown(f"**Chunk {idx}**")
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("Cosine Similarity", f"{result['@scores']['cosine_similarity']:.3f}")
+            col_b.metric("Text Match", f"{result['@scores']['text_match']:.3f}")
+            col_c.metric("Reranker", f"{result['@scores'].get('reranker_score', 0):.3f}")
+            st.info(result["CHUNK_TEXT"])
+            if idx < len(store.playground_results):
+                st.divider()
+
+    st.divider()
+    if store.playground_search_id is not None:
+        render_feedback_form(
+            session,
+            store.playground_search_id,
+            0,
+            prefix="playground_agent",
+            label="Rate This Response",
+        )
+    else:
+        st.error("Could not retrieve search ID for feedback.")
+
+
+def _render_playground_chunks_mode(session: Session) -> None:
+    """Render the individual chunks mode with carousel navigation."""
+    store = get_store()
+    results = store.playground_results
+    total_chunks = len(results)
+
+    if total_chunks == 0:
+        st.info("No chunks to display.")
+        return
+
+    chunk_labels = [f"Chunk {i + 1}" for i in range(total_chunks)]
+    current_idx = render_carousel_nav(
+        total_items=total_chunks,
+        session_key="playground_chunks",
+        index_action_class=SetPlaygroundChunkIndexAction,
+        current_index=store.playground_chunk_index,
+        item_labels=chunk_labels,
+        label_prefix="Chunk",
+    )
+
+    st.divider()
+
+    result = results[current_idx]
+
+    st.markdown(f"### Chunk {current_idx + 1} of {total_chunks}")
+    st.caption(f"Query: {store.playground_query}")
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.markdown("**Chunk Content**")
+        st.info(result["CHUNK_TEXT"])
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric("Cosine Similarity", f"{result['@scores']['cosine_similarity']:.3f}")
+        col_b.metric("Text Match", f"{result['@scores']['text_match']:.3f}")
+        col_c.metric("Reranker", f"{result['@scores'].get('reranker_score', 0):.3f}")
+
+    with col2:
+        if store.playground_search_id is not None:
+            render_feedback_form(
+                session,
+                store.playground_search_id,
+                current_idx + 1,
+                prefix="playground_chunk",
+                label="Rate This Chunk",
+                feedback_type="CHUNK",
+                chunk_index=current_idx,
+            )
+        else:
+            st.error("Could not retrieve search ID for feedback.")
+
+
+def render_feedback_tab(session: Session, source_df: pd.DataFrame, feedback_counts: pd.DataFrame) -> None:
+    """Render the feedback review tab."""
+    st.header("Search Results Review")
+
+    if source_df.empty:
+        st.info("No search results available for review.")
+        return
+
+    if not feedback_counts.empty:
+        source_df = source_df.merge(feedback_counts, on="SEARCH_ID", how="left")
+        source_df["FEEDBACK_COUNT"] = source_df["FEEDBACK_COUNT"].fillna(0).astype(int)
+    else:
+        source_df["FEEDBACK_COUNT"] = 0
+
+    render_feedback_carousel(session, source_df, feedback_counts_df=feedback_counts)
