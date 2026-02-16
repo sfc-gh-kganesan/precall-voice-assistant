@@ -36,6 +36,8 @@ services:
             DEBUG_DEFAULT_USER: bobthebuilder
             # Slack Socket Mode - get app token from Slack app settings → App-Level Tokens
             SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
+            # Slack Bot Token - get from OAuth & Permissions → Bot User OAuth Token
+            SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
         volumes:
             - ./services/controld/.data_root:/app/services/controld/.local-storage
         depends_on:

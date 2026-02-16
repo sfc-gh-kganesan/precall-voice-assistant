@@ -177,6 +177,7 @@ export type UserWhereInput = {
   workflows?: Prisma.WorkflowListRelationFilter
   secrets?: Prisma.SecretListRelationFilter
   workflowRuns?: Prisma.WorkflowRunListRelationFilter
+  slackUsers?: Prisma.SlackUserListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -187,6 +188,7 @@ export type UserOrderByWithRelationInput = {
   workflows?: Prisma.WorkflowOrderByRelationAggregateInput
   secrets?: Prisma.SecretOrderByRelationAggregateInput
   workflowRuns?: Prisma.WorkflowRunOrderByRelationAggregateInput
+  slackUsers?: Prisma.SlackUserOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -200,6 +202,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   workflows?: Prisma.WorkflowListRelationFilter
   secrets?: Prisma.SecretListRelationFilter
   workflowRuns?: Prisma.WorkflowRunListRelationFilter
+  slackUsers?: Prisma.SlackUserListRelationFilter
 }, "id" | "snowflakeUser">
 
 export type UserOrderByWithAggregationInput = {
@@ -230,6 +233,7 @@ export type UserCreateInput = {
   workflows?: Prisma.WorkflowCreateNestedManyWithoutOwnerInput
   secrets?: Prisma.SecretCreateNestedManyWithoutOwnerInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutUserInput
+  slackUsers?: Prisma.SlackUserCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -240,6 +244,7 @@ export type UserUncheckedCreateInput = {
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutOwnerInput
   secrets?: Prisma.SecretUncheckedCreateNestedManyWithoutOwnerInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutUserInput
+  slackUsers?: Prisma.SlackUserUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -250,6 +255,7 @@ export type UserUpdateInput = {
   workflows?: Prisma.WorkflowUpdateManyWithoutOwnerNestedInput
   secrets?: Prisma.SecretUpdateManyWithoutOwnerNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutUserNestedInput
+  slackUsers?: Prisma.SlackUserUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -260,6 +266,7 @@ export type UserUncheckedUpdateInput = {
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutOwnerNestedInput
   secrets?: Prisma.SecretUncheckedUpdateManyWithoutOwnerNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutUserNestedInput
+  slackUsers?: Prisma.SlackUserUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -317,6 +324,20 @@ export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
 }
 
+export type UserCreateNestedOneWithoutSlackUsersInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSlackUsersInput, Prisma.UserUncheckedCreateWithoutSlackUsersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSlackUsersInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutSlackUsersNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSlackUsersInput, Prisma.UserUncheckedCreateWithoutSlackUsersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSlackUsersInput
+  upsert?: Prisma.UserUpsertWithoutSlackUsersInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSlackUsersInput, Prisma.UserUpdateWithoutSlackUsersInput>, Prisma.UserUncheckedUpdateWithoutSlackUsersInput>
+}
+
 export type UserCreateNestedOneWithoutWorkflowsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutWorkflowsInput, Prisma.UserUncheckedCreateWithoutWorkflowsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutWorkflowsInput
@@ -359,6 +380,62 @@ export type UserUpdateOneRequiredWithoutSecretsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSecretsInput, Prisma.UserUpdateWithoutSecretsInput>, Prisma.UserUncheckedUpdateWithoutSecretsInput>
 }
 
+export type UserCreateWithoutSlackUsersInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  snowflakeUser: string
+  workflows?: Prisma.WorkflowCreateNestedManyWithoutOwnerInput
+  secrets?: Prisma.SecretCreateNestedManyWithoutOwnerInput
+  workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutSlackUsersInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  snowflakeUser: string
+  workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutOwnerInput
+  secrets?: Prisma.SecretUncheckedCreateNestedManyWithoutOwnerInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutSlackUsersInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutSlackUsersInput, Prisma.UserUncheckedCreateWithoutSlackUsersInput>
+}
+
+export type UserUpsertWithoutSlackUsersInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutSlackUsersInput, Prisma.UserUncheckedUpdateWithoutSlackUsersInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutSlackUsersInput, Prisma.UserUncheckedCreateWithoutSlackUsersInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutSlackUsersInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutSlackUsersInput, Prisma.UserUncheckedUpdateWithoutSlackUsersInput>
+}
+
+export type UserUpdateWithoutSlackUsersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
+  workflows?: Prisma.WorkflowUpdateManyWithoutOwnerNestedInput
+  secrets?: Prisma.SecretUpdateManyWithoutOwnerNestedInput
+  workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutSlackUsersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
+  workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutOwnerNestedInput
+  secrets?: Prisma.SecretUncheckedUpdateManyWithoutOwnerNestedInput
+  workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutUserNestedInput
+}
+
 export type UserCreateWithoutWorkflowsInput = {
   id?: string
   createdAt?: Date | string
@@ -366,6 +443,7 @@ export type UserCreateWithoutWorkflowsInput = {
   snowflakeUser: string
   secrets?: Prisma.SecretCreateNestedManyWithoutOwnerInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutUserInput
+  slackUsers?: Prisma.SlackUserCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutWorkflowsInput = {
@@ -375,6 +453,7 @@ export type UserUncheckedCreateWithoutWorkflowsInput = {
   snowflakeUser: string
   secrets?: Prisma.SecretUncheckedCreateNestedManyWithoutOwnerInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutUserInput
+  slackUsers?: Prisma.SlackUserUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutWorkflowsInput = {
@@ -400,6 +479,7 @@ export type UserUpdateWithoutWorkflowsInput = {
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   secrets?: Prisma.SecretUpdateManyWithoutOwnerNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutUserNestedInput
+  slackUsers?: Prisma.SlackUserUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWorkflowsInput = {
@@ -409,6 +489,7 @@ export type UserUncheckedUpdateWithoutWorkflowsInput = {
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   secrets?: Prisma.SecretUncheckedUpdateManyWithoutOwnerNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutUserNestedInput
+  slackUsers?: Prisma.SlackUserUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutWorkflowRunsInput = {
@@ -418,6 +499,7 @@ export type UserCreateWithoutWorkflowRunsInput = {
   snowflakeUser: string
   workflows?: Prisma.WorkflowCreateNestedManyWithoutOwnerInput
   secrets?: Prisma.SecretCreateNestedManyWithoutOwnerInput
+  slackUsers?: Prisma.SlackUserCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutWorkflowRunsInput = {
@@ -427,6 +509,7 @@ export type UserUncheckedCreateWithoutWorkflowRunsInput = {
   snowflakeUser: string
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutOwnerInput
   secrets?: Prisma.SecretUncheckedCreateNestedManyWithoutOwnerInput
+  slackUsers?: Prisma.SlackUserUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutWorkflowRunsInput = {
@@ -452,6 +535,7 @@ export type UserUpdateWithoutWorkflowRunsInput = {
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   workflows?: Prisma.WorkflowUpdateManyWithoutOwnerNestedInput
   secrets?: Prisma.SecretUpdateManyWithoutOwnerNestedInput
+  slackUsers?: Prisma.SlackUserUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWorkflowRunsInput = {
@@ -461,6 +545,7 @@ export type UserUncheckedUpdateWithoutWorkflowRunsInput = {
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutOwnerNestedInput
   secrets?: Prisma.SecretUncheckedUpdateManyWithoutOwnerNestedInput
+  slackUsers?: Prisma.SlackUserUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSecretsInput = {
@@ -470,6 +555,7 @@ export type UserCreateWithoutSecretsInput = {
   snowflakeUser: string
   workflows?: Prisma.WorkflowCreateNestedManyWithoutOwnerInput
   workflowRuns?: Prisma.WorkflowRunCreateNestedManyWithoutUserInput
+  slackUsers?: Prisma.SlackUserCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSecretsInput = {
@@ -479,6 +565,7 @@ export type UserUncheckedCreateWithoutSecretsInput = {
   snowflakeUser: string
   workflows?: Prisma.WorkflowUncheckedCreateNestedManyWithoutOwnerInput
   workflowRuns?: Prisma.WorkflowRunUncheckedCreateNestedManyWithoutUserInput
+  slackUsers?: Prisma.SlackUserUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSecretsInput = {
@@ -504,6 +591,7 @@ export type UserUpdateWithoutSecretsInput = {
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   workflows?: Prisma.WorkflowUpdateManyWithoutOwnerNestedInput
   workflowRuns?: Prisma.WorkflowRunUpdateManyWithoutUserNestedInput
+  slackUsers?: Prisma.SlackUserUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSecretsInput = {
@@ -513,6 +601,7 @@ export type UserUncheckedUpdateWithoutSecretsInput = {
   snowflakeUser?: Prisma.StringFieldUpdateOperationsInput | string
   workflows?: Prisma.WorkflowUncheckedUpdateManyWithoutOwnerNestedInput
   workflowRuns?: Prisma.WorkflowRunUncheckedUpdateManyWithoutUserNestedInput
+  slackUsers?: Prisma.SlackUserUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -524,12 +613,14 @@ export type UserCountOutputType = {
   workflows: number
   secrets: number
   workflowRuns: number
+  slackUsers: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workflows?: boolean | UserCountOutputTypeCountWorkflowsArgs
   secrets?: boolean | UserCountOutputTypeCountSecretsArgs
   workflowRuns?: boolean | UserCountOutputTypeCountWorkflowRunsArgs
+  slackUsers?: boolean | UserCountOutputTypeCountSlackUsersArgs
 }
 
 /**
@@ -563,6 +654,13 @@ export type UserCountOutputTypeCountWorkflowRunsArgs<ExtArgs extends runtime.Typ
   where?: Prisma.WorkflowRunWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountSlackUsersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SlackUserWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -572,6 +670,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   workflows?: boolean | Prisma.User$workflowsArgs<ExtArgs>
   secrets?: boolean | Prisma.User$secretsArgs<ExtArgs>
   workflowRuns?: boolean | Prisma.User$workflowRunsArgs<ExtArgs>
+  slackUsers?: boolean | Prisma.User$slackUsersArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -601,6 +700,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   workflows?: boolean | Prisma.User$workflowsArgs<ExtArgs>
   secrets?: boolean | Prisma.User$secretsArgs<ExtArgs>
   workflowRuns?: boolean | Prisma.User$workflowRunsArgs<ExtArgs>
+  slackUsers?: boolean | Prisma.User$slackUsersArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -612,6 +712,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     workflows: Prisma.$WorkflowPayload<ExtArgs>[]
     secrets: Prisma.$SecretPayload<ExtArgs>[]
     workflowRuns: Prisma.$WorkflowRunPayload<ExtArgs>[]
+    slackUsers: Prisma.$SlackUserPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1015,6 +1116,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   workflows<T extends Prisma.User$workflowsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$workflowsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   secrets<T extends Prisma.User$secretsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$secretsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SecretPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   workflowRuns<T extends Prisma.User$workflowRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$workflowRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  slackUsers<T extends Prisma.User$slackUsersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$slackUsersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SlackUserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1505,6 +1607,30 @@ export type User$workflowRunsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.WorkflowRunScalarFieldEnum | Prisma.WorkflowRunScalarFieldEnum[]
+}
+
+/**
+ * User.slackUsers
+ */
+export type User$slackUsersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SlackUser
+   */
+  select?: Prisma.SlackUserSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SlackUser
+   */
+  omit?: Prisma.SlackUserOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SlackUserInclude<ExtArgs> | null
+  where?: Prisma.SlackUserWhereInput
+  orderBy?: Prisma.SlackUserOrderByWithRelationInput | Prisma.SlackUserOrderByWithRelationInput[]
+  cursor?: Prisma.SlackUserWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SlackUserScalarFieldEnum | Prisma.SlackUserScalarFieldEnum[]
 }
 
 /**

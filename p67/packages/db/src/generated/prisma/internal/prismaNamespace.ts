@@ -385,6 +385,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  SlackUser: 'SlackUser',
   Workflow: 'Workflow',
   WorkflowRun: 'WorkflowRun',
   Log: 'Log',
@@ -405,7 +406,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "workflow" | "workflowRun" | "log" | "secret" | "workflowInterrupt"
+    modelProps: "user" | "slackUser" | "workflow" | "workflowRun" | "log" | "secret" | "workflowInterrupt"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -480,6 +481,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    SlackUser: {
+      payload: Prisma.$SlackUserPayload<ExtArgs>
+      fields: Prisma.SlackUserFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SlackUserFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SlackUserFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>
+        }
+        findFirst: {
+          args: Prisma.SlackUserFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SlackUserFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>
+        }
+        findMany: {
+          args: Prisma.SlackUserFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>[]
+        }
+        create: {
+          args: Prisma.SlackUserCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>
+        }
+        createMany: {
+          args: Prisma.SlackUserCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SlackUserCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>[]
+        }
+        delete: {
+          args: Prisma.SlackUserDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>
+        }
+        update: {
+          args: Prisma.SlackUserUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>
+        }
+        deleteMany: {
+          args: Prisma.SlackUserDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SlackUserUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SlackUserUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>[]
+        }
+        upsert: {
+          args: Prisma.SlackUserUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackUserPayload>
+        }
+        aggregate: {
+          args: Prisma.SlackUserAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSlackUser>
+        }
+        groupBy: {
+          args: Prisma.SlackUserGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SlackUserGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SlackUserCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SlackUserCountAggregateOutputType> | number
         }
       }
     }
@@ -902,6 +977,19 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const SlackUserScalarFieldEnum = {
+  id: 'id',
+  slackUserId: 'slackUserId',
+  slackTeamId: 'slackTeamId',
+  slackUsername: 'slackUsername',
+  userId: 'userId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SlackUserScalarFieldEnum = (typeof SlackUserScalarFieldEnum)[keyof typeof SlackUserScalarFieldEnum]
+
+
 export const WorkflowScalarFieldEnum = {
   id: 'id',
   storagePath: 'storagePath',
@@ -1258,6 +1346,7 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  slackUser?: Prisma.SlackUserOmit
   workflow?: Prisma.WorkflowOmit
   workflowRun?: Prisma.WorkflowRunOmit
   log?: Prisma.LogOmit

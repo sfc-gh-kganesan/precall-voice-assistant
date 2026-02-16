@@ -9,6 +9,7 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/User.js'
+export type * from './models/SlackUser.js'
 export type * from './models/Workflow.js'
 export type * from './models/WorkflowRun.js'
 export type * from './models/Log.js'

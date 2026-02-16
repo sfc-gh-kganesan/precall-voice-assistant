@@ -9,6 +9,7 @@ await server.register(apiRouter, { prefix: '/api' });
 const slackSocketMode = new SlackSocketModeService(
     server.db,
     server.runnerRegistry,
+    server.logService,
 );
 
 const start = async () => {

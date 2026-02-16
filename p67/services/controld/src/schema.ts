@@ -291,3 +291,42 @@ export type InterruptResumeBody = z.infer<typeof InterruptResumeBodySchema>;
 export type InterruptResumeResponse = z.infer<
     typeof InterruptResumeResponseSchema
 >;
+
+// Slack Schemas
+export const SlackSlashCommandBodySchema = z.object({
+    command: z.string(), // e.g., "/workflow"
+    text: z.string(), // Everything after the command
+    user_id: z.string(), // Slack user ID
+    user_name: z.string(), // Slack username
+    team_id: z.string(), // Slack workspace ID
+    team_domain: z.string(), // Slack workspace domain
+    channel_id: z.string(), // Channel where command was issued
+    channel_name: z.string(), // Channel name
+    response_url: z.string(), // URL for async responses
+    trigger_id: z.string(), // For opening modals
+});
+
+export const SlackCommandResponseSchema = z.object({
+    response_type: z.enum(['ephemeral', 'in_channel']).optional(),
+    text: z.string(),
+    blocks: z.array(z.unknown()).optional(),
+});
+
+export const SlackUserSchema = z.object({
+    id: z.string(),
+    slackUserId: z.string(),
+    slackTeamId: z.string(),
+    slackUsername: z.string().nullable(),
+    userId: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+});
+
+export const SlackUserListResponseSchema = z.object({
+    slackUsers: z.array(SlackUserSchema),
+});
+
+export type SlackSlashCommandBody = z.infer<typeof SlackSlashCommandBodySchema>;
+export type SlackCommandResponse = z.infer<typeof SlackCommandResponseSchema>;
+export type SlackUser = z.infer<typeof SlackUserSchema>;
+export type SlackUserListResponse = z.infer<typeof SlackUserListResponseSchema>;

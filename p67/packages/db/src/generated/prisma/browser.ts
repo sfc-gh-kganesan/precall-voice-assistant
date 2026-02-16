@@ -23,6 +23,11 @@ export * from './enums.js';
  */
 export type User = Prisma.UserModel
 /**
+ * Model SlackUser
+ * 
+ */
+export type SlackUser = Prisma.SlackUserModel
+/**
  * Model Workflow
  * 
  */

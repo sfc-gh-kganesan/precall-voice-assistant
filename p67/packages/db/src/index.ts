@@ -5,6 +5,7 @@ export type {
     PrismaClient,
     Secret,
     SecretType,
+    SlackUser,
     Workflow,
     WorkflowInterrupt,
     WorkflowRun,

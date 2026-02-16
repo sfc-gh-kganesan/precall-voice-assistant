@@ -1,4 +1,9 @@
 import crypto from 'node:crypto';
+import {
+    executeCommand,
+    parseCommand,
+    type SlackSlashCommandPayload,
+} from '@controld/lib/slack-commands.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 /**
@@ -227,6 +232,76 @@ export function registerSlackWebhookRoutes(server: FastifyInstance) {
                 console.error('Error processing Slack interaction:', error);
                 return reply.code(200).send({
                     text: 'Error processing interaction',
+                });
+            }
+        },
+    );
+
+    /**
+     * Slack Slash Commands webhook endpoint
+     * Receives slash commands like /workflow run my-workflow
+     *
+     * Note: This endpoint must be publicly accessible and registered as the
+     * "Request URL" for your slash command in Slack app settings.
+     */
+    server.post(
+        '/webhook/slack/commands',
+        {
+            schema: {
+                description: 'Slack slash commands webhook',
+                tags: ['Webhook'],
+            },
+            // Skip authentication - Slack calls this endpoint directly
+            config: {
+                skipAuth: true,
+            },
+        },
+        async (request, reply) => {
+            try {
+                // Verify Slack signature if signing secret is configured
+                const signingSecret = process.env.SLACK_SIGNING_SECRET;
+                if (signingSecret) {
+                    if (!verifySlackSignature(request, signingSecret)) {
+                        console.error(
+                            'Invalid Slack signature for slash command',
+                        );
+                        return reply
+                            .code(401)
+                            .send({ error: 'Invalid signature' });
+                    }
+                } else {
+                    console.warn(
+                        'SLACK_SIGNING_SECRET not set - skipping signature verification',
+                    );
+                }
+
+                // Slack sends slash command data as form-encoded body
+                const body = request.body as SlackSlashCommandPayload;
+
+                console.log(
+                    `📥 Received slash command via HTTP: ${body.command} ${body.text}`,
+                );
+
+                // Parse and execute the command
+                const parsedCommand = parseCommand(body.text);
+                const result = await executeCommand(parsedCommand, body, {
+                    db: server.db,
+                    runnerRegistry: server.runnerRegistry,
+                    logService: server.logService,
+                });
+
+                // Return immediate response
+                // Further async updates will be sent via response_url
+                return reply.code(200).send({
+                    response_type: 'ephemeral',
+                    text: result.message,
+                    blocks: result.blocks,
+                });
+            } catch (error) {
+                console.error('Error processing Slack slash command:', error);
+                return reply.code(200).send({
+                    response_type: 'ephemeral',
+                    text: '❌ Error processing command. Please try again.',
                 });
             }
         },

@@ -435,10 +435,6 @@ export type WorkflowInterruptUncheckedUpdateManyWithoutRunNestedInput = {
   deleteMany?: Prisma.WorkflowInterruptScalarWhereInput | Prisma.WorkflowInterruptScalarWhereInput[]
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
-}
-
 export type EnumInterruptStatusFieldUpdateOperationsInput = {
   set?: $Enums.InterruptStatus
 }

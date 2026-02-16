@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  SlackUser: 'SlackUser',
   Workflow: 'Workflow',
   WorkflowRun: 'WorkflowRun',
   Log: 'Log',
@@ -83,6 +84,19 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const SlackUserScalarFieldEnum = {
+  id: 'id',
+  slackUserId: 'slackUserId',
+  slackTeamId: 'slackTeamId',
+  slackUsername: 'slackUsername',
+  userId: 'userId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SlackUserScalarFieldEnum = (typeof SlackUserScalarFieldEnum)[keyof typeof SlackUserScalarFieldEnum]
 
 
 export const WorkflowScalarFieldEnum = {

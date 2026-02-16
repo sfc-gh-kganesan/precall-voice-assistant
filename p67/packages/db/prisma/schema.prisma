@@ -21,6 +21,21 @@ model User {
   workflows Workflow[]
   secrets Secret[]
   workflowRuns WorkflowRun[]
+  slackUsers SlackUser[]
+}
+
+model SlackUser {
+    id            String   @id @default(uuid())
+    slackUserId   String            // Slack's user ID (e.g., U012AB3CD)
+    slackTeamId   String            // Slack workspace ID (e.g., T012AB3CD)
+    slackUsername String?           // Slack username for display purposes
+    userId        String
+    user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    @@unique([slackUserId, slackTeamId])
+    @@index([userId])
 }
 
 enum WorkflowVisibility {

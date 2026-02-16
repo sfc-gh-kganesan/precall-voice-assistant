@@ -1,6 +1,12 @@
 import type { PrismaClient } from '@p67/db';
 import { SocketModeClient } from '@slack/socket-mode';
+import type { LogService } from './LogService.js';
 import type { Runner } from './runner.js';
+import {
+    executeCommand,
+    parseCommand,
+    type SlackSlashCommandPayload,
+} from './slack-commands.js';
 
 /**
  * Slack interactive message payload structure for block_actions
@@ -60,6 +66,7 @@ export class SlackSocketModeService {
     constructor(
         private readonly db: PrismaClient,
         private readonly runnerRegistry: RunnerRegistry,
+        private readonly logService: LogService,
         private readonly appToken?: string,
     ) {}
 
@@ -96,6 +103,40 @@ export class SlackSocketModeService {
                 if (body.type === 'block_actions') {
                     await this.handleBlockActions(body);
                 }
+            },
+        );
+
+        // Listen for slash commands (e.g., /workflow run my-workflow)
+        this.socketModeClient.on(
+            'slash_commands',
+            async ({
+                body,
+                ack,
+            }: {
+                body: SlackSlashCommandPayload;
+                ack: (response?: unknown) => Promise<void>;
+            }) => {
+                console.log(
+                    `📥 Received slash command: ${body.command} ${body.text}`,
+                );
+
+                // Parse and execute the command
+                const parsedCommand = parseCommand(body.text);
+                const result = await executeCommand(parsedCommand, body, {
+                    db: this.db,
+                    runnerRegistry: this.runnerRegistry,
+                    logService: this.logService,
+                });
+
+                // Acknowledge with immediate response
+                await ack({
+                    response_type: 'ephemeral',
+                    text: result.message,
+                    blocks: result.blocks,
+                });
+
+                // If the command kicked off async work (like running a workflow),
+                // further updates will be sent via response_url in executeCommand
             },
         );
 
