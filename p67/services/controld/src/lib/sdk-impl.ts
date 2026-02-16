@@ -11,6 +11,18 @@ import {
     type CortexAgentOptions,
     type CortexAgentResponse,
     type CortexAnalystResponse,
+    type CortexChoice,
+    type CortexChoiceMessage,
+    type CortexCompleteOptions,
+    type CortexCompleteRequestInfo,
+    type CortexCompleteResponse,
+    type CortexInferenceRegion,
+    type CortexMessage,
+    type CortexStreamChoice,
+    type CortexStreamChunk,
+    type CortexStreamDelta,
+    type CortexStreamDeltaToolCall,
+    type CortexTokenUsage,
     type EmailOptions,
     type HttpRequestOptions,
     type HttpResponse,
@@ -929,6 +941,457 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                 }, options.timeout);
             }
         });
+    }
+
+    /**
+     * Maps region option to the appropriate header value for cross-region inference
+     */
+    private getRegionHeader(
+        region?: CortexInferenceRegion,
+    ): string | undefined {
+        if (!region || region === 'auto') {
+            return undefined;
+        }
+
+        // Map our region names to Snowflake's expected header values
+        const regionMap: Record<string, string> = {
+            'cross-cloud-any': 'cross-cloud',
+            'aws-global': 'aws',
+            'aws-us': 'aws-us',
+            'aws-eu': 'aws-eu',
+            'aws-apj': 'aws-apj',
+            'azure-global': 'azure',
+            'azure-us': 'azure-us',
+            'azure-eu': 'azure-eu',
+        };
+
+        return regionMap[region];
+    }
+
+    /**
+     * Normalizes messages input to array format
+     */
+    private normalizeMessages(
+        messages: string | CortexMessage[],
+    ): CortexMessage[] {
+        if (typeof messages === 'string') {
+            return [{ role: 'user', content: messages }];
+        }
+        return messages;
+    }
+
+    /**
+     * Builds the request payload for Cortex Complete API
+     */
+    private buildCortexCompletePayload(
+        options: CortexCompleteOptions,
+        stream: boolean,
+    ): Record<string, unknown> {
+        const messages = this.normalizeMessages(options.messages);
+
+        // Convert messages to API format
+        const apiMessages = messages.map((msg) => {
+            const apiMsg: Record<string, unknown> = {
+                role: msg.role,
+            };
+
+            // Handle content - string or array of content blocks
+            if (typeof msg.content === 'string') {
+                apiMsg.content = msg.content;
+            } else {
+                // Array of content blocks
+                apiMsg.content = msg.content;
+            }
+
+            // Add tool_call_id for tool messages
+            if (msg.tool_call_id) {
+                apiMsg.tool_call_id = msg.tool_call_id;
+            }
+
+            return apiMsg;
+        });
+
+        const payload: Record<string, unknown> = {
+            model: options.model,
+            messages: apiMessages,
+        };
+
+        // Add optional parameters
+        if (options.temperature !== undefined) {
+            payload.temperature = options.temperature;
+        }
+        if (options.topP !== undefined) {
+            payload.top_p = options.topP;
+        }
+        if (options.maxTokens !== undefined) {
+            payload.max_tokens = options.maxTokens;
+        }
+
+        // Add tools if provided
+        if (options.tools && options.tools.length > 0) {
+            payload.tools = options.tools.map((tool) => ({
+                type: tool.type,
+                function: {
+                    name: tool.function.name,
+                    description: tool.function.description,
+                    parameters: tool.function.parameters,
+                },
+            }));
+        }
+
+        // Add tool_choice if provided
+        if (options.toolChoice !== undefined) {
+            if (typeof options.toolChoice === 'string') {
+                payload.tool_choice = options.toolChoice;
+            } else {
+                // Specific tool choice
+                payload.tool_choice = {
+                    type: options.toolChoice.type,
+                    function: { name: options.toolChoice.function.name },
+                };
+            }
+        }
+
+        // Add guardrails if provided
+        if (options.guardrails) {
+            payload.guardrails = {
+                enabled: options.guardrails.enabled,
+            };
+            if (options.guardrails.responseWhenUnsafe) {
+                (
+                    payload.guardrails as Record<string, unknown>
+                ).response_when_unsafe = options.guardrails.responseWhenUnsafe;
+            }
+        }
+
+        // Add stream flag - must explicitly set false for non-streaming
+        payload.stream = stream;
+        if (stream) {
+            // Include usage in stream for final chunk
+            payload.stream_options = { include_usage: true };
+        }
+
+        return payload;
+    }
+
+    /**
+     * Creates sanitized request info for debugging (no auth token)
+     */
+    private createRequestInfo(
+        url: string,
+        headers: Record<string, string>,
+        payload: unknown,
+    ): CortexCompleteRequestInfo {
+        // Remove Authorization header for security
+        const sanitizedHeaders = { ...headers };
+        delete sanitizedHeaders.Authorization;
+
+        return {
+            url,
+            headers: sanitizedHeaders,
+            payload,
+        };
+    }
+
+    /**
+     * Parses the API response into our CortexChoice format
+     */
+    private parseChoices(apiChoices: unknown[]): CortexChoice[] {
+        return apiChoices.map((choice: unknown) => {
+            const c = choice as Record<string, unknown>;
+            const message = c.message as Record<string, unknown>;
+
+            const choiceMessage: CortexChoiceMessage = {
+                role: 'assistant',
+                content: (message.content as string) || null,
+            };
+
+            // Parse tool calls if present
+            if (message.tool_calls && Array.isArray(message.tool_calls)) {
+                choiceMessage.toolCalls = (
+                    message.tool_calls as Record<string, unknown>[]
+                ).map((tc) => ({
+                    id: tc.id as string,
+                    type: 'function' as const,
+                    function: {
+                        name: (tc.function as Record<string, unknown>)
+                            .name as string,
+                        arguments: (tc.function as Record<string, unknown>)
+                            .arguments as string,
+                    },
+                }));
+            }
+
+            return {
+                index: c.index as number,
+                message: choiceMessage,
+                finishReason:
+                    (c.finish_reason as CortexChoice['finishReason']) || 'stop',
+            };
+        });
+    }
+
+    /**
+     * Parses token usage from API response
+     */
+    private parseUsage(apiUsage: unknown): CortexTokenUsage | undefined {
+        if (!apiUsage) return undefined;
+
+        const usage = apiUsage as Record<string, unknown>;
+        return {
+            promptTokens: (usage.prompt_tokens as number) || 0,
+            completionTokens: (usage.completion_tokens as number) || 0,
+            totalTokens: (usage.total_tokens as number) || 0,
+            promptTokensCached: usage.prompt_tokens_cached as
+                | number
+                | undefined,
+        };
+    }
+
+    /**
+     * Generates text completion using Snowflake Cortex LLM (non-streaming)
+     */
+    async cortexComplete(
+        options: CortexCompleteOptions,
+        config_name?: string,
+    ): Promise<CortexCompleteResponse> {
+        const cfg = this.cfg(config_name);
+
+        const url = `${cfg.accessUrl}/api/v2/cortex/inference:complete`;
+        const payload = this.buildCortexCompletePayload(options, false);
+        const timeout = options.timeout ?? 120000;
+
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${cfg.token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        };
+
+        // Add region header if specified
+        const regionHeader = this.getRegionHeader(options.region);
+        if (regionHeader) {
+            headers['X-Snowflake-Cortex-Region'] = regionHeader;
+        }
+
+        const requestInfo = this.createRequestInfo(url, headers, payload);
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+                signal: AbortSignal.timeout(timeout),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                return {
+                    success: false,
+                    error: `HTTP ${response.status}: ${errorText}`,
+                    statusCode: response.status,
+                    request: requestInfo,
+                };
+            }
+
+            const data = (await response.json()) as Record<string, unknown>;
+
+            return {
+                success: true,
+                id: data.id as string | undefined,
+                model: data.model as string | undefined,
+                choices: this.parseChoices((data.choices as unknown[]) || []),
+                usage: this.parseUsage(data.usage),
+                statusCode: response.status,
+                request: requestInfo,
+            };
+        } catch (error) {
+            const errorMessage =
+                error instanceof Error ? error.message : String(error);
+
+            // Check for timeout
+            if (
+                errorMessage.includes('abort') ||
+                errorMessage.includes('timeout')
+            ) {
+                return {
+                    success: false,
+                    error: `Request timeout after ${timeout}ms`,
+                    statusCode: 0,
+                    request: requestInfo,
+                };
+            }
+
+            return {
+                success: false,
+                error: `Request failed: ${errorMessage}`,
+                statusCode: 0,
+                request: requestInfo,
+            };
+        }
+    }
+
+    /**
+     * Generates streaming text completion using Snowflake Cortex LLM
+     * Returns an async iterable that yields chunks as they arrive
+     */
+    async *cortexCompleteStream(
+        options: CortexCompleteOptions,
+        config_name?: string,
+    ): AsyncIterable<CortexStreamChunk> {
+        const cfg = this.cfg(config_name);
+
+        const url = `${cfg.accessUrl}/api/v2/cortex/inference:complete`;
+        const payload = this.buildCortexCompletePayload(options, true);
+        const timeout = options.timeout ?? 120000;
+
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${cfg.token}`,
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+        };
+
+        // Add region header if specified
+        const regionHeader = this.getRegionHeader(options.region);
+        if (regionHeader) {
+            headers['X-Snowflake-Cortex-Region'] = regionHeader;
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(timeout),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        if (!response.body) {
+            throw new Error('No response body received');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6).trim();
+
+                        if (dataStr === '[DONE]') {
+                            return;
+                        }
+
+                        try {
+                            const eventData = JSON.parse(dataStr) as Record<
+                                string,
+                                unknown
+                            >;
+                            const chunk = this.parseStreamChunk(eventData);
+                            yield chunk;
+                        } catch {
+                            // Skip malformed JSON lines
+                            console.warn(
+                                `[SDK] Failed to parse stream chunk: ${dataStr}`,
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Process any remaining buffer
+            if (buffer.trim()) {
+                if (buffer.startsWith('data: ')) {
+                    const dataStr = buffer.substring(6).trim();
+                    if (dataStr && dataStr !== '[DONE]') {
+                        try {
+                            const eventData = JSON.parse(dataStr) as Record<
+                                string,
+                                unknown
+                            >;
+                            const chunk = this.parseStreamChunk(eventData);
+                            yield chunk;
+                        } catch {
+                            // Skip malformed JSON
+                        }
+                    }
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+    }
+
+    /**
+     * Parses a streaming chunk from the API response
+     */
+    private parseStreamChunk(data: Record<string, unknown>): CortexStreamChunk {
+        const choices = (data.choices as Record<string, unknown>[]) || [];
+
+        const parsedChoices: CortexStreamChoice[] = choices.map((choice) => {
+            const delta = (choice.delta as Record<string, unknown>) || {};
+
+            const parsedDelta: CortexStreamDelta = {};
+
+            if (delta.role) {
+                parsedDelta.role = delta.role as 'assistant';
+            }
+            if (delta.content !== undefined) {
+                parsedDelta.content = delta.content as string;
+            }
+
+            // Parse tool calls delta
+            if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+                parsedDelta.toolCalls = (
+                    delta.tool_calls as Record<string, unknown>[]
+                ).map((tc): CortexStreamDeltaToolCall => {
+                    const result: CortexStreamDeltaToolCall = {
+                        index: tc.index as number,
+                    };
+                    if (tc.id) result.id = tc.id as string;
+                    if (tc.type) result.type = tc.type as 'function';
+                    if (tc.function) {
+                        const fn = tc.function as Record<string, unknown>;
+                        result.function = {};
+                        if (fn.name) result.function.name = fn.name as string;
+                        if (fn.arguments)
+                            result.function.arguments = fn.arguments as string;
+                    }
+                    return result;
+                });
+            }
+
+            return {
+                index: (choice.index as number) || 0,
+                delta: parsedDelta,
+                finishReason:
+                    (choice.finish_reason as CortexStreamChoice['finishReason']) ||
+                    null,
+            };
+        });
+
+        return {
+            id: (data.id as string) || '',
+            object: 'chat.completion.chunk',
+            created: (data.created as number) || Math.floor(Date.now() / 1000),
+            model: (data.model as string) || '',
+            choices: parsedChoices,
+            usage: this.parseUsage(data.usage),
+        };
     }
 }
 

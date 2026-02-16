@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import urllib.request
 import urllib.error
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Dict, Iterator, List, Optional, TypeVar
 
 from p67_sdk.types import (
     QueryResult,
@@ -18,6 +18,19 @@ from p67_sdk.types import (
     CortexAnalystResponse,
     CortexAgentResponse,
     EmailOptions,
+    CortexCompleteOptions,
+    CortexCompleteResponse,
+    CortexCompleteRequestInfo,
+    CortexChoice,
+    CortexChoiceMessage,
+    CortexTokenUsage,
+    CortexToolCall,
+    CortexToolCallFunction,
+    CortexStreamChunk,
+    CortexStreamChoice,
+    CortexStreamDelta,
+    CortexStreamDeltaToolCall,
+    CortexStreamDeltaToolCallFunction,
 )
 from p67_sdk.ipc import send_interrupt, wait_for_resume
 
@@ -539,6 +552,478 @@ class WorkflowSDK:
         response = wait_for_resume(interrupt_id, timeout_sec)
         
         return response  # type: ignore
+    
+    def _get_region_header(self, region: Optional[str]) -> Optional[str]:
+        """
+        Maps region option to the appropriate header value for cross-region inference.
+        
+        Args:
+            region: Region option string
+            
+        Returns:
+            Header value or None if auto/not specified
+        """
+        if not region or region == 'auto':
+            return None
+        
+        region_map = {
+            'cross-cloud-any': 'cross-cloud',
+            'aws-global': 'aws',
+            'aws-us': 'aws-us',
+            'aws-eu': 'aws-eu',
+            'aws-apj': 'aws-apj',
+            'azure-global': 'azure',
+            'azure-us': 'azure-us',
+            'azure-eu': 'azure-eu',
+        }
+        
+        return region_map.get(region)
+    
+    def _normalize_messages(self, messages: Any) -> List[Dict[str, Any]]:
+        """
+        Normalizes messages input to list format.
+        
+        Args:
+            messages: String or list of message dicts
+            
+        Returns:
+            List of message dicts
+        """
+        if isinstance(messages, str):
+            return [{'role': 'user', 'content': messages}]
+        return list(messages)
+    
+    def _build_cortex_complete_payload(
+        self,
+        options: CortexCompleteOptions,
+        stream: bool,
+    ) -> Dict[str, Any]:
+        """
+        Builds the request payload for Cortex Complete API.
+        
+        Args:
+            options: Complete options
+            stream: Whether to enable streaming
+            
+        Returns:
+            Request payload dict
+        """
+        messages = self._normalize_messages(options.messages)
+        
+        # Convert messages to API format
+        api_messages = []
+        for msg in messages:
+            api_msg: Dict[str, Any] = {'role': msg.get('role', 'user')}
+            
+            content = msg.get('content')
+            if isinstance(content, str):
+                api_msg['content'] = content
+            else:
+                api_msg['content'] = content
+            
+            if msg.get('tool_call_id'):
+                api_msg['tool_call_id'] = msg['tool_call_id']
+            
+            api_messages.append(api_msg)
+        
+        payload: Dict[str, Any] = {
+            'model': options.model,
+            'messages': api_messages,
+        }
+        
+        # Add optional parameters
+        if options.temperature is not None:
+            payload['temperature'] = options.temperature
+        if options.top_p is not None:
+            payload['top_p'] = options.top_p
+        if options.max_tokens is not None:
+            payload['max_tokens'] = options.max_tokens
+        
+        # Add tools if provided
+        if options.tools:
+            payload['tools'] = [
+                {
+                    'type': tool.type,
+                    'function': {
+                        'name': tool.function.name,
+                        'description': tool.function.description,
+                        'parameters': {
+                            'type': tool.function.parameters.type,
+                            'properties': tool.function.parameters.properties,
+                            'required': tool.function.parameters.required,
+                        } if tool.function.parameters.required else {
+                            'type': tool.function.parameters.type,
+                            'properties': tool.function.parameters.properties,
+                        },
+                    },
+                }
+                for tool in options.tools
+            ]
+        
+        # Add tool_choice if provided
+        if options.tool_choice is not None:
+            if isinstance(options.tool_choice, str):
+                payload['tool_choice'] = options.tool_choice
+            else:
+                payload['tool_choice'] = {
+                    'type': options.tool_choice.type,
+                    'function': {'name': options.tool_choice.function.name},
+                }
+        
+        # Add guardrails if provided
+        if options.guardrails:
+            guardrails_payload: Dict[str, Any] = {
+                'enabled': options.guardrails.enabled,
+            }
+            if options.guardrails.response_when_unsafe:
+                guardrails_payload['response_when_unsafe'] = options.guardrails.response_when_unsafe
+            payload['guardrails'] = guardrails_payload
+        
+        # Add stream flag - must explicitly set false for non-streaming
+        payload['stream'] = stream
+        if stream:
+            payload['stream_options'] = {'include_usage': True}
+        
+        return payload
+    
+    def _create_request_info(
+        self,
+        url: str,
+        headers: Dict[str, str],
+        payload: Any,
+    ) -> CortexCompleteRequestInfo:
+        """
+        Creates sanitized request info for debugging.
+        
+        Args:
+            url: Request URL
+            headers: Request headers
+            payload: Request payload
+            
+        Returns:
+            Request info with auth header removed
+        """
+        sanitized_headers = {k: v for k, v in headers.items() if k != 'Authorization'}
+        return CortexCompleteRequestInfo(
+            url=url,
+            headers=sanitized_headers,
+            payload=payload,
+        )
+    
+    def _parse_usage(self, api_usage: Optional[Dict[str, Any]]) -> Optional[CortexTokenUsage]:
+        """
+        Parses token usage from API response.
+        
+        Args:
+            api_usage: Usage dict from API
+            
+        Returns:
+            CortexTokenUsage or None
+        """
+        if not api_usage:
+            return None
+        
+        return CortexTokenUsage(
+            prompt_tokens=api_usage.get('prompt_tokens', 0),
+            completion_tokens=api_usage.get('completion_tokens', 0),
+            total_tokens=api_usage.get('total_tokens', 0),
+            prompt_tokens_cached=api_usage.get('prompt_tokens_cached'),
+        )
+    
+    def _parse_choices(self, api_choices: List[Dict[str, Any]]) -> List[CortexChoice]:
+        """
+        Parses choices from API response.
+        
+        Args:
+            api_choices: Choices list from API
+            
+        Returns:
+            List of CortexChoice
+        """
+        choices = []
+        for choice in api_choices:
+            message = choice.get('message', {})
+            
+            # Parse tool calls if present
+            tool_calls = None
+            if message.get('tool_calls'):
+                tool_calls = [
+                    CortexToolCall(
+                        id=tc.get('id', ''),
+                        type='function',
+                        function=CortexToolCallFunction(
+                            name=tc.get('function', {}).get('name', ''),
+                            arguments=tc.get('function', {}).get('arguments', ''),
+                        ),
+                    )
+                    for tc in message['tool_calls']
+                ]
+            
+            choice_message = CortexChoiceMessage(
+                role='assistant',
+                content=message.get('content'),
+                tool_calls=tool_calls,
+            )
+            
+            choices.append(CortexChoice(
+                index=choice.get('index', 0),
+                message=choice_message,
+                finish_reason=choice.get('finish_reason', 'stop'),
+            ))
+        
+        return choices
+    
+    def cortex_complete(
+        self,
+        options: CortexCompleteOptions,
+        config_name: Optional[str] = None,
+    ) -> CortexCompleteResponse:
+        """
+        Generate text completion using Snowflake Cortex LLM.
+        
+        Args:
+            options: Completion configuration
+            config_name: Optional Snowflake config name
+            
+        Returns:
+            CortexCompleteResponse with choices, usage, or error.
+            Never raises - errors returned in response object.
+            
+        Example:
+            response = sdk.cortex_complete(CortexCompleteOptions(
+                model='claude-3-5-sonnet',
+                messages='Explain quantum computing.'
+            ))
+            if response.success:
+                print(response.choices[0].message.content)
+        """
+        cfg = self._get_config(config_name)
+        
+        token = cfg.get('token')
+        access_url = self._normalize_access_url(cfg.get('accessUrl'))
+        
+        if not token or not access_url:
+            return CortexCompleteResponse(
+                success=False,
+                error="token and accessUrl are required in config",
+                status_code=0,
+            )
+        
+        url = f"{access_url}/api/v2/cortex/inference:complete"
+        payload = self._build_cortex_complete_payload(options, stream=False)
+        timeout = (options.timeout or 120000) / 1000  # Convert ms to seconds
+        
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        }
+        
+        # Add region header if specified
+        region_header = self._get_region_header(options.region)
+        if region_header:
+            headers['X-Snowflake-Cortex-Region'] = region_header
+        
+        request_info = self._create_request_info(url, headers, payload)
+        
+        try:
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+            
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                response_data = json.loads(resp.read().decode('utf-8'))
+                
+                return CortexCompleteResponse(
+                    success=True,
+                    id=response_data.get('id'),
+                    model=response_data.get('model'),
+                    choices=self._parse_choices(response_data.get('choices', [])),
+                    usage=self._parse_usage(response_data.get('usage')),
+                    status_code=resp.status,
+                    request=request_info,
+                )
+                
+        except urllib.error.HTTPError as e:
+            error_body = None
+            try:
+                error_body = e.read().decode('utf-8')
+            except Exception:
+                pass
+            return CortexCompleteResponse(
+                success=False,
+                error=f"HTTP {e.code}: {error_body or str(e)}",
+                status_code=e.code,
+                request=request_info,
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if 'timed out' in error_msg.lower() or 'timeout' in error_msg.lower():
+                return CortexCompleteResponse(
+                    success=False,
+                    error=f"Request timeout after {int(timeout * 1000)}ms",
+                    status_code=0,
+                    request=request_info,
+                )
+            return CortexCompleteResponse(
+                success=False,
+                error=f"Request failed: {error_msg}",
+                status_code=0,
+                request=request_info,
+            )
+    
+    def cortex_complete_stream(
+        self,
+        options: CortexCompleteOptions,
+        config_name: Optional[str] = None,
+    ) -> Iterator[CortexStreamChunk]:
+        """
+        Generate streaming text completion using Snowflake Cortex LLM.
+        
+        Returns an iterator that yields chunks as they arrive.
+        
+        Args:
+            options: Completion configuration
+            config_name: Optional Snowflake config name
+            
+        Yields:
+            CortexStreamChunk objects as they arrive
+            
+        Raises:
+            Exception: If request fails to initiate
+            
+        Example:
+            stream = sdk.cortex_complete_stream(CortexCompleteOptions(
+                model='claude-3-5-sonnet',
+                messages='Write a haiku.'
+            ))
+            
+            full_content = ''
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    print(delta, end='', flush=True)
+                    full_content += delta
+        """
+        cfg = self._get_config(config_name)
+        
+        token = cfg.get('token')
+        access_url = self._normalize_access_url(cfg.get('accessUrl'))
+        
+        if not token or not access_url:
+            raise ValueError("token and accessUrl are required in config")
+        
+        url = f"{access_url}/api/v2/cortex/inference:complete"
+        payload = self._build_cortex_complete_payload(options, stream=True)
+        timeout = (options.timeout or 120000) / 1000  # Convert ms to seconds
+        
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+        }
+        
+        # Add region header if specified
+        region_header = self._get_region_header(options.region)
+        if region_header:
+            headers['X-Snowflake-Cortex-Region'] = region_header
+        
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            buffer = ''
+            
+            while True:
+                chunk_bytes = resp.read(4096)
+                if not chunk_bytes:
+                    break
+                
+                buffer += chunk_bytes.decode('utf-8')
+                lines = buffer.split('\n')
+                buffer = lines.pop()  # Keep incomplete line in buffer
+                
+                for line in lines:
+                    if not line.strip():
+                        continue
+                    
+                    if line.startswith('data: '):
+                        data_str = line[6:].strip()
+                        
+                        if data_str == '[DONE]':
+                            return
+                        
+                        try:
+                            event_data = json.loads(data_str)
+                            yield self._parse_stream_chunk(event_data)
+                        except json.JSONDecodeError:
+                            # Skip malformed JSON
+                            pass
+            
+            # Process remaining buffer
+            if buffer.strip():
+                if buffer.startswith('data: '):
+                    data_str = buffer[6:].strip()
+                    if data_str and data_str != '[DONE]':
+                        try:
+                            event_data = json.loads(data_str)
+                            yield self._parse_stream_chunk(event_data)
+                        except json.JSONDecodeError:
+                            pass
+    
+    def _parse_stream_chunk(self, data: Dict[str, Any]) -> CortexStreamChunk:
+        """
+        Parses a streaming chunk from the API response.
+        
+        Args:
+            data: Chunk data dict
+            
+        Returns:
+            CortexStreamChunk
+        """
+        choices = data.get('choices', [])
+        
+        parsed_choices = []
+        for choice in choices:
+            delta = choice.get('delta', {})
+            
+            # Parse tool calls delta
+            tool_calls = None
+            if delta.get('tool_calls'):
+                tool_calls = []
+                for tc in delta['tool_calls']:
+                    fn = tc.get('function', {})
+                    tool_call = CortexStreamDeltaToolCall(
+                        index=tc.get('index', 0),
+                        id=tc.get('id'),
+                        type=tc.get('type'),
+                        function=CortexStreamDeltaToolCallFunction(
+                            name=fn.get('name'),
+                            arguments=fn.get('arguments'),
+                        ) if fn else None,
+                    )
+                    tool_calls.append(tool_call)
+            
+            parsed_delta = CortexStreamDelta(
+                role=delta.get('role'),
+                content=delta.get('content'),
+                tool_calls=tool_calls,
+            )
+            
+            parsed_choices.append(CortexStreamChoice(
+                index=choice.get('index', 0),
+                delta=parsed_delta,
+                finish_reason=choice.get('finish_reason'),
+            ))
+        
+        import time
+        return CortexStreamChunk(
+            id=data.get('id', ''),
+            object='chat.completion.chunk',
+            created=data.get('created', int(time.time())),
+            model=data.get('model', ''),
+            choices=parsed_choices,
+            usage=self._parse_usage(data.get('usage')),
+        )
     
     def close(self) -> None:
         """

@@ -314,6 +314,343 @@ export interface InterruptPayload<T = unknown> {
     nodeId?: string;
 }
 
+// ============================================================================
+// Cortex Complete Types (LLM Inference)
+// ============================================================================
+
+/**
+ * Message role in a Cortex LLM conversation
+ */
+export type CortexMessageRole = 'system' | 'user' | 'assistant' | 'tool';
+
+/**
+ * Text content block
+ */
+export interface CortexTextContent {
+    type: 'text';
+    text: string;
+}
+
+/**
+ * Image content block (for vision-capable models)
+ */
+export interface CortexImageContent {
+    type: 'image_url';
+    image_url: {
+        /** Base64 data URL or HTTPS URL */
+        url: string;
+    };
+}
+
+/**
+ * Tool result content block (for returning tool call results)
+ */
+export interface CortexToolResultContent {
+    type: 'tool_result';
+    tool_use_id: string;
+    content: string;
+}
+
+/**
+ * Message content can be a string or structured content blocks
+ */
+export type CortexMessageContent =
+    | string
+    | (CortexTextContent | CortexImageContent | CortexToolResultContent)[];
+
+/**
+ * Message in a Cortex LLM conversation
+ */
+export interface CortexMessage {
+    role: CortexMessageRole;
+    content: CortexMessageContent;
+    /** Tool call ID (required when role is 'tool') */
+    tool_call_id?: string;
+}
+
+/**
+ * JSON Schema for tool function parameters
+ */
+export interface CortexToolFunctionParameters {
+    type: 'object';
+    properties: Record<
+        string,
+        {
+            type: string;
+            description?: string;
+            enum?: string[];
+            items?: unknown;
+        }
+    >;
+    required?: string[];
+}
+
+/**
+ * Tool function definition
+ */
+export interface CortexToolFunction {
+    /** Function name (must match pattern ^[a-zA-Z0-9_-]+$) */
+    name: string;
+    /** Description of what the function does (helps model decide when to use it) */
+    description: string;
+    /** JSON Schema for function parameters */
+    parameters: CortexToolFunctionParameters;
+}
+
+/**
+ * Tool definition for Cortex LLM
+ */
+export interface CortexTool {
+    type: 'function';
+    function: CortexToolFunction;
+}
+
+/**
+ * Tool call made by the model
+ */
+export interface CortexToolCall {
+    /** Unique identifier for this tool call */
+    id: string;
+    type: 'function';
+    function: {
+        /** Name of the function to call */
+        name: string;
+        /** JSON string of arguments */
+        arguments: string;
+    };
+}
+
+/**
+ * Specific function to force the model to call
+ */
+export interface CortexForcedFunction {
+    name: string;
+}
+
+/**
+ * Force the model to call a specific tool
+ */
+export interface CortexForcedToolChoice {
+    type: 'function';
+    function: CortexForcedFunction;
+}
+
+/**
+ * Tool choice control for Cortex LLM
+ * - 'auto': Model decides whether to call tools (default)
+ * - 'none': Never call tools
+ * - 'required': Must call at least one tool
+ * - object: Force a specific tool
+ */
+export type CortexToolChoice =
+    | 'auto'
+    | 'none'
+    | 'required'
+    | CortexForcedToolChoice;
+
+/**
+ * Cortex Guard guardrails configuration
+ */
+export interface CortexGuardrails {
+    /** Enable Cortex Guard content filtering */
+    enabled: boolean;
+    /** Custom response when content is flagged as unsafe */
+    responseWhenUnsafe?: string;
+}
+
+/**
+ * Cross-region inference configuration
+ * Allows routing requests to different Snowflake regions for model availability
+ */
+export type CortexInferenceRegion =
+    | 'auto' // Use account's region (default)
+    | 'cross-cloud-any' // Any region across clouds
+    | 'aws-global' // AWS cross-region
+    | 'aws-us' // AWS US regions
+    | 'aws-eu' // AWS EU regions
+    | 'aws-apj' // AWS Asia-Pacific
+    | 'azure-global' // Azure cross-region
+    | 'azure-us' // Azure US regions
+    | 'azure-eu'; // Azure EU regions
+
+/**
+ * Options for cortexComplete
+ */
+export interface CortexCompleteOptions {
+    /**
+     * Model identifier (required).
+     * Examples: 'claude-3-5-sonnet', 'llama3.1-70b', 'mistral-large2'
+     * See Cortex docs for full list of available models per region.
+     */
+    model: string;
+
+    /**
+     * Messages for completion.
+     * Can be a single string (converted to user message) or array of messages.
+     */
+    messages: string | CortexMessage[];
+
+    /** Temperature (0-1). Higher values = more random. Default: 0.0 */
+    temperature?: number;
+
+    /** Nucleus sampling (0-1). Default: 1.0 */
+    topP?: number;
+
+    /** Maximum tokens to generate (1-16384). Default: 4096 */
+    maxTokens?: number;
+
+    /** Tools available to the model for function calling */
+    tools?: CortexTool[];
+
+    /** Control tool usage behavior */
+    toolChoice?: CortexToolChoice;
+
+    /** Enable Cortex Guard content filtering */
+    guardrails?: CortexGuardrails;
+
+    /** Request timeout in milliseconds. Default: 120000 (2 min) */
+    timeout?: number;
+
+    /** Cross-region inference. Default: 'auto' (use account region) */
+    region?: CortexInferenceRegion;
+}
+
+/**
+ * Token usage statistics from Cortex LLM
+ */
+export interface CortexTokenUsage {
+    /** Tokens in the prompt/input */
+    promptTokens: number;
+    /** Tokens in the completion/output */
+    completionTokens: number;
+    /** Total tokens (prompt + completion) */
+    totalTokens: number;
+    /** Cached prompt tokens (prompt caching) */
+    promptTokensCached?: number;
+}
+
+/**
+ * Generated message in a completion choice
+ */
+export interface CortexChoiceMessage {
+    role: 'assistant';
+    /** Generated text content (null if only tool calls) */
+    content: string | null;
+    /** Tool calls made by the model */
+    toolCalls?: CortexToolCall[];
+}
+
+/**
+ * Choice from a Cortex LLM completion
+ */
+export interface CortexChoice {
+    /** Index of this choice */
+    index: number;
+    /** Generated message */
+    message: CortexChoiceMessage;
+    /** Why generation stopped */
+    finishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter';
+}
+
+/**
+ * Request details for debugging (included in responses)
+ */
+export interface CortexCompleteRequestInfo {
+    /** Request URL */
+    url: string;
+    /** Request headers (sanitized - no auth token) */
+    headers: Record<string, string>;
+    /** Request payload */
+    payload: unknown;
+}
+
+/**
+ * Response from cortexComplete (non-streaming)
+ */
+export interface CortexCompleteResponse {
+    /** Whether the request succeeded */
+    success: boolean;
+    /** Unique response ID */
+    id?: string;
+    /** Model used for completion */
+    model?: string;
+    /** Generated choices (usually 1) */
+    choices?: CortexChoice[];
+    /** Token usage statistics */
+    usage?: CortexTokenUsage;
+    /** Error message if success is false */
+    error?: string;
+    /** HTTP status code (for debugging) */
+    statusCode?: number;
+    /** Request details for debugging */
+    request?: CortexCompleteRequestInfo;
+}
+
+// ============================================================================
+// Cortex Complete Streaming Types
+// ============================================================================
+
+/**
+ * Tool call delta in a streaming chunk
+ */
+export interface CortexStreamDeltaToolCall {
+    /** Index of the tool call being built */
+    index: number;
+    /** Tool call ID (first chunk only) */
+    id?: string;
+    /** Tool type (first chunk only) */
+    type?: 'function';
+    /** Function details (accumulated across chunks) */
+    function?: {
+        /** Function name (first chunk only) */
+        name?: string;
+        /** Arguments fragment (accumulated) */
+        arguments?: string;
+    };
+}
+
+/**
+ * Delta content in a streaming chunk
+ */
+export interface CortexStreamDelta {
+    /** Role (usually only in first chunk) */
+    role?: 'assistant';
+    /** Content fragment */
+    content?: string;
+    /** Tool call fragments */
+    toolCalls?: CortexStreamDeltaToolCall[];
+}
+
+/**
+ * Choice in a streaming chunk
+ */
+export interface CortexStreamChoice {
+    /** Choice index */
+    index: number;
+    /** Delta content */
+    delta: CortexStreamDelta;
+    /** Finish reason (only in final chunk) */
+    finishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null;
+}
+
+/**
+ * Streaming chunk from cortexCompleteStream
+ */
+export interface CortexStreamChunk {
+    /** Unique chunk ID */
+    id: string;
+    /** Object type */
+    object: 'chat.completion.chunk';
+    /** Unix timestamp */
+    created: number;
+    /** Model used */
+    model: string;
+    /** Delta choices */
+    choices: CortexStreamChoice[];
+    /** Usage statistics (only in final chunk when requested) */
+    usage?: CortexTokenUsage;
+}
+
 /**
  * Interface for the P67 Agent SDK
  * Defines the public API for interacting with Snowflake and Cortex services
@@ -581,4 +918,168 @@ export interface WorkflowSDK {
         payload: unknown,
         options?: InterruptOptions,
     ): Promise<T>;
+
+    /**
+     * Generates text completion using Snowflake Cortex LLM (non-streaming)
+     *
+     * Calls the Cortex REST API to generate text using the specified model.
+     * Supports conversations, tool calling, vision, and content filtering.
+     *
+     * @param options - Completion configuration
+     *   - `model`: Model identifier (required, e.g., 'claude-3-5-sonnet', 'llama3.1-70b')
+     *   - `messages`: Single prompt string or array of conversation messages
+     *   - `temperature`: Randomness control (0-1, default 0.0)
+     *   - `topP`: Nucleus sampling (0-1, default 1.0)
+     *   - `maxTokens`: Max output tokens (1-16384, default 4096)
+     *   - `tools`: Tools available for function calling
+     *   - `toolChoice`: Control tool usage ('auto', 'none', 'required', or specific tool)
+     *   - `guardrails`: Cortex Guard content filtering configuration
+     *   - `timeout`: Request timeout in milliseconds (default 120000)
+     *   - `region`: Cross-region inference configuration
+     * @param config_name - Optional Snowflake config name
+     * @returns Response with choices, usage stats, request info, or error.
+     *          Never throws - errors are returned in the response object.
+     *
+     * @example
+     * // Simple prompt
+     * const response = await sdk.cortexComplete({
+     *   model: 'claude-3-5-sonnet',
+     *   messages: 'Explain quantum computing in one paragraph.'
+     * });
+     *
+     * if (response.success) {
+     *   console.log(response.choices?.[0].message.content);
+     *   console.log(`Tokens used: ${response.usage?.totalTokens}`);
+     * } else {
+     *   console.error(response.error);
+     *   console.error('Request:', response.request);
+     * }
+     *
+     * @example
+     * // Multi-turn conversation
+     * const response = await sdk.cortexComplete({
+     *   model: 'llama3.1-70b',
+     *   messages: [
+     *     { role: 'system', content: 'You are a helpful data analyst.' },
+     *     { role: 'user', content: 'What is a JOIN in SQL?' },
+     *     { role: 'assistant', content: 'A JOIN combines rows from two tables...' },
+     *     { role: 'user', content: 'Show me an example with INNER JOIN.' }
+     *   ],
+     *   temperature: 0.7,
+     *   maxTokens: 1000
+     * });
+     *
+     * @example
+     * // Tool calling
+     * const response = await sdk.cortexComplete({
+     *   model: 'claude-3-5-sonnet',
+     *   messages: [{ role: 'user', content: 'What is the weather in NYC?' }],
+     *   tools: [{
+     *     type: 'function',
+     *     function: {
+     *       name: 'get_weather',
+     *       description: 'Get current weather for a location',
+     *       parameters: {
+     *         type: 'object',
+     *         properties: {
+     *           location: { type: 'string', description: 'City name' }
+     *         },
+     *         required: ['location']
+     *       }
+     *     }
+     *   }]
+     * });
+     *
+     * if (response.choices?.[0].message.toolCalls) {
+     *   const toolCall = response.choices[0].message.toolCalls[0];
+     *   const args = JSON.parse(toolCall.function.arguments);
+     *   console.log(`Calling ${toolCall.function.name} with:`, args);
+     *   // Execute the tool, then continue conversation with tool result...
+     * }
+     *
+     * @example
+     * // Cross-region inference
+     * const response = await sdk.cortexComplete({
+     *   model: 'claude-3-5-sonnet',
+     *   messages: 'Hello!',
+     *   region: 'aws-us'  // Route to AWS US regions
+     * });
+     */
+    cortexComplete(
+        options: CortexCompleteOptions,
+        config_name?: string,
+    ): Promise<CortexCompleteResponse>;
+
+    /**
+     * Generates streaming text completion using Snowflake Cortex LLM
+     *
+     * Returns an async iterable that yields chunks as they arrive from the model.
+     * Ideal for real-time UIs, long-form content generation, or showing progress.
+     *
+     * @param options - Completion configuration (same as cortexComplete)
+     * @param config_name - Optional Snowflake config name
+     * @returns Async iterable of streaming chunks. Throws on request initiation failure.
+     *
+     * @example
+     * // Stream to console
+     * const stream = sdk.cortexCompleteStream({
+     *   model: 'claude-3-5-sonnet',
+     *   messages: 'Write a poem about data warehouses.'
+     * });
+     *
+     * let fullContent = '';
+     * for await (const chunk of stream) {
+     *   const delta = chunk.choices[0]?.delta?.content;
+     *   if (delta) {
+     *     process.stdout.write(delta);
+     *     fullContent += delta;
+     *   }
+     *   // Check for usage in final chunk
+     *   if (chunk.usage) {
+     *     console.log(`\nTotal tokens: ${chunk.usage.totalTokens}`);
+     *   }
+     * }
+     *
+     * @example
+     * // Collect tool calls from stream
+     * const toolCalls = new Map<number, { id: string; name: string; args: string }>();
+     *
+     * for await (const chunk of sdk.cortexCompleteStream({
+     *   model: 'claude-3-5-sonnet',
+     *   messages: [{ role: 'user', content: 'Get weather for NYC and LA' }],
+     *   tools: [weatherTool]
+     * })) {
+     *   for (const choice of chunk.choices) {
+     *     if (choice.delta.toolCalls) {
+     *       for (const tc of choice.delta.toolCalls) {
+     *         const existing = toolCalls.get(tc.index) || { id: '', name: '', args: '' };
+     *         if (tc.id) existing.id = tc.id;
+     *         if (tc.function?.name) existing.name = tc.function.name;
+     *         if (tc.function?.arguments) existing.args += tc.function.arguments;
+     *         toolCalls.set(tc.index, existing);
+     *       }
+     *     }
+     *     if (choice.finishReason === 'tool_calls') {
+     *       console.log('Tool calls:', Array.from(toolCalls.values()));
+     *     }
+     *   }
+     * }
+     *
+     * @example
+     * // Error handling with try-catch
+     * try {
+     *   for await (const chunk of sdk.cortexCompleteStream({
+     *     model: 'invalid-model',
+     *     messages: 'Hello'
+     *   })) {
+     *     console.log(chunk);
+     *   }
+     * } catch (error) {
+     *   console.error('Stream failed:', error);
+     * }
+     */
+    cortexCompleteStream(
+        options: CortexCompleteOptions,
+        config_name?: string,
+    ): AsyncIterable<CortexStreamChunk>;
 }
