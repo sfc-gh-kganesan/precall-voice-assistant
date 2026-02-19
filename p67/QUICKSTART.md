@@ -59,7 +59,7 @@ Set up a connection to your local controld instance:
 ```bash
 p67 connection add p67 --endpoint http://localhost:3002
 ```
-You will be prompted to enter your Snowflake PAT.
+You will be prompted to enter a Snowflake PAT. *When running locally, put any value e.g. `dummy`*
 
 ## Your First Workflow
 
