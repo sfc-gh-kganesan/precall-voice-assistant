@@ -300,7 +300,6 @@ export class WorkflowSDKImpl implements WorkflowSDK {
 
     /**
      * Executes a SQL query against Snowflake
-     * Internal function - use executeQueryReadOnly for read-only queries
      *
      * @param {SnowflakeStatement} stmt - Snowflake statement to execute
      *   - `sqlText`: SQL text to execute
@@ -309,7 +308,7 @@ export class WorkflowSDKImpl implements WorkflowSDK {
      * @returns {Promise<QueryResult>} Query results with statement and rows
      * @throws {Error} If query execution fails
      */
-    private async executeQuery(
+    async executeQuery(
         stmt: SnowflakeStatement,
         config_name?: string,
     ): Promise<QueryResult> {

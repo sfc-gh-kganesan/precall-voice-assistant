@@ -673,6 +673,41 @@ export interface WorkflowSDK {
     getParameters(config_name?: string): Record<string, string>;
 
     /**
+     * Executes a SQL query against Snowflake
+     *
+     * Executes any SQL statement including DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP).
+     * For read-only queries, prefer using `executeQueryReadOnly` which validates the query type.
+     *
+     * @param stmt - Snowflake statement to execute
+     *   - `sqlText`: SQL text to execute
+     *   - `binds`: Binds to use for the statement
+     * @param config_name - Optional name of the Snowflake config to use. If not provided and only
+     *                      one config exists, that config will be used automatically.
+     * @returns Query results containing the statement metadata and result rows
+     * @throws Error if query execution fails
+     *
+     * @example
+     * const result = await sdk.executeQuery({
+     *   sqlText: 'INSERT INTO my_table (col1) VALUES (?)',
+     *   binds: ['value1']
+     * });
+     *
+     * @example
+     * // Using a specific config
+     * const result = await sdk.executeQuery(
+     *   {
+     *     sqlText: 'UPDATE orders SET status = ? WHERE id = ?',
+     *     binds: ['shipped', 123]
+     *   },
+     *   'production_config'
+     * );
+     */
+    executeQuery(
+        stmt: SnowflakeStatement,
+        config_name?: string,
+    ): Promise<QueryResult>;
+
+    /**
      * Executes a read-only SELECT query against Snowflake
      *
      * Validates that the query is read-only before execution.

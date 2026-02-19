@@ -195,6 +195,35 @@ class WorkflowSDK:
         result.update(self._parameters)
         return result
     
+    def execute_query(
+        self,
+        sql_text: str,
+        binds: Optional[List[Any]] = None,
+        config_name: Optional[str] = None,
+    ) -> QueryResult:
+        """
+        Execute a SQL query against Snowflake.
+        
+        Executes any SQL statement including DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP).
+        For read-only queries, prefer using `execute_query_read_only` which validates the query type.
+        
+        Args:
+            sql_text: The SQL query to execute
+            binds: Optional list of bind parameters
+            config_name: Optional name of the config to use
+            
+        Returns:
+            QueryResult with statement and rows
+        """
+        conn = self._get_connection(config_name)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql_text, binds or [])
+            rows = cursor.fetchall()
+            return QueryResult(statement=cursor, rows=list(rows))
+        finally:
+            cursor.close()
+    
     def execute_query_read_only(
         self,
         sql_text: str,
