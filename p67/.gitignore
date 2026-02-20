@@ -7,3 +7,6 @@ dist
 output
 /Makefile
 .certs
+
+# Override parent gitignore to track .claude/ config
+!.claude/
