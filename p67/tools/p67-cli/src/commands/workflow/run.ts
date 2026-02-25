@@ -9,6 +9,7 @@ import * as yaml from 'js-yaml';
 export const runCommand = new Command('run')
     .description('Run a workflow')
     .argument('[workflowId]', 'Workflow ID to run')
+    .option('-n, --name <name>', 'Run workflow by name (uses latest version)')
     .option('-t, --timeout <ms>', 'Request timeout in milliseconds', '600000')
     .option(
         '-p, --param <kv>',
@@ -27,11 +28,20 @@ export const runCommand = new Command('run')
         async (
             workflowId: string | undefined,
             options: {
+                name?: string;
                 timeout: string;
                 param?: string[];
                 param_file?: string;
             },
         ) => {
+            // Validate that both workflowId and name are not provided
+            if (workflowId && options.name) {
+                console.error(
+                    'Error: Cannot specify both workflow ID and --name. Use one or the other.',
+                );
+                process.exit(1);
+            }
+
             const params: Record<string, string> = {};
             if (options.param) {
                 // Split the param string into key=value pairs
@@ -74,6 +84,28 @@ export const runCommand = new Command('run')
                     timeout: Number.parseInt(options.timeout, 10),
                 });
 
+                // If running by name, use the name-based endpoint
+                if (options.name) {
+                    console.log(
+                        `\nRunning workflow by name: ${options.name} (latest version)\n`,
+                    );
+
+                    const runResult = await client.runWorkflowByName(
+                        options.name,
+                        params,
+                    );
+
+                    // Display results
+                    console.log('─'.repeat(50));
+                    console.log(`Exit Code: ${runResult.exitCode}`);
+                    console.log(`Success: ${runResult.success}`);
+                    console.log('─'.repeat(50));
+                    console.log(runResult.log.join('\n'));
+
+                    // Exit with the workflow's exit code
+                    process.exit(runResult.exitCode);
+                }
+
                 let selectedWorkflowId = workflowId;
 
                 // If no workflow ID provided, prompt user to select one
@@ -87,7 +119,9 @@ export const runCommand = new Command('run')
                     const choices = result.workflows.map((wf) => ({
                         value: wf.workflowId,
                         updatedAt: wf.updatedAt,
-                        name: `${wf.workflowId} (${wf.updatedAt}, owner: ${wf.owner})`,
+                        name: wf.name
+                            ? `${wf.name} [${wf.workflowId}] (${wf.updatedAt}, owner: ${wf.owner})`
+                            : `${wf.workflowId} (${wf.updatedAt}, owner: ${wf.owner})`,
                     }));
                     // Sort the choices by updatedAt descending
                     choices.sort(

@@ -992,6 +992,7 @@ export type SlackUserScalarFieldEnum = (typeof SlackUserScalarFieldEnum)[keyof t
 
 export const WorkflowScalarFieldEnum = {
   id: 'id',
+  name: 'name',
   storagePath: 'storagePath',
   ownerId: 'ownerId',
   createdAt: 'createdAt',

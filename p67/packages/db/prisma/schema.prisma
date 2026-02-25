@@ -45,6 +45,7 @@ enum WorkflowVisibility {
 
 model Workflow {
     id String @id @default(uuid())
+    name String? // Optional human-readable name for the workflow (multiple IDs can share a name = versions)
     storagePath String // the directory on disk (block storage volume) where workflow artifacts are stored
     ownerId String
     owner User @relation(fields: [ownerId], references: [id])
@@ -52,6 +53,8 @@ model Workflow {
     updatedAt DateTime @default(now())
     visibility WorkflowVisibility @default(Private)
     runs WorkflowRun[]
+
+    @@index([name, ownerId, createdAt(sort: Desc)]) // For efficient latest-version-by-name lookup
 }
 
 enum LogSource {

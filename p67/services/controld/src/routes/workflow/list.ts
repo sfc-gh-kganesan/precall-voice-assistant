@@ -31,6 +31,7 @@ export function registerListRoute(server: FastifyInstance) {
                     workflows: workflows.map((w) => {
                         return {
                             workflowId: w.id,
+                            name: w.name,
                             createdAt: formatDateISO(w.createdAt),
                             updatedAt: formatDateISO(w.updatedAt),
                             owner: w.owner.snowflakeUser,

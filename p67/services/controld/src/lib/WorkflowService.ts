@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PrismaClient, WorkflowWithOwner } from '@p67/db';
+import { parseManifest } from './manifest.js';
 import { unzip } from './zip.js';
 
 export interface WorkflowServiceConfig {
@@ -82,9 +83,25 @@ export class WorkflowService {
         const dest = join(this.localStoragePath, workflowId);
         const { dir } = await unzip(zipFileBuffer, dest);
 
+        // Extract workflow name from manifest if present
+        let workflowName: string | undefined;
+        const manifestPath = join(dir, 'manifest.yaml');
+        if (existsSync(manifestPath)) {
+            try {
+                const manifestStr = await readFile(manifestPath, 'utf-8');
+                const manifest = parseManifest(manifestStr);
+                workflowName = manifest.name;
+            } catch (err) {
+                console.debug(
+                    `[WorkflowService] Failed to parse manifest for name extraction: ${err}`,
+                );
+            }
+        }
+
         return this.db.workflow.create({
             data: {
                 id: workflowId,
+                name: workflowName,
                 storagePath: dir,
                 ownerId: ownerId,
                 visibility: 'Private',
@@ -161,6 +178,70 @@ export class WorkflowService {
                 owner: true,
             },
         });
+    }
+
+    /**
+     * Find the latest workflow version by name that a user can run.
+     * Returns the most recently created workflow with the given name.
+     */
+    async findLatestByName(
+        name: string,
+        userId: string,
+    ): Promise<WorkflowWithOwner | null> {
+        const wf = await this.db.workflow.findFirst({
+            where: {
+                name,
+                OR: [{ ownerId: userId }, { visibility: 'Public' }],
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+            include: {
+                owner: true,
+            },
+        });
+        return wf;
+    }
+
+    /**
+     * Find all versions of a workflow by name that a user can access.
+     * Returns workflows sorted by createdAt descending (newest first).
+     */
+    async findAllVersionsByName(
+        name: string,
+        userId: string,
+    ): Promise<WorkflowWithOwner[]> {
+        return this.db.workflow.findMany({
+            where: {
+                name,
+                OR: [{ ownerId: userId }, { visibility: 'Public' }],
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+            include: {
+                owner: true,
+            },
+        });
+    }
+
+    /**
+     * Get unique workflow names for a user (for listing available workflows by name).
+     */
+    async getUniqueWorkflowNames(userId: string): Promise<string[]> {
+        const workflows = await this.db.workflow.findMany({
+            where: {
+                name: { not: null },
+                OR: [{ ownerId: userId }, { visibility: 'Public' }],
+            },
+            select: {
+                name: true,
+            },
+            distinct: ['name'],
+        });
+        return workflows
+            .map((w) => w.name)
+            .filter((n): n is string => n !== null);
     }
 
     rbacUserCanRun(userId: string, workflow: WorkflowWithOwner): boolean {

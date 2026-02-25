@@ -54,7 +54,9 @@ export const listCommand = new Command('list')
                     const choices = result.workflows.map((wf) => ({
                         value: wf.workflowId,
                         updatedAt: wf.updatedAt,
-                        name: `${wf.workflowId} (${wf.updatedAt}, owner: ${wf.owner})`,
+                        name: wf.name
+                            ? `${wf.name} [${wf.workflowId}] (${wf.updatedAt}, owner: ${wf.owner})`
+                            : `${wf.workflowId} (${wf.updatedAt}, owner: ${wf.owner})`,
                     }));
 
                     // Sort by updatedAt descending

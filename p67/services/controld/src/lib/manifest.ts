@@ -33,6 +33,13 @@ const LanguageSchema = z.enum(['typescript', 'python']).optional();
  *    schema: snowflake_schema
  */
 const ManifestSchema = z.object({
+    // Optional workflow name - used for version management
+    name: z
+        .string()
+        .min(1)
+        .max(128)
+        .regex(/^[a-zA-Z0-9_-]+$/)
+        .optional(),
     // Optional language field - if not specified, will be detected from files
     language: LanguageSchema,
     // Top-level workflow parameters - can be overridden at runtime via POST body

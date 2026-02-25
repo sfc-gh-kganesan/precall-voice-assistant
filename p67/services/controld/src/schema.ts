@@ -17,6 +17,7 @@ export const WorkflowCreateResponseSchema = z.object({
 
 export const WorkflowSchema = z.object({
     workflowId: z.string(),
+    name: z.string().nullable(),
     owner: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),

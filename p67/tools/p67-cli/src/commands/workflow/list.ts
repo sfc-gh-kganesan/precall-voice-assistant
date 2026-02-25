@@ -17,8 +17,11 @@ export const listCommand = new Command('list')
                 console.log('No workflows found.');
             } else {
                 result.workflows.forEach((workflow) => {
+                    const nameDisplay = workflow.name
+                        ? `${workflow.name} [${workflow.workflowId}]`
+                        : workflow.workflowId;
                     console.log(
-                        `${workflow.workflowId} (${workflow.visibility}, owner: ${workflow.owner})`,
+                        `${nameDisplay} (${workflow.visibility}, owner: ${workflow.owner})`,
                     );
                 });
             }

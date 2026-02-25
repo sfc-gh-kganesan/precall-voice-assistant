@@ -10,6 +10,7 @@ export interface WorkflowCreateResponse {
 
 export interface Workflow {
     workflowId: string;
+    name: string | null;
     owner: string;
     createdAt: string;
     updatedAt: string;
@@ -263,6 +264,41 @@ export class ControldClient {
         }
 
         return (await response.json()) as WorkflowManifestResponse;
+    }
+
+    async runWorkflowByName(
+        name: string,
+        params: Record<string, string>,
+    ): Promise<WorkflowRunResponse> {
+        const response = await this.post(
+            `/api/workflow/name/${encodeURIComponent(name)}/run`,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(params),
+            },
+        );
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as WorkflowRunResponse;
+    }
+
+    async getWorkflowVersions(name: string): Promise<WorkflowListResponse> {
+        const response = await this.get(
+            `/api/workflow/name/${encodeURIComponent(name)}/versions`,
+        );
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as WorkflowListResponse;
     }
 
     // Secret methods

@@ -232,6 +232,7 @@ describe('ControldClient', () => {
                 workflows: [
                     {
                         workflowId: 'wf-123',
+                        name: 'test-workflow',
                         owner: 'user-1',
                         createdAt: '2024-01-01T00:00:00Z',
                         updatedAt: '2024-01-01T00:00:00Z',
@@ -239,6 +240,7 @@ describe('ControldClient', () => {
                     },
                     {
                         workflowId: 'wf-456',
+                        name: null,
                         owner: 'user-1',
                         createdAt: '2024-01-02T00:00:00Z',
                         updatedAt: '2024-01-02T00:00:00Z',
@@ -246,6 +248,7 @@ describe('ControldClient', () => {
                     },
                     {
                         workflowId: 'wf-789',
+                        name: 'public-workflow',
                         owner: 'user-1',
                         createdAt: '2024-01-03T00:00:00Z',
                         updatedAt: '2024-01-03T00:00:00Z',
