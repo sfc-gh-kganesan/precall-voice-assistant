@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { Runner } from '@controld/lib/runner.js';
 import {
     ErrorResponseSchema,
+    type WorkflowRunBody,
+    WorkflowRunBodySchema,
     WorkflowRunParamsSchema,
     WorkflowRunResponseSchema,
 } from '@controld/schema.js';
@@ -18,6 +20,7 @@ export function registerRunRoute(server: FastifyInstance) {
                 description: 'Run a workflow',
                 tags: ['Workflow'],
                 params: WorkflowRunParamsSchema,
+                body: WorkflowRunBodySchema,
                 response: {
                     200: WorkflowRunResponseSchema,
                     400: ErrorResponseSchema,
@@ -28,7 +31,8 @@ export function registerRunRoute(server: FastifyInstance) {
         async (request, reply) => {
             try {
                 const { workflowId } = request.params as { workflowId: string };
-                const params = request.body as Record<string, string>;
+                const body = request.body as WorkflowRunBody;
+                const params = body?.params;
                 const workflow =
                     await fastify.workflowService.findRunnableWorkflowByUser(
                         workflowId,

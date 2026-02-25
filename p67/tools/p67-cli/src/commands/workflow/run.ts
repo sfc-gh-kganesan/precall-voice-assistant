@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { select } from '@inquirer/prompts';
+import { input, select } from '@inquirer/prompts';
 import { Command } from '@p67-cli/Command.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { DotP67Config } from '@p67-cli/config/DotP67Config.ts';
@@ -105,6 +105,100 @@ export const runCommand = new Command('run')
                         message: 'Select a workflow to run:',
                         choices: choices,
                     });
+
+                    // In interactive mode, prompt for missing required params
+                    try {
+                        const manifest =
+                            await client.getWorkflowManifest(
+                                selectedWorkflowId,
+                            );
+
+                        if (
+                            manifest.params &&
+                            Object.keys(manifest.params).length > 0
+                        ) {
+                            // Find params that need prompting: required params without defaults
+                            // that weren't provided via CLI
+                            const paramsToPrompt = Object.entries(
+                                manifest.params,
+                            ).filter(([key, valueObj]) => {
+                                // Skip secrets - they're resolved from the secret store
+                                if (valueObj.secretRef || valueObj.oauthRef) {
+                                    return false;
+                                }
+                                // Skip if already provided via CLI
+                                if (params[key] !== undefined) {
+                                    return false;
+                                }
+                                // In non-interactive mode (CLI params provided), only prompt for missing required params
+                                const hasCliParams =
+                                    Object.keys(params).length > 0 ||
+                                    options.param_file !== undefined;
+                                if (hasCliParams) {
+                                    const isRequired =
+                                        valueObj.required === true;
+                                    const hasDefault =
+                                        valueObj.value !== undefined &&
+                                        valueObj.value !== '';
+                                    return isRequired && !hasDefault;
+                                }
+                                // In fully interactive mode, prompt for all params
+                                return true;
+                            });
+
+                            if (paramsToPrompt.length > 0) {
+                                console.log(
+                                    '\nThis workflow has configurable parameters:\n',
+                                );
+
+                                for (const [key, valueObj] of paramsToPrompt) {
+                                    const isRequired =
+                                        valueObj.required === true;
+                                    const defaultVal = valueObj.value ?? '';
+                                    const hasDefault = defaultVal !== '';
+
+                                    // Build the prompt message
+                                    let message = key;
+                                    if (isRequired && !hasDefault) {
+                                        message += ' (required)';
+                                    }
+                                    message += ':';
+
+                                    // Show description if provided
+                                    if (valueObj.description) {
+                                        console.log(
+                                            `  ${key}: ${valueObj.description}`,
+                                        );
+                                    }
+
+                                    const value = await input({
+                                        message,
+                                        default: defaultVal,
+                                        required: isRequired && !hasDefault,
+                                        validate: (val) => {
+                                            if (
+                                                isRequired &&
+                                                !hasDefault &&
+                                                !val
+                                            ) {
+                                                return `${key} is required`;
+                                            }
+                                            return true;
+                                        },
+                                    });
+                                    if (value && value.trim() !== '') {
+                                        params[key] = value;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        // Log error but continue - workflow may still run
+                        console.error(
+                            'Warning: Could not fetch workflow manifest:',
+                            err instanceof Error ? err.message : err,
+                        );
+                    }
                 }
 
                 console.log(`\nRunning workflow: ${selectedWorkflowId}\n`);

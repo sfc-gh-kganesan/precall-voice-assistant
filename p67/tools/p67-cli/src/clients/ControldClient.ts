@@ -29,6 +29,19 @@ export interface WorkflowRunResponse {
     log: string[];
 }
 
+export interface ManifestParamValue {
+    value?: string;
+    valueRef?: string;
+    secretRef?: string;
+    oauthRef?: string;
+    required?: boolean;
+    description?: string;
+}
+
+export interface WorkflowManifestResponse {
+    params?: Record<string, ManifestParamValue>;
+}
+
 export interface ErrorResponse {
     error: string;
     message?: string;
@@ -228,7 +241,7 @@ export class ControldClient {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(params),
+            body: JSON.stringify({ params }),
         });
 
         if (!response.ok) {
@@ -237,6 +250,19 @@ export class ControldClient {
         }
 
         return (await response.json()) as WorkflowRunResponse;
+    }
+
+    async getWorkflowManifest(
+        workflowId: string,
+    ): Promise<WorkflowManifestResponse> {
+        const response = await this.get(`/api/workflow/${workflowId}/manifest`);
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as WorkflowManifestResponse;
     }
 
     // Secret methods

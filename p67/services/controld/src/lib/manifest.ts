@@ -11,6 +11,8 @@ const ValueSchema = z.object({
     valueRef: z.string().optional(),
     secretRef: z.string().optional(),
     oauthRef: z.string().optional(), // Reference to an OAuth token secret
+    required: z.boolean().optional(), // If true, param must be provided at runtime
+    description: z.string().optional(), // Description shown in interactive prompt
 });
 
 export type Value = z.infer<typeof ValueSchema>;
@@ -33,6 +35,8 @@ const LanguageSchema = z.enum(['typescript', 'python']).optional();
 const ManifestSchema = z.object({
     // Optional language field - if not specified, will be detected from files
     language: LanguageSchema,
+    // Top-level workflow parameters - can be overridden at runtime via POST body
+    params: z.record(z.string(), ValueSchema).optional(),
     config: z.array(
         z.object({
             config_name: z.string(),

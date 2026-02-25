@@ -62,6 +62,32 @@ export const WorkflowRunParamsSchema = z.object({
     workflowId: z.string(),
 });
 
+export const WorkflowRunBodySchema = z
+    .object({
+        params: z.record(z.string(), z.string()).optional(),
+    })
+    .optional();
+
+export type WorkflowRunBody = z.infer<typeof WorkflowRunBodySchema>;
+
+// Manifest param value - can be a literal value or reference
+export const ManifestParamValueSchema = z.object({
+    value: z.string().optional(),
+    valueRef: z.string().optional(),
+    secretRef: z.string().optional(),
+    oauthRef: z.string().optional(),
+    required: z.boolean().optional(),
+    description: z.string().optional(),
+});
+
+export const WorkflowManifestResponseSchema = z.object({
+    params: z.record(z.string(), ManifestParamValueSchema).optional(),
+});
+
+export type WorkflowManifestResponse = z.infer<
+    typeof WorkflowManifestResponseSchema
+>;
+
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 

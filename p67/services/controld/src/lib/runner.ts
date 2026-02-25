@@ -230,6 +230,7 @@ export class Runner {
     private completionPromise: Promise<RunResult> | null = null;
     private completionResolve: ((value: RunResult) => void) | null = null;
     private valueManager: ValueManager | null = null;
+    private mergedParams: Record<string, string> = {};
 
     constructor(
         private readonly workflowDir: string,
@@ -347,7 +348,7 @@ export class Runner {
     private serializeConfig(config: P67Config): SerializedP67Config {
         return {
             snowflakeConfig: Object.fromEntries(config.snowflakeConfig),
-            parameters: this.params ?? {},
+            parameters: this.mergedParams,
         };
     }
 
@@ -507,6 +508,35 @@ export class Runner {
                 runId,
                 status: 'failed',
             };
+        }
+
+        // Hydrate top-level manifest params and merge with runtime params
+        // Runtime params override manifest defaults
+        if (manifest.params && this.valueManager) {
+            for (const [key, valueObj] of Object.entries(manifest.params)) {
+                try {
+                    const hydratedValue = await this.valueManager.get(valueObj);
+                    if (hydratedValue !== undefined) {
+                        this.mergedParams[key] = hydratedValue;
+                    }
+                } catch (err) {
+                    // For required params without runtime override, fail early
+                    if (valueObj.required && !this.params?.[key]) {
+                        throw new Error(
+                            `Required param "${key}" could not be hydrated: ${err instanceof Error ? err.message : err}`,
+                        );
+                    }
+                    // Log but continue - param may be overridden by runtime params
+                    console.warn(
+                        `Warning: Could not hydrate param "${key}":`,
+                        err instanceof Error ? err.message : err,
+                    );
+                }
+            }
+        }
+        // Runtime params override manifest params
+        if (this.params) {
+            Object.assign(this.mergedParams, this.params);
         }
 
         // Detect workflow language and create appropriate adapter
