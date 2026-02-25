@@ -315,6 +315,44 @@ export interface InterruptPayload<T = unknown> {
 }
 
 // ============================================================================
+// Subworkflow Types
+// ============================================================================
+
+/**
+ * Options for executing a subworkflow
+ */
+export interface SubworkflowOptions {
+    /** Run workflow by ID (mutually exclusive with workflowName) */
+    workflowId?: string;
+    /** Run workflow by name - uses latest version (mutually exclusive with workflowId) */
+    workflowName?: string;
+    /** Runtime parameter overrides */
+    params?: Record<string, string>;
+    /** Timeout in milliseconds (default: 300000 = 5 min) */
+    timeout?: number;
+}
+
+/**
+ * Response from subworkflow execution
+ */
+export interface SubworkflowResponse {
+    /** Whether the subworkflow completed successfully */
+    success: boolean;
+    /** Exit code from the workflow process */
+    exitCode?: number;
+    /** Standard output lines */
+    stdout?: string[];
+    /** Standard error lines */
+    stderr?: string[];
+    /** Final status: 'completed', 'failed', 'interrupted' */
+    status?: 'completed' | 'failed' | 'interrupted';
+    /** Unique run ID for this execution */
+    runId?: string;
+    /** Error message if success is false */
+    error?: string;
+}
+
+// ============================================================================
 // Cortex Complete Types (LLM Inference)
 // ============================================================================
 
@@ -1117,4 +1155,45 @@ export interface WorkflowSDK {
         options: CortexCompleteOptions,
         config_name?: string,
     ): AsyncIterable<CortexStreamChunk>;
+
+    /**
+     * Executes another workflow as a subworkflow
+     *
+     * Runs a workflow by ID or by name, optionally passing runtime parameters.
+     * When running by name, the latest version of the workflow is used.
+     *
+     * @param options - Subworkflow configuration:
+     *   - `workflowId`: Run by ID (mutually exclusive with workflowName)
+     *   - `workflowName`: Run by name, uses latest version (mutually exclusive with workflowId)
+     *   - `params`: Optional runtime parameter overrides
+     *   - `timeout`: Request timeout in milliseconds (default 300000 = 5 min)
+     * @param config_name - Optional name of the Snowflake config to use for authentication
+     * @returns Response with success status, stdout, stderr, exit code, and run ID.
+     *          Never throws - errors are returned in the response object.
+     *
+     * @example
+     * // Run by name with parameters
+     * const result = await sdk.executeSubworkflow({
+     *   workflowName: 'data-pipeline',
+     *   params: { env: 'prod', batchSize: '100' }
+     * });
+     *
+     * if (result.success) {
+     *   console.log(`Completed with status: ${result.status}`);
+     *   console.log(`Output: ${result.stdout?.join('\n')}`);
+     * } else {
+     *   console.error(`Failed: ${result.error}`);
+     * }
+     *
+     * @example
+     * // Run by ID
+     * const result = await sdk.executeSubworkflow({
+     *   workflowId: 'abc-123-uuid',
+     *   params: { targetTable: 'SALES' }
+     * });
+     */
+    executeSubworkflow(
+        options: SubworkflowOptions,
+        config_name?: string,
+    ): Promise<SubworkflowResponse>;
 }

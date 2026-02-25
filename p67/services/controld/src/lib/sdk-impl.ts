@@ -33,6 +33,8 @@ import {
     P67ConfigValueSchema,
     type QueryResult,
     type SnowflakeStatement,
+    type SubworkflowOptions,
+    type SubworkflowResponse,
     type WorkflowSDK,
 } from '@p67/workflow-sdk';
 import snowflake from 'snowflake-sdk';
@@ -1391,6 +1393,128 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             choices: parsedChoices,
             usage: this.parseUsage(data.usage),
         };
+    }
+
+    /**
+     * Executes another workflow as a subworkflow
+     */
+    async executeSubworkflow(
+        options: SubworkflowOptions,
+        config_name?: string,
+    ): Promise<SubworkflowResponse> {
+        // Validate that exactly one of workflowId or workflowName is provided
+        const hasId =
+            options.workflowId !== undefined && options.workflowId !== '';
+        const hasName =
+            options.workflowName !== undefined && options.workflowName !== '';
+
+        if (hasId === hasName) {
+            if (hasId) {
+                return {
+                    success: false,
+                    error: 'Provide either workflowId or workflowName, not both',
+                };
+            } else {
+                return {
+                    success: false,
+                    error: 'Either workflowId or workflowName is required',
+                };
+            }
+        }
+
+        const cfg = this.cfg(config_name);
+
+        const token = cfg.token;
+        const accessUrl = cfg.accessUrl;
+
+        if (!token || !accessUrl) {
+            return {
+                success: false,
+                error: 'token and accessUrl are required in config for subworkflow execution',
+            };
+        }
+
+        // Build URL based on whether we're using ID or name
+        let url: string;
+        if (hasId) {
+            url = `${accessUrl}/api/workflow/${encodeURIComponent(options.workflowId!)}/run`;
+        } else {
+            url = `${accessUrl}/api/workflow/name/${encodeURIComponent(options.workflowName!)}/run`;
+        }
+
+        // Build request body with params
+        const payload: { params?: Record<string, string> } = {};
+        if (options.params) {
+            payload.params = options.params;
+        }
+
+        const timeout = options.timeout ?? 300000; // 5 minutes default
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                let errorMsg: string;
+                try {
+                    const errorData = (await response.json()) as {
+                        message?: string;
+                        error?: string;
+                    };
+                    errorMsg =
+                        errorData.message ||
+                        errorData.error ||
+                        `HTTP ${response.status}`;
+                } catch {
+                    errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+                }
+                return {
+                    success: false,
+                    error: errorMsg,
+                };
+            }
+
+            const data = (await response.json()) as {
+                success?: boolean;
+                exitCode?: number;
+                stdout?: string[];
+                stderr?: string[];
+                status?: 'completed' | 'failed' | 'interrupted';
+                runId?: string;
+            };
+
+            return {
+                success: data.success ?? false,
+                exitCode: data.exitCode,
+                stdout: data.stdout,
+                stderr: data.stderr,
+                status: data.status,
+                runId: data.runId,
+            };
+        } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') {
+                return {
+                    success: false,
+                    error: `Request timed out after ${timeout}ms`,
+                };
+            }
+            return {
+                success: false,
+                error: err instanceof Error ? err.message : String(err),
+            };
+        }
     }
 }
 

@@ -8,9 +8,11 @@ Snowflake and external services.
 from __future__ import annotations
 
 import json
+import socket
 import urllib.request
 import urllib.error
 from typing import Any, Dict, Iterator, List, Optional, TypeVar
+from urllib.parse import quote
 
 from p67_sdk.types import (
     QueryResult,
@@ -31,6 +33,8 @@ from p67_sdk.types import (
     CortexStreamDelta,
     CortexStreamDeltaToolCall,
     CortexStreamDeltaToolCallFunction,
+    SubworkflowOptions,
+    SubworkflowResponse,
 )
 from p67_sdk.ipc import send_interrupt, wait_for_resume
 
@@ -1053,6 +1057,109 @@ class WorkflowSDK:
             choices=parsed_choices,
             usage=self._parse_usage(data.get('usage')),
         )
+    
+    def execute_subworkflow(
+        self,
+        options: SubworkflowOptions,
+        config_name: Optional[str] = None,
+    ) -> SubworkflowResponse:
+        """
+        Execute another workflow as a subworkflow.
+        
+        Runs a workflow by ID or by name, optionally passing runtime parameters.
+        When running by name, the latest version of the workflow is used.
+        
+        Args:
+            options: SubworkflowOptions containing:
+                - workflow_id: Run by ID (mutually exclusive with workflow_name)
+                - workflow_name: Run by name, uses latest version (mutually exclusive with workflow_id)
+                - params: Optional dict of parameter overrides
+                - timeout: Timeout in milliseconds (default 300000 = 5 min)
+            config_name: Optional name of the config to use for authentication
+            
+        Returns:
+            SubworkflowResponse with success status, stdout, stderr, exit_code, etc.
+            
+        Example:
+            # Run by name with parameters
+            result = sdk.execute_subworkflow(SubworkflowOptions(
+                workflow_name='data-pipeline',
+                params={'env': 'prod', 'batch_size': '100'}
+            ))
+            
+            if result.success:
+                print(f"Completed with exit code: {result.exit_code}")
+            else:
+                print(f"Failed: {result.error}")
+        """
+        cfg = self._get_config(config_name)
+        
+        token = cfg.get('token')
+        access_url = self._normalize_access_url(cfg.get('accessUrl'))
+        
+        if not token or not access_url:
+            return SubworkflowResponse(
+                success=False,
+                error="token and accessUrl are required in config for subworkflow execution",
+            )
+        
+        # Build URL based on whether we're using ID or name
+        if options.workflow_id is not None:
+            url = f"{access_url}/api/workflow/{quote(options.workflow_id, safe='')}/run"
+        else:
+            url = f"{access_url}/api/workflow/name/{quote(options.workflow_name, safe='')}/run"
+        
+        # Build request body with params
+        payload = {}
+        if options.params:
+            payload['params'] = options.params
+        
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        
+        timeout_sec = options.timeout / 1000  # Convert ms to seconds
+        
+        try:
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+            
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                response_data = json.loads(resp.read().decode('utf-8'))
+                
+                return SubworkflowResponse(
+                    success=response_data.get('success', False),
+                    exit_code=response_data.get('exitCode'),
+                    stdout=response_data.get('stdout'),
+                    stderr=response_data.get('stderr'),
+                    status=response_data.get('status'),
+                    run_id=response_data.get('runId'),
+                )
+                
+        except urllib.error.HTTPError as e:
+            error_body = None
+            try:
+                error_body = e.read().decode('utf-8')
+                error_json = json.loads(error_body)
+                error_msg = error_json.get('message') or error_json.get('error') or error_body
+            except Exception:
+                error_msg = error_body or str(e)
+            
+            return SubworkflowResponse(
+                success=False,
+                error=f"HTTP {e.code}: {error_msg}",
+            )
+        except socket.timeout:
+            return SubworkflowResponse(
+                success=False,
+                error=f"Request timed out after {timeout_sec}s",
+            )
+        except Exception as e:
+            return SubworkflowResponse(
+                success=False,
+                error=str(e),
+            )
     
     def close(self) -> None:
         """

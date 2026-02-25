@@ -3,7 +3,7 @@ Type definitions for the P67 Workflow SDK.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 
 @dataclass
@@ -76,6 +76,47 @@ class CortexAgentOptions:
     agent_schema: Optional[str] = None
     agent_name: Optional[str] = None
     parent_message_id: Optional[str] = None
+
+
+# =============================================================================
+# Subworkflow Types
+# =============================================================================
+
+# Type alias for subworkflow execution status
+SubworkflowStatus = Literal['completed', 'failed', 'interrupted']
+
+
+@dataclass(frozen=True)
+class SubworkflowOptions:
+    """Options for executing a subworkflow.
+    
+    Exactly one of workflow_id or workflow_name must be provided.
+    """
+    workflow_id: Optional[str] = None  # Run by ID
+    workflow_name: Optional[str] = None  # Run by name (uses latest version)
+    params: Optional[Dict[str, str]] = None  # Runtime parameter overrides
+    timeout: int = 300000  # Timeout in milliseconds (default 5 min)
+
+    def __post_init__(self) -> None:
+        """Validate that exactly one of workflow_id or workflow_name is provided."""
+        has_id = self.workflow_id is not None and self.workflow_id != ''
+        has_name = self.workflow_name is not None and self.workflow_name != ''
+        if has_id and has_name:
+            raise ValueError("Provide either workflow_id or workflow_name, not both")
+        if not has_id and not has_name:
+            raise ValueError("Either workflow_id or workflow_name is required")
+
+
+@dataclass(frozen=True)
+class SubworkflowResponse:
+    """Response from subworkflow execution."""
+    success: bool
+    exit_code: Optional[int] = None
+    stdout: Optional[List[str]] = None
+    stderr: Optional[List[str]] = None
+    status: Optional[SubworkflowStatus] = None
+    run_id: Optional[str] = None
+    error: Optional[str] = None
 
 
 # =============================================================================
