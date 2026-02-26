@@ -49,7 +49,7 @@ export class ValueManager {
         if (!value) {
             return undefined;
         }
-        if (value.value) {
+        if (value.value !== undefined) {
             return value.value;
         }
         if (value.valueRef) {
