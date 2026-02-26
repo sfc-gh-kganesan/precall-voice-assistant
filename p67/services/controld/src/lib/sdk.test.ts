@@ -213,6 +213,38 @@ describe('workflow-sdk', () => {
             const firstKeyword = withoutComments.split(/\s+/)[0]?.toUpperCase();
             expect(firstKeyword).toBe('SELECT');
         });
+
+        it('should reject missing sqlText with helpful error', async () => {
+            // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+            const badStmt = { sql: 'SELECT 1' } as any;
+            await expect(sdk.executeQueryReadOnly(badStmt)).rejects.toThrow(
+                "executeQueryReadOnly requires 'sqlText' property, got keys: [sql]",
+            );
+        });
+
+        it('should reject empty sqlText', async () => {
+            await expect(
+                sdk.executeQueryReadOnly({ sqlText: '' }),
+            ).rejects.toThrow(
+                "executeQueryReadOnly requires 'sqlText' property",
+            );
+        });
+    });
+
+    describe('executeQuery', () => {
+        it('should reject missing sqlText with helpful error', async () => {
+            // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+            const badStmt = { sql: 'INSERT INTO t VALUES (1)' } as any;
+            await expect(sdk.executeQuery(badStmt)).rejects.toThrow(
+                "executeQuery requires 'sqlText' property, got keys: [sql]",
+            );
+        });
+
+        it('should reject empty sqlText', async () => {
+            await expect(sdk.executeQuery({ sqlText: '' })).rejects.toThrow(
+                "executeQuery requires 'sqlText' property",
+            );
+        });
     });
 
     describe('queryCortexAnalyst', () => {

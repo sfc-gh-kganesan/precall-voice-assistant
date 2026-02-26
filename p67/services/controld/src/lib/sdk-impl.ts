@@ -314,6 +314,12 @@ export class WorkflowSDKImpl implements WorkflowSDK {
         stmt: SnowflakeStatement,
         config_name?: string,
     ): Promise<QueryResult> {
+        if (!stmt.sqlText) {
+            const keys = Object.keys(stmt);
+            throw new Error(
+                `executeQuery requires 'sqlText' property, got keys: [${keys.join(', ')}]. Use { sqlText: '...' } not { sql: '...' }.`,
+            );
+        }
         const conn = await this.getSnowflakeConnection(config_name);
         return new Promise((resolve, reject) => {
             conn.execute({
@@ -362,6 +368,12 @@ export class WorkflowSDKImpl implements WorkflowSDK {
         stmt: SnowflakeStatement,
         config_name?: string,
     ): Promise<QueryResult> {
+        if (!stmt.sqlText) {
+            const keys = Object.keys(stmt);
+            throw new Error(
+                `executeQueryReadOnly requires 'sqlText' property, got keys: [${keys.join(', ')}]. Use { sqlText: '...' } not { sql: '...' }.`,
+            );
+        }
         if (!this.isSelectQuery(stmt.sqlText)) {
             throw new Error(
                 'Only SELECT queries are allowed. DML (INSERT, UPDATE, DELETE) and DDL (CREATE, ALTER, DROP) statements are not permitted.',
