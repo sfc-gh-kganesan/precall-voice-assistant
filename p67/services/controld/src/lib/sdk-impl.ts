@@ -238,13 +238,13 @@ export class WorkflowSDKImpl implements WorkflowSDK {
 
         this.isConnecting = true;
         this.connectionPromise = new Promise((resolve, reject) => {
-            console.log(
-                `🔥[SDK] Creating Snowflake connection with options:`,
-                this.getSnowflakeConnectionOptions(cfg),
-            );
-            const connection = snowflake.createConnection(
-                this.getSnowflakeConnectionOptions(cfg),
-            );
+            const connOpts = this.getSnowflakeConnectionOptions(cfg);
+            console.log(`🔥[SDK] Creating Snowflake connection with options:`, {
+                ...connOpts,
+                token: connOpts.token ? '<redacted>' : undefined,
+                password: connOpts.password ? '<redacted>' : undefined,
+            });
+            const connection = snowflake.createConnection(connOpts);
 
             connection.connect((err, conn) => {
                 this.isConnecting = false;
