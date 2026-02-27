@@ -350,6 +350,8 @@ export interface SubworkflowResponse {
     runId?: string;
     /** Error message if success is false */
     error?: string;
+    /** Structured result returned by the workflow */
+    result?: unknown;
 }
 
 // ============================================================================
