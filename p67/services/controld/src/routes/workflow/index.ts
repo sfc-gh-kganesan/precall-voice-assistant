@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { registerByNameRoutes } from './byName.js';
 import { registerCreateRoute } from './create.js';
+import { registerDeleteRoute } from './delete.js';
 import { registerInterruptRoutes } from './interrupt.js';
 import { registerListRoute } from './list.js';
 import { registerManifestRoute } from './manifest.js';
@@ -15,6 +16,8 @@ const workflowRoutes = async (server: FastifyInstance) => {
     registerManifestRoute(server);
     console.log('[WorkflowRoutes] Registering run route...');
     registerRunRoute(server);
+    console.log('[WorkflowRoutes] Registering delete route...');
+    registerDeleteRoute(server);
     console.log('[WorkflowRoutes] Registering by-name routes...');
     registerByNameRoutes(server);
     console.log('[WorkflowRoutes] Registering interrupt routes...');

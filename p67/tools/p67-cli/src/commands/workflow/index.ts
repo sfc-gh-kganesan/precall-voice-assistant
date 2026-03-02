@@ -1,4 +1,5 @@
 import { Command } from '@p67-cli/Command';
+import { deleteCommand } from '@p67-cli/commands/workflow/delete.ts';
 import { deployCommand } from '@p67-cli/commands/workflow/deploy.ts';
 import { listCommand } from '@p67-cli/commands/workflow/list.ts';
 import { runCommand } from '@p67-cli/commands/workflow/run.ts';
@@ -13,4 +14,5 @@ export const workflowCommand = new Command('workflow')
     .addCommand(listCommand)
     .addCommand(runCommand)
     .addCommand(deployCommand)
-    .addCommand(versionsCommand);
+    .addCommand(versionsCommand)
+    .addCommand(deleteCommand);

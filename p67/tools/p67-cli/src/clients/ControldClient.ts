@@ -21,6 +21,11 @@ export interface WorkflowListResponse {
     workflows: Workflow[];
 }
 
+export interface WorkflowDeleteResponse {
+    deleted: boolean;
+    workflowId: string;
+}
+
 export interface WorkflowRunResponse {
     exitCode: number;
     stdout: string[];
@@ -232,6 +237,19 @@ export class ControldClient {
         }
 
         return (await response.json()) as WorkflowListResponse;
+    }
+
+    async deleteWorkflow(workflowId: string): Promise<WorkflowDeleteResponse> {
+        const response = await this.delete(
+            `/api/workflow/${encodeURIComponent(workflowId)}`,
+        );
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as WorkflowDeleteResponse;
     }
 
     async runWorkflow(

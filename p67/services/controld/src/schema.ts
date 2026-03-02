@@ -135,6 +135,20 @@ export const WhoamiResponseSchema = z.object({
 export type WhoamiResponse = z.infer<typeof WhoamiResponseSchema>;
 
 // Secret Schemas
+// Workflow Delete Schemas
+export const WorkflowDeleteParamsSchema = z.object({
+    workflowId: z.string(),
+});
+
+export const WorkflowDeleteResponseSchema = z.object({
+    deleted: z.boolean(),
+    workflowId: z.string(),
+});
+
+export type WorkflowDeleteResponse = z.infer<
+    typeof WorkflowDeleteResponseSchema
+>;
+
 export const SecretTypeSchema = z.enum(['Secret', 'OAuth']);
 
 export const SecretSaveBodySchema = z.object({

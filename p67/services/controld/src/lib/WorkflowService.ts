@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PrismaClient, WorkflowWithOwner } from '@p67/db';
 import { parseManifest } from './manifest.js';
@@ -282,5 +282,42 @@ export class WorkflowService {
                 startedAt: 'desc',
             },
         });
+    }
+
+    /**
+     * Delete a workflow by ID.
+     * Only the owner can delete. Rejects if the workflow has an active run.
+     * Prisma cascades handle cleanup of runs, logs, and interrupts.
+     * Disk files are removed after the DB record is deleted.
+     */
+    async delete(workflowId: string, userId: string): Promise<boolean> {
+        const workflow = await this.findById(workflowId);
+        if (!workflow) {
+            return false;
+        }
+
+        if (!this.rbacUserCanUpdate(userId, workflow)) {
+            return false;
+        }
+
+        const activeRun = await this.findActiveRun(workflowId);
+        if (activeRun) {
+            throw new WorkflowLockedError(
+                workflowId,
+                activeRun.id,
+                activeRun.startedAt,
+            );
+        }
+
+        await this.db.workflow.delete({
+            where: { id: workflowId },
+        });
+
+        const diskPath = this.getWorkflowPath(workflowId);
+        if (existsSync(diskPath)) {
+            await rm(diskPath, { recursive: true, force: true });
+        }
+
+        return true;
     }
 }
