@@ -2,64 +2,21 @@
 
 This guide will help you get started with P67, from setting up the development environment to deploying and running your first workflow.
 
-## Requirements
-
-Before you begin, ensure you have the following installed:
-
--   **Node.js** (v20 or later)
--   **Bun** (v1.1 or later) - [Install Bun](https://bun.sh/docs/installation)
--   **pnpm** (v10 or later) - `npm install -g pnpm`| [Install pnpm](https://pnpm.io/installation)
--   **Docker** and **Docker Compose** - for running the local development environment
-
 ## Setting Up the Development Environment
 
-### 1. Start the Local Services
-
-In one terminal, start the development environment:
+From the project root, open Cortex Code and run the install skill:
 
 ```bash
-./configure.sh
-make dev
+cortex
 ```
 
-This will:
-
--   Start PostgreSQL in Docker
--   Run database migrations
--   Start the controld service
--   Stream logs from all services
-
-Keep this terminal running while developing.
-
-### 2. Build and Install the CLI
-
-In another terminal, build and install the P67 CLI:
-
-```bash
-make install-cli
-```
-
-You'll be prompted for an install directory:
+Then in the Cortex Code session:
 
 ```
-Install directory [/usr/local/bin]:
+$install
 ```
 
-Press **Enter** to accept the default (`/usr/local/bin`), or type a custom path (e.g., `~/.local/bin`).
-
-> **Note:** Ensure the install directory is in your `$PATH`. If it's not, add it to your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
-> ```bash
-> export PATH="$PATH:/usr/local/bin"
-> ```
-
-### 3. Configure a Connection
-
-Set up a connection to your local controld instance:
-
-```bash
-p67 connection add p67 --endpoint http://localhost:3002
-```
-You will be prompted to enter a Snowflake PAT. *When running locally, put any value e.g. `dummy`*
+This will handle all setup automatically — installing dependencies, starting local services, building and installing the CLI, and configuring a local connection.
 
 ## Your First Workflow
 
