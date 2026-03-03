@@ -19,6 +19,8 @@ FROM deps AS builder
 RUN pnpm run build
 
 # Generate Prisma Client for database package
+# DATABASE_URL is required by prisma.config.ts but not used during generate
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN cd packages/db && pnpm db:generate
 
 # Generic service runner stage
@@ -54,7 +56,12 @@ COPY --from=builder /app/services/${SERVICE_NAME}/dist ./services/${SERVICE_NAME
 
 ENV NODE_ENV=production
 ENV PORT=${SERVICE_PORT}
+ENV SERVICE_NAME=${SERVICE_NAME}
 EXPOSE ${SERVICE_PORT}
 
+# Entrypoint runs migrations then starts the service
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 WORKDIR /app/services/${SERVICE_NAME}
-CMD ["node", "dist/index.js"]
+CMD ["/app/entrypoint.sh"]

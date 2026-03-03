@@ -36,13 +36,13 @@
         "@prisma/adapter-pg": "^7.1.0",
         "@prisma/client": "^7.1.0",
         "fastify-plugin": "^5.1.0",
-        "pg": "^8.13.1"
+        "pg": "^8.13.1",
+        "prisma": "^7.1.0"
     },
     "devDependencies": {
         "@types/node": "^24.10.1",
         "@types/pg": "^8.11.10",
         "fastify": "^5.2.0",
-        "prisma": "^7.1.0",
         "tsc-alias": "^1.8.16"
     },
     "files": [

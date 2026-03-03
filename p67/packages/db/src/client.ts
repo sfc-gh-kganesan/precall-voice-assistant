@@ -8,7 +8,15 @@ export const createPrismaClient = (databaseUrl: string): PrismaClient => {
     }
 
     // Create PostgreSQL connection pool
-    const pool = new pg.Pool({ connectionString: databaseUrl });
+    // Enable SSL for Snowflake Postgres connections (self-signed certificates)
+    const url = new URL(databaseUrl);
+    const sslParam = url.searchParams.get('sslmode');
+    const useSSL =
+        sslParam === 'require' || databaseUrl.includes('.snowflake.app');
+    const pool = new pg.Pool({
+        connectionString: databaseUrl,
+        ...(useSSL && { ssl: { rejectUnauthorized: false } }),
+    });
 
     // Create Prisma driver adapter for PostgreSQL
     const adapter = new PrismaPg(pool);
