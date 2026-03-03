@@ -1,0 +1,32 @@
+name: VALUE_PROPOSITION
+config:
+  - config_name: snowbiz
+    account:
+      value: SNOWHOUSE_AWS_US_WEST_2
+    username:
+      value: NWIEGAND
+    token:
+      secretRef: p67_frostsight_pat
+    accessUrl:
+      value: SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2.snowflakecomputing.com
+    database:
+      value: SALES
+    schema:
+      value: RAVEN_DEV
+    role:
+      value: SALES_AI_PLATFORM_APP_RL
+    warehouse:
+      value: SALES_AI_PLATFORM_AGENT_RUNTIME_WH
+    parameters:
+      account_name:
+        value: sanofi
+      salesforce_account_id:
+        value: 001Do00000QKwjeIAD
+      account_id:
+        value: 001Do00000QKwjeIAD
+      sfdc_email:
+        value: nwiegand@snowflake.com
+      company_profile:
+        value: ""
+      account_recent_news:
+        value: ""
