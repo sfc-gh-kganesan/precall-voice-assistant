@@ -1,0 +1,35 @@
+# Build output
+build/
+dist/
+.p67/
+workflow.zip
+
+# Dependencies
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.venv/
+venv/
+ENV/
+
+# P67 SDK (copied for IDE support, bundled at build time)
+p67_sdk/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
