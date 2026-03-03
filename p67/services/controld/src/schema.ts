@@ -13,6 +13,8 @@ export const ErrorResponseSchema = z.object({
 
 export const WorkflowCreateResponseSchema = z.object({
     workflowId: z.string(),
+    isNewVersion: z.boolean().optional(),
+    versionNumber: z.number().optional(),
 });
 
 export const WorkflowSchema = z.object({
@@ -22,6 +24,7 @@ export const WorkflowSchema = z.object({
     createdAt: z.string(),
     updatedAt: z.string(),
     visibility: z.string(),
+    versionCount: z.number().optional(),
 });
 
 export const WorkflowListResponseSchema = z.object({

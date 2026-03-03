@@ -27,8 +27,24 @@ export function registerListRoute(server: FastifyInstance) {
                     await fastify.workflowService.findAllRunnableWorkflowsByUser(
                         req.user.id,
                     );
+
+                // Compute version counts for named workflows
+                const versionCounts = new Map<string, number>();
+                for (const w of workflows) {
+                    if (w.name) {
+                        const key = `${w.ownerId}:${w.name}`;
+                        versionCounts.set(
+                            key,
+                            (versionCounts.get(key) ?? 0) + 1,
+                        );
+                    }
+                }
+
                 return reply.code(200).send({
                     workflows: workflows.map((w) => {
+                        const versionCount = w.name
+                            ? versionCounts.get(`${w.ownerId}:${w.name}`)
+                            : undefined;
                         return {
                             workflowId: w.id,
                             name: w.name,
@@ -36,6 +52,7 @@ export function registerListRoute(server: FastifyInstance) {
                             updatedAt: formatDateISO(w.updatedAt),
                             owner: w.owner.snowflakeUser,
                             visibility: w.visibility,
+                            versionCount,
                         };
                     }),
                 });

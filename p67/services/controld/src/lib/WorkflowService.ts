@@ -20,6 +20,8 @@ export interface CreateWorkflowInput {
 export interface CreateWorkflowResult {
     workflowId: string;
     storagePath: string;
+    isNewVersion: boolean;
+    versionNumber: number;
 }
 
 export class WorkflowLockedError extends Error {
@@ -51,7 +53,7 @@ export class WorkflowService {
         ownerId: string,
         zipFileBuffer: Buffer,
         overwriteWorkflowId?: string,
-    ): Promise<WorkflowWithOwner> {
+    ): Promise<CreateWorkflowResult & { workflow: WorkflowWithOwner }> {
         let workflowId = `wf-${randomUUID()}`;
 
         if (overwriteWorkflowId) {
@@ -100,7 +102,26 @@ export class WorkflowService {
             }
         }
 
-        return this.db.workflow.create({
+        // Check if this is a new version of an existing named workflow
+        let isNewVersion = false;
+        let versionNumber = 1;
+        if (workflowName && !overwriteWorkflowId) {
+            const existingVersions = await this.db.workflow.count({
+                where: {
+                    name: workflowName,
+                    ownerId: ownerId,
+                },
+            });
+            if (existingVersions > 0) {
+                isNewVersion = true;
+                versionNumber = existingVersions + 1;
+                console.log(
+                    `[WorkflowService] Creating version ${versionNumber} of workflow "${workflowName}" for owner ${ownerId}`,
+                );
+            }
+        }
+
+        const workflow = await this.db.workflow.create({
             data: {
                 id: workflowId,
                 name: workflowName,
@@ -112,6 +133,14 @@ export class WorkflowService {
                 owner: true,
             },
         });
+
+        return {
+            workflow,
+            workflowId: workflow.id,
+            storagePath: workflow.storagePath,
+            isNewVersion,
+            versionNumber,
+        };
     }
 
     async listAll(): Promise<WorkflowWithOwner[]> {

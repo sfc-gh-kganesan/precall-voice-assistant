@@ -76,6 +76,11 @@ export const deployCommand = new Command('deploy')
 
                 console.log('Workflow deployed successfully!');
                 console.log(`  Workflow ID: ${result.workflowId}`);
+                if (result.isNewVersion && result.versionNumber) {
+                    console.log(
+                        `  Created version ${result.versionNumber} (use "p67 workflow versions <name>" to see all versions)`,
+                    );
+                }
 
                 dotP67Config.setWorkflowId(result.workflowId);
                 dotP67Config.write();

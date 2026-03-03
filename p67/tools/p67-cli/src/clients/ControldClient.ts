@@ -6,6 +6,8 @@ export interface HealthResponse {
 
 export interface WorkflowCreateResponse {
     workflowId: string;
+    isNewVersion?: boolean;
+    versionNumber?: number;
 }
 
 export interface Workflow {
@@ -15,6 +17,7 @@ export interface Workflow {
     createdAt: string;
     updatedAt: string;
     visibility: string;
+    versionCount?: number;
 }
 
 export interface WorkflowListResponse {

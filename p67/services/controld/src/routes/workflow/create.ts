@@ -38,12 +38,18 @@ export function registerCreateRoute(server: FastifyInstance) {
                 }
 
                 const fileBuffer = await data.toBuffer();
-                const wf = await fastify.workflowService.create(
+                const result = await fastify.workflowService.create(
                     request.user.id /* ownerId */,
                     fileBuffer /* zip file buffer */,
                     overwriteWorkflowId /* overwriteWorkflowId */,
                 );
-                return reply.code(200).send({ workflowId: wf.id });
+                return reply.code(200).send({
+                    workflowId: result.workflowId,
+                    isNewVersion: result.isNewVersion || undefined,
+                    versionNumber: result.isNewVersion
+                        ? result.versionNumber
+                        : undefined,
+                });
             } catch (error) {
                 console.error('Error creating workflow:', error);
 
