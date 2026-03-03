@@ -130,9 +130,10 @@ export const runCommand = new Command('run')
                             new Date(a.updatedAt).getTime(),
                     );
                     // If there's a workflowid in the dotP67Config, sort such that it's first.
-                    if (dotP67Config.get().workflowId) {
+                    const lastWorkflowId = dotP67Config.get()?.workflowId;
+                    if (lastWorkflowId) {
                         choices.sort((a, _b) =>
-                            a.value === dotP67Config.get().workflowId ? -1 : 1,
+                            a.value === lastWorkflowId ? -1 : 1,
                         );
                     }
                     selectedWorkflowId = await select({

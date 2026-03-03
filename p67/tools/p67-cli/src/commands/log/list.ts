@@ -67,9 +67,10 @@ export const listCommand = new Command('list')
                     );
 
                     // If there's a workflowId in the dotP67Config, sort such that it's first
-                    if (dotP67Config.get().workflowId) {
+                    const lastWorkflowId = dotP67Config.get()?.workflowId;
+                    if (lastWorkflowId) {
                         choices.sort((a, _b) =>
-                            a.value === dotP67Config.get().workflowId ? -1 : 1,
+                            a.value === lastWorkflowId ? -1 : 1,
                         );
                     }
 

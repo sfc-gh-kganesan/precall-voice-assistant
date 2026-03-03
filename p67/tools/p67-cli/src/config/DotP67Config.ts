@@ -19,11 +19,6 @@ export class DotP67Config {
         this.configPath = path.join(this.configDir, '.p67');
         if (fs.existsSync(this.configPath)) {
             this.load();
-        } else {
-            this.data = {
-                workflowId: '',
-            };
-            this.write();
         }
     }
 
@@ -97,12 +92,9 @@ export class DotP67Config {
     }
 
     /**
-     * Get the configuration data (loads if not already loaded)
+     * Get the configuration data, or null if no .p67 file exists
      */
-    get(): DotP67ConfigData {
-        if (!this.data) {
-            throw new Error('unable to load project config');
-        }
+    get(): DotP67ConfigData | null {
         return this.data;
     }
 

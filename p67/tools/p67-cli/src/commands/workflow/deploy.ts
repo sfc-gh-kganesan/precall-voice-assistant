@@ -4,8 +4,10 @@ import { Command } from '@p67-cli/Command.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { DotP67Config } from '@p67-cli/config/DotP67Config.ts';
 import { ctx } from '@p67-cli/context';
+import { projectConfig } from '@p67-cli/middleware/project-config';
 
 export const deployCommand = new Command('deploy')
+    .use(projectConfig)
     .option('--overwrite [boolean]', 'Overwrite existing workflow if it exists')
     .description('Deploy a workflow from a zip file')
     .argument(
@@ -58,17 +60,18 @@ export const deployCommand = new Command('deploy')
                 });
 
                 // Handle both --overwrite (boolean true) and --overwrite true (string 'true')
+                const existingWorkflowId = dotP67Config.get()?.workflowId;
                 const overwrite =
                     (options?.overwrite === true ||
                         options?.overwrite === 'true') &&
-                    dotP67Config.get().workflowId !== undefined;
+                    existingWorkflowId !== undefined;
                 if (overwrite) {
                     console.log('Overwriting existing workflow...');
                 }
                 const result = await client.createWorkflow(
                     blob,
                     filename,
-                    overwrite ? dotP67Config.get().workflowId : undefined,
+                    overwrite ? existingWorkflowId : undefined,
                 );
 
                 console.log('Workflow deployed successfully!');
