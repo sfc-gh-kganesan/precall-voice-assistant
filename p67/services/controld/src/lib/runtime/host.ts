@@ -197,7 +197,23 @@ async function handleMessage(message: Message) {
             oauthTokenResolver: createIPCOAuthTokenResolver(),
         });
         const result = await script.main(sdk);
-        process.send?.({ type: 'result', data: result });
+        // Wait for the IPC message to be flushed before exiting, otherwise
+        // process.exit(0) can kill the process before the parent receives it.
+        await new Promise<void>((resolve, reject) => {
+            if (!process.send) {
+                resolve();
+                return;
+            }
+            process.send(
+                { type: 'result', data: result },
+                undefined,
+                undefined,
+                (err: Error | null) => {
+                    if (err) reject(err);
+                    else resolve();
+                },
+            );
+        });
         process.exit(0);
     } catch (err) {
         sendError(WorkflowError.ExecutionError, err);

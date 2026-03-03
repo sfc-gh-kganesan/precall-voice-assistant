@@ -40,6 +40,16 @@ const ManifestSchema = z.object({
         .max(128)
         .regex(/^[a-zA-Z0-9_-]+$/)
         .optional(),
+    // Optional visibility - defaults to Private if not specified (case-insensitive)
+    visibility: z
+        .string()
+        .transform((v) => v.toLowerCase())
+        .pipe(z.enum(['private', 'public']))
+        .transform(
+            (v) =>
+                (v === 'public' ? 'Public' : 'Private') as 'Private' | 'Public',
+        )
+        .optional(),
     // Optional language field - if not specified, will be detected from files
     language: LanguageSchema,
     // Top-level workflow parameters - can be overridden at runtime via POST body

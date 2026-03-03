@@ -1437,21 +1437,24 @@ export class WorkflowSDKImpl implements WorkflowSDK {
         const cfg = this.cfg(config_name);
 
         const token = cfg.token;
-        const accessUrl = cfg.accessUrl;
 
-        if (!token || !accessUrl) {
+        // Sub-workflow calls go to the local controld service (we're a child process of it)
+        const port = process.env.PORT || '3002';
+        const accessUrl = `http://localhost:${port}`;
+
+        if (!token) {
             return {
                 success: false,
-                error: 'token and accessUrl are required in config for subworkflow execution',
+                error: 'token is required in config for subworkflow execution',
             };
         }
 
         // Build URL based on whether we're using ID or name
         let url: string;
         if (hasId) {
-            url = `${accessUrl}/api/workflow/${encodeURIComponent(options.workflowId!)}/run`;
+            url = `${accessUrl}/api/workflow/${encodeURIComponent(options.workflowId ?? '')}/run`;
         } else {
-            url = `${accessUrl}/api/workflow/name/${encodeURIComponent(options.workflowName!)}/run`;
+            url = `${accessUrl}/api/workflow/name/${encodeURIComponent(options.workflowName ?? '')}/run`;
         }
 
         // Build request body with params
@@ -1505,6 +1508,7 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                 stderr?: string[];
                 status?: 'completed' | 'failed' | 'interrupted';
                 runId?: string;
+                result?: unknown;
             };
 
             return {
@@ -1514,6 +1518,7 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                 stderr: data.stderr,
                 status: data.status,
                 runId: data.runId,
+                result: data.result,
             };
         } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') {

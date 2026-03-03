@@ -83,14 +83,16 @@ export class WorkflowService {
         const dest = join(this.localStoragePath, workflowId);
         const { dir } = await unzip(zipFileBuffer, dest);
 
-        // Extract workflow name from manifest if present
+        // Extract workflow name and visibility from manifest if present
         let workflowName: string | undefined;
+        let workflowVisibility: 'Private' | 'Public' = 'Private';
         const manifestPath = join(dir, 'manifest.yaml');
         if (existsSync(manifestPath)) {
             try {
                 const manifestStr = await readFile(manifestPath, 'utf-8');
                 const manifest = parseManifest(manifestStr);
                 workflowName = manifest.name;
+                workflowVisibility = manifest.visibility ?? 'Private';
             } catch (err) {
                 console.debug(
                     `[WorkflowService] Failed to parse manifest for name extraction: ${err}`,
@@ -104,7 +106,7 @@ export class WorkflowService {
                 name: workflowName,
                 storagePath: dir,
                 ownerId: ownerId,
-                visibility: 'Private',
+                visibility: workflowVisibility,
             },
             include: {
                 owner: true,
@@ -242,6 +244,17 @@ export class WorkflowService {
         return workflows
             .map((w) => w.name)
             .filter((n): n is string => n !== null);
+    }
+
+    async setVisibility(
+        workflowId: string,
+        visibility: 'Private' | 'Public',
+    ): Promise<WorkflowWithOwner> {
+        return this.db.workflow.update({
+            where: { id: workflowId },
+            data: { visibility },
+            include: { owner: true },
+        });
     }
 
     rbacUserCanRun(userId: string, workflow: WorkflowWithOwner): boolean {

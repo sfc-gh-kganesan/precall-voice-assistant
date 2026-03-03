@@ -4,6 +4,7 @@ import { Runner } from '@controld/lib/runner.js';
 import {
     ErrorResponseSchema,
     WorkflowListResponseSchema,
+    WorkflowRunBodySchema,
     WorkflowRunResponseSchema,
 } from '@controld/schema.js';
 import type { FastifyInstance } from 'fastify';
@@ -21,8 +22,6 @@ const WorkflowNameParamsSchema = z.object({
         ),
 });
 
-const WorkflowRunByNameBodySchema = z.record(z.string(), z.string()).optional();
-
 export function registerByNameRoutes(server: FastifyInstance) {
     const fastify = server.withTypeProvider<ZodTypeProvider>();
 
@@ -34,7 +33,7 @@ export function registerByNameRoutes(server: FastifyInstance) {
                 description: 'Run the latest version of a workflow by name',
                 tags: ['Workflow'],
                 params: WorkflowNameParamsSchema,
-                body: WorkflowRunByNameBodySchema,
+                body: WorkflowRunBodySchema,
                 response: {
                     200: WorkflowRunResponseSchema,
                     400: ErrorResponseSchema,
@@ -46,7 +45,9 @@ export function registerByNameRoutes(server: FastifyInstance) {
         async (request, reply) => {
             try {
                 const { name } = request.params as { name: string };
-                const params = request.body ?? {};
+                const params =
+                    (request.body as { params?: Record<string, string> })
+                        ?.params ?? {};
 
                 const workflow = await fastify.workflowService.findLatestByName(
                     name,
@@ -136,6 +137,7 @@ export function registerByNameRoutes(server: FastifyInstance) {
                     status: result.status,
                     pendingInterrupt: result.pendingInterrupt,
                     runId: result.runId,
+                    result: result.result,
                 });
             } catch (error) {
                 console.error('Error running workflow by name:', error);

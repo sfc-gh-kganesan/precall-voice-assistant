@@ -129,6 +129,7 @@ export function registerRunRoute(server: FastifyInstance) {
                     status: result.status,
                     pendingInterrupt: result.pendingInterrupt,
                     runId: result.runId,
+                    result: result.result,
                 });
             } catch (error) {
                 console.error('Error running workflow:', error);

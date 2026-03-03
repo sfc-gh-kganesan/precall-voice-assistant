@@ -57,11 +57,32 @@ export const WorkflowRunResponseSchema = z.object({
     status: RunStatusSchema.optional(),
     pendingInterrupt: PendingInterruptSchema.optional(),
     runId: z.string().optional(),
+    result: z.unknown().optional(),
 });
 
 export const WorkflowRunParamsSchema = z.object({
     workflowId: z.string(),
 });
+
+export const WorkflowVisibilityParamsSchema = z.object({
+    workflowId: z.string(),
+});
+
+export const WorkflowVisibilityBodySchema = z.object({
+    visibility: z.enum(['Private', 'Public']),
+});
+
+export const WorkflowVisibilityResponseSchema = z.object({
+    workflowId: z.string(),
+    visibility: z.enum(['Private', 'Public']),
+});
+
+export type WorkflowVisibilityBody = z.infer<
+    typeof WorkflowVisibilityBodySchema
+>;
+export type WorkflowVisibilityResponse = z.infer<
+    typeof WorkflowVisibilityResponseSchema
+>;
 
 export const WorkflowRunBodySchema = z
     .object({

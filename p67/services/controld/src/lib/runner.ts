@@ -40,6 +40,7 @@ export type RunResult = {
     runId: string;
     status: RunStatus;
     pendingInterrupt?: InterruptPayload;
+    result?: unknown;
 };
 
 export class Logger {
@@ -553,6 +554,7 @@ export class Runner {
         const stderr: string[] = [];
         const errors: WorkflowErrorMessage[] = [];
         const logger = new Logger();
+        let workflowResult: unknown;
 
         await writeLog(
             'RuntimeHost',
@@ -566,7 +568,9 @@ export class Runner {
                 // The adapter handles message parsing
                 if (language === 'typescript') {
                     console.log('[Child stdout]:', text);
-                    stdout.push(text);
+                    // Don't push to stdout[] — it pollutes the response sent to callers.
+                    // The structured result goes via IPC (result field).
+                    // Log lines go to logger (result.log) for CLI display.
                     logger.stdout(text.trim());
                     writeLog('RuntimeHost', text.trim(), { stream: 'stdout' });
                 }
@@ -590,7 +594,8 @@ export class Runner {
             if (msgAny.type === 'result') {
                 logger.debug('Received result message from child process');
                 const resultData = msgAny.data;
-                logger.debug(`Workflow result: ${JSON.stringify(resultData)}`);
+                workflowResult = resultData;
+                logger.debug(`Workflow result received`);
                 writeLog('RuntimeHost', 'Workflow completed with result', {
                     result: resultData,
                 });
@@ -690,6 +695,7 @@ export class Runner {
                             runId,
                             status: 'interrupted',
                             pendingInterrupt: this.pendingInterrupt,
+                            result: workflowResult,
                         });
                     }
                     break;
@@ -799,6 +805,7 @@ export class Runner {
                     exitCode: 1,
                     runId,
                     status: 'failed',
+                    result: workflowResult,
                 };
                 resolve(result);
                 this.completionResolve?.(result);
@@ -820,6 +827,7 @@ export class Runner {
                     exitCode: 1,
                     runId,
                     status: 'failed',
+                    result: workflowResult,
                 };
                 resolve(result);
                 this.completionResolve?.(result);
@@ -843,6 +851,7 @@ export class Runner {
                     exitCode: code || 0,
                     runId,
                     status: code === 0 ? 'completed' : 'failed',
+                    result: workflowResult,
                 };
                 // Always resolve the completion promise on exit
                 this.completionResolve?.(result);
