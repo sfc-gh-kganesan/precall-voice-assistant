@@ -1,0 +1,20 @@
+name: COMPANY_RESEARCH
+config:
+  - config_name: snowbiz
+    account:
+      value: SNOWHOUSE_AWS_US_WEST_2
+    username:
+      value: NWIEGAND
+    token:
+      secretRef: p67_frostsight_pat
+    accessUrl:
+      value: SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2.snowflakecomputing.com
+    database:
+      value: SALES
+    schema:
+      value: RAVEN_DEV
+    role:
+      value: SALES_AI_PLATFORM_APP_RL
+    parameters:
+      account_name:
+        value: sanofi

@@ -1,0 +1,213 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WorkflowCollection",
+    "description": "Schema for a collection of workflow graphs",
+    "type": "object",
+    "required": ["workflows"],
+    "properties": {
+        "workflows": {
+            "type": "array",
+            "description": "List of workflow graphs (main workflow and subgraphs)",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "description",
+                    "variables",
+                    "nodes",
+                    "edges"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the workflow graph"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "A description of what this workflow graph does"
+                    },
+                    "variables": {
+                        "type": "array",
+                        "description": "List of variables accessible by every node within the graph",
+                        "items": {
+                            "type": "object",
+                            "required": ["name", "data_type", "description"],
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "The name of the state variable"
+                                },
+                                "data_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "string",
+                                        "number",
+                                        "integer",
+                                        "boolean",
+                                        "object",
+                                        "array"
+                                    ],
+                                    "description": "The data type of the state variable (e.g., string, number, integer, boolean, object, array)"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "What information this state variable stores"
+                                },
+                                "default": {
+                                    "description": "Optional default value for the state variable"
+                                }
+                            }
+                        }
+                    },
+                    "nodes": {
+                        "type": "array",
+                        "description": "List of all nodes in the workflow graph",
+                        "items": {
+                            "type": "object",
+                            "required": ["id", "type", "name"],
+                            "properties": {
+                                "id": {
+                                    "type": "string",
+                                    "description": "Unique identifier for the node"
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "start_node",
+                                        "action_node",
+                                        "decision_node",
+                                        "subgraph_node",
+                                        "query_node",
+                                        "human_node",
+                                        "end_node"
+                                    ],
+                                    "description": "The type of node"
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Human-readable name for the node"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Description of what the node does"
+                                },
+                                "action_name": {
+                                    "type": "string",
+                                    "description": "For action_node: the name of the action to call"
+                                },
+                                "input_mappings": {
+                                    "type": "array",
+                                    "description": "For action_node, query_node, and human_node: list of input parameter mappings from workflow variables",
+                                    "items": {
+                                        "type": "object",
+                                        "required": [
+                                            "in_param_name",
+                                            "variable_expression"
+                                        ],
+                                        "properties": {
+                                            "param_name": {
+                                                "type": "string",
+                                                "description": "Name of the function input parameter"
+                                            },
+                                            "variable_expression": {
+                                                "type": "string",
+                                                "description": "Expression to evaluate the workflow variable to map to this parameter"
+                                            }
+                                        }
+                                    }
+                                },
+                                "output_mappings": {
+                                    "type": "array",
+                                    "description": "For action_node, query_node, and human_node: list of workflow variables to map to function output/return fields",
+                                    "items": {
+                                        "type": "object",
+                                        "required": [
+                                            "variable_name",
+                                            "out_param_expression"
+                                        ],
+                                        "properties": {
+                                            "variable_name": {
+                                                "type": "string",
+                                                "description": "Name of the workflow variable to store this output"
+                                            },
+                                            "out_param_expression": {
+                                                "type": "string",
+                                                "description": "Expression to evaluate the function output/return field to map to this workflow variable"
+                                            }
+                                        }
+                                    }
+                                },
+                                "branches": {
+                                    "type": "array",
+                                    "description": "For decision_node: list of possible branches with their conditions",
+                                    "items": {
+                                        "type": "object",
+                                        "required": ["label", "condition"],
+                                        "properties": {
+                                            "label": {
+                                                "type": "string",
+                                                "description": "Label for this branch"
+                                            },
+                                            "condition": {
+                                                "type": "string",
+                                                "description": "Natural language expression specifying the condition in workflow variables that must be met to take this branch"
+                                            }
+                                        }
+                                    }
+                                },
+                                "subgraph_name": {
+                                    "type": "string",
+                                    "description": "For subgraph_node: the name of the workflow graph to call"
+                                },
+                                "question": {
+                                    "type": "string",
+                                    "description": "For query_node: the question to ask the QueryEngine.  The question should be in terms of workflow variables."
+                                },
+                                "human_role": {
+                                    "type": "string",
+                                    "description": "For human_node: the role of the human to assign the task to.  The role can be expressed in terms of workflow variables."
+                                },
+                                "human_task": {
+                                    "type": "string",
+                                    "description": "For human_node: description of the task to be completed by the human.  The task description can be expressed in terms of workflow variables."
+                                },
+                                "end_type": {
+                                    "type": "string",
+                                    "enum": ["success", "failure", "cancelled"],
+                                    "description": "For end_node: the type of ending"
+                                }
+                            }
+                        }
+                    },
+                    "edges": {
+                        "type": "array",
+                        "description": "List of all directed edges connecting nodes",
+                        "items": {
+                            "type": "object",
+                            "required": ["id", "from_node", "to_node"],
+                            "properties": {
+                                "id": {
+                                    "type": "string",
+                                    "description": "Unique identifier for the edge"
+                                },
+                                "from_node": {
+                                    "type": "string",
+                                    "description": "ID of the head node (source)"
+                                },
+                                "to_node": {
+                                    "type": "string",
+                                    "description": "ID of the tail node (destination)"
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "description": "Optional label for the edge only when from_node is a decision_node"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
