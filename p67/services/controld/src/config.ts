@@ -36,7 +36,6 @@ export type ServerConfig = {
         defaultUser?: string;
     };
     sandbox: {
-        enabled: boolean;
         runnerImage: string;
         hostStorageRoot?: string;
         containerStorageRoot?: string;
@@ -119,7 +118,6 @@ export const loadConfig = (): ServerConfig => {
             defaultUser: process.env.DEBUG_DEFAULT_USER,
         },
         sandbox: {
-            enabled: process.env.P67_SANDBOX_MODE === 'true',
             runnerImage: process.env.P67_RUNNER_IMAGE || 'p67-runner:latest',
             hostStorageRoot: process.env.P67_HOST_STORAGE_ROOT || undefined,
             containerStorageRoot: localStoragePath,

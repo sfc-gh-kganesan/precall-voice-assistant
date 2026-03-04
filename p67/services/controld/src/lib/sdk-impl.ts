@@ -6,6 +6,7 @@
  */
 
 import * as crypto from 'node:crypto';
+import * as readline from 'node:readline';
 import {
     type Binds,
     type CortexAgentOptions,
@@ -98,7 +99,15 @@ export class WorkflowSDKImpl implements WorkflowSDK {
      * Sets up listener for ResumeInterrupt messages from parent process
      */
     private setupResumeListener(): void {
-        process.on('message', (message: unknown) => {
+        const rl = readline.createInterface({ input: process.stdin });
+        rl.on('line', (line) => {
+            if (!line.trim()) return;
+            let message: unknown;
+            try {
+                message = JSON.parse(line);
+            } catch {
+                return;
+            }
             console.log(
                 `[SDK] Received message from parent:`,
                 JSON.stringify(message),
@@ -910,14 +919,8 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             notify: options?.notify,
         });
 
-        if (!process.send) {
-            throw new Error(
-                'interrupt() can only be called from a workflow running in a child process',
-            );
-        }
-
         console.log(`[SDK] Sending interrupt message: ${interruptId}`);
-        process.send(message);
+        process.stdout.write(`${JSON.stringify(message)}\n`);
 
         // Wait for response (long-poll pattern)
         // Use setInterval to keep the event loop alive while waiting

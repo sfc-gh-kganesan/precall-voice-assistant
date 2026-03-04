@@ -38,13 +38,12 @@ services:
             SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
             # Slack Bot Token - get from OAuth & Permissions → Bot User OAuth Token
             SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
-            # Sandbox mode: run Python workflows inside p67-runner container
-            P67_SANDBOX_MODE: ${P67_SANDBOX_MODE:-false}
+            # Runner container image for workflow execution
             P67_RUNNER_IMAGE: ${P67_RUNNER_IMAGE:-p67-runner:latest}
             P67_HOST_STORAGE_ROOT: ${PWD}/services/controld/.data_root
         volumes:
             - ./services/controld/.data_root:/app/services/controld/.local-storage
-            # Docker socket for spawning p67-runner containers (sandbox mode)
+            # Docker socket for spawning p67-runner containers
             - /var/run/docker.sock:/var/run/docker.sock
         depends_on:
             postgres:

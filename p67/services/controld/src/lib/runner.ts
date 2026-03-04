@@ -6,8 +6,8 @@ import type { Manifest } from '@controld/lib/manifest.js';
 import { detectLanguage, parseManifest } from '@controld/lib/manifest.js';
 import {
     createAdapter,
+    type DockerAdapterConfig,
     type RuntimeAdapter,
-    type SandboxConfig,
 } from '@controld/lib/runtime/adapter.js';
 import {
     type InterruptMessage,
@@ -238,9 +238,9 @@ export class Runner {
         private readonly workflowDir: string,
         private readonly db: PrismaClient,
         private readonly userId: string,
-        private readonly logService?: LogService,
-        private readonly params?: Record<string, string>,
-        private readonly sandboxConfig?: SandboxConfig,
+        private readonly logService: LogService,
+        private readonly params: Record<string, string>,
+        private readonly sandboxConfig: DockerAdapterConfig,
     ) {
         // Extract workflow ID from directory name (e.g., "wf-abc123")
         this.workflowId = basename(workflowDir);

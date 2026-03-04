@@ -82,6 +82,11 @@ def handle_run_workflow(data: Dict[str, Any]) -> None:
     workflow_dir = data.get("dir")
     config = data.get("config", {})
     
+    # Inside the runner container the workflow is bind-mounted at /workflow.
+    # The dir in the message is controld's internal path which doesn't exist here.
+    if os.path.isdir("/workflow"):
+        workflow_dir = "/workflow"
+    
     # Look for main.py in the workflow directory
     script_path = Path(workflow_dir) / "main.py"
     if not script_path.exists():

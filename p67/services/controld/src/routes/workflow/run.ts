@@ -32,7 +32,7 @@ export function registerRunRoute(server: FastifyInstance) {
             try {
                 const { workflowId } = request.params as { workflowId: string };
                 const body = request.body as WorkflowRunBody;
-                const params = body?.params;
+                const params = body?.params ?? {};
                 const workflow =
                     await fastify.workflowService.findRunnableWorkflowByUser(
                         workflowId,

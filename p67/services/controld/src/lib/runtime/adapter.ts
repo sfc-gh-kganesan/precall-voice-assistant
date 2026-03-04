@@ -3,17 +3,12 @@
  *
  * Provides a unified interface for spawning and communicating with
  * workflow runtime hosts across different languages (TypeScript, Python).
+ * All workflows run inside the p67-runner Docker container.
  */
 
 import type { ChildProcess } from 'node:child_process';
-import { fork, spawn } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import type { Message } from '@controld/lib/runtime/schema.js';
-import { MessageSchema } from '@controld/lib/runtime/schema.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 export type WorkflowLanguage = 'typescript' | 'python';
 
@@ -36,44 +31,8 @@ export interface RuntimeAdapter {
 }
 
 /**
- * TypeScript/JavaScript runtime adapter.
- * Uses Node.js fork() with built-in IPC channel.
- */
-export class TypeScriptAdapter implements RuntimeAdapter {
-    readonly language: WorkflowLanguage = 'typescript';
-
-    private readonly hostPath: string;
-
-    constructor() {
-        this.hostPath = resolve(__dirname, 'host.js');
-    }
-
-    spawn(): ChildProcess {
-        return fork(this.hostPath, [], {
-            stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-        });
-    }
-
-    sendMessage(proc: ChildProcess, message: Message): void {
-        proc.send(message);
-    }
-
-    onMessage(proc: ChildProcess, handler: (msg: Message) => void): void {
-        proc.on('message', (rawMessage: unknown) => {
-            const parsed = MessageSchema.safeParse(rawMessage);
-            if (parsed.success) {
-                handler(parsed.data);
-            } else {
-                // For non-schema messages (like 'result'), pass through
-                handler(rawMessage as Message);
-            }
-        });
-    }
-}
-
-/**
  * Shared NDJSON-over-stdout message handling for adapters that
- * communicate via stdin/stdout (Python, Docker).
+ * communicate via stdin/stdout.
  */
 class NdjsonMessageHandler {
     private messageBuffer: Map<ChildProcess, string> = new Map();
@@ -119,54 +78,30 @@ class NdjsonMessageHandler {
 }
 
 /**
- * Python runtime adapter.
- * Uses spawn() with JSON over stdin/stdout for IPC.
- */
-export class PythonAdapter implements RuntimeAdapter {
-    readonly language: WorkflowLanguage = 'python';
-
-    private readonly hostPath: string;
-    private readonly ndjson = new NdjsonMessageHandler();
-
-    constructor() {
-        this.hostPath = resolve(__dirname, 'host.py');
-    }
-
-    spawn(): ChildProcess {
-        return spawn('python3', [this.hostPath], {
-            stdio: ['pipe', 'pipe', 'pipe'],
-        });
-    }
-
-    sendMessage(proc: ChildProcess, message: Message): void {
-        this.ndjson.sendMessage(proc, message);
-    }
-
-    onMessage(proc: ChildProcess, handler: (msg: Message) => void): void {
-        this.ndjson.onMessage(proc, handler, 'Python');
-    }
-}
-
-/**
- * Docker-based Python runtime adapter.
+ * Docker-based runtime adapter (Python + TypeScript).
  * Runs the p67-runner container with the workflow directory bind-mounted.
- * IPC is identical to PythonAdapter: NDJSON over stdin/stdout.
+ * The Go supervisor inside the container auto-detects the language
+ * (main.py vs index.js) and execs the appropriate host process.
+ * IPC is NDJSON over stdin/stdout for both languages.
  */
-export class DockerPythonAdapter implements RuntimeAdapter {
-    readonly language: WorkflowLanguage = 'python';
+export class DockerAdapter implements RuntimeAdapter {
+    readonly language: WorkflowLanguage;
 
     private readonly ndjson = new NdjsonMessageHandler();
 
     constructor(
+        language: WorkflowLanguage,
         private readonly image: string,
         private readonly hostStorageRoot?: string,
         private readonly containerStorageRoot?: string,
-    ) {}
+    ) {
+        this.language = language;
+    }
 
     spawn(workflowDir?: string): ChildProcess {
         if (!workflowDir) {
             throw new Error(
-                'DockerPythonAdapter requires workflowDir to be passed to spawn()',
+                'DockerAdapter requires workflowDir to be passed to spawn()',
             );
         }
 
@@ -203,34 +138,23 @@ export class DockerPythonAdapter implements RuntimeAdapter {
     }
 }
 
-export type SandboxConfig = {
-    enabled: boolean;
+export type DockerAdapterConfig = {
     runnerImage: string;
     hostStorageRoot?: string;
     containerStorageRoot?: string;
 };
 
 /**
- * Factory function to create the appropriate adapter for a workflow language.
- * When sandbox mode is enabled, Python workflows run inside a Docker container.
+ * Create a DockerAdapter for the given workflow language.
  */
 export function createAdapter(
     language: WorkflowLanguage,
-    sandbox?: SandboxConfig,
+    config: DockerAdapterConfig,
 ): RuntimeAdapter {
-    switch (language) {
-        case 'typescript':
-            return new TypeScriptAdapter();
-        case 'python':
-            if (sandbox?.enabled) {
-                return new DockerPythonAdapter(
-                    sandbox.runnerImage,
-                    sandbox.hostStorageRoot,
-                    sandbox.containerStorageRoot,
-                );
-            }
-            return new PythonAdapter();
-        default:
-            throw new Error(`Unsupported workflow language: ${language}`);
-    }
+    return new DockerAdapter(
+        language,
+        config.runnerImage,
+        config.hostStorageRoot,
+        config.containerStorageRoot,
+    );
 }

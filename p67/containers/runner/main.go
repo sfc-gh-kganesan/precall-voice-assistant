@@ -1,27 +1,28 @@
 // p67-runner is a lightweight process supervisor for p67 workflow execution.
 //
-// It fork-execs the Python host process (host.py), feeds it a RunWorkflow
-// message over stdin, and captures stdout (IPC JSON) and stderr (workflow
-// logs) separately. This gives us a single hook point for log capture,
-// timeouts, and resource limits in future iterations.
+// It fork-execs the appropriate host process (Python or Node.js) based on the
+// workflow contents, then transparently relays stdin/stdout/stderr between the
+// orchestrator (controld) and the host.  The Go runner does not parse or
+// construct any IPC messages — it is a pure pipe relay.  This gives us a
+// single hook point for log capture, timeouts, and resource limits.
+//
+// Language detection:
+//
+//	main.py  → python3 /app/host.py
+//	index.js → node /app/host.js
 //
 // Usage:
 //
 //	p67-runner <workflow-dir>
-//
-// Environment:
-//
-//	P67_RUN_CONFIG  – JSON string with the RunWorkflow config payload
-//	P67_HOST_SCRIPT – path to host.py (default: /app/host.py)
 package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -39,87 +40,59 @@ func main() {
 		fatal("workflow directory does not exist: %s", workflowDir)
 	}
 
-	// Build the RunWorkflow message.
-	configJSON := os.Getenv("P67_RUN_CONFIG")
-	if configJSON == "" {
-		configJSON = `{"snowflakeConfig":{},"parameters":{}}`
-	}
+	// Detect workflow language and resolve the host command.
+	cmdName, cmdArgs := detectLanguage(workflowDir)
 
-	var config json.RawMessage
-	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-		fatal("invalid P67_RUN_CONFIG: %v", err)
-	}
-
-	runMsg := map[string]any{
-		"type":   "RunWorkflow",
-		"dir":    workflowDir,
-		"config": config,
-	}
-
-	runMsgBytes, err := json.Marshal(runMsg)
-	if err != nil {
-		fatal("failed to marshal RunWorkflow message: %v", err)
-	}
-
-	// Resolve host script path.
-	hostScript := os.Getenv("P67_HOST_SCRIPT")
-	if hostScript == "" {
-		hostScript = "/app/host.py"
-	}
-
-	if _, err := os.Stat(hostScript); err != nil {
-		fatal("host script not found: %s", hostScript)
-	}
-
-	// Start the Python host process.
-	cmd := exec.Command("python3", hostScript)
+	// Start the host process.
+	cmd := exec.Command(cmdName, cmdArgs...)
 	cmd.Dir = workflowDir
 
-	stdin, err := cmd.StdinPipe()
+	hostStdin, err := cmd.StdinPipe()
 	if err != nil {
 		fatal("failed to create stdin pipe: %v", err)
 	}
 
-	stdout, err := cmd.StdoutPipe()
+	hostStdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fatal("failed to create stdout pipe: %v", err)
 	}
 
-	stderr, err := cmd.StderrPipe()
+	hostStderr, err := cmd.StderrPipe()
 	if err != nil {
 		fatal("failed to create stderr pipe: %v", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		fatal("failed to start python3: %v", err)
+		fatal("failed to start %s: %v", cmdName, err)
 	}
 
-	// Send the RunWorkflow message then close stdin to signal no more input.
-	// (For future interrupt support, we'd keep stdin open.)
-	stdin.Write(runMsgBytes)
-	stdin.Write([]byte("\n"))
-	stdin.Close()
-
-	// Capture stdout (IPC messages) and stderr (workflow logs) concurrently.
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(2) // Only wait for stdout + stderr relays, not stdin.
 
-	// Stdout: IPC JSON messages from the host process.
-	// Forward them to our own stdout so the orchestrator can read them.
+	// Relay our stdin → host stdin.
+	// This goroutine is NOT part of the WaitGroup because controld keeps stdin
+	// open for follow-up messages (OAuth, interrupts).  When the host process
+	// exits, hostStdin.Close() is a no-op and the goroutine will exit once the
+	// container shuts down.
+	go func() {
+		defer hostStdin.Close()
+		io.Copy(hostStdin, os.Stdin)
+	}()
+
+	// Relay host stdout → our stdout (IPC JSON messages).
 	go func() {
 		defer wg.Done()
-		scanner := bufio.NewScanner(stdout)
+		scanner := bufio.NewScanner(hostStdout)
 		scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024) // 10MB max line
 		for scanner.Scan() {
 			fmt.Println(scanner.Text())
 		}
 	}()
 
-	// Stderr: workflow print() output and host diagnostics.
-	// Prefix each line with a timestamp for structured logging.
+	// Relay host stderr → our stderr with timestamps.
 	go func() {
 		defer wg.Done()
-		reader := bufio.NewReader(stderr)
+		reader := bufio.NewReader(hostStderr)
 		for {
 			line, err := reader.ReadString('\n')
 			if len(line) > 0 {
@@ -144,6 +117,30 @@ func main() {
 		}
 		fatal("workflow process error: %v", err)
 	}
+}
+
+// detectLanguage inspects the workflow directory and returns the command name
+// and arguments for the appropriate host process.
+func detectLanguage(workflowDir string) (string, []string) {
+	hasPython := fileExists(filepath.Join(workflowDir, "main.py"))
+	hasJS := fileExists(filepath.Join(workflowDir, "index.js"))
+
+	switch {
+	case hasPython && hasJS:
+		fatal("ambiguous workflow: found both main.py and index.js in %s", workflowDir)
+	case hasPython:
+		return "python3", []string{"/app/host.py"}
+	case hasJS:
+		return "node", []string{"/app/host.js"}
+	default:
+		fatal("no workflow entry point found: expected main.py or index.js in %s", workflowDir)
+	}
+	return "", nil // unreachable
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func fatal(format string, args ...any) {
