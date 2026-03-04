@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import type { PrismaClient } from '@p67/db';
 import type { LogService } from './LogService.js';
 import { Runner } from './runner.js';
+import type { SandboxConfig } from './runtime/adapter.js';
 import {
     addReaction,
     postMessage,
@@ -52,6 +53,7 @@ export interface CommandDependencies {
     db: PrismaClient;
     runnerRegistry: Map<string, Runner>;
     logService: LogService;
+    sandboxConfig?: SandboxConfig;
     linkBaseUrl?: string; // Base URL for account linking
 }
 
@@ -233,6 +235,7 @@ async function executeRunCommand(
         slackUser.userId,
         deps.logService,
         command.params || {},
+        deps.sandboxConfig,
     );
 
     // Don't await - let it run in background and post updates to thread

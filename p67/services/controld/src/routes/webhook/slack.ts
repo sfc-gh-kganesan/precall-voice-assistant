@@ -288,6 +288,7 @@ export function registerSlackWebhookRoutes(server: FastifyInstance) {
                     db: server.db,
                     runnerRegistry: server.runnerRegistry,
                     logService: server.logService,
+                    sandboxConfig: server.config.sandbox,
                 });
 
                 // Return immediate response

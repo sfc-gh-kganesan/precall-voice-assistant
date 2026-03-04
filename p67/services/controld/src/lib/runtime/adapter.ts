@@ -26,7 +26,7 @@ export interface RuntimeAdapter {
     readonly language: WorkflowLanguage;
 
     /** Spawn the runtime host process */
-    spawn(): ChildProcess;
+    spawn(workflowDir?: string): ChildProcess;
 
     /** Send a message to the child process */
     sendMessage(proc: ChildProcess, message: Message): void;
@@ -72,6 +72,53 @@ export class TypeScriptAdapter implements RuntimeAdapter {
 }
 
 /**
+ * Shared NDJSON-over-stdout message handling for adapters that
+ * communicate via stdin/stdout (Python, Docker).
+ */
+class NdjsonMessageHandler {
+    private messageBuffer: Map<ChildProcess, string> = new Map();
+
+    sendMessage(proc: ChildProcess, message: Message): void {
+        if (proc.stdin) {
+            proc.stdin.write(`${JSON.stringify(message)}\n`);
+        }
+    }
+
+    onMessage(
+        proc: ChildProcess,
+        handler: (msg: Message) => void,
+        label: string,
+    ): void {
+        if (!proc.stdout) return;
+
+        this.messageBuffer.set(proc, '');
+
+        proc.stdout.on('data', (data: Buffer) => {
+            let buffer = this.messageBuffer.get(proc) || '';
+            buffer += data.toString();
+
+            const lines = buffer.split('\n');
+            this.messageBuffer.set(proc, lines.pop() || '');
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+
+                try {
+                    const msg = JSON.parse(line);
+                    handler(msg as Message);
+                } catch {
+                    console.log(`[${label} stdout]:`, line);
+                }
+            }
+        });
+
+        proc.on('exit', () => {
+            this.messageBuffer.delete(proc);
+        });
+    }
+}
+
+/**
  * Python runtime adapter.
  * Uses spawn() with JSON over stdin/stdout for IPC.
  */
@@ -79,7 +126,7 @@ export class PythonAdapter implements RuntimeAdapter {
     readonly language: WorkflowLanguage = 'python';
 
     private readonly hostPath: string;
-    private messageBuffer: Map<ChildProcess, string> = new Map();
+    private readonly ndjson = new NdjsonMessageHandler();
 
     constructor() {
         this.hostPath = resolve(__dirname, 'host.py');
@@ -92,55 +139,96 @@ export class PythonAdapter implements RuntimeAdapter {
     }
 
     sendMessage(proc: ChildProcess, message: Message): void {
-        if (proc.stdin) {
-            proc.stdin.write(`${JSON.stringify(message)}\n`);
-        }
+        this.ndjson.sendMessage(proc, message);
     }
 
     onMessage(proc: ChildProcess, handler: (msg: Message) => void): void {
-        if (!proc.stdout) return;
-
-        // Initialize buffer for this process
-        this.messageBuffer.set(proc, '');
-
-        proc.stdout.on('data', (data: Buffer) => {
-            // Append to buffer
-            let buffer = this.messageBuffer.get(proc) || '';
-            buffer += data.toString();
-
-            // Process complete lines (NDJSON)
-            const lines = buffer.split('\n');
-            // Keep the last incomplete line in the buffer
-            this.messageBuffer.set(proc, lines.pop() || '');
-
-            for (const line of lines) {
-                if (!line.trim()) continue;
-
-                try {
-                    const msg = JSON.parse(line);
-                    handler(msg as Message);
-                } catch {
-                    // Not valid JSON - might be regular stdout output
-                    // Log it but don't crash
-                    console.log('[Python stdout]:', line);
-                }
-            }
-        });
-
-        proc.on('exit', () => {
-            this.messageBuffer.delete(proc);
-        });
+        this.ndjson.onMessage(proc, handler, 'Python');
     }
 }
 
 /**
- * Factory function to create the appropriate adapter for a workflow language.
+ * Docker-based Python runtime adapter.
+ * Runs the p67-runner container with the workflow directory bind-mounted.
+ * IPC is identical to PythonAdapter: NDJSON over stdin/stdout.
  */
-export function createAdapter(language: WorkflowLanguage): RuntimeAdapter {
+export class DockerPythonAdapter implements RuntimeAdapter {
+    readonly language: WorkflowLanguage = 'python';
+
+    private readonly ndjson = new NdjsonMessageHandler();
+
+    constructor(
+        private readonly image: string,
+        private readonly hostStorageRoot?: string,
+        private readonly containerStorageRoot?: string,
+    ) {}
+
+    spawn(workflowDir?: string): ChildProcess {
+        if (!workflowDir) {
+            throw new Error(
+                'DockerPythonAdapter requires workflowDir to be passed to spawn()',
+            );
+        }
+
+        // Translate container path to host path for Docker bind mount
+        let mountPath = workflowDir;
+        if (this.hostStorageRoot && this.containerStorageRoot) {
+            mountPath = workflowDir.replace(
+                this.containerStorageRoot,
+                this.hostStorageRoot,
+            );
+        }
+
+        return spawn(
+            'docker',
+            [
+                'run',
+                '--rm',
+                '-i',
+                '-v',
+                `${mountPath}:/workflow:ro`,
+                this.image,
+                '/workflow',
+            ],
+            { stdio: ['pipe', 'pipe', 'pipe'] },
+        );
+    }
+
+    sendMessage(proc: ChildProcess, message: Message): void {
+        this.ndjson.sendMessage(proc, message);
+    }
+
+    onMessage(proc: ChildProcess, handler: (msg: Message) => void): void {
+        this.ndjson.onMessage(proc, handler, 'Docker');
+    }
+}
+
+export type SandboxConfig = {
+    enabled: boolean;
+    runnerImage: string;
+    hostStorageRoot?: string;
+    containerStorageRoot?: string;
+};
+
+/**
+ * Factory function to create the appropriate adapter for a workflow language.
+ * When sandbox mode is enabled, Python workflows run inside a Docker container.
+ */
+export function createAdapter(
+    language: WorkflowLanguage,
+    sandbox?: SandboxConfig,
+): RuntimeAdapter {
     switch (language) {
         case 'typescript':
             return new TypeScriptAdapter();
         case 'python':
+            if (sandbox?.enabled) {
+                return new DockerPythonAdapter(
+                    sandbox.runnerImage,
+                    sandbox.hostStorageRoot,
+                    sandbox.containerStorageRoot,
+                );
+            }
             return new PythonAdapter();
         default:
             throw new Error(`Unsupported workflow language: ${language}`);

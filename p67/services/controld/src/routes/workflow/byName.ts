@@ -74,6 +74,7 @@ export function registerByNameRoutes(server: FastifyInstance) {
                     request.user.id,
                     fastify.logService,
                     params,
+                    fastify.config.sandbox,
                 );
                 const result = await runnerInstance.start();
 

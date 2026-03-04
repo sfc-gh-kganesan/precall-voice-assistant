@@ -10,6 +10,7 @@ const slackSocketMode = new SlackSocketModeService(
     server.db,
     server.runnerRegistry,
     server.logService,
+    server.config.sandbox,
 );
 
 const start = async () => {

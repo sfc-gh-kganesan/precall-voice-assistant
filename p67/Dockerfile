@@ -30,12 +30,13 @@ ARG SERVICE_PORT=3000
 
 # Install Python for multilingual workflow support
 # Build tools needed for snowflake-connector-python native extensions
+# Install Docker CLI for sandbox mode (spawning p67-runner containers)
 RUN apk add --no-cache --virtual .build-deps \
         python3-dev \
         g++ \
         gcc \
         musl-dev \
-    && apk add --no-cache python3 py3-pip \
+    && apk add --no-cache python3 py3-pip docker-cli \
     && pip3 install --no-cache-dir --break-system-packages snowflake-connector-python \
     && apk del .build-deps
 

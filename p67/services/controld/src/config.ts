@@ -35,6 +35,12 @@ export type ServerConfig = {
         enableDefaultUser: boolean;
         defaultUser?: string;
     };
+    sandbox: {
+        enabled: boolean;
+        runnerImage: string;
+        hostStorageRoot?: string;
+        containerStorageRoot?: string;
+    };
 };
 
 function readFileIfExistsSync(filePath: string): string | null {
@@ -84,13 +90,15 @@ export const loadConfig = (): ServerConfig => {
         console.log('🔥 RUH-ROH: missing encryption key');
     }
 
+    const localStoragePath = resolve(
+        __dirname,
+        process.env.DATA_ROOT || createTempDir(),
+    );
+
     return {
         port: parseInt(process.env.PORT || '3002', 10),
         nodeEnv: process.env.NODE_ENV || 'development',
-        localStoragePath: resolve(
-            __dirname,
-            process.env.DATA_ROOT || createTempDir(),
-        ),
+        localStoragePath,
         oauth: {
             google: {
                 clientId: googleClientId ?? '<not set>',
@@ -109,6 +117,12 @@ export const loadConfig = (): ServerConfig => {
         debug: {
             enableDefaultUser: process.env.DEBUG_ENABLE_DEFAULT_USER === 'true',
             defaultUser: process.env.DEBUG_DEFAULT_USER,
+        },
+        sandbox: {
+            enabled: process.env.P67_SANDBOX_MODE === 'true',
+            runnerImage: process.env.P67_RUNNER_IMAGE || 'p67-runner:latest',
+            hostStorageRoot: process.env.P67_HOST_STORAGE_ROOT || undefined,
+            containerStorageRoot: localStoragePath,
         },
     };
 };

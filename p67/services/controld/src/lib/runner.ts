@@ -7,6 +7,7 @@ import { detectLanguage, parseManifest } from '@controld/lib/manifest.js';
 import {
     createAdapter,
     type RuntimeAdapter,
+    type SandboxConfig,
 } from '@controld/lib/runtime/adapter.js';
 import {
     type InterruptMessage,
@@ -239,6 +240,7 @@ export class Runner {
         private readonly userId: string,
         private readonly logService?: LogService,
         private readonly params?: Record<string, string>,
+        private readonly sandboxConfig?: SandboxConfig,
     ) {
         // Extract workflow ID from directory name (e.g., "wf-abc123")
         this.workflowId = basename(workflowDir);
@@ -542,12 +544,12 @@ export class Runner {
 
         // Detect workflow language and create appropriate adapter
         const language = detectLanguage(this.workflowDir, manifest);
-        const adapter = createAdapter(language);
+        const adapter = createAdapter(language, this.sandboxConfig);
         this.adapter = adapter;
 
         console.log(`Detected workflow language: ${language}`);
 
-        const proc = adapter.spawn();
+        const proc = adapter.spawn(this.workflowDir);
         this.proc = proc;
 
         const stdout: string[] = [];

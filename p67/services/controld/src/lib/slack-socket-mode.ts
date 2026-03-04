@@ -2,6 +2,7 @@ import type { PrismaClient } from '@p67/db';
 import { SocketModeClient } from '@slack/socket-mode';
 import type { LogService } from './LogService.js';
 import type { Runner } from './runner.js';
+import type { SandboxConfig } from './runtime/adapter.js';
 import {
     executeCommand,
     parseCommand,
@@ -67,6 +68,7 @@ export class SlackSocketModeService {
         private readonly db: PrismaClient,
         private readonly runnerRegistry: RunnerRegistry,
         private readonly logService: LogService,
+        private readonly sandboxConfig?: SandboxConfig,
         private readonly appToken?: string,
     ) {}
 
@@ -126,6 +128,7 @@ export class SlackSocketModeService {
                     db: this.db,
                     runnerRegistry: this.runnerRegistry,
                     logService: this.logService,
+                    sandboxConfig: this.sandboxConfig,
                 });
 
                 // Acknowledge with immediate response
