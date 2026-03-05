@@ -68,6 +68,15 @@ begin
     grant usage on compute pool service_compute_pool to application role app_user;
     grant usage on compute pool service_compute_pool to application role app_admin;
 
+    create compute pool if not exists runner_compute_pool
+    min_nodes = 1
+    max_nodes = 10
+    instance_family = cpu_x64_xs;
+    grant usage on compute pool runner_compute_pool to application role app_admin;
+
+    create stage if not exists app.workflow_stage
+        encryption = (type = 'SNOWFLAKE_SSE');
+
     call v1.start_controld('service_compute_pool');
     return 'CREATE_SERVICES COMPLETE';
 end

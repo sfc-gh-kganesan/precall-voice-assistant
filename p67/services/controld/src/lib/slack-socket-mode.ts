@@ -1,8 +1,8 @@
+import type { SandboxConfig } from '@controld/config.js';
 import type { PrismaClient } from '@p67/db';
 import { SocketModeClient } from '@slack/socket-mode';
 import type { LogService } from './LogService.js';
 import type { Runner } from './runner.js';
-import type { DockerAdapterConfig } from './runtime/adapter.js';
 import {
     executeCommand,
     parseCommand,
@@ -68,7 +68,7 @@ export class SlackSocketModeService {
         private readonly db: PrismaClient,
         private readonly runnerRegistry: RunnerRegistry,
         private readonly logService: LogService,
-        private readonly sandboxConfig: DockerAdapterConfig,
+        private readonly sandboxConfig: SandboxConfig,
         private readonly appToken?: string,
     ) {}
 

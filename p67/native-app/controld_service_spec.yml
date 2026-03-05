@@ -8,6 +8,7 @@ spec:
           env:
               PORT: 80
               DATA_ROOT: /opt/local-storage
+              P67_RUNNER_IMAGE: /p67_src/core/img_repo/p67-runner:latest
               GOOGLE_REDIRECT_URI: https://jnb46h6e-sfengineering-aifde.snowflakecomputing.app/api/auth/google/callback
           resources:
               requests:

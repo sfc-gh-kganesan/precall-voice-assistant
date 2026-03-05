@@ -1,13 +1,15 @@
 import type { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import { basename, resolve } from 'node:path';
+import type { SandboxConfig } from '@controld/config.js';
 import type { LogService } from '@controld/lib/LogService.js';
 import type { Manifest } from '@controld/lib/manifest.js';
 import { detectLanguage, parseManifest } from '@controld/lib/manifest.js';
 import {
     createAdapter,
-    type DockerAdapterConfig,
     type RuntimeAdapter,
+    SPCSAdapter,
+    type WorkflowLanguage,
 } from '@controld/lib/runtime/adapter.js';
 import {
     type InterruptMessage,
@@ -240,7 +242,7 @@ export class Runner {
         private readonly userId: string,
         private readonly logService: LogService,
         private readonly params: Record<string, string>,
-        private readonly sandboxConfig: DockerAdapterConfig,
+        private readonly sandboxConfig: SandboxConfig,
     ) {
         // Extract workflow ID from directory name (e.g., "wf-abc123")
         this.workflowId = basename(workflowDir);
@@ -545,9 +547,21 @@ export class Runner {
         // Detect workflow language and create appropriate adapter
         const language = detectLanguage(this.workflowDir, manifest);
         const adapter = createAdapter(language, this.sandboxConfig);
-        this.adapter = adapter;
 
         console.log(`Detected workflow language: ${language}`);
+
+        if (adapter instanceof SPCSAdapter) {
+            return this.startSPCS(
+                adapter,
+                language,
+                hydratedConfig,
+                runId,
+                writeLog,
+            );
+        }
+
+        // Docker-local path: ChildProcess-based execution
+        this.adapter = adapter;
 
         const proc = adapter.spawn(this.workflowDir);
         this.proc = proc;
@@ -876,5 +890,281 @@ export class Runner {
         }
 
         return result;
+    }
+
+    /**
+     * SPCS execution path.
+     *
+     * Instead of spawning a local Docker container with stdin/stdout pipes,
+     * this method:
+     *   1. Uploads workflow files to a Snowflake internal stage
+     *   2. Executes EXECUTE JOB SERVICE to launch an ephemeral runner container
+     *   3. Waits for the job to complete (SPCS_WAIT_FOR)
+     *   4. Reads container logs for stderr output
+     *   5. Cleans up stage files and job service
+     *
+     * Note: HITL interrupts are NOT supported in SPCS mode (v0).
+     * Workflows that call sdk.interrupt() will fail.
+     */
+    private async startSPCS(
+        adapter: SPCSAdapter,
+        _language: WorkflowLanguage,
+        hydratedConfig: import('@p67/workflow-sdk').P67Config,
+        runId: string,
+        writeLog: (
+            source: 'RuntimeHost' | 'WorkflowNode' | 'ToolCall',
+            message: string,
+            attributes?: Record<string, unknown>,
+        ) => Promise<void>,
+    ): Promise<RunResult> {
+        const { executeSql, executeSqlBatch } = await import(
+            '@controld/lib/runtime/spcs-sql.js'
+        );
+
+        const logger = new Logger();
+        const stderr: string[] = [];
+        const errors: Array<{ error: WorkflowError; message: string }> = [];
+
+        const jobName = adapter.createJobId();
+
+        await writeLog('RuntimeHost', `Starting SPCS job: ${jobName}`);
+        logger.debug(`SPCS mode: launching job ${jobName}`);
+
+        // 1. Upload workflow files to stage
+        const { putSQL, stagePath } = adapter.buildStageUploadSQL(
+            jobName,
+            this.workflowDir,
+        );
+        try {
+            logger.debug(`Uploading workflow to stage: ${stagePath}`);
+            await executeSql(putSQL);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            logger.error(`Failed to upload workflow to stage: ${message}`);
+            await writeLog('RuntimeHost', `Stage upload failed: ${message}`);
+            if (this.logService) {
+                await this.logService.completeRun(runId, 1);
+            }
+            return {
+                stdout: [],
+                stderr: [],
+                log: logger.dump(),
+                exitCode: 1,
+                errors: [
+                    {
+                        error: 'ExecutionError' as WorkflowError,
+                        message: `Stage upload failed: ${message}`,
+                    },
+                ],
+                runId,
+                status: 'failed',
+            };
+        }
+
+        // 2. Build and send the RunWorkflow message (passed via env var)
+        const runWorkflowMessage = makeRunWorkflowMessage({
+            dir: '/workflow',
+            config: this.serializeConfig(hydratedConfig),
+        });
+
+        // 3. Execute the job service
+        const jobSQL = adapter.buildJobServiceSQL(
+            jobName,
+            stagePath,
+            runWorkflowMessage,
+        );
+
+        try {
+            logger.debug('Executing SPCS job service...');
+            await writeLog('RuntimeHost', `Executing job: ${jobName}`);
+
+            // EXECUTE JOB SERVICE is synchronous by default — it blocks until
+            // all containers exit. This is the simplest approach for v0.
+            await executeSql(jobSQL);
+
+            logger.debug('SPCS job completed');
+            await writeLog('RuntimeHost', 'SPCS job completed successfully');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            logger.error(`SPCS job failed: ${message}`);
+            await writeLog('RuntimeHost', `SPCS job failed: ${message}`);
+
+            // Try to get logs before cleaning up
+            try {
+                const logRows = await executeSql(
+                    adapter.buildGetLogsSQL(jobName),
+                );
+                for (const row of logRows) {
+                    const logLine = String(row.LOG ?? '');
+                    if (logLine) {
+                        stderr.push(logLine);
+                        logger.stderr(logLine);
+                    }
+                }
+            } catch {
+                // Logs may not be available if job failed to start
+            }
+
+            // Clean up
+            try {
+                await executeSqlBatch(
+                    adapter.buildCleanupSQL(jobName, stagePath),
+                );
+            } catch {
+                // Best-effort cleanup
+            }
+
+            if (this.logService) {
+                await this.logService.completeRun(runId, 1);
+            }
+
+            return {
+                stdout: [],
+                stderr,
+                log: logger.dump(),
+                exitCode: 1,
+                errors: [
+                    {
+                        error: 'ExecutionError' as WorkflowError,
+                        message: `SPCS job failed: ${message}`,
+                    },
+                ],
+                runId,
+                status: 'failed',
+            };
+        }
+
+        // 4. Retrieve container logs (stderr)
+        try {
+            const logRows = await executeSql(adapter.buildGetLogsSQL(jobName));
+            for (const row of logRows) {
+                const logLine = String(row.LOG ?? '');
+                if (logLine) {
+                    stderr.push(logLine);
+                    logger.stderr(logLine);
+                }
+            }
+        } catch {
+            logger.debug('Could not retrieve SPCS container logs');
+        }
+
+        // 5. Download results NDJSON from stage and parse messages
+        let workflowResult: unknown;
+        const stdout: string[] = [];
+        try {
+            await executeSql(adapter.buildGetResultsSQL(stagePath));
+            const resultsPath = adapter.resultsLocalPath;
+            const resultsContent = await fs.promises.readFile(
+                resultsPath,
+                'utf-8',
+            );
+            const lines = resultsContent.split('\n').filter((l) => l.trim());
+            for (const line of lines) {
+                try {
+                    const msg = JSON.parse(line) as {
+                        type: string;
+                        data?: unknown;
+                        error?: string;
+                        message?: string;
+                    };
+                    if (msg.type === 'result') {
+                        workflowResult = msg.data;
+                        logger.debug('Received workflow result from SPCS job');
+                        await writeLog(
+                            'RuntimeHost',
+                            'Workflow completed with result',
+                            { result: msg.data },
+                        );
+                    } else if (msg.type === MessageType.ThrowError) {
+                        const parsed =
+                            WorkflowErrorMessageSchema.safeParse(msg);
+                        if (parsed.success) {
+                            errors.push({
+                                error: parsed.data.error,
+                                message: parsed.data.message,
+                            });
+                            logger.error(
+                                `${parsed.data.error}: ${parsed.data.message}`,
+                            );
+                        }
+                    }
+                    stdout.push(line);
+                } catch {
+                    // Non-JSON line, skip
+                }
+            }
+            // Clean up local temp file
+            await fs.promises.rm(resultsPath, { force: true });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            logger.debug(`Could not read results from stage: ${message}`);
+
+            // Fallback: parse NDJSON messages from container logs (SPCS_GET_LOGS
+            // captures both stdout and stderr). This handles the case where
+            // the stage-backed results volume didn't persist writes.
+            for (const logLine of stderr) {
+                try {
+                    const msg = JSON.parse(logLine) as {
+                        type: string;
+                        data?: unknown;
+                        error?: string;
+                        message?: string;
+                    };
+                    if (msg.type === 'result') {
+                        workflowResult = msg.data;
+                        logger.debug(
+                            'Received workflow result from SPCS logs (fallback)',
+                        );
+                        await writeLog(
+                            'RuntimeHost',
+                            'Workflow completed with result (from logs)',
+                            { result: msg.data },
+                        );
+                    } else if (msg.type === MessageType.ThrowError) {
+                        const parsed =
+                            WorkflowErrorMessageSchema.safeParse(msg);
+                        if (parsed.success) {
+                            errors.push({
+                                error: parsed.data.error,
+                                message: parsed.data.message,
+                            });
+                            logger.error(
+                                `${parsed.data.error}: ${parsed.data.message}`,
+                            );
+                        }
+                    }
+                    stdout.push(logLine);
+                } catch {
+                    // Not JSON — regular log line, skip
+                }
+            }
+        }
+
+        // 6. Clean up stage files and job service
+        try {
+            await executeSqlBatch(adapter.buildCleanupSQL(jobName, stagePath));
+            logger.debug('SPCS cleanup complete');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            logger.debug(`SPCS cleanup warning: ${message}`);
+        }
+
+        const exitCode = errors.length > 0 ? 1 : 0;
+        const status: RunStatus = errors.length > 0 ? 'failed' : 'completed';
+
+        if (this.logService) {
+            await this.logService.completeRun(runId, exitCode);
+        }
+
+        return {
+            stdout,
+            stderr,
+            log: logger.dump(),
+            exitCode,
+            errors,
+            runId,
+            status,
+            result: workflowResult,
+        };
     }
 }

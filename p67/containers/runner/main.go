@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+  "encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -69,23 +70,60 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2) // Only wait for stdout + stderr relays, not stdin.
 
-	// Relay our stdin → host stdin.
-	// This goroutine is NOT part of the WaitGroup because controld keeps stdin
-	// open for follow-up messages (OAuth, interrupts).  When the host process
-	// exits, hostStdin.Close() is a no-op and the goroutine will exit once the
-	// container shuts down.
+	// SPCS mode: if P67_RUN_MESSAGE_B64 is set, decode and inject it as
+	// the first stdin message. In SPCS there is no stdin pipe from controld,
+	// so the RunWorkflow message is passed as a base64-encoded env var.
+	runMsgB64 := os.Getenv("P67_RUN_MESSAGE_B64")
+
 	go func() {
 		defer hostStdin.Close()
+		if runMsgB64 != "" {
+			decoded, err := base64.StdEncoding.DecodeString(runMsgB64)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[p67-runner] failed to decode P67_RUN_MESSAGE_B64: %v\n", err)
+				return
+			}
+			// Write decoded message + newline (NDJSON)
+			hostStdin.Write(decoded)
+			hostStdin.Write([]byte("\n"))
+			// In SPCS mode there are no follow-up messages, so close stdin
+			// to signal EOF to the host process.
+			return
+		}
+		// Docker mode: relay our stdin → host stdin.
 		io.Copy(hostStdin, os.Stdin)
 	}()
 
+	// SPCS mode: optionally tee host stdout to a results file so controld
+	// can read structured messages from the stage after the job completes.
+	resultsDir := os.Getenv("P67_RESULTS_DIR")
+	var resultsFile *os.File
+	if resultsDir != "" {
+		if err := os.MkdirAll(resultsDir, 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "[p67-runner] failed to create results dir %s: %v\n", resultsDir, err)
+		} else {
+			f, err := os.Create(filepath.Join(resultsDir, "messages.ndjson"))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[p67-runner] failed to create results file: %v\n", err)
+			} else {
+				resultsFile = f
+				defer resultsFile.Close()
+			}
+		}
+	}
+
 	// Relay host stdout → our stdout (IPC JSON messages).
+	// When resultsFile is set, also write each line to the file.
 	go func() {
 		defer wg.Done()
 		scanner := bufio.NewScanner(hostStdout)
 		scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024) // 10MB max line
 		for scanner.Scan() {
-			fmt.Println(scanner.Text())
+			line := scanner.Text()
+			fmt.Println(line)
+			if resultsFile != nil {
+				resultsFile.WriteString(line + "\n")
+			}
 		}
 	}()
 

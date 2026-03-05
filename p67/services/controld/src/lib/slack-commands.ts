@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
+import type { SandboxConfig } from '@controld/config.js';
 import type { PrismaClient } from '@p67/db';
 import type { LogService } from './LogService.js';
 import { Runner } from './runner.js';
-import type { DockerAdapterConfig } from './runtime/adapter.js';
 import {
     addReaction,
     postMessage,
@@ -53,7 +53,7 @@ export interface CommandDependencies {
     db: PrismaClient;
     runnerRegistry: Map<string, Runner>;
     logService: LogService;
-    sandboxConfig: DockerAdapterConfig;
+    sandboxConfig: SandboxConfig;
     linkBaseUrl?: string; // Base URL for account linking
 }
 

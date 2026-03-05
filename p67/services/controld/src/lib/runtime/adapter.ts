@@ -2,19 +2,23 @@
  * Runtime Adapter
  *
  * Provides a unified interface for spawning and communicating with
- * workflow runtime hosts across different languages (TypeScript, Python).
- * All workflows run inside the p67-runner Docker container.
+ * workflow runtime hosts across different environments:
+ *
+ * - DockerAdapter: local dev, uses `docker run -i` with stdin/stdout NDJSON
+ * - SPCSAdapter: Snowpark Container Services, uses EXECUTE JOB SERVICE + stage I/O
  */
 
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import type { SandboxConfig } from '@controld/config.js';
 import type { Message } from '@controld/lib/runtime/schema.js';
 
 export type WorkflowLanguage = 'typescript' | 'python';
 
 /**
  * Interface for runtime adapters that handle language-specific
- * process spawning and IPC.
+ * process spawning and IPC via stdin/stdout (Docker-local mode).
  */
 export interface RuntimeAdapter {
     /** The language this adapter handles */
@@ -138,19 +142,236 @@ export class DockerAdapter implements RuntimeAdapter {
     }
 }
 
-export type DockerAdapterConfig = {
-    runnerImage: string;
-    hostStorageRoot?: string;
-    containerStorageRoot?: string;
+// ---------------------------------------------------------------------------
+// SPCS (Snowpark Container Services) Adapter
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of an SPCS job execution.
+ */
+export type SPCSJobResult = {
+    /** NDJSON messages emitted by the runner (read from stage) */
+    messages: Message[];
+    /** Container stderr (from SPCS_GET_LOGS) */
+    stderr: string[];
+    /** Exit status string from DESCRIBE SERVICE */
+    status: string;
 };
+
+/**
+ * SPCS-based runtime adapter.
+ *
+ * Unlike DockerAdapter (which relies on ChildProcess stdin/stdout pipes),
+ * SPCSAdapter launches an ephemeral SPCS job service via EXECUTE JOB SERVICE.
+ *
+ * Communication flow:
+ *   1. controld uploads workflow files to a Snowflake internal stage
+ *   2. controld executes EXECUTE JOB SERVICE with an inline spec that
+ *      mounts the stage as a volume at /workflow and mounts a results
+ *      volume backed by the same stage at /results
+ *   3. The p67-runner container reads /workflow as usual (no code changes)
+ *   4. The host process writes NDJSON messages to /results/messages.ndjson
+ *      (in SPCS mode, detected via P67_RESULTS_DIR env var)
+ *   5. controld polls DESCRIBE SERVICE until the job finishes
+ *   6. controld reads the results file from the stage
+ */
+export class SPCSAdapter {
+    readonly language: WorkflowLanguage;
+    private readonly image: string;
+    private readonly computePool: string;
+    private readonly warehouseName: string;
+    private readonly stageName: string;
+
+    constructor(
+        language: WorkflowLanguage,
+        config: Extract<SandboxConfig, { mode: 'spcs' }>,
+    ) {
+        this.language = language;
+        this.image = config.runnerImage;
+        this.computePool = config.computePool;
+        this.warehouseName = config.warehouseName;
+        this.stageName = config.stageName;
+    }
+
+    /**
+     * Generate a unique job ID for this workflow run.
+     */
+    private jobId(): string {
+        return `runner_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    }
+
+    /**
+     * Build the EXECUTE JOB SERVICE SQL statement.
+     */
+    buildJobServiceSQL(
+        jobName: string,
+        stagePath: string,
+        runWorkflowMessage: Message,
+        resourceRequests?: { cpu?: string; memory?: string },
+    ): string {
+        const cpu = resourceRequests?.cpu ?? '0.5';
+        const memory = resourceRequests?.memory ?? '512Mi';
+        const limitCpu = '1';
+        const limitMemory = '1Gi';
+
+        // The RunWorkflow message is passed as a base64-encoded env var.
+        // The runner reads this instead of stdin in SPCS mode.
+        const messageB64 = Buffer.from(
+            JSON.stringify(runWorkflowMessage),
+        ).toString('base64');
+
+        // Results volume is stage-backed so controld can read messages.ndjson
+        // after the job completes. The runner tees stdout to this file.
+        const spec = `
+spec:
+  containers:
+  - name: runner
+    image: ${this.image}
+    args:
+    - "/workflow"
+    env:
+      P67_RUN_MESSAGE_B64: "${messageB64}"
+      P67_RESULTS_DIR: "/results"
+    volumeMounts:
+    - name: workflow-files
+      mountPath: /workflow
+    - name: results
+      mountPath: /results
+    resources:
+      requests:
+        cpu: "${cpu}"
+        memory: "${memory}"
+      limits:
+        cpu: "${limitCpu}"
+        memory: "${limitMemory}"
+  volumes:
+  - name: workflow-files
+    source: "@${this.stageName}/${stagePath}"
+    uid: 1000
+    gid: 1000
+  - name: results
+    source: "@${this.stageName}/${stagePath}/results"
+    uid: 1000
+    gid: 1000
+`.trim();
+
+        return [
+            `EXECUTE JOB SERVICE`,
+            `  IN COMPUTE POOL ${this.computePool}`,
+            `  NAME = ${jobName}`,
+            `  QUERY_WAREHOUSE = ${this.warehouseName}`,
+            `  EXTERNAL_ACCESS_INTEGRATIONS = (reference('google_oauth_eai'), reference('postgres_eai'))`,
+            `  FROM SPECIFICATION $$`,
+            spec,
+            `$$`,
+        ].join('\n');
+    }
+
+    /**
+     * Build SQL to upload workflow files to the stage.
+     * Returns [putSQL, stagePath] where stagePath is the sub-directory on stage.
+     */
+    buildStageUploadSQL(
+        jobName: string,
+        workflowDir: string,
+    ): { putSQL: string; stagePath: string } {
+        const stagePath = jobName;
+        const putSQL = `PUT 'file://${workflowDir}/*' '@${this.stageName}/${stagePath}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`;
+        return { putSQL, stagePath };
+    }
+
+    /**
+     * Build SQL to poll job status.
+     */
+    buildDescribeSQL(jobName: string): string {
+        return `CALL ${jobName}!SPCS_WAIT_FOR('DONE', 600)`;
+    }
+
+    /**
+     * Build SQL to retrieve container logs.
+     */
+    buildGetLogsSQL(jobName: string): string {
+        return `SELECT * FROM TABLE(${jobName}!SPCS_GET_LOGS())`;
+    }
+
+    /**
+     * Build SQL to read the results NDJSON file from the stage.
+     * The runner writes messages.ndjson to the results volume which is
+     * backed by @stageName/stagePath/results/.
+     */
+    buildGetResultsSQL(stagePath: string): string {
+        return `GET '@${this.stageName}/${stagePath}/results/messages.ndjson' 'file:///tmp/p67-results/'`;
+    }
+
+    /**
+     * The local path where GET downloads the results file.
+     */
+    get resultsLocalPath(): string {
+        return '/tmp/p67-results/messages.ndjson';
+    }
+
+    /**
+     * Build SQL to clean up the job service.
+     */
+    buildCleanupSQL(jobName: string, stagePath: string): string[] {
+        return [
+            `DROP SERVICE IF EXISTS ${jobName}`,
+            `REMOVE '@${this.stageName}/${stagePath}/'`,
+        ];
+    }
+
+    /**
+     * Create a new job ID.
+     */
+    createJobId(): string {
+        return this.jobId();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Factory
+// ---------------------------------------------------------------------------
+
+export type DockerAdapterConfig = Extract<SandboxConfig, { mode: 'docker' }>;
+export type SPCSAdapterConfig = Extract<SandboxConfig, { mode: 'spcs' }>;
 
 /**
  * Create a DockerAdapter for the given workflow language.
  */
-export function createAdapter(
+export function createDockerAdapter(
     language: WorkflowLanguage,
     config: DockerAdapterConfig,
-): RuntimeAdapter {
+): DockerAdapter {
+    return new DockerAdapter(
+        language,
+        config.runnerImage,
+        config.hostStorageRoot,
+        config.containerStorageRoot,
+    );
+}
+
+/**
+ * Create an SPCSAdapter for the given workflow language.
+ */
+export function createSPCSAdapter(
+    language: WorkflowLanguage,
+    config: SPCSAdapterConfig,
+): SPCSAdapter {
+    return new SPCSAdapter(language, config);
+}
+
+/**
+ * Create the appropriate adapter based on sandbox config.
+ * Returns DockerAdapter | SPCSAdapter (not a unified interface,
+ * because SPCS fundamentally differs from the ChildProcess model).
+ */
+export function createAdapter(
+    language: WorkflowLanguage,
+    config: SandboxConfig,
+): DockerAdapter | SPCSAdapter {
+    if (config.mode === 'spcs') {
+        return new SPCSAdapter(language, config);
+    }
     return new DockerAdapter(
         language,
         config.runnerImage,

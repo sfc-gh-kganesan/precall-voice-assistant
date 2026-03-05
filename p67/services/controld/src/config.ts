@@ -20,6 +20,21 @@ export type OAuthConfig = {
     };
 };
 
+export type SandboxConfig =
+    | {
+          mode: 'docker';
+          runnerImage: string;
+          hostStorageRoot?: string;
+          containerStorageRoot?: string;
+      }
+    | {
+          mode: 'spcs';
+          runnerImage: string;
+          computePool: string;
+          warehouseName: string;
+          stageName: string;
+      };
+
 export type ServerConfig = {
     port: number;
     nodeEnv: string;
@@ -35,11 +50,7 @@ export type ServerConfig = {
         enableDefaultUser: boolean;
         defaultUser?: string;
     };
-    sandbox: {
-        runnerImage: string;
-        hostStorageRoot?: string;
-        containerStorageRoot?: string;
-    };
+    sandbox: SandboxConfig;
 };
 
 function readFileIfExistsSync(filePath: string): string | null {
@@ -48,6 +59,33 @@ function readFileIfExistsSync(filePath: string): string | null {
     }
 
     return readFileSync(filePath, 'utf-8');
+}
+
+function buildSandboxConfig(localStoragePath: string): SandboxConfig {
+    const runnerImage = process.env.P67_RUNNER_IMAGE || 'p67-runner:latest';
+
+    // SPCS mode is detected by the presence of SNOWFLAKE_HOST (injected by SPCS runtime)
+    // or explicitly via P67_SANDBOX_MODE=spcs
+    const isSpcs =
+        process.env.P67_SANDBOX_MODE === 'spcs' || !!process.env.SNOWFLAKE_HOST;
+
+    if (isSpcs) {
+        return {
+            mode: 'spcs',
+            runnerImage,
+            computePool:
+                process.env.P67_RUNNER_COMPUTE_POOL || 'runner_compute_pool',
+            warehouseName: process.env.P67_RUNNER_WAREHOUSE || 'p67_app_wh',
+            stageName: process.env.P67_WORKFLOW_STAGE || 'app.workflow_stage',
+        };
+    }
+
+    return {
+        mode: 'docker',
+        runnerImage,
+        hostStorageRoot: process.env.P67_HOST_STORAGE_ROOT || undefined,
+        containerStorageRoot: localStoragePath,
+    };
 }
 
 export const loadConfig = (): ServerConfig => {
@@ -117,10 +155,6 @@ export const loadConfig = (): ServerConfig => {
             enableDefaultUser: process.env.DEBUG_ENABLE_DEFAULT_USER === 'true',
             defaultUser: process.env.DEBUG_DEFAULT_USER,
         },
-        sandbox: {
-            runnerImage: process.env.P67_RUNNER_IMAGE || 'p67-runner:latest',
-            hostStorageRoot: process.env.P67_HOST_STORAGE_ROOT || undefined,
-            containerStorageRoot: localStoragePath,
-        },
+        sandbox: buildSandboxConfig(localStoragePath),
     };
 };

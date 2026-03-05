@@ -18,6 +18,7 @@ artifacts:
     container_services:
         images:
             - /p67_src/core/img_repo/controld:latest
+            - /p67_src/core/img_repo/p67-runner:latest
 
 references:
     - google_oauth_eai:
