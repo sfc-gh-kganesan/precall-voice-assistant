@@ -260,7 +260,7 @@ spec:
             `  IN COMPUTE POOL ${this.computePool}`,
             `  NAME = ${jobName}`,
             `  QUERY_WAREHOUSE = ${this.warehouseName}`,
-            `  EXTERNAL_ACCESS_INTEGRATIONS = (reference('google_oauth_eai'), reference('postgres_eai'))`,
+            `  EXTERNAL_ACCESS_INTEGRATIONS = (reference('google_oauth_eai'), reference('snowflake_egress_eai'), reference('postgres_eai'))`,
             `  FROM SPECIFICATION $$`,
             spec,
             `$$`,

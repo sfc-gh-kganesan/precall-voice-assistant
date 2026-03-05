@@ -47,6 +47,14 @@ references:
           register_callback: v1.register_reference
           configuration_callback: v1.configure_reference
           required_at_setup: true
+    - snowflake_egress_eai:
+          label: "Snowflake Egress Access Integration"
+          description: "External Access Integration for Egress to Snowflake APIs (Cortex, SQL, etc.)"
+          privileges: [USAGE]
+          object_type: EXTERNAL_ACCESS_INTEGRATION
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: true
     - postgres_eai:
           label: "Postgres Access Integration"
           description: "External Access Integration for Egress to Snowflake Postgres service"
@@ -58,6 +66,15 @@ references:
     - postgres_connection_url:
           label: "Postgres connection URL"
           description: "Secret holding Postgres connection URL (which includes username/password)"
+          privileges:
+              - READ
+          object_type: SECRET
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: true
+    - encryption_key:
+          label: "Encryption key for secrets"
+          description: "Secret holding Base64-encoded 32-byte AES-256 key used to encrypt user secrets at rest"
           privileges:
               - READ
           object_type: SECRET

@@ -1052,6 +1052,10 @@ export class Runner {
         let workflowResult: unknown;
         const stdout: string[] = [];
         try {
+            // Ensure the local download directory exists before GET
+            const resultsDir = '/tmp/p67-results';
+            fs.mkdirSync(resultsDir, { recursive: true });
+
             await executeSql(adapter.buildGetResultsSQL(stagePath));
             const resultsPath = adapter.resultsLocalPath;
             const resultsContent = await fs.promises.readFile(

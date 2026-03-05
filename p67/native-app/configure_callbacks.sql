@@ -31,6 +31,18 @@ begin
                     "type": "GENERIC_STRING"
                 }
             }';
+        when 'SNOWFLAKE_EGRESS_EAI' then
+            -- NOTE: SPCS does not support wildcards in network rules.
+            -- Use the exact Snowflake account hostname(s) that workflows connect to.
+            return '{
+                "type": "CONFIGURATION",
+                "payload": {
+                    "host_ports": [
+                        "SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2.snowflakecomputing.com"
+                    ],
+                    "allowed_secrets": "NONE"
+                }
+            }';
         when 'POSTGRES_EAI' then
             return '{
                 "type": "CONFIGURATION",
@@ -42,6 +54,13 @@ begin
                 }
             }';
         when 'POSTGRES_CONNECTION_URL' then
+            return '{
+                "type": "CONFIGURATION",
+                "payload": {
+                    "type": "GENERIC_STRING"
+                }
+            }';
+        when 'ENCRYPTION_KEY' then
             return '{
                 "type": "CONFIGURATION",
                 "payload": {

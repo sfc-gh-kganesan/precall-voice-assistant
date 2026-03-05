@@ -3,7 +3,7 @@ SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_r
 CONTROLD_IMAGE=controld
 .PHONY: help build build-controld ci deploy describe dev fix \
 ensure-encryption-key init-provider-account install-cli list-services login logs push push-controld \
-url dbmigrate cert
+url dbmigrate cert spcs-data-secret spcs-snowflake-eai
 
 .DEFAULT_GOAL := help
 
@@ -94,6 +94,34 @@ url: ## Print the ingress URL for the running SPCS service
 		jq '.[] | select(.name == "web") | .ingress_url' -r | \
 		xargs -I {} echo "https://{}"
 
+
+spcs-data-secret: ## Generate and create the p67 encryption_key Snowflake Secret and bind to app (idempotent)
+	@snow sql -q "DESCRIBE SECRET p67_src.core.p67_encryption_key" \
+	  -c $(SNOW_CONNECTION) > /dev/null 2>&1 && { \
+	    echo "Secret p67_src.core.p67_encryption_key already exists — skipping creation."; \
+	} || { \
+	    KEY=$$(openssl rand -base64 32); \
+	    echo "Creating Snowflake secret p67_src.core.p67_encryption_key..."; \
+	    snow sql -q "USE SCHEMA p67_src.core; CREATE SECRET p67_encryption_key TYPE = GENERIC_STRING SECRET_STRING = '$$KEY'" \
+	      -c $(SNOW_CONNECTION) > /dev/null; \
+	    echo "Secret created."; \
+	}
+	@echo "Binding encryption_key reference to app..."
+	@snow sql -q "CALL p67.v1.register_reference('encryption_key', 'ADD', SYSTEM\$$REFERENCE('SECRET', 'p67_src.core.p67_encryption_key', 'PERSISTENT', 'READ'))" \
+	  -c $(SNOW_CONNECTION) > /dev/null
+	@echo "encryption_key bound to app."
+	@echo "Reinitializing service with new spec..."
+	@snow sql -q "CALL p67.v1.init()" -c $(SNOW_CONNECTION) > /dev/null
+	@echo "Done."
+
+spcs-snowflake-eai: ## Bind the Snowflake egress EAI to the app and reinitialize
+	@echo "Binding snowflake_egress_eai reference to app..."
+	@snow sql -q "CALL p67.v1.register_reference('snowflake_egress_eai', 'ADD', SYSTEM\$$REFERENCE('EXTERNAL_ACCESS_INTEGRATION', 'p67_snowflake_egress_eai', 'PERSISTENT', 'USAGE'))" \
+	  -c $(SNOW_CONNECTION) > /dev/null
+	@echo "snowflake_egress_eai bound to app."
+	@echo "Reinitializing service with new spec..."
+	@snow sql -q "CALL p67.v1.init()" -c $(SNOW_CONNECTION) > /dev/null
+	@echo "Done."
 
 cert: ## Generate locally-trusted HTTPS certificates using mkcert
 	@command -v mkcert >/dev/null 2>&1 || { echo "mkcert not found. Install with: brew install mkcert"; exit 1; }

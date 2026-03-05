@@ -27,6 +27,9 @@ spec:
               - snowflakeSecret:
                     objectReference: postgres_connection_url
                 directoryPath: /opt/creds/postgres_connection_url
+              - snowflakeSecret:
+                    objectReference: encryption_key
+                directoryPath: /opt/creds/encryption_key
     volumes:
         - name: local-storage
           source: block

@@ -28,8 +28,16 @@ create or replace procedure v1.init()
     execute as owner
 as $$
 begin
-    alter service if exists app.controld from specification_file='controld_service_spec.yml';
-    alter service if exists app.controld set external_access_integrations=( reference('google_oauth_eai'), reference('postgres_eai') );
+    begin
+        alter service if exists app.controld from specification_file='controld_service_spec.yml';
+        alter service if exists app.controld set external_access_integrations=( reference('google_oauth_eai'), reference('snowflake_egress_eai'), reference('postgres_eai') );
+    exception
+        when other then
+            -- New references (e.g. encryption_key) may not be bound yet during upgrade.
+            -- The service will be updated once the consumer binds the missing references
+            -- and calls start_controld or re-runs init.
+            return 'INIT PARTIAL — service not updated: ' || sqlerrm;
+    end;
     return 'INIT COMPLETE';
 end
 $$;
@@ -45,7 +53,7 @@ begin
     create service if not exists app.controld
         in compute pool identifier(:pool_name)
         from specification_file='controld_service_spec.yml'
-        external_access_integrations=( reference('google_oauth_eai'), reference('postgres_eai') )
+        external_access_integrations=( reference('google_oauth_eai'), reference('snowflake_egress_eai'), reference('postgres_eai') )
         query_warehouse = 'p67_app_wh';
     grant usage on service app.controld to application role app_user;
     grant monitor on service app.controld to application role app_user;
