@@ -39,10 +39,23 @@ export function registerRunListRoute(server: FastifyInstance) {
                         request.user.id,
                     );
 
+                type ApiRunStatus =
+                    | 'running'
+                    | 'completed'
+                    | 'failed'
+                    | 'interrupted';
+                const statusMap: Record<string, ApiRunStatus> = {
+                    Running: 'running',
+                    Completed: 'completed',
+                    Interrupted: 'interrupted',
+                    Failed: 'failed',
+                };
+
                 return reply.code(200).send({
                     runs: runs.map((run) => ({
                         id: run.id,
                         workflowId: run.workflowId,
+                        status: statusMap[run.status] ?? ('running' as const),
                         startedAt: run.startedAt.toISOString(),
                         completedAt: run.completedAt?.toISOString() ?? null,
                         exitCode: run.exitCode,

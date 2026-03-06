@@ -63,6 +63,40 @@ export const WorkflowRunResponseSchema = z.object({
     result: z.unknown().optional(),
 });
 
+export const WorkflowRunAcceptedSchema = z.object({
+    runId: z.string(),
+    status: z.literal('running'),
+});
+
+export type WorkflowRunAccepted = z.infer<typeof WorkflowRunAcceptedSchema>;
+
+export const WorkflowRunStatusParamsSchema = z.object({
+    runId: z.string(),
+});
+
+export const WorkflowRunStatusResponseSchema = z.object({
+    runId: z.string(),
+    status: RunStatusSchema,
+    exitCode: z.number().nullable(),
+    result: z.unknown().optional(),
+    stdout: z.array(z.string()).optional(),
+    stderr: z.array(z.string()).optional(),
+    log: z.array(z.string()).optional(),
+    errors: z
+        .array(
+            z.object({
+                error: z.string(),
+                message: z.string(),
+            }),
+        )
+        .optional(),
+    pendingInterrupt: PendingInterruptSchema.optional(),
+});
+
+export type WorkflowRunStatusResponse = z.infer<
+    typeof WorkflowRunStatusResponseSchema
+>;
+
 export const WorkflowRunParamsSchema = z.object({
     workflowId: z.string(),
 });
@@ -282,6 +316,7 @@ export const RunListQuerySchema = z.object({
 export const RunEntrySchema = z.object({
     id: z.string(),
     workflowId: z.string(),
+    status: z.enum(['running', 'completed', 'failed', 'interrupted']),
     startedAt: z.string(),
     completedAt: z.string().nullable(),
     exitCode: z.number().nullable(),

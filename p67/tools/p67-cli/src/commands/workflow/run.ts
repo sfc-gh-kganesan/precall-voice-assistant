@@ -1,10 +1,42 @@
 import * as fs from 'node:fs';
 import { input, select } from '@inquirer/prompts';
 import { Command } from '@p67-cli/Command.ts';
+import type { WorkflowRunStatusResponse } from '@p67-cli/clients/ControldClient.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 import { DotP67Config } from '@p67-cli/config/DotP67Config.ts';
 import { ctx } from '@p67-cli/context';
 import * as yaml from 'js-yaml';
+
+function formatElapsed(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+    return `${minutes}m ${remaining}s`;
+}
+
+function displayRunResult(result: WorkflowRunStatusResponse): void {
+    console.log('─'.repeat(50));
+    console.log(`Exit Code: ${result.exitCode ?? 'N/A'}`);
+    console.log(
+        `Status: ${result.status === 'completed' ? 'Success' : result.status}`,
+    );
+    console.log('─'.repeat(50));
+    if (result.log && result.log.length > 0) {
+        console.log(result.log.join('\n'));
+    }
+    if (result.stdout && result.stdout.length > 0) {
+        console.log(result.stdout.join('\n'));
+    }
+    if (result.stderr && result.stderr.length > 0) {
+        console.error(result.stderr.join('\n'));
+    }
+    if (result.errors && result.errors.length > 0) {
+        for (const err of result.errors) {
+            console.error(`Error: ${err.error} - ${err.message}`);
+        }
+    }
+}
 
 export const runCommand = new Command('run')
     .description('Run a workflow')
@@ -24,6 +56,7 @@ export const runCommand = new Command('run')
         '-P, --param_file <param_file>',
         'Parameter file to pass to the workflow',
     )
+    .option('--poll-interval <ms>', 'Polling interval in milliseconds', '2000')
     .action(
         async (
             workflowId: string | undefined,
@@ -32,6 +65,7 @@ export const runCommand = new Command('run')
                 timeout: string;
                 param?: string[];
                 param_file?: string;
+                pollInterval: string;
             },
         ) => {
             // Validate that both workflowId and name are not provided
@@ -84,26 +118,43 @@ export const runCommand = new Command('run')
                     timeout: Number.parseInt(options.timeout, 10),
                 });
 
+                const pollIntervalMs = Number.parseInt(
+                    options.pollInterval,
+                    10,
+                );
+
                 // If running by name, use the name-based endpoint
                 if (options.name) {
                     console.log(
                         `\nRunning workflow by name: ${options.name} (latest version)\n`,
                     );
 
-                    const runResult = await client.runWorkflowByName(
+                    const accepted = await client.runWorkflowByName(
                         options.name,
                         params,
                     );
 
-                    // Display results
-                    console.log('─'.repeat(50));
-                    console.log(`Exit Code: ${runResult.exitCode}`);
-                    console.log(`Success: ${runResult.success}`);
-                    console.log('─'.repeat(50));
-                    console.log(runResult.log.join('\n'));
+                    console.log(
+                        `Workflow started (run ID: ${accepted.runId}). Waiting for completion...\n`,
+                    );
 
-                    // Exit with the workflow's exit code
-                    process.exit(runResult.exitCode);
+                    const result = await client.pollForCompletion(
+                        accepted.runId,
+                        {
+                            intervalMs: pollIntervalMs,
+                            onPoll: (_status, elapsed) => {
+                                process.stdout.write(
+                                    `\r  Running... ${formatElapsed(elapsed)}`,
+                                );
+                            },
+                        },
+                    );
+
+                    // Clear the polling line
+                    process.stdout.write(`\r${' '.repeat(40)}\r`);
+
+                    displayRunResult(result);
+                    process.exit(result.exitCode ?? 1);
                 }
 
                 let selectedWorkflowId = workflowId;
@@ -238,20 +289,29 @@ export const runCommand = new Command('run')
 
                 console.log(`\nRunning workflow: ${selectedWorkflowId}\n`);
 
-                const runResult = await client.runWorkflow(
+                const accepted = await client.runWorkflow(
                     selectedWorkflowId,
                     params,
                 );
 
-                // Display results
-                console.log('─'.repeat(50));
-                console.log(`Exit Code: ${runResult.exitCode}`);
-                console.log(`Success: ${runResult.success}`);
-                console.log('─'.repeat(50));
-                console.log(runResult.log.join('\n'));
+                console.log(
+                    `Workflow started (run ID: ${accepted.runId}). Waiting for completion...\n`,
+                );
 
-                // Exit with the workflow's exit code
-                process.exit(runResult.exitCode);
+                const result = await client.pollForCompletion(accepted.runId, {
+                    intervalMs: pollIntervalMs,
+                    onPoll: (_status, elapsed) => {
+                        process.stdout.write(
+                            `\r  Running... ${formatElapsed(elapsed)}`,
+                        );
+                    },
+                });
+
+                // Clear the polling line
+                process.stdout.write(`\r${' '.repeat(40)}\r`);
+
+                displayRunResult(result);
+                process.exit(result.exitCode ?? 1);
             } catch (error) {
                 console.error('Failed to run workflow');
                 throw error;

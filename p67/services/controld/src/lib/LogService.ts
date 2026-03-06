@@ -51,7 +51,11 @@ export class LogService {
         });
     }
 
-    async completeRun(runId: string, exitCode: number): Promise<WorkflowRun> {
+    async completeRun(
+        runId: string,
+        exitCode: number,
+        result?: unknown,
+    ): Promise<WorkflowRun> {
         const status: WorkflowRunStatus =
             exitCode === 0 ? 'Completed' : 'Failed';
         return this.db.workflowRun.update({
@@ -60,6 +64,8 @@ export class LogService {
                 completedAt: new Date(),
                 exitCode,
                 status,
+                // biome-ignore lint/suspicious/noExplicitAny: Prisma JSON type requires flexible input
+                ...(result !== undefined ? { result: result as any } : {}),
             },
         });
     }

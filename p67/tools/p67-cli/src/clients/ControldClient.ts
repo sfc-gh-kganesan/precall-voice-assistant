@@ -38,6 +38,30 @@ export interface WorkflowRunResponse {
     log: string[];
 }
 
+export interface WorkflowRunAccepted {
+    runId: string;
+    status: 'running';
+}
+
+export type RunStatus = 'running' | 'completed' | 'interrupted' | 'failed';
+
+export interface WorkflowRunStatusResponse {
+    runId: string;
+    status: RunStatus;
+    exitCode: number | null;
+    result?: unknown;
+    stdout?: string[];
+    stderr?: string[];
+    log?: string[];
+    errors?: Array<{ error: string; message: string }>;
+    pendingInterrupt?: {
+        interruptId: string;
+        value: unknown;
+        timestamp: string;
+        nodeId?: string;
+    };
+}
+
 export interface ManifestParamValue {
     value?: string;
     valueRef?: string;
@@ -123,6 +147,7 @@ export interface LogListOptions {
 export interface RunEntry {
     id: string;
     workflowId: string;
+    status: RunStatus;
     startedAt: string;
     completedAt: string | null;
     exitCode: number | null;
@@ -258,7 +283,7 @@ export class ControldClient {
     async runWorkflow(
         workflowId: string,
         params: Record<string, string>,
-    ): Promise<WorkflowRunResponse> {
+    ): Promise<WorkflowRunAccepted> {
         const response = await this.post(`/api/workflow/${workflowId}/run`, {
             headers: {
                 'Content-Type': 'application/json',
@@ -279,7 +304,7 @@ export class ControldClient {
             throw new Error(errorMessage);
         }
 
-        return JSON.parse(text) as WorkflowRunResponse;
+        return JSON.parse(text) as WorkflowRunAccepted;
     }
 
     async getWorkflowManifest(
@@ -298,14 +323,14 @@ export class ControldClient {
     async runWorkflowByName(
         name: string,
         params: Record<string, string>,
-    ): Promise<WorkflowRunResponse> {
+    ): Promise<WorkflowRunAccepted> {
         const response = await this.post(
             `/api/workflow/name/${encodeURIComponent(name)}/run`,
             {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(params),
+                body: JSON.stringify({ params }),
             },
         );
 
@@ -322,7 +347,7 @@ export class ControldClient {
             throw new Error(errorMessage);
         }
 
-        return JSON.parse(text) as WorkflowRunResponse;
+        return JSON.parse(text) as WorkflowRunAccepted;
     }
 
     async getWorkflowVersions(name: string): Promise<WorkflowListResponse> {
@@ -336,6 +361,48 @@ export class ControldClient {
         }
 
         return (await response.json()) as WorkflowListResponse;
+    }
+
+    async getRunStatus(runId: string): Promise<WorkflowRunStatusResponse> {
+        const response = await this.get(
+            `/api/workflow/runs/${encodeURIComponent(runId)}`,
+        );
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as WorkflowRunStatusResponse;
+    }
+
+    async pollForCompletion(
+        runId: string,
+        options?: {
+            intervalMs?: number;
+            onPoll?: (
+                status: WorkflowRunStatusResponse,
+                elapsed: number,
+            ) => void;
+        },
+    ): Promise<WorkflowRunStatusResponse> {
+        const intervalMs = options?.intervalMs ?? 2000;
+        const startTime = Date.now();
+
+        while (true) {
+            const status = await this.getRunStatus(runId);
+            const elapsed = Date.now() - startTime;
+
+            if (options?.onPoll) {
+                options.onPoll(status, elapsed);
+            }
+
+            if (status.status !== 'running') {
+                return status;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        }
     }
 
     // Secret methods

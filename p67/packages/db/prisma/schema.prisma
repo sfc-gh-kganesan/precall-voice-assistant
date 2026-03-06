@@ -81,6 +81,7 @@ model WorkflowRun {
     completedAt DateTime?
     exitCode    Int?
     status      WorkflowRunStatus @default(Running)
+    result      Json?             // Workflow result payload (persisted for async polling)
     logs        Log[]
     interrupts  WorkflowInterrupt[]
 

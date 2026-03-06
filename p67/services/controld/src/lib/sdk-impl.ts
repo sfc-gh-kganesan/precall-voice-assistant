@@ -1455,12 +1455,14 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             };
         }
 
-        // Build URL based on whether we're using ID or name
+        // Build URL based on whether we're using ID or name.
+        // Always use sync=true for subworkflow calls — the runner
+        // needs the complete result, not an async 202 response.
         let url: string;
         if (hasId) {
-            url = `${accessUrl}/api/workflow/${encodeURIComponent(options.workflowId ?? '')}/run`;
+            url = `${accessUrl}/api/workflow/${encodeURIComponent(options.workflowId ?? '')}/run?sync=true`;
         } else {
-            url = `${accessUrl}/api/workflow/name/${encodeURIComponent(options.workflowName ?? '')}/run`;
+            url = `${accessUrl}/api/workflow/name/${encodeURIComponent(options.workflowName ?? '')}/run?sync=true`;
         }
 
         // Build request body with params

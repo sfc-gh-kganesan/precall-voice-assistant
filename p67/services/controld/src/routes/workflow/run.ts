@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { Runner } from '@controld/lib/runner.js';
 import {
     ErrorResponseSchema,
+    WorkflowRunAcceptedSchema,
     type WorkflowRunBody,
     WorkflowRunBodySchema,
     WorkflowRunParamsSchema,
@@ -23,6 +24,7 @@ export function registerRunRoute(server: FastifyInstance) {
                 body: WorkflowRunBodySchema,
                 response: {
                     200: WorkflowRunResponseSchema,
+                    202: WorkflowRunAcceptedSchema,
                     400: ErrorResponseSchema,
                     500: ErrorResponseSchema,
                 },
@@ -33,6 +35,8 @@ export function registerRunRoute(server: FastifyInstance) {
                 const { workflowId } = request.params as { workflowId: string };
                 const body = request.body as WorkflowRunBody;
                 const params = body?.params ?? {};
+                const syncMode =
+                    (request.query as { sync?: string })?.sync === 'true';
                 const workflow =
                     await fastify.workflowService.findRunnableWorkflowByUser(
                         workflowId,
@@ -61,76 +65,97 @@ export function registerRunRoute(server: FastifyInstance) {
                     params,
                     fastify.config.sandbox,
                 );
-                const result = await runnerInstance.start();
+
+                // Create the run record before starting so we can return the runId
+                const runId = await runnerInstance.init();
 
                 // Register runner in registry for potential resume operations
-                fastify.runnerRegistry.set(result.runId, runnerInstance);
+                fastify.runnerRegistry.set(runId, runnerInstance);
 
-                // Handle interrupted workflows
-                if (
-                    result.status === 'interrupted' &&
-                    result.pendingInterrupt
-                ) {
-                    // Create interrupt record in database
-                    await fastify.db.workflowInterrupt.create({
-                        data: {
-                            id: result.pendingInterrupt.interruptId,
-                            runId: result.runId,
-                            workflowId: workflowId,
-                            payload: result.pendingInterrupt.value as object,
-                            nodeId: result.pendingInterrupt.nodeId,
-                            status: 'Pending',
-                        },
+                // Synchronous mode: wait for the result (used by subworkflow calls)
+                if (syncMode) {
+                    const result = await runnerInstance.start();
+                    fastify.runnerRegistry.delete(runId);
+                    return reply.code(200).send({
+                        exitCode: result.exitCode,
+                        stdout: result.stdout,
+                        stderr: result.stderr,
+                        log: result.log,
+                        success: result.exitCode === 0,
+                        errors: result.errors,
+                        status: result.status,
+                        runId: result.runId,
+                        result: result.result,
+                        pendingInterrupt: result.pendingInterrupt,
                     });
-
-                    // Update run status to Interrupted
-                    await fastify.db.workflowRun.update({
-                        where: { id: result.runId },
-                        data: { status: 'Interrupted' },
-                    });
-
-                    // Set up cleanup when workflow eventually completes
-                    runnerInstance
-                        .waitForCompletion()
-                        .then(async (finalResult) => {
-                            // Clean up runner from registry
-                            fastify.runnerRegistry.delete(finalResult.runId);
-
-                            // Update run status based on final result
-                            await fastify.db.workflowRun.update({
-                                where: { id: finalResult.runId },
-                                data: {
-                                    status:
-                                        finalResult.status === 'completed'
-                                            ? 'Completed'
-                                            : 'Failed',
-                                    completedAt: new Date(),
-                                },
-                            });
-                        })
-                        .catch((err) => {
-                            console.error(
-                                'Error waiting for workflow completion:',
-                                err,
-                            );
-                            fastify.runnerRegistry.delete(result.runId);
-                        });
-                } else {
-                    // Workflow completed or failed - clean up immediately
-                    fastify.runnerRegistry.delete(result.runId);
                 }
 
-                return reply.code(200).send({
-                    exitCode: result.exitCode,
-                    stdout: result.stdout,
-                    stderr: result.stderr,
-                    errors: result.errors,
-                    log: result.log,
-                    success: result.exitCode === 0,
-                    status: result.status,
-                    pendingInterrupt: result.pendingInterrupt,
-                    runId: result.runId,
-                    result: result.result,
+                // Async mode (default): fire off execution in the background
+                runnerInstance
+                    .start()
+                    .then(async (result) => {
+                        // Handle interrupted workflows
+                        if (
+                            result.status === 'interrupted' &&
+                            result.pendingInterrupt
+                        ) {
+                            await fastify.db.workflowInterrupt.create({
+                                data: {
+                                    id: result.pendingInterrupt.interruptId,
+                                    runId: result.runId,
+                                    workflowId: workflowId,
+                                    payload: result.pendingInterrupt
+                                        .value as object,
+                                    nodeId: result.pendingInterrupt.nodeId,
+                                    status: 'Pending',
+                                },
+                            });
+
+                            await fastify.db.workflowRun.update({
+                                where: { id: result.runId },
+                                data: { status: 'Interrupted' },
+                            });
+
+                            // Wait for eventual completion after resume
+                            runnerInstance
+                                .waitForCompletion()
+                                .then(async (finalResult) => {
+                                    fastify.runnerRegistry.delete(
+                                        finalResult.runId,
+                                    );
+                                    await fastify.db.workflowRun.update({
+                                        where: { id: finalResult.runId },
+                                        data: {
+                                            status:
+                                                finalResult.status ===
+                                                'completed'
+                                                    ? 'Completed'
+                                                    : 'Failed',
+                                            completedAt: new Date(),
+                                        },
+                                    });
+                                })
+                                .catch((err) => {
+                                    console.error(
+                                        'Error waiting for workflow completion:',
+                                        err,
+                                    );
+                                    fastify.runnerRegistry.delete(result.runId);
+                                });
+                        } else {
+                            // Workflow completed or failed — clean up
+                            fastify.runnerRegistry.delete(result.runId);
+                        }
+                    })
+                    .catch((err) => {
+                        console.error('Background workflow run failed:', err);
+                        fastify.runnerRegistry.delete(runId);
+                    });
+
+                // Return immediately with the run ID
+                return reply.code(202).send({
+                    runId,
+                    status: 'running',
                 });
             } catch (error) {
                 console.error('Error running workflow:', error);

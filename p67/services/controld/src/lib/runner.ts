@@ -273,6 +273,25 @@ export class Runner {
     /**
      * Returns the workflow ID
      */
+
+    /**
+     * Create the workflow run record and return the run ID.
+     * Call this before start() to get the runId for async responses.
+     * If not called, start() will create the run record itself.
+     */
+    public async init(): Promise<string> {
+        if (this.currentRunId !== 'unknown') {
+            return this.currentRunId;
+        }
+        if (this.logService) {
+            const run = await this.logService.createRun(
+                this.workflowId,
+                this.userId,
+            );
+            this.currentRunId = run.id;
+        }
+        return this.currentRunId;
+    }
     public getWorkflowId(): string {
         return this.workflowId;
     }
@@ -360,16 +379,8 @@ export class Runner {
     public async start(): Promise<RunResult> {
         console.log(`Running workflow from ${this.workflowDir}...`);
 
-        // Create a workflow run record if logService is available
-        let runId = 'unknown';
-        if (this.logService) {
-            const run = await this.logService.createRun(
-                this.workflowId,
-                this.userId,
-            );
-            runId = run.id;
-        }
-        this.currentRunId = runId;
+        // Create a workflow run record if not already created by init()
+        const runId = await this.init();
 
         // Helper to write logs to the database
         const writeLog = async (
@@ -886,7 +897,11 @@ export class Runner {
 
         // Complete the run record only if workflow completed (not interrupted)
         if (this.logService && result.status !== 'interrupted') {
-            await this.logService.completeRun(runId, result.exitCode);
+            await this.logService.completeRun(
+                runId,
+                result.exitCode,
+                result.result,
+            );
         }
 
         return result;
@@ -1010,16 +1025,48 @@ export class Runner {
             logger.error(`SPCS job failed: ${message}`);
             await writeLog('RuntimeHost', `SPCS job failed: ${message}`);
 
-            // Try to get logs before cleaning up
+            // Try to get logs before cleaning up — use SYSTEM$GET_SERVICE_LOGS
+            // directly since the job function (SPCS_GET_LOGS) may not be available
+            // after a failed job.
             try {
                 const logRows = await executeSql(
-                    adapter.buildGetLogsSQL(jobName),
+                    `SELECT SYSTEM$GET_SERVICE_LOGS('app.${jobName}', 0, 'runner') AS LOG`,
                 );
                 for (const row of logRows) {
                     const logLine = String(row.LOG ?? '');
                     if (logLine) {
                         stderr.push(logLine);
                         logger.stderr(logLine);
+                        await writeLog(
+                            'RuntimeHost',
+                            `[runner stderr] ${logLine}`,
+                        );
+                    }
+                }
+            } catch (logErr) {
+                const logErrMsg =
+                    logErr instanceof Error ? logErr.message : String(logErr);
+                logger.debug(`Could not retrieve runner logs: ${logErrMsg}`);
+                await writeLog(
+                    'RuntimeHost',
+                    `Log retrieval failed: ${logErrMsg}`,
+                );
+            }
+
+            // Also try the job function approach as fallback
+            try {
+                const logRows = await executeSql(
+                    adapter.buildGetLogsSQL(jobName),
+                );
+                for (const row of logRows) {
+                    const logLine = String(row.LOG ?? '');
+                    if (logLine && !stderr.includes(logLine)) {
+                        stderr.push(logLine);
+                        logger.stderr(logLine);
+                        await writeLog(
+                            'RuntimeHost',
+                            `[runner stderr fallback] ${logLine}`,
+                        );
                     }
                 }
             } catch {
@@ -1178,7 +1225,7 @@ export class Runner {
         const status: RunStatus = errors.length > 0 ? 'failed' : 'completed';
 
         if (this.logService) {
-            await this.logService.completeRun(runId, exitCode);
+            await this.logService.completeRun(runId, exitCode, workflowResult);
         }
 
         return {

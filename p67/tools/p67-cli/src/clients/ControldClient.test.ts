@@ -4,7 +4,7 @@ import type {
     HealthResponse,
     WorkflowCreateResponse,
     WorkflowListResponse,
-    WorkflowRunResponse,
+    WorkflowRunAccepted,
 } from '@p67-cli/clients/ControldClient.ts';
 import { ControldClient } from '@p67-cli/clients/ControldClient.ts';
 
@@ -323,14 +323,10 @@ describe('ControldClient', () => {
     });
 
     describe('runWorkflow()', () => {
-        test('should execute workflow successfully', async () => {
-            const mockResponse: WorkflowRunResponse = {
-                exitCode: 0,
-                stdout: ['Task completed successfully'],
-                stderr: [],
-                success: true,
-                errors: [],
-                log: [],
+        test('should return accepted response with runId', async () => {
+            const mockResponse: WorkflowRunAccepted = {
+                runId: 'run-abc-123',
+                status: 'running',
             };
 
             const workflowId = 'wf-123e4567-e89b-12d3-a456-426614174000';
@@ -341,7 +337,7 @@ describe('ControldClient', () => {
                 );
 
                 return new Response(JSON.stringify(mockResponse), {
-                    status: 200,
+                    status: 202,
                     headers: { 'Content-Type': 'application/json' },
                 });
             }) as unknown as typeof globalThis.fetch;
@@ -349,27 +345,23 @@ describe('ControldClient', () => {
             const result = await client.runWorkflow(workflowId, {});
 
             expect(result).toEqual(mockResponse);
-            expect(result.success).toBe(true);
-            expect(result.exitCode).toBe(0);
+            expect(result.runId).toBe('run-abc-123');
+            expect(result.status).toBe('running');
 
             globalThis.fetch = originalFetch;
         });
 
-        test('should return failure response when workflow fails', async () => {
-            const mockResponse: WorkflowRunResponse = {
-                exitCode: 1,
-                stdout: ['Some output'],
-                stderr: ['Error occurred'],
-                success: false,
-                errors: [],
-                log: [],
+        test('should return accepted response for any valid workflow', async () => {
+            const mockResponse: WorkflowRunAccepted = {
+                runId: 'run-def-456',
+                status: 'running',
             };
 
             const workflowId = 'wf-123e4567-e89b-12d3-a456-426614174000';
 
             globalThis.fetch = mock(async () => {
                 return new Response(JSON.stringify(mockResponse), {
-                    status: 200,
+                    status: 202,
                     headers: { 'Content-Type': 'application/json' },
                 });
             }) as unknown as typeof globalThis.fetch;
@@ -377,9 +369,8 @@ describe('ControldClient', () => {
             const result = await client.runWorkflow(workflowId, {});
 
             expect(result).toEqual(mockResponse);
-            expect(result.success).toBe(false);
-            expect(result.exitCode).toBe(1);
-            expect(result.stderr).toEqual(['Error occurred']);
+            expect(result.runId).toBe('run-def-456');
+            expect(result.status).toBe('running');
 
             globalThis.fetch = originalFetch;
         });
@@ -405,13 +396,9 @@ describe('ControldClient', () => {
         });
 
         test('should call correct endpoint with workflow ID in path', async () => {
-            const mockResponse: WorkflowRunResponse = {
-                exitCode: 0,
-                stdout: ['Success'],
-                stderr: [],
-                success: true,
-                errors: [],
-                log: [],
+            const mockResponse: WorkflowRunAccepted = {
+                runId: 'run-ghi-789',
+                status: 'running',
             };
 
             const workflowId = 'wf-custom-id-123';
@@ -428,7 +415,7 @@ describe('ControldClient', () => {
                 );
 
                 return new Response(JSON.stringify(mockResponse), {
-                    status: 200,
+                    status: 202,
                     headers: { 'Content-Type': 'application/json' },
                 });
             }) as unknown as typeof globalThis.fetch;
