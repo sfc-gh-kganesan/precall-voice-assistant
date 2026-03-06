@@ -1441,9 +1441,12 @@ export class WorkflowSDKImpl implements WorkflowSDK {
 
         const token = cfg.token;
 
-        // Sub-workflow calls go to the local controld service (we're a child process of it)
+        // In SPCS, the runner job container is separate from controld — use the
+        // controld internal DNS passed via P67_CONTROLD_URL. In local/Docker mode,
+        // the workflow is a child process of controld so localhost works.
+        const controldUrl = process.env.P67_CONTROLD_URL;
         const port = process.env.PORT || '3002';
-        const accessUrl = `http://localhost:${port}`;
+        const accessUrl = controldUrl || `http://localhost:${port}`;
 
         if (!token) {
             return {
@@ -1477,6 +1480,12 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
+                    // SPCS ingress injects this header for external requests;
+                    // for internal service-to-service calls we must set it
+                    // ourselves so controld's user plugin can resolve the user.
+                    ...(cfg.username
+                        ? { 'sf-context-current-user': cfg.username }
+                        : {}),
                 },
                 body: JSON.stringify(payload),
                 signal: controller.signal,

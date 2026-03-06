@@ -967,11 +967,32 @@ export class Runner {
             config: this.serializeConfig(hydratedConfig),
         });
 
+        // 2b. Discover the controld service URL so the runner job can reach it
+        //     for subworkflow execution. Jobs are in the same schema as controld,
+        //     so we use SPCS internal DNS: controld.<dns-domain>
+        let controldUrl: string | undefined;
+        try {
+            const rows = await executeSql(
+                `SELECT SYSTEM$GET_SERVICE_DNS_DOMAIN('app') AS dns_domain`,
+            );
+            const domain = rows[0]?.DNS_DOMAIN ?? rows[0]?.dns_domain;
+            if (domain) {
+                controldUrl = `http://controld.${domain}:80`;
+                logger.debug(`Controld URL for job: ${controldUrl}`);
+            }
+        } catch (err) {
+            logger.debug(
+                `Could not resolve controld DNS domain: ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
+
         // 3. Execute the job service
         const jobSQL = adapter.buildJobServiceSQL(
             jobName,
             stagePath,
             runWorkflowMessage,
+            undefined,
+            controldUrl,
         );
 
         try {

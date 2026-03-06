@@ -208,6 +208,7 @@ export class SPCSAdapter {
         stagePath: string,
         runWorkflowMessage: Message,
         resourceRequests?: { cpu?: string; memory?: string },
+        controldUrl?: string,
     ): string {
         const cpu = resourceRequests?.cpu ?? '0.5';
         const memory = resourceRequests?.memory ?? '512Mi';
@@ -222,6 +223,9 @@ export class SPCSAdapter {
 
         // Results volume is stage-backed so controld can read messages.ndjson
         // after the job completes. The runner tees stdout to this file.
+        const controldEnvLine = controldUrl
+            ? `\n      P67_CONTROLD_URL: "${controldUrl}"`
+            : '';
         const spec = `
 spec:
   containers:
@@ -231,7 +235,7 @@ spec:
     - "/workflow"
     env:
       P67_RUN_MESSAGE_B64: "${messageB64}"
-      P67_RESULTS_DIR: "/results"
+      P67_RESULTS_DIR: "/results"${controldEnvLine}
     volumeMounts:
     - name: workflow-files
       mountPath: /workflow

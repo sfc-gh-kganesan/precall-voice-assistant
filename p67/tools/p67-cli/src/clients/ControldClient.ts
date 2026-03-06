@@ -266,12 +266,20 @@ export class ControldClient {
             body: JSON.stringify({ params }),
         });
 
+        const text = await response.text();
+
         if (!response.ok) {
-            const error = (await response.json()) as ErrorResponse;
-            throw new Error(error.message || error.error);
+            let errorMessage: string;
+            try {
+                const error = JSON.parse(text) as ErrorResponse;
+                errorMessage = error.message || error.error;
+            } catch {
+                errorMessage = `HTTP ${response.status}: ${text.slice(0, 500)}`;
+            }
+            throw new Error(errorMessage);
         }
 
-        return (await response.json()) as WorkflowRunResponse;
+        return JSON.parse(text) as WorkflowRunResponse;
     }
 
     async getWorkflowManifest(
@@ -301,12 +309,20 @@ export class ControldClient {
             },
         );
 
+        const text = await response.text();
+
         if (!response.ok) {
-            const error = (await response.json()) as ErrorResponse;
-            throw new Error(error.message || error.error);
+            let errorMessage: string;
+            try {
+                const error = JSON.parse(text) as ErrorResponse;
+                errorMessage = error.message || error.error;
+            } catch {
+                errorMessage = `HTTP ${response.status}: ${text.slice(0, 500)}`;
+            }
+            throw new Error(errorMessage);
         }
 
-        return (await response.json()) as WorkflowRunResponse;
+        return JSON.parse(text) as WorkflowRunResponse;
     }
 
     async getWorkflowVersions(name: string): Promise<WorkflowListResponse> {

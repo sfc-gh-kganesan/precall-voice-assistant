@@ -1,19 +1,21 @@
 /**
  * SPCS SQL Execution Helper
  *
- * Provides a lightweight Snowflake connection for executing SPCS management
+ * Provides Snowflake connections for executing SPCS management
  * SQL (EXECUTE JOB SERVICE, PUT, DESCRIBE SERVICE, etc.) from within
  * a running SPCS service container.
  *
  * Uses the auto-provisioned OAuth token at /snowflake/session/token.
+ *
+ * Each executeSql call creates a fresh connection to avoid deadlocks
+ * when concurrent EXECUTE JOB SERVICE statements (e.g. top-level
+ * workflow + nested subworkflows) block on the same session.
  */
 
 import { readFileSync } from 'node:fs';
 import snowflake from 'snowflake-sdk';
 
 type SnowflakeConnection = ReturnType<typeof snowflake.createConnection>;
-
-let cachedConnection: SnowflakeConnection | null = null;
 
 /**
  * Read the SPCS session token from the well-known path.
@@ -23,13 +25,9 @@ function readSessionToken(): string {
 }
 
 /**
- * Get or create a Snowflake connection using the SPCS session token.
+ * Create a new Snowflake connection using the SPCS session token.
  */
-export async function getConnection(): Promise<SnowflakeConnection> {
-    if (cachedConnection) {
-        return cachedConnection;
-    }
-
+function createSPCSConnection(): Promise<SnowflakeConnection> {
     const host = process.env.SNOWFLAKE_HOST;
     const account = process.env.SNOWFLAKE_ACCOUNT;
 
@@ -60,7 +58,6 @@ export async function getConnection(): Promise<SnowflakeConnection> {
                     ),
                 );
             } else {
-                cachedConnection = connection;
                 resolve(connection);
             }
         });
@@ -69,27 +66,34 @@ export async function getConnection(): Promise<SnowflakeConnection> {
 
 /**
  * Execute a SQL statement and return the rows.
+ *
+ * Creates a fresh connection for each call so that long-running
+ * statements (like EXECUTE JOB SERVICE) don't block other callers.
  */
 export async function executeSql(
     sql: string,
 ): Promise<Record<string, unknown>[]> {
-    const conn = await getConnection();
-    return new Promise((resolve, reject) => {
-        conn.execute({
-            sqlText: sql,
-            complete: (err, _stmt, rows) => {
-                if (err) {
-                    reject(
-                        new Error(
-                            `SQL execution failed: ${err.message}\nSQL: ${sql}`,
-                        ),
-                    );
-                } else {
-                    resolve((rows as Record<string, unknown>[]) ?? []);
-                }
-            },
+    const conn = await createSPCSConnection();
+    try {
+        return await new Promise((resolve, reject) => {
+            conn.execute({
+                sqlText: sql,
+                complete: (err, _stmt, rows) => {
+                    if (err) {
+                        reject(
+                            new Error(
+                                `SQL execution failed: ${err.message}\nSQL: ${sql}`,
+                            ),
+                        );
+                    } else {
+                        resolve((rows as Record<string, unknown>[]) ?? []);
+                    }
+                },
+            });
         });
-    });
+    } finally {
+        conn.destroy(() => {});
+    }
 }
 
 /**
