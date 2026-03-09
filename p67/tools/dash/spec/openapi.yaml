@@ -1,0 +1,595 @@
+openapi: 3.0.3
+info:
+  title: p67 Controld API
+  description: API for managing p67 workflows, runs, logs, and interrupts
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: Relative API endpoint
+
+paths:
+  /whoami:
+    get:
+      summary: Get current user info
+      tags: [Auth]
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoamiResponse'
+
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /workflow/list:
+    get:
+      summary: List all workflows accessible by the user
+      tags: [Workflow]
+      responses:
+        '200':
+          description: List of workflows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowListResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /workflow/{workflowId}/manifest:
+    get:
+      summary: Get workflow manifest params
+      tags: [Workflow]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowManifestResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /workflow/{workflowId}/run:
+    post:
+      summary: Run a workflow
+      tags: [Workflow]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowRunRequest'
+      responses:
+        '200':
+          description: Workflow execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /workflow/{workflowId}/visibility:
+    patch:
+      summary: Set workflow visibility
+      tags: [Workflow]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visibility]
+              properties:
+                visibility:
+                  type: string
+                  enum: [Private, Public]
+      responses:
+        '200':
+          description: Updated visibility
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflowId:
+                    type: string
+                  visibility:
+                    type: string
+
+  /workflow/{workflowId}:
+    delete:
+      summary: Delete a workflow
+      tags: [Workflow]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  workflowId:
+                    type: string
+
+  /workflow/name/{name}/versions:
+    get:
+      summary: List all versions of a workflow by name
+      tags: [Workflow]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of workflow versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /log/runs:
+    get:
+      summary: List runs for a workflow
+      tags: [Log]
+      parameters:
+        - name: workflowId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunListResponse'
+
+  /log/list:
+    get:
+      summary: List logs for a run
+      tags: [Log]
+      parameters:
+        - name: workflowId
+          in: query
+          schema:
+            type: string
+        - name: runId
+          in: query
+          schema:
+            type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [RuntimeHost, WorkflowNode, ToolCall]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogListResponse'
+
+  /workflow/interrupts:
+    get:
+      summary: List workflow interrupts
+      tags: [Interrupt]
+      parameters:
+        - name: workflowId
+          in: query
+          schema:
+            type: string
+        - name: runId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Pending, Resumed, Expired]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of interrupts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterruptListResponse'
+
+  /workflow/interrupts/{interruptId}:
+    get:
+      summary: Get a specific interrupt
+      tags: [Interrupt]
+      parameters:
+        - name: interruptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Interrupt details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interrupt'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /workflow/interrupts/{interruptId}/resume:
+    post:
+      summary: Resume a paused workflow with human input
+      tags: [Interrupt]
+      parameters:
+        - name: interruptId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [response]
+              properties:
+                response:
+                  description: User-provided response to the interrupt
+      responses:
+        '200':
+          description: Resume result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterruptResumeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Workflow process no longer active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    WhoamiResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        snowflakeUser:
+          type: string
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        timestamp:
+          type: string
+        localStoragePath:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    Workflow:
+      type: object
+      properties:
+        workflowId:
+          type: string
+        name:
+          type: string
+          nullable: true
+        owner:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        visibility:
+          type: string
+          enum: [Private, Public]
+        versionCount:
+          type: integer
+
+    WorkflowListResponse:
+      type: object
+      properties:
+        workflows:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workflow'
+
+    ManifestParamValue:
+      type: object
+      properties:
+        value:
+          type: string
+        valueRef:
+          type: string
+        secretRef:
+          type: string
+        oauthRef:
+          type: string
+        required:
+          type: boolean
+        description:
+          type: string
+
+    WorkflowManifestResponse:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ManifestParamValue'
+
+    WorkflowRunRequest:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties:
+            type: string
+
+    PendingInterrupt:
+      type: object
+      properties:
+        interruptId:
+          type: string
+        value: {}
+        timestamp:
+          type: string
+        nodeId:
+          type: string
+
+    WorkflowRunResponse:
+      type: object
+      properties:
+        exitCode:
+          type: integer
+        stdout:
+          type: array
+          items:
+            type: string
+        stderr:
+          type: array
+          items:
+            type: string
+        log:
+          type: array
+          items:
+            type: string
+        success:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+        status:
+          type: string
+          enum: [running, completed, interrupted, failed]
+        pendingInterrupt:
+          $ref: '#/components/schemas/PendingInterrupt'
+        runId:
+          type: string
+        result: {}
+
+    RunEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        exitCode:
+          type: integer
+          nullable: true
+        logCount:
+          type: integer
+
+    RunListResponse:
+      type: object
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunEntry'
+        total:
+          type: integer
+
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        workflowId:
+          type: string
+        source:
+          type: string
+          enum: [RuntimeHost, WorkflowNode, ToolCall]
+        message:
+          type: string
+        attributes:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    LogListResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogEntry'
+        total:
+          type: integer
+
+    Interrupt:
+      type: object
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        workflowId:
+          type: string
+        payload: {}
+        nodeId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [Pending, Resumed, Expired]
+        response:
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        resumedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    InterruptListResponse:
+      type: object
+      properties:
+        interrupts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Interrupt'
+        total:
+          type: integer
+
+    InterruptResumeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        interruptId:
+          type: string
+        resumedAt:
+          type: string
+          format: date-time
+        nextInterrupt:
+          $ref: '#/components/schemas/PendingInterrupt'
+        status:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

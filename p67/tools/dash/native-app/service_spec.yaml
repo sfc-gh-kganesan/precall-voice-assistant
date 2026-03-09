@@ -1,0 +1,28 @@
+spec:
+  containers:
+    - name: dashboard
+      image: /app/images/dashboard:latest
+      env:
+        P67_API_URL: "http://controld.ghw6if.svc.spcs.internal:80"
+        NODE_ENV: "production"
+      resources:
+        requests:
+          memory: 256M
+          cpu: 0.5
+        limits:
+          memory: 512M
+          cpu: 1
+      readinessProbe:
+        path: /health
+        port: 3001
+        initialDelaySeconds: 10
+        periodSeconds: 5
+      livenessProbe:
+        path: /health
+        port: 3001
+        initialDelaySeconds: 30
+        periodSeconds: 10
+  endpoints:
+    - name: dashboard
+      port: 3001
+      public: true

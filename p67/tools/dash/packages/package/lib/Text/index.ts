@@ -1,0 +1,15 @@
+export type { EditorialProps } from './Editorial';
+export { Editorial } from './Editorial';
+export type { HeadingProps, HeadingSize } from './Heading';
+export { Heading } from './Heading';
+export type { LabelProps } from './Label';
+export { Label } from './Label';
+export type { ParagraphProps } from './Paragraph';
+export { Paragraph } from './Paragraph';
+export type { PreProps } from './Pre';
+export { Pre } from './Pre';
+export { SingleLine } from './SingleLine';
+export type { SpanProps } from './Span';
+export { Span } from './Span';
+export type { TextVariant } from './types';
+export { textVariants } from './types';

@@ -1,0 +1,97 @@
+{
+    "name": "@snowflake/stellar-components",
+    "version": "0.22.3",
+    "sideEffects": false,
+    "main": "./dist/main.es.js",
+    "types": "./dist/main.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/main.es.js",
+            "types": "./dist/main.d.ts",
+            "require": "./dist/main.cjs.js",
+            "default": "./dist/main.es.js"
+        },
+        "./types": "./dist/main.d.ts",
+        "./getThemesForColorScheme": {
+            "import": "./dist/BaltoProvider/getThemesForColorScheme.es.js",
+            "types": "./dist/BaltoProvider/getThemesForColorScheme.d.ts",
+            "require": "./dist/BaltoProvider/getThemesForColorScheme.cjs.js",
+            "default": "./dist/BaltoProvider/getThemesForColorScheme.es.js"
+        }
+    },
+    "files": [
+        "dist",
+        "lib"
+    ],
+    "dependencies": {
+        "@react-stately/utils": "^3.10.8",
+        "@react-types/shared": "^3.32.1",
+        "@stylexjs/stylex": "0.16.1",
+        "react": "^17.0.2 || ^18.0 || ^19.0 || ^19.0.0-rc",
+        "react-dom": "^17.0.2 || ^18.0 || ^19.0 || ^19.0.0-rc",
+        "react-stately": "^3.41.0",
+        "@snowflake/balto-themes": "0.22.3",
+        "@snowflake/balto-tokens": "0.22.3",
+        "@snowflake/stellar-icons": "0.22.3",
+        "@snowflake/stellar-tokens": "0.22.3"
+    },
+    "devDependencies": {
+        "@internationalized/date": "^3.10.0",
+        "@radix-ui/react-avatar": "1.1.10",
+        "@radix-ui/react-context": "^1.1.2",
+        "@radix-ui/react-slot": "^1.2.3",
+        "@react-aria/collections": "3.0.0",
+        "@react-aria/interactions": "3.25.6",
+        "@react-aria/optimize-locales-plugin": "^1.1.5",
+        "@react-aria/overlays": "3.30.0",
+        "@react-aria/toast": "3.0.8",
+        "@react-aria/utils": "^3.31.0",
+        "@react-stately/form": "^3.2.1",
+        "@react-stately/list": "^3.13.0",
+        "@react-stately/overlays": "^3.6.19",
+        "@react-stately/toast": "3.1.2",
+        "@rollup/plugin-replace": "6.0.2",
+        "@stylexjs/stylex": "0.16.1",
+        "@testing-library/jest-dom": "^6.6.3",
+        "@testing-library/react": "^16.3.0",
+        "@testing-library/user-event": "^14.6.1",
+        "@types/node": "^22.15.3",
+        "@types/react": "18.3.12",
+        "@types/react-dom": "18.3.1",
+        "@types/react-is": "^19.0.0",
+        "@types/use-sync-external-store": "^1.5.0",
+        "@vitejs/plugin-react": "4.5.2",
+        "clsx": "^2.1.1",
+        "eslint": "^9.29.0",
+        "glob": "11.0.3",
+        "happy-dom": "^18.0.1",
+        "react-aria": "^3.44.0",
+        "react-aria-components": "1.13.0",
+        "react-is": "^19.1.0",
+        "unplugin-stylex": "0.5.5",
+        "use-shared-resize-observer": "0.2.4",
+        "use-sync-external-store": "^1.5.0",
+        "vite-bundle-analyzer": "^1.2.3",
+        "@snowflake/balto-tokens": "0.22.3",
+        "@snowflake/balto-themes": "0.22.3",
+        "@snowflake/stellar-eslint-config": "0.22.3",
+        "@snowflake/stellar-icons": "0.22.3",
+        "@snowflake/stellar-typescript-config": "0.22.3"
+    },
+    "peerDependencies": {
+        "@types/react": "^17.0.2 || ^18.0 || ^19.0 || ^19.0.0-rc",
+        "@types/react-dom": "^17.0.2 || ^18.0 || ^19.0 || ^19.0.0-rc"
+    },
+    "scripts": {
+        "build": "vite build",
+        "typecheck": "tsc --project ./tsconfig.json",
+        "clean": "rm -rf node_modules dist",
+        "coverage": "vitest run --coverage",
+        "dev": "vite",
+        "fix": "eslint . --fix",
+        "lint": "eslint . --max-warnings 0",
+        "preview": "vite preview",
+        "test": "vitest run --passWithNoTests",
+        "watch": "tsc --project ./tsconfig.json && vite build --watch"
+    }
+}

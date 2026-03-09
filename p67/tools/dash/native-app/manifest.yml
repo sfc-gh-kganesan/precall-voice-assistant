@@ -1,0 +1,26 @@
+manifest_version: 2
+
+version:
+    name: V3
+    label: "v3.0"
+
+configuration:
+    grant_callback: v1.create_services
+
+artifacts:
+    readme: README.md
+    setup_script: setup.sql
+
+    default_web_endpoint:
+        service: app.dashboard
+        endpoint: web
+
+    container_services:
+        images:
+            - /p67_src/dash/img_repo/p67-dash:v1772775308
+
+privileges:
+    - BIND SERVICE ENDPOINT:
+          description: "Enables application to expose dashboard web endpoint"
+    - CREATE EXTERNAL ACCESS INTEGRATION:
+          description: "Allows the app to create an EAI to connect to the controld backend service"

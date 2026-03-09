@@ -2,6 +2,7 @@ packages:
     - "packages/*"
     - "services/*"
     - "tools/*"
+    - "!tools/dash"
 onlyBuiltDependencies:
     - "@prisma/engines"
     - esbuild

@@ -1,0 +1,21 @@
+spec:
+  containers:
+    - name: dashboard
+      image: /p67_src/dash/img_repo/p67-dash:v1772775308
+      env:
+        P67_API_URL: "https://frb46h6e-sfengineering-aifde.snowflakecomputing.app"
+        PORT: "3001"
+      resources:
+        requests:
+          memory: 256M
+          cpu: 0.5
+        limits:
+          memory: 512M
+          cpu: 1
+      readinessProbe:
+        path: /health
+        port: 3001
+  endpoints:
+    - name: web
+      port: 3001
+      public: true

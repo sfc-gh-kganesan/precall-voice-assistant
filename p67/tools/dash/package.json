@@ -1,0 +1,48 @@
+{
+    "name": "p67-dash",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@snowflake/balto-themes": "file:./packages/snowflake-balto-themes-0.22.3.tgz",
+        "@snowflake/balto-tokens": "file:./packages/snowflake-balto-tokens-0.22.3.tgz",
+        "@snowflake/stellar-components": "file:./packages/snowflake-stellar-components-0.22.3.tgz",
+        "@snowflake/stellar-data-table": "file:./packages/snowflake-stellar-data-table-0.22.3.tgz",
+        "@snowflake/stellar-icons": "file:./packages/snowflake-stellar-icons-0.22.3.tgz",
+        "@snowflake/stellar-tokens": "file:./packages/snowflake-stellar-tokens-0.22.3.tgz",
+        "@stylexjs/stylex": "^0.10.1",
+        "@tanstack/react-query": "^5.56.2",
+        "clsx": "^2.1.1",
+        "pg": "^8.20.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^7.9.5",
+        "unplugin-stylex": "^0.5.5"
+    },
+    "devDependencies": {
+        "@stylexjs/babel-plugin": "^0.16.3",
+        "@types/node": "^20.10.0",
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^5.1.0",
+        "typescript": "^5.5.0",
+        "vite": "^6.4.1"
+    },
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc -b && vite build",
+        "preview": "vite preview"
+    },
+    "pnpm": {
+        "overrides": {
+            "@snowflake/balto-themes": "file:./packages/snowflake-balto-themes-0.22.3.tgz",
+            "@snowflake/balto-tokens": "file:./packages/snowflake-balto-tokens-0.22.3.tgz",
+            "@snowflake/stellar-charts": "file:./packages/snowflake-stellar-charts-0.22.3.tgz",
+            "@snowflake/stellar-components": "file:./packages/snowflake-stellar-components-0.22.3.tgz",
+            "@snowflake/stellar-data-table": "file:./packages/snowflake-stellar-data-table-0.22.3.tgz",
+            "@snowflake/stellar-data-tools": "file:./packages/snowflake-stellar-data-tools-0.22.3.tgz",
+            "@snowflake/stellar-icons": "file:./packages/snowflake-stellar-icons-0.22.3.tgz",
+            "@snowflake/stellar-tokens": "file:./packages/snowflake-stellar-tokens-0.22.3.tgz"
+        }
+    }
+}

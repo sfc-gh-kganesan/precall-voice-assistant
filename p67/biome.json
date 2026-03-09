@@ -11,7 +11,8 @@
             "**",
             "!experiments",
             "!example_workflows",
-            "!**/generated"
+            "!**/generated",
+            "!tools/dash/packages"
         ]
     },
     "formatter": {
