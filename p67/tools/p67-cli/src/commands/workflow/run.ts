@@ -42,7 +42,7 @@ export const runCommand = new Command('run')
     .description('Run a workflow')
     .argument('[workflowId]', 'Workflow ID to run')
     .option('-n, --name <name>', 'Run workflow by name (uses latest version)')
-    .option('-t, --timeout <ms>', 'Request timeout in milliseconds', '600000')
+    .option('-t, --timeout <seconds>', 'Request timeout in seconds', '600')
     .option(
         '-p, --param <kv>',
         'Parameter in key=value format (repeatable)',
@@ -56,7 +56,7 @@ export const runCommand = new Command('run')
         '-P, --param_file <param_file>',
         'Parameter file to pass to the workflow',
     )
-    .option('--poll-interval <ms>', 'Polling interval in milliseconds', '2000')
+    .option('--poll-interval <seconds>', 'Polling interval in seconds', '2')
     .action(
         async (
             workflowId: string | undefined,
@@ -115,13 +115,11 @@ export const runCommand = new Command('run')
                 const client = new ControldClient({
                     baseUrl: connection.endpoint,
                     pat: connection.pat,
-                    timeout: Number.parseInt(options.timeout, 10),
+                    timeout: Number.parseInt(options.timeout, 10) * 1000,
                 });
 
-                const pollIntervalMs = Number.parseInt(
-                    options.pollInterval,
-                    10,
-                );
+                const pollIntervalMs =
+                    Number.parseInt(options.pollInterval, 10) * 1000;
 
                 // If running by name, use the name-based endpoint
                 if (options.name) {
