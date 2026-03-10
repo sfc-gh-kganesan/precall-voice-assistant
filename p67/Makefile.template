@@ -1,9 +1,12 @@
 SNOW_CONNECTION?=<<snow_connection>>
 SNOW_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/core/img_repo
+DASH_REPO=sfengineering-aifde.registry.snowflakecomputing.com/p67_src/dash/img_repo
 CONTROLD_IMAGE=controld
-.PHONY: help build build-controld ci deploy describe dev fix \
-ensure-encryption-key init-provider-account install-cli list-services login logs push push-controld \
-url dbmigrate cert spcs-data-secret spcs-snowflake-eai
+DASH_IMAGE=p67-dash
+DASH_DIR=tools/dash
+.PHONY: help build build-controld build-dash ci deploy describe dev fix \
+ensure-encryption-key init-provider-account install-cli list-services login logs logs-dash push push-controld push-dash \
+url dash-url dbmigrate cert spcs-data-secret spcs-snowflake-eai
 
 .DEFAULT_GOAL := help
 
@@ -15,7 +18,7 @@ help: ## Show this help message
 		/^[a-zA-Z_-]+:.*?##/ { printf "  %-20s %s\n", $$1, $$2 }' \
 		$(MAKEFILE_LIST)
 
-build: build-controld ## Build Docker images
+build: build-controld build-dash ## Build Docker images
 
 build-controld: ## Build controld Docker image for linux/amd64
 	docker build \
@@ -25,6 +28,13 @@ build-controld: ## Build controld Docker image for linux/amd64
 		--build-arg SERVICE_PORT=8000 \
 		-t $(CONTROLD_IMAGE) \
 		.
+
+build-dash: ## Build dashboard frontend and Docker image for linux/amd64
+	cd $(DASH_DIR) && pnpm install && pnpm run build
+	docker build \
+		--platform linux/amd64 \
+		-t $(DASH_IMAGE) \
+		$(DASH_DIR)
 
 ci:
 	pnpm run ci
@@ -81,14 +91,28 @@ login: ## Log in to Snowflake image registry
 logs: ## show spcs service logs
 	snow spcs service logs p67.app.controld --container-name controld --instance-id 0 -c $(SNOW_CONNECTION)
 
-push: push-controld ## Push Docker images to Snowflake registry
+logs-dash: ## show dashboard spcs service logs
+	snow spcs service logs p67.app.dashboard --container-name dashboard --instance-id 0 -c $(SNOW_CONNECTION)
+
+push: push-controld push-dash ## Push Docker images to Snowflake registry
 
 push-controld: ## Tag and push controld image to Snowflake registry
 	docker tag $(CONTROLD_IMAGE) $(SNOW_REPO)/$(CONTROLD_IMAGE)
 	docker push $(SNOW_REPO)/$(CONTROLD_IMAGE)
 
+push-dash: ## Tag and push dashboard image to Snowflake registry
+	docker tag $(DASH_IMAGE) $(DASH_REPO)/$(DASH_IMAGE)
+	docker push $(DASH_REPO)/$(DASH_IMAGE)
+
 url: ## Print the ingress URL for the running SPCS service
 	snow spcs service list-endpoints p67.app.controld \
+		-c $(SNOW_CONNECTION) \
+		--format json | \
+		jq '.[] | select(.name == "web") | .ingress_url' -r | \
+		xargs -I {} echo "https://{}"
+
+dash-url: ## Print the ingress URL for the dashboard service
+	snow spcs service list-endpoints p67.app.dashboard \
 		-c $(SNOW_CONNECTION) \
 		--format json | \
 		jq '.[] | select(.name == "web") | .ingress_url' -r | \
