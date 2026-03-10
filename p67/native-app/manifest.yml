@@ -19,6 +19,7 @@ artifacts:
         images:
             - /p67_src/core/img_repo/controld:latest
             - /p67_src/core/img_repo/p67-runner:latest
+            - /p67_src/dash/img_repo/p67-dash:latest
 
 references:
     - google_oauth_eai:

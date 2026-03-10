@@ -1,0 +1,21 @@
+spec:
+  containers:
+    - name: dashboard
+      image: /p67_src/dash/img_repo/p67-dash:latest
+      env:
+        P67_API_URL: "http://controld.ghw6if.svc.spcs.internal:80"
+        PORT: "3001"
+      resources:
+        requests:
+          memory: 256M
+          cpu: 0.5
+        limits:
+          memory: 512M
+          cpu: 1
+      readinessProbe:
+        path: /health
+        port: 3001
+  endpoints:
+    - name: web
+      port: 3001
+      public: true

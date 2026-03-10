@@ -31,6 +31,7 @@ begin
     begin
         alter service if exists app.controld from specification_file='controld_service_spec.yml';
         alter service if exists app.controld set external_access_integrations=( reference('google_oauth_eai'), reference('snowflake_egress_eai'), reference('postgres_eai') );
+        alter service if exists app.dashboard from specification_file='dashboard_service_spec.yml';
     exception
         when other then
             -- New references (e.g. encryption_key) may not be bound yet during upgrade.
@@ -80,6 +81,24 @@ end
 $$;
 grant usage on procedure v1.start_controld(varchar) to application role app_admin;
 
+create or replace procedure v1.start_dashboard(pool_name varchar)
+    returns string
+    language sql
+    execute as owner
+as $$
+begin
+    create service if not exists app.dashboard
+        in compute pool identifier(:pool_name)
+        from specification_file='dashboard_service_spec.yml'
+        query_warehouse = 'p67_app_wh';
+    grant usage on service app.dashboard to application role app_user;
+    grant monitor on service app.dashboard to application role app_user;
+    grant service role app.dashboard!all_endpoints_usage to application role app_user;
+    return 'DASHBOARD START COMPLETE';
+end
+$$;
+grant usage on procedure v1.start_dashboard(varchar) to application role app_admin;
+
 create or replace procedure v1.create_services(privileges array)
     returns string
     language sql
@@ -103,6 +122,7 @@ begin
         encryption = (type = 'SNOWFLAKE_SSE');
 
     call v1.start_controld('service_compute_pool');
+    call v1.start_dashboard('service_compute_pool');
     return 'CREATE_SERVICES COMPLETE';
 end
 $$;
@@ -114,6 +134,7 @@ create or replace procedure app.stop_app()
     execute as owner
 as $$
 begin
+    drop service if exists app.dashboard;
     drop service if exists app.controld;
     return 'STOP_APP COMPLETE';
 end
@@ -134,3 +155,18 @@ end
 $$;
 grant usage on procedure v1.app_url() to application role app_admin;
 grant usage on procedure v1.app_url() to application role app_user;
+
+create or replace procedure v1.dashboard_url()
+    returns string
+    language sql
+    execute as owner
+as $$
+    declare ingress_url varchar;
+begin
+    show endpoints in service app.dashboard;
+    select "ingress_url" into :ingress_url from table (result_scan (last_query_id())) limit 1;
+    return ingress_url;
+end
+$$;
+grant usage on procedure v1.dashboard_url() to application role app_admin;
+grant usage on procedure v1.dashboard_url() to application role app_user;
