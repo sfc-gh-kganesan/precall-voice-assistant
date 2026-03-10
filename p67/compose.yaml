@@ -41,6 +41,7 @@ services:
             # Runner container image for workflow execution
             P67_RUNNER_IMAGE: ${P67_RUNNER_IMAGE:-p67-runner:latest}
             P67_HOST_STORAGE_ROOT: ${PWD}/services/controld/.data_root
+            SNOWFLAKE_WEBHOOK_SECRET: ${SNOWFLAKE_WEBHOOK_SECRET:-p67-webhook-secret-token}
         volumes:
             - ./services/controld/.data_root:/app/services/controld/.local-storage
             # Docker socket for spawning p67-runner containers

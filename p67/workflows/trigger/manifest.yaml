@@ -1,0 +1,24 @@
+---
+name: NEW_USER
+visibility: public
+
+params:
+  ID:
+    required: true
+    description: User ID from the USERS table
+  NAME:
+    required: true
+    description: User's full name
+  EMAIL:
+    required: true
+    description: User's email address
+
+config:
+  - config_name: default
+    parameters:
+      ID:
+        value: ""
+      NAME:
+        value: ""
+      EMAIL:
+        value: ""

@@ -10,6 +10,7 @@ spec:
               DATA_ROOT: /opt/local-storage
               P67_RUNNER_IMAGE: /p67_src/core/img_repo/p67-runner:latest
               GOOGLE_REDIRECT_URI: https://jnb46h6e-sfengineering-aifde.snowflakecomputing.app/api/auth/google/callback
+              SNOWFLAKE_WEBHOOK_SECRET: p67-webhook-secret-token
           resources:
               requests:
                   memory: 512Mi
@@ -38,3 +39,7 @@ spec:
         - name: web
           port: 80
           public: true
+serviceRoles:
+    - name: webhook_caller
+      endpoints:
+          - web

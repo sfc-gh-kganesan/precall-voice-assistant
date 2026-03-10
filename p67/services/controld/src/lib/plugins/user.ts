@@ -16,6 +16,10 @@ declare module 'fastify' {
     interface FastifyRequest {
         user: UserModel;
     }
+
+    interface FastifyContextConfig {
+        skipAuth?: boolean;
+    }
 }
 
 const SF_USER_HEADER = 'sf-context-current-user';
@@ -25,6 +29,11 @@ const userPlugin: FastifyPluginAsync<UserPluginOptions> = async (
     options,
 ) => {
     fastify.addHook('onRequest', async (request, _) => {
+        // Skip auth for routes that opt out (e.g. webhooks)
+        if (request.routeOptions.config?.skipAuth) {
+            return;
+        }
+
         const hasUserHeader = Object.hasOwn(request.headers, SF_USER_HEADER);
 
         if (!hasUserHeader && options.setDefaultUser && options.defaultUser) {
@@ -34,6 +43,11 @@ const userPlugin: FastifyPluginAsync<UserPluginOptions> = async (
 
     fastify.decorateRequest('user');
     fastify.addHook('onRequest', async (req, _) => {
+        // Skip auth for routes that opt out (e.g. webhooks)
+        if (req.routeOptions.config?.skipAuth) {
+            return;
+        }
+
         const userValue = req.headers[SF_USER_HEADER];
         if (!userValue) {
             throw new Error(`missing request header: ${SF_USER_HEADER}`);

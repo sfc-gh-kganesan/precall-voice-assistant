@@ -38,6 +38,22 @@ begin
             -- and calls start_controld or re-runs init.
             return 'INIT PARTIAL — service not updated: ' || sqlerrm;
     end;
+
+    -- Create service function after the service has been updated with the webhook endpoint
+    begin
+        create or replace function app.trigger_new_user_workflow(row_data variant)
+            returns variant
+            service = app.controld
+            endpoint = web
+            as '/api/webhook/snowflake/NEW_USER';
+        grant usage on function app.trigger_new_user_workflow(variant) to application role app_admin;
+        grant usage on function app.trigger_new_user_workflow(variant) to application role app_user;
+    exception
+        when other then
+            -- Service may not have the webhook endpoint yet
+            return 'INIT PARTIAL — service function not created: ' || sqlerrm;
+    end;
+
     return 'INIT COMPLETE';
 end
 $$;
@@ -58,6 +74,7 @@ begin
     grant usage on service app.controld to application role app_user;
     grant monitor on service app.controld to application role app_user;
     grant service role app.controld!all_endpoints_usage to application role app_user;
+    grant service role app.controld!webhook_caller to application role app_admin;
     return 'START COMPLETE';
 end
 $$;
