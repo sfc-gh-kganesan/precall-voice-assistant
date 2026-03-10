@@ -29,11 +29,11 @@ export function registerStatusRoute(server: FastifyInstance) {
                 const { runId } = request.params as { runId: string };
 
                 const run = await fastify.db.workflowRun.findFirst({
-                    where: {
-                        id: runId,
-                        userId: request.user.id,
-                    },
+                    where: { id: runId },
                     include: {
+                        workflow: {
+                            select: { ownerId: true, visibility: true },
+                        },
                         logs: {
                             orderBy: { timestamp: 'asc' },
                         },
@@ -46,6 +46,19 @@ export function registerStatusRoute(server: FastifyInstance) {
                 });
 
                 if (!run) {
+                    return reply.code(404).send({
+                        error: 'Not found',
+                        message: `Run ${runId} not found`,
+                    });
+                }
+
+                // Access check: user owns the run, owns the workflow, or workflow is public
+                const canAccess =
+                    run.userId === request.user.id ||
+                    run.workflow.ownerId === request.user.id ||
+                    run.workflow.visibility === 'Public';
+
+                if (!canAccess) {
                     return reply.code(404).send({
                         error: 'Not found',
                         message: `Run ${runId} not found or you do not have access`,

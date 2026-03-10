@@ -25,6 +25,14 @@ function displayRunResult(result: WorkflowRunStatusResponse): void {
     if (result.log && result.log.length > 0) {
         console.log(result.log.join('\n'));
     }
+    if (result.result !== undefined && result.result !== null) {
+        console.log('\nResult:');
+        if (typeof result.result === 'string') {
+            console.log(result.result);
+        } else {
+            console.log(JSON.stringify(result.result, null, 2));
+        }
+    }
     if (result.stdout && result.stdout.length > 0) {
         console.log(result.stdout.join('\n'));
     }
