@@ -1,0 +1,290 @@
+name: p67 CLI - New Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type"
+        required: true
+        type: choice
+        options:
+          - dev
+          - beta
+          - prod
+        default: "dev"
+
+defaults:
+  run:
+    working-directory: p67
+
+permissions:
+  contents: write
+
+env:
+  CLI_DIR: p67/tools/p67-cli
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  check-valid-release-branch:
+    name: Validate Release Branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate release branch
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "Current branch: $BRANCH"
+
+          if [[ ! "$BRANCH" =~ ^release-p67-cli- ]]; then
+            echo "Error: This workflow must be run from a release-p67-cli-* branch"
+            echo "  Current branch: $BRANCH"
+            echo ""
+            echo "  To create a release branch, run: ./scripts/prep-release.sh [patch|minor|major]"
+            exit 1
+          fi
+
+          echo "Valid release branch: $BRANCH"
+        working-directory: .
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: [check-valid-release-branch]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-arm64
+            bun_target: bun-darwin-arm64
+            runner: macos-15-xlarge
+            archive_ext: tar.gz
+          - platform: darwin-x64
+            bun_target: bun-darwin-x64
+            runner: macos-15-large
+            archive_ext: tar.gz
+          - platform: linux-x64
+            bun_target: bun-linux-x64
+            runner: ubuntu-latest
+            archive_ext: tar.gz
+          - platform: linux-arm64
+            bun_target: bun-linux-arm64
+            runner: ubuntu-24.04-arm
+            archive_ext: tar.gz
+          - platform: windows-x64
+            bun_target: bun-windows-x64
+            runner: windows-latest
+            archive_ext: zip
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node-js
+        with:
+          node-version: 20
+          pnpm-version: 10.22.0
+          cache-dependency-path: ./p67/pnpm-lock.yaml
+          working-directory: ./p67
+
+      - name: Build workflow-sdk
+        run: pnpm --filter "@p67/workflow-sdk" run build
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./tools/p67-cli/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building p67 CLI v$VERSION for ${{ matrix.platform }}"
+
+      - name: Compile binary
+        shell: bash
+        run: |
+          cd tools/p67-cli
+          # shellcheck disable=SC2193
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            bun build ./src/index.ts --compile --target=${{ matrix.bun_target }} --outfile ./bin/p67.exe
+          else
+            bun build ./src/index.ts --compile --target=${{ matrix.bun_target }} --outfile ./bin/p67
+          fi
+
+      # --- Code Signing (not yet configured) ---
+      #
+      # macOS: Uncomment and configure secrets to enable notarization
+      # - name: Sign binary (macOS)
+      #   if: contains(matrix.platform, 'darwin')
+      #   run: |
+      #     echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+      #     security create-keychain -p "" build.keychain
+      #     security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+      #     security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+      #     codesign --force --options runtime --sign "$MACOS_CERTIFICATE_ID" tools/p67-cli/bin/p67
+      #     rm certificate.p12
+      #   env:
+      #     MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      #     MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      #     MACOS_CERTIFICATE_ID: ${{ secrets.MACOS_CERTIFICATE_ID }}
+      #
+      # Windows: Uncomment and configure secrets to enable signing
+      # - name: Sign binary (Windows)
+      #   if: contains(matrix.platform, 'windows')
+      #   shell: pwsh
+      #   run: |
+      #     # Add Windows code signing logic here
+      #   env:
+      #     WINDOWS_CODE_SIGN_API_TOKEN: ${{ secrets.WINDOWS_CODE_SIGN_API_TOKEN }}
+      #     WINDOWS_CODE_SIGN_CERT: ${{ secrets.WINDOWS_CODE_SIGN_CERT }}
+
+      - name: Package archive (unix)
+        if: matrix.archive_ext == 'tar.gz'
+        shell: bash
+        run: |
+          cd tools/p67-cli/bin
+          tar -czf "p67-${{ matrix.platform }}.tar.gz" p67
+
+      - name: Package archive (windows)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "tools\p67-cli\bin\p67.exe" -DestinationPath "tools\p67-cli\bin\p67-${{ matrix.platform }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: p67-${{ matrix.platform }}
+          path: p67/tools/p67-cli/bin/p67-${{ matrix.platform }}.${{ matrix.archive_ext }}
+          retention-days: 7
+
+  create-github-release:
+    name: Create GitHub Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+        working-directory: .
+
+      - name: Create tag and release
+        working-directory: .
+        run: |
+          BASE_VERSION="${{ needs.build.outputs.version }}"
+
+          if [ "${{ github.event.inputs.release_type }}" = "prod" ]; then
+            VERSION="${BASE_VERSION}"
+          else
+            VERSION="${BASE_VERSION}-${{ github.event.inputs.release_type }}"
+          fi
+
+          TAG_NAME="p67-cli-v${VERSION}"
+
+          echo "Creating release for version: ${VERSION}"
+          echo "Tag name: ${TAG_NAME}"
+
+          if [ -n "$(git ls-remote --tags origin "${TAG_NAME}")" ]; then
+            echo "Tag ${TAG_NAME} already exists on remote, skipping tag creation"
+          else
+            echo "Creating new tag ${TAG_NAME}"
+            git tag -a "${TAG_NAME}" -m "p67 CLI Release ${VERSION}"
+            git push origin "${TAG_NAME}"
+          fi
+
+          echo "${VERSION}" > latest.txt
+
+          RELEASE_BODY=$(cat <<'BODY_EOF'
+          ## p67 CLI ${VERSION}
+
+          ### Installation
+
+          Download the archive for your platform, extract, and place the binary in your PATH.
+
+          **macOS** (unsigned — run once after downloading):
+          ```sh
+          tar -xzf p67-darwin-*.tar.gz
+          xattr -cr ./p67
+          chmod +x ./p67
+          sudo mv ./p67 /usr/local/bin/
+          p67 --version
+          ```
+
+          **Linux**:
+          ```sh
+          tar -xzf p67-linux-*.tar.gz
+          chmod +x ./p67
+          sudo mv ./p67 /usr/local/bin/
+          p67 --version
+          ```
+
+          **Windows** (unsigned — if SmartScreen blocks it, right-click the exe > Properties > Unblock):
+          ```powershell
+          Expand-Archive p67-windows-x64.zip -DestinationPath .
+          .\p67.exe --version
+          ```
+          BODY_EOF
+          )
+
+          RELEASE_BODY="${RELEASE_BODY//\$\{VERSION\}/$VERSION}"
+
+          CURRENT_BRANCH=$(git branch --show-current)
+
+          if gh release view "${TAG_NAME}" &>/dev/null; then
+            echo "Release ${TAG_NAME} already exists. Uploading assets..."
+            gh release upload "${TAG_NAME}" \
+              latest.txt \
+              artifacts/p67-darwin-arm64/* \
+              artifacts/p67-darwin-x64/* \
+              artifacts/p67-linux-x64/* \
+              artifacts/p67-linux-arm64/* \
+              artifacts/p67-windows-x64/* \
+              --clobber
+          else
+            echo "Creating new draft release ${TAG_NAME}..."
+
+            PREV_TAG=""
+            if [[ "${TAG_NAME}" =~ -dev$ ]]; then
+              PREV_TAG=$(git tag -l "p67-cli-v*-dev" --sort=-version:refname | grep -Fxv "${TAG_NAME}" | head -n 1)
+            elif [[ "${TAG_NAME}" =~ -beta$ ]]; then
+              PREV_TAG=$(git tag -l "p67-cli-v*-beta" --sort=-version:refname | grep -Fxv "${TAG_NAME}" | head -n 1)
+            else
+              PREV_TAG=$(git tag -l "p67-cli-v*" --sort=-version:refname | grep -v -E "-(dev|beta)$" | grep -Fxv "${TAG_NAME}" | head -n 1)
+            fi
+
+            if [ -n "$PREV_TAG" ]; then
+              CHANGELOG_LINE="**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG_NAME}"
+              RELEASE_BODY="${RELEASE_BODY}
+
+          ${CHANGELOG_LINE}"
+            fi
+
+            gh release create "${TAG_NAME}" \
+              --title "p67 CLI ${VERSION}" \
+              --draft \
+              --notes "$RELEASE_BODY" \
+              --target "$CURRENT_BRANCH" \
+              latest.txt \
+              artifacts/p67-darwin-arm64/* \
+              artifacts/p67-darwin-x64/* \
+              artifacts/p67-linux-x64/* \
+              artifacts/p67-linux-arm64/* \
+              artifacts/p67-windows-x64/*
+
+            echo ""
+            echo "Draft release created successfully!"
+            echo "  Next steps:"
+            echo "  1. Review the draft release on GitHub"
+            echo "  2. Publish when ready"
+            echo "  3. Merge the release branch PR to main"
+          fi

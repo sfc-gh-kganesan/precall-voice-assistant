@@ -284,6 +284,7 @@ pnpm db:generate
 GitHub Actions workflows:
 - **p67-ci.yml:** Runs linting, type checking, and builds on PR
 - **p67-migrate-db.yml:** Database migration deployment (manual trigger)
+- **p67-cli-release.yml:** Builds and releases p67 CLI binaries for all platforms (manual trigger from `release-p67-cli-*` branches). See [tools/p67-cli/README.md](tools/p67-cli/README.md#releasing) for the full release process.
 
 ## Configuration Files
 
