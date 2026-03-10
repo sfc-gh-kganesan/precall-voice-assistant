@@ -11,6 +11,7 @@ import {
     useWorkflowManifest,
     useWorkflows,
 } from '@/hooks/useWorkflows';
+import { formatDuration, timeAgo } from '@/utils/time';
 
 export function WorkflowDetailPage() {
     const { workflowId } = useParams<{ workflowId: string }>();
@@ -65,13 +66,23 @@ export function WorkflowDetailPage() {
         setVisibility.mutate({ workflowId, visibility: newVisibility });
     };
 
+    const displayName = workflow?.name || workflowId || '';
+
     if (!workflow) {
         return (
             <AppShell>
                 <div className="page-container">
-                    <p style={{ color: 'var(--sf-gray-500)' }}>
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: 'var(--sf-gray-500)',
+                        }}
+                    >
+                        <span className="spinner" />
                         Loading workflow...
-                    </p>
+                    </div>
                 </div>
             </AppShell>
         );
@@ -90,8 +101,10 @@ export function WorkflowDetailPage() {
                 <div className="breadcrumb">
                     <Link to="/">Workflows</Link>
                     <span>/</span>
-                    <span style={{ color: 'var(--sf-gray-700)' }}>
-                        {workflow.name || workflow.workflowId}
+                    <span
+                        style={{ color: 'var(--sf-gray-700)', fontWeight: 500 }}
+                    >
+                        {displayName}
                     </span>
                 </div>
 
@@ -104,9 +117,7 @@ export function WorkflowDetailPage() {
                     }}
                 >
                     <div>
-                        <h1 className="page-title">
-                            {workflow.name || workflow.workflowId}
-                        </h1>
+                        <h1 className="page-title">{displayName}</h1>
                         <div className="metadata-row">
                             <span className="metadata-item">
                                 <svg
@@ -123,7 +134,12 @@ export function WorkflowDetailPage() {
                                 </svg>
                                 {workflow.owner}
                             </span>
-                            <span className="metadata-item">
+                            <span
+                                className="metadata-item"
+                                title={new Date(
+                                    workflow.createdAt,
+                                ).toLocaleString()}
+                            >
                                 <svg
                                     aria-hidden="true"
                                     width="14"
@@ -145,10 +161,7 @@ export function WorkflowDetailPage() {
                                     <line x1="8" y1="2" x2="8" y2="6" />
                                     <line x1="3" y1="10" x2="21" y2="10" />
                                 </svg>
-                                Created{' '}
-                                {new Date(
-                                    workflow.createdAt,
-                                ).toLocaleDateString()}
+                                Created {timeAgo(workflow.createdAt)}
                             </span>
                         </div>
                     </div>
@@ -173,7 +186,10 @@ export function WorkflowDetailPage() {
                             variant="secondary"
                             onClick={handleVisibilityToggle}
                         >
-                            Toggle
+                            Make{' '}
+                            {workflow.visibility === 'Public'
+                                ? 'Private'
+                                : 'Public'}
                         </Button>
                     </div>
                 </div>
@@ -260,9 +276,22 @@ export function WorkflowDetailPage() {
                     </div>
                 )}
 
-                <div style={{ marginBottom: '24px' }}>
+                <div className="run-button-area">
                     <Button onClick={handleRun} disabled={isRunning}>
-                        {isRunning ? 'Running...' : 'Run Workflow'}
+                        {isRunning ? (
+                            <span
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                }}
+                            >
+                                <span className="spinner" />
+                                Running...
+                            </span>
+                        ) : (
+                            'Run Workflow'
+                        )}
                     </Button>
                 </div>
 
@@ -276,13 +305,14 @@ export function WorkflowDetailPage() {
                                     gap: '12px',
                                 }}
                             >
-                                <span className="card-title">
-                                    Latest Run Result
-                                </span>
+                                <span className="card-title">Latest Run</span>
                                 <Link
                                     to={`/workflow/${workflowId}/run/${lastResult.runId}`}
                                     className="link"
-                                    style={{ fontSize: '13px' }}
+                                    style={{
+                                        fontSize: '12px',
+                                        fontFamily: 'monospace',
+                                    }}
                                 >
                                     {lastResult.runId.slice(0, 8)}
                                 </Link>
@@ -302,7 +332,7 @@ export function WorkflowDetailPage() {
                         <div className="card-body">
                             {lastResult.result !== undefined && (
                                 <div style={{ marginBottom: '12px' }}>
-                                    <p className="form-label">Result:</p>
+                                    <p className="form-label">Result</p>
                                     <pre className="code-block">
                                         {typeof lastResult.result === 'string'
                                             ? lastResult.result
@@ -317,7 +347,7 @@ export function WorkflowDetailPage() {
                             {lastResult.stdout &&
                                 lastResult.stdout.length > 0 && (
                                     <div style={{ marginBottom: '12px' }}>
-                                        <p className="form-label">Output:</p>
+                                        <p className="form-label">Output</p>
                                         <pre className="code-block">
                                             {lastResult.stdout.join('\n')}
                                         </pre>
@@ -332,7 +362,7 @@ export function WorkflowDetailPage() {
                                                 color: 'var(--sf-red-500)',
                                             }}
                                         >
-                                            Errors:
+                                            Errors
                                         </p>
                                         <pre
                                             className="code-block"
@@ -354,7 +384,7 @@ export function WorkflowDetailPage() {
                                     lastResult.stdout.length === 0) &&
                                 (!lastResult.errors ||
                                     lastResult.errors.length === 0) && (
-                                    <p style={{ color: 'var(--sf-gray-500)' }}>
+                                    <p className="text-muted text-sm">
                                         No result data available for this run.
                                     </p>
                                 )}
@@ -365,13 +395,26 @@ export function WorkflowDetailPage() {
                 <div className="card">
                     <div className="card-header">
                         <span className="card-title">Run History</span>
+                        {totalRuns > 0 && (
+                            <span className="text-muted text-xs">
+                                {totalRuns} runs
+                            </span>
+                        )}
                     </div>
 
                     {runsLoading && (
                         <div className="card-body">
-                            <p style={{ color: 'var(--sf-gray-500)' }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    color: 'var(--sf-gray-500)',
+                                }}
+                            >
+                                <span className="spinner" />
                                 Loading runs...
-                            </p>
+                            </div>
                         </div>
                     )}
 
@@ -381,10 +424,10 @@ export function WorkflowDetailPage() {
                                 <tr>
                                     <th>Run ID</th>
                                     <th>Started</th>
-                                    <th>Completed</th>
+                                    <th>Duration</th>
                                     <th>Status</th>
                                     <th>Logs</th>
-                                    <th></th>
+                                    <th style={{ width: '60px' }}></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -393,56 +436,107 @@ export function WorkflowDetailPage() {
                                         <td
                                             style={{
                                                 fontFamily: 'monospace',
-                                                fontSize: '13px',
+                                                fontSize: '12px',
                                             }}
                                         >
                                             {run.id.slice(0, 8)}
                                         </td>
                                         <td
-                                            style={{
-                                                color: 'var(--sf-gray-500)',
-                                            }}
-                                        >
-                                            {new Date(
+                                            className="text-muted text-sm"
+                                            title={new Date(
                                                 run.startedAt,
                                             ).toLocaleString()}
-                                        </td>
-                                        <td
-                                            style={{
-                                                color: 'var(--sf-gray-500)',
-                                            }}
                                         >
-                                            {run.completedAt
-                                                ? new Date(
-                                                      run.completedAt,
-                                                  ).toLocaleString()
-                                                : '—'}
+                                            {timeAgo(run.startedAt)}
                                         </td>
                                         <td>
-                                            <StatusBadge
-                                                variant={
-                                                    run.status === 'completed'
-                                                        ? 'success'
+                                            <span className="duration-badge">
+                                                {formatDuration(
+                                                    run.startedAt,
+                                                    run.completedAt,
+                                                )}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                }}
+                                            >
+                                                <StatusBadge
+                                                    variant={
+                                                        run.status ===
+                                                        'completed'
+                                                            ? 'success'
+                                                            : run.status ===
+                                                                'failed'
+                                                              ? 'critical'
+                                                              : run.status ===
+                                                                  'interrupted'
+                                                                ? 'caution'
+                                                                : 'active'
+                                                    }
+                                                >
+                                                    {run.status === 'completed'
+                                                        ? 'Success'
                                                         : run.status ===
                                                             'failed'
-                                                          ? 'critical'
+                                                          ? 'Failed'
                                                           : run.status ===
                                                               'interrupted'
-                                                            ? 'caution'
-                                                            : 'active'
-                                                }
-                                            >
-                                                {run.status === 'completed'
-                                                    ? 'Success'
-                                                    : run.status === 'failed'
-                                                      ? 'Failed'
-                                                      : run.status ===
-                                                          'interrupted'
-                                                        ? 'Interrupted'
-                                                        : 'Running'}
-                                            </StatusBadge>
+                                                            ? 'Interrupted'
+                                                            : 'Running'}
+                                                </StatusBadge>
+                                                {run.status ===
+                                                    'interrupted' && (
+                                                    <Link
+                                                        to="/interrupts"
+                                                        title="View interrupts for this run"
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems:
+                                                                'center',
+                                                            color: 'var(--sf-yellow-500)',
+                                                        }}
+                                                    >
+                                                        <svg
+                                                            aria-hidden="true"
+                                                            width="14"
+                                                            height="14"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        >
+                                                            <circle
+                                                                cx="12"
+                                                                cy="12"
+                                                                r="10"
+                                                            />
+                                                            <line
+                                                                x1="12"
+                                                                y1="8"
+                                                                x2="12"
+                                                                y2="12"
+                                                            />
+                                                            <line
+                                                                x1="12"
+                                                                y1="16"
+                                                                x2="12.01"
+                                                                y2="16"
+                                                            />
+                                                        </svg>
+                                                    </Link>
+                                                )}
+                                            </div>
                                         </td>
-                                        <td>{run.logCount}</td>
+                                        <td className="text-sm">
+                                            {run.logCount}
+                                        </td>
                                         <td>
                                             <Link
                                                 to={`/workflow/${workflowId}/run/${run.id}`}
@@ -461,15 +555,13 @@ export function WorkflowDetailPage() {
                                     <tr>
                                         <td colSpan={6}>
                                             <div className="empty-state">
-                                                <div className="empty-state-icon">
-                                                    🚀
-                                                </div>
                                                 <div className="empty-state-title">
                                                     No runs yet
                                                 </div>
                                                 <p>
-                                                    Click "Run Workflow" to
-                                                    start your first execution
+                                                    Click &ldquo;Run
+                                                    Workflow&rdquo; to start
+                                                    your first execution
                                                 </p>
                                             </div>
                                         </td>

@@ -1,13 +1,33 @@
-import { Button } from '@snowflake/stellar-components';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { api } from '@/api/client';
 
 interface AppShellProps {
     children: ReactNode;
 }
 
+const NAV_ITEMS = [
+    {
+        path: '/',
+        label: 'Workflows',
+        match: (p: string) => p === '/' || p.startsWith('/workflow'),
+    },
+    {
+        path: '/interrupts',
+        label: 'Interrupts',
+        match: (p: string) => p === '/interrupts',
+    },
+];
+
 export function AppShell({ children }: AppShellProps) {
     const location = useLocation();
+    const [user, setUser] = useState<string | null>(null);
+
+    useEffect(() => {
+        api.whoami()
+            .then((res) => setUser(res.snowflakeUser))
+            .catch(() => {});
+    }, []);
 
     return (
         <div
@@ -22,58 +42,125 @@ export function AppShell({ children }: AppShellProps) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '12px 24px',
-                    borderBottom: '1px solid var(--color-border)',
-                    backgroundColor: 'var(--color-surface)',
+                    padding: '0 24px',
+                    height: '52px',
+                    borderBottom: '1px solid var(--sf-gray-200)',
+                    backgroundColor: 'var(--sf-surface)',
+                    boxShadow: 'var(--sf-shadow-sm)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 50,
                 }}
             >
                 <div
                     style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '24px',
+                        gap: '32px',
                     }}
                 >
-                    <Link to="/" style={{ textDecoration: 'none' }}>
-                        <h1
+                    <Link
+                        to="/"
+                        style={{
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                        }}
+                    >
+                        <svg
+                            aria-hidden="true"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="var(--sf-blue-600)"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                        <span
                             style={{
-                                fontSize: '20px',
-                                fontWeight: 600,
-                                color: 'var(--color-text)',
+                                fontSize: '15px',
+                                fontWeight: 700,
+                                color: 'var(--sf-gray-900)',
+                                letterSpacing: '-0.02em',
                             }}
                         >
-                            p67 Dashboard
-                        </h1>
+                            Workflow Studio
+                        </span>
                     </Link>
-                    <nav style={{ display: 'flex', gap: '8px' }}>
-                        <Link to="/">
-                            <Button
-                                variant={
-                                    location.pathname === '/'
-                                        ? 'primary'
-                                        : 'secondary'
-                                }
-                                size="small"
-                            >
-                                Workflows
-                            </Button>
-                        </Link>
-                        <Link to="/interrupts">
-                            <Button
-                                variant={
-                                    location.pathname === '/interrupts'
-                                        ? 'primary'
-                                        : 'secondary'
-                                }
-                                size="small"
-                            >
-                                Interrupts
-                            </Button>
-                        </Link>
+                    <nav
+                        style={{
+                            display: 'flex',
+                            gap: '2px',
+                            height: '52px',
+                            alignItems: 'stretch',
+                        }}
+                    >
+                        {NAV_ITEMS.map((item) => {
+                            const isActive = item.match(location.pathname);
+                            return (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '0 16px',
+                                        fontSize: '13px',
+                                        fontWeight: isActive ? 600 : 500,
+                                        color: isActive
+                                            ? 'var(--sf-blue-600)'
+                                            : 'var(--sf-gray-500)',
+                                        textDecoration: 'none',
+                                        borderBottom: isActive
+                                            ? '2px solid var(--sf-blue-600)'
+                                            : '2px solid transparent',
+                                        transition:
+                                            'color 150ms ease, border-color 150ms ease',
+                                    }}
+                                >
+                                    {item.label}
+                                </Link>
+                            );
+                        })}
                     </nav>
                 </div>
+                {user && (
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '13px',
+                            color: 'var(--sf-gray-500)',
+                            fontWeight: 500,
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '50%',
+                                background: 'var(--sf-blue-600)',
+                                color: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                            }}
+                        >
+                            {user.charAt(0).toUpperCase()}
+                        </div>
+                        {user}
+                    </div>
+                )}
             </header>
-            <main style={{ flex: 1, padding: '24px' }}>{children}</main>
+            <main style={{ flex: 1 }}>{children}</main>
         </div>
     );
 }

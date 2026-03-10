@@ -1,11 +1,13 @@
 import { StatusBadge } from '@snowflake/stellar-components';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { LogEntry, LogSource } from '@/api/types';
 import { AppShell } from '@/components/AppShell';
+import { useInterrupts } from '@/hooks/useInterrupts';
 import { useLogs } from '@/hooks/useLogs';
 import { useRuns } from '@/hooks/useRuns';
-import { useRunStatus } from '@/hooks/useWorkflows';
+import { useRunStatus, useWorkflows } from '@/hooks/useWorkflows';
+import { formatDuration, timeAgo } from '@/utils/time';
 
 const LOG_SOURCES: Array<{ value: LogSource | undefined; label: string }> = [
     { value: undefined, label: 'All' },
@@ -20,23 +22,42 @@ export function RunDetailPage() {
         runId: string;
     }>();
     const { data: runsData } = useRuns(workflowId ?? '');
+    const { data: workflowsData } = useWorkflows();
     const [sourceFilter, setSourceFilter] = useState<LogSource | undefined>(
         undefined,
     );
     const [autoRefresh, setAutoRefresh] = useState(true);
+    const logContainerRef = useRef<HTMLDivElement>(null);
 
     const { data: logsData, isLoading } = useLogs(
         workflowId ?? '',
         runId ?? '',
-        {
-            source: sourceFilter,
-            autoRefresh,
-        },
+        { source: sourceFilter, autoRefresh },
     );
 
     const { data: runStatus } = useRunStatus(runId ?? null);
-
     const run = runsData?.runs.find((r) => r.id === runId);
+
+    const isInterrupted =
+        run?.status === 'interrupted' || runStatus?.status === 'interrupted';
+    const { data: interruptsData } = useInterrupts({
+        runId: runId ?? undefined,
+    });
+    const pendingInterrupts = isInterrupted
+        ? (interruptsData?.interrupts ?? [])
+        : [];
+
+    const workflow = workflowsData?.workflows.find(
+        (w) => w.workflowId === workflowId,
+    );
+    const workflowName = workflow?.name || workflowId || '';
+
+    useEffect(() => {
+        if (autoRefresh && logContainerRef.current) {
+            const el = logContainerRef.current;
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [autoRefresh]);
 
     return (
         <AppShell>
@@ -44,9 +65,11 @@ export function RunDetailPage() {
                 <div className="breadcrumb">
                     <Link to="/">Workflows</Link>
                     <span>/</span>
-                    <Link to={`/workflow/${workflowId}`}>{workflowId}</Link>
+                    <Link to={`/workflow/${workflowId}`}>{workflowName}</Link>
                     <span>/</span>
-                    <span style={{ color: 'var(--sf-gray-700)' }}>
+                    <span
+                        style={{ color: 'var(--sf-gray-700)', fontWeight: 500 }}
+                    >
                         Run {runId?.slice(0, 8)}
                     </span>
                 </div>
@@ -63,7 +86,12 @@ export function RunDetailPage() {
                         <h1 className="page-title">Run Details</h1>
                         {run && (
                             <div className="metadata-row">
-                                <span className="metadata-item">
+                                <span
+                                    className="metadata-item"
+                                    title={new Date(
+                                        run.startedAt,
+                                    ).toLocaleString()}
+                                >
                                     <svg
                                         aria-hidden="true"
                                         width="14"
@@ -76,29 +104,27 @@ export function RunDetailPage() {
                                         <circle cx="12" cy="12" r="10" />
                                         <polyline points="12 6 12 12 16 14" />
                                     </svg>
-                                    Started{' '}
-                                    {new Date(run.startedAt).toLocaleString()}
+                                    Started {timeAgo(run.startedAt)}
                                 </span>
-                                {run.completedAt && (
-                                    <span className="metadata-item">
-                                        <svg
-                                            aria-hidden="true"
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                        >
-                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                            <polyline points="22 4 12 14.01 9 11.01" />
-                                        </svg>
-                                        Completed{' '}
-                                        {new Date(
+                                <span className="metadata-item">
+                                    <svg
+                                        aria-hidden="true"
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                    </svg>
+                                    <span className="duration-badge">
+                                        {formatDuration(
+                                            run.startedAt,
                                             run.completedAt,
-                                        ).toLocaleString()}
+                                        )}
                                     </span>
-                                )}
+                                </span>
                             </div>
                         )}
                     </div>
@@ -125,6 +151,86 @@ export function RunDetailPage() {
                     )}
                 </div>
 
+                {isInterrupted && pendingInterrupts.length > 0 && (
+                    <div
+                        className="card"
+                        style={{
+                            marginBottom: '24px',
+                            borderLeft: '3px solid var(--sf-yellow-500)',
+                        }}
+                    >
+                        <div
+                            className="card-body"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                }}
+                            >
+                                <svg
+                                    aria-hidden="true"
+                                    width="18"
+                                    height="18"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="var(--sf-yellow-500)"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                <span
+                                    style={{
+                                        fontSize: '13px',
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    This run is waiting for human input (
+                                    {pendingInterrupts.length} interrupt
+                                    {pendingInterrupts.length !== 1 ? 's' : ''})
+                                </span>
+                            </div>
+                            <Link
+                                to="/interrupts"
+                                style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    color: 'var(--sf-blue-600)',
+                                    textDecoration: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                }}
+                            >
+                                View Interrupts
+                                <svg
+                                    aria-hidden="true"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
                 {runStatus && runStatus.status !== 'running' && (
                     <div className="card" style={{ marginBottom: '24px' }}>
                         <div className="card-header">
@@ -144,7 +250,7 @@ export function RunDetailPage() {
                         <div className="card-body">
                             {runStatus.result !== undefined && (
                                 <div style={{ marginBottom: '12px' }}>
-                                    <p className="form-label">Result:</p>
+                                    <p className="form-label">Result</p>
                                     <pre className="code-block">
                                         {typeof runStatus.result === 'string'
                                             ? runStatus.result
@@ -159,7 +265,7 @@ export function RunDetailPage() {
                             {runStatus.stdout &&
                                 runStatus.stdout.length > 0 && (
                                     <div style={{ marginBottom: '12px' }}>
-                                        <p className="form-label">Output:</p>
+                                        <p className="form-label">Output</p>
                                         <pre className="code-block">
                                             {runStatus.stdout.join('\n')}
                                         </pre>
@@ -168,7 +274,7 @@ export function RunDetailPage() {
                             {runStatus.stderr &&
                                 runStatus.stderr.length > 0 && (
                                     <div style={{ marginBottom: '12px' }}>
-                                        <p className="form-label">Stderr:</p>
+                                        <p className="form-label">Stderr</p>
                                         <pre
                                             className="code-block"
                                             style={{
@@ -188,7 +294,7 @@ export function RunDetailPage() {
                                                 color: 'var(--sf-red-500)',
                                             }}
                                         >
-                                            Errors:
+                                            Errors
                                         </p>
                                         <pre
                                             className="code-block"
@@ -210,7 +316,7 @@ export function RunDetailPage() {
                                     runStatus.stdout.length === 0) &&
                                 (!runStatus.errors ||
                                     runStatus.errors.length === 0) && (
-                                    <p style={{ color: 'var(--sf-gray-500)' }}>
+                                    <p className="text-muted text-sm">
                                         No result data available for this run.
                                     </p>
                                 )}
@@ -226,97 +332,61 @@ export function RunDetailPage() {
                         <span className="card-title">
                             Logs ({logsData?.total ?? 0})
                         </span>
-                        <div
-                            style={{
-                                display: 'flex',
-                                gap: '8px',
-                                alignItems: 'center',
-                            }}
-                        >
-                            <span
-                                style={{
-                                    fontSize: '13px',
-                                    color: 'var(--sf-gray-500)',
-                                }}
-                            >
-                                Filter:
-                            </span>
+                        <div className="log-toolbar">
                             {LOG_SOURCES.map((source) => (
                                 <button
                                     type="button"
                                     key={source.label}
-                                    className={`tab ${sourceFilter === source.value ? 'active' : ''}`}
+                                    className={`log-filter-btn ${sourceFilter === source.value ? 'active' : ''}`}
                                     onClick={() =>
                                         setSourceFilter(source.value)
                                     }
-                                    style={{
-                                        padding: '6px 12px',
-                                        fontSize: '13px',
-                                        fontWeight: 500,
-                                        color:
-                                            sourceFilter === source.value
-                                                ? 'var(--sf-blue-600)'
-                                                : 'var(--sf-gray-500)',
-                                        cursor: 'pointer',
-                                        border: '1px solid',
-                                        borderColor:
-                                            sourceFilter === source.value
-                                                ? 'var(--sf-blue-600)'
-                                                : 'var(--sf-gray-200)',
-                                        borderRadius: '6px',
-                                        background:
-                                            sourceFilter === source.value
-                                                ? 'var(--sf-gray-50)'
-                                                : 'var(--sf-surface)',
-                                    }}
                                 >
                                     {source.label}
                                 </button>
                             ))}
                             <span
                                 style={{
-                                    margin: '0 8px',
-                                    color: 'var(--sf-gray-300)',
+                                    width: '1px',
+                                    height: '16px',
+                                    background: 'var(--sf-gray-200)',
+                                    margin: '0 4px',
                                 }}
-                            >
-                                |
-                            </span>
+                            />
                             <button
                                 type="button"
                                 onClick={() => setAutoRefresh(!autoRefresh)}
-                                style={{
-                                    padding: '6px 12px',
-                                    fontSize: '13px',
-                                    fontWeight: 500,
-                                    color: autoRefresh
-                                        ? 'var(--sf-green-500)'
-                                        : 'var(--sf-gray-500)',
-                                    cursor: 'pointer',
-                                    border: '1px solid',
-                                    borderColor: autoRefresh
-                                        ? 'var(--sf-green-500)'
-                                        : 'var(--sf-gray-200)',
-                                    borderRadius: '6px',
-                                    background: 'var(--sf-surface)',
-                                }}
+                                className={`log-live-btn ${autoRefresh ? 'live' : 'paused'}`}
                             >
-                                {autoRefresh ? '● Live' : '○ Paused'}
+                                {autoRefresh ? 'Live' : 'Paused'}
                             </button>
                         </div>
                     </div>
 
                     {isLoading && (
                         <div className="card-body">
-                            <p style={{ color: 'var(--sf-gray-500)' }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    color: 'var(--sf-gray-500)',
+                                }}
+                            >
+                                <span className="spinner" />
                                 Loading logs...
-                            </p>
+                            </div>
                         </div>
                     )}
 
                     {!isLoading && logsData && (
-                        <div className="log-container">
-                            {logsData.logs.map((log) => (
-                                <LogLine key={log.id} log={log} />
+                        <div className="log-container" ref={logContainerRef}>
+                            {logsData.logs.map((log, idx) => (
+                                <LogLine
+                                    key={log.id}
+                                    log={log}
+                                    lineNumber={idx + 1}
+                                />
                             ))}
                             {logsData.logs.length === 0 && (
                                 <p
@@ -337,7 +407,7 @@ export function RunDetailPage() {
     );
 }
 
-function LogLine({ log }: { log: LogEntry }) {
+function LogLine({ log, lineNumber }: { log: LogEntry; lineNumber: number }) {
     const [expanded, setExpanded] = useState(false);
     const hasAttributes = Object.keys(log.attributes).length > 0;
 
@@ -348,17 +418,20 @@ function LogLine({ log }: { log: LogEntry }) {
     };
 
     return (
-        <div style={{ marginBottom: '2px' }}>
+        <div style={{ marginBottom: '1px' }}>
             <div className="log-line">
+                <span className="log-line-number">{lineNumber}</span>
                 <span className="log-time">
                     {new Date(log.timestamp).toLocaleTimeString('en-US', {
                         hour12: false,
                     })}
                 </span>
                 <span className={`log-source ${sourceClass[log.source]}`}>
-                    [{log.source.padEnd(12)}]
+                    {log.source.slice(0, 8).padEnd(8)}
                 </span>
-                <span style={{ flex: 1 }}>{log.message}</span>
+                <span style={{ flex: 1, wordBreak: 'break-word' }}>
+                    {log.message}
+                </span>
                 {hasAttributes && (
                     <button
                         type="button"
@@ -370,18 +443,19 @@ function LogLine({ log }: { log: LogEntry }) {
                             border: 'none',
                             color: 'var(--sf-gray-400)',
                             cursor: 'pointer',
-                            fontSize: '12px',
+                            fontSize: '11px',
+                            flexShrink: 0,
                         }}
                     >
-                        {expanded ? '▼' : '▶'}
+                        {expanded ? '[-]' : '[+]'}
                     </button>
                 )}
             </div>
             {expanded && hasAttributes && (
                 <pre
                     style={{
-                        marginLeft: '180px',
-                        marginTop: '4px',
+                        marginLeft: '60px',
+                        marginTop: '2px',
                         padding: '8px 12px',
                         backgroundColor: 'var(--sf-log-attr-bg)',
                         borderRadius: '4px',

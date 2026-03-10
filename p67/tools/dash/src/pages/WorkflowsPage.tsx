@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { Workflow } from '@/api/types';
 import { AppShell } from '@/components/AppShell';
 import { useWorkflows } from '@/hooks/useWorkflows';
+import { timeAgo } from '@/utils/time';
 
 export function WorkflowsPage() {
     const { data, isLoading, error } = useWorkflows();
@@ -44,37 +45,43 @@ export function WorkflowsPage() {
                 </div>
 
                 <div className="stats-grid">
-                    <div className="stat-card">
-                        <div className="stat-label">Total Workflows</div>
-                        <div className="stat-value">{workflows.length}</div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Public</div>
-                        <div className="stat-value">{publicCount}</div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Private</div>
-                        <div className="stat-value">{privateCount}</div>
-                    </div>
+                    <StatCard
+                        label="Total Workflows"
+                        value={workflows.length}
+                    />
+                    <StatCard
+                        label="Public"
+                        value={publicCount}
+                        color="var(--sf-green-500)"
+                    />
+                    <StatCard label="Private" value={privateCount} />
                 </div>
 
                 <div className="card">
                     <div className="card-header">
                         <span className="card-title">All Workflows</span>
                         <TextInput
-                            placeholder="Search..."
+                            placeholder="Search workflows..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            style={{ width: '240px' }}
+                            style={{ width: '260px' }}
                             aria-label="Search workflows"
                         />
                     </div>
 
                     {isLoading && (
                         <div className="card-body">
-                            <p style={{ color: 'var(--sf-gray-500)' }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    color: 'var(--sf-gray-500)',
+                                }}
+                            >
+                                <span className="spinner" />
                                 Loading workflows...
-                            </p>
+                            </div>
                         </div>
                     )}
 
@@ -94,8 +101,8 @@ export function WorkflowsPage() {
                                     <th>Owner</th>
                                     <th>Visibility</th>
                                     <th>Versions</th>
-                                    <th>Last Updated</th>
-                                    <th></th>
+                                    <th>Updated</th>
+                                    <th style={{ width: '60px' }}></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -109,15 +116,15 @@ export function WorkflowsPage() {
                                     <tr>
                                         <td colSpan={6}>
                                             <div className="empty-state">
-                                                <div className="empty-state-icon">
-                                                    📋
-                                                </div>
                                                 <div className="empty-state-title">
-                                                    No workflows found
+                                                    {search
+                                                        ? 'No matching workflows'
+                                                        : 'No workflows yet'}
                                                 </div>
                                                 <p>
-                                                    Try adjusting your search
-                                                    criteria
+                                                    {search
+                                                        ? 'Try adjusting your search criteria'
+                                                        : 'Deploy a workflow to get started'}
                                                 </p>
                                             </div>
                                         </td>
@@ -132,15 +139,38 @@ export function WorkflowsPage() {
     );
 }
 
+function StatCard({
+    label,
+    value,
+    color,
+}: {
+    label: string;
+    value: number;
+    color?: string;
+}) {
+    return (
+        <div className="stat-card">
+            <div className="stat-label">{label}</div>
+            <div className="stat-value" style={color ? { color } : undefined}>
+                {value}
+            </div>
+        </div>
+    );
+}
+
 function WorkflowRow({ workflow }: { workflow: Workflow }) {
     return (
         <tr>
             <td>
-                <Link to={`/workflow/${workflow.workflowId}`} className="link">
+                <Link
+                    to={`/workflow/${workflow.workflowId}`}
+                    className="link"
+                    style={{ fontSize: '13px' }}
+                >
                     {workflow.name || workflow.workflowId}
                 </Link>
             </td>
-            <td style={{ color: 'var(--sf-gray-500)' }}>{workflow.owner}</td>
+            <td className="text-muted text-sm">{workflow.owner}</td>
             <td>
                 <span
                     className={`status-badge ${workflow.visibility === 'Public' ? 'success' : 'default'}`}
@@ -148,9 +178,12 @@ function WorkflowRow({ workflow }: { workflow: Workflow }) {
                     {workflow.visibility}
                 </span>
             </td>
-            <td>{workflow.versionCount ?? 1}</td>
-            <td style={{ color: 'var(--sf-gray-500)' }}>
-                {new Date(workflow.updatedAt).toLocaleDateString()}
+            <td className="text-sm">{workflow.versionCount ?? 1}</td>
+            <td
+                className="text-muted text-sm"
+                title={new Date(workflow.updatedAt).toLocaleString()}
+            >
+                {timeAgo(workflow.updatedAt)}
             </td>
             <td>
                 <Link to={`/workflow/${workflow.workflowId}`}>

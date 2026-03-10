@@ -3,14 +3,21 @@ import { api } from '@/api/client';
 
 export function useInterrupts(options?: {
     workflowId?: string;
+    runId?: string;
     status?: string;
     limit?: number;
 }) {
     return useQuery({
-        queryKey: ['interrupts', options?.workflowId, options?.status],
+        queryKey: [
+            'interrupts',
+            options?.workflowId,
+            options?.runId,
+            options?.status,
+        ],
         queryFn: () =>
             api.interrupts.list({
                 workflowId: options?.workflowId,
+                runId: options?.runId,
                 status: options?.status,
                 limit: options?.limit,
             }),
