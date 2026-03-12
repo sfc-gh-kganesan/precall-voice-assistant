@@ -3,7 +3,7 @@ spec:
     - name: dashboard
       image: /p67_src/dash/img_repo/p67-dash:latest
       env:
-        P67_API_URL: "http://controld.ghw6if.svc.spcs.internal:80"
+        P67_API_URL: {{ controld_url }}
         PORT: "3001"
       resources:
         requests:

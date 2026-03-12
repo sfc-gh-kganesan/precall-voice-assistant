@@ -27,11 +27,19 @@ create or replace procedure v1.init()
     language sql
     execute as owner
 as $$
+    declare
+        controld_url varchar;
+        controld_dns varchar;
 begin
     begin
         alter service if exists app.controld from specification_file='controld_service_spec.yml';
         alter service if exists app.controld set external_access_integrations=( reference('google_oauth_eai'), reference('snowflake_egress_eai'), reference('postgres_eai') );
-        alter service if exists app.dashboard from specification_file='dashboard_service_spec.yml';
+
+        show services like 'CONTROLD' in schema app;
+        select "dns_name" into :controld_dns from table(result_scan(last_query_id())) limit 1;
+        controld_url := '"http://' || controld_dns || ':80"';
+        alter service if exists app.dashboard from specification_template_file='dashboard_service_spec.yml'
+            using (controld_url => :controld_url);
     exception
         when other then
             -- New references (e.g. encryption_key) may not be bound yet during upgrade.
@@ -86,10 +94,18 @@ create or replace procedure v1.start_dashboard(pool_name varchar)
     language sql
     execute as owner
 as $$
+    declare
+        controld_url varchar;
+        controld_dns varchar;
 begin
+    show services like 'CONTROLD' in schema app;
+    select "dns_name" into :controld_dns from table(result_scan(last_query_id())) limit 1;
+    controld_url := '"http://' || controld_dns || ':80"';
+
     create service if not exists app.dashboard
         in compute pool identifier(:pool_name)
-        from specification_file='dashboard_service_spec.yml'
+        from specification_template_file='dashboard_service_spec.yml'
+        using (controld_url => :controld_url)
         query_warehouse = 'p67_app_wh';
     grant usage on service app.dashboard to application role app_user;
     grant monitor on service app.dashboard to application role app_user;

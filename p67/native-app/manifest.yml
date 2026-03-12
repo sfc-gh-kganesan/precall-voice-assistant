@@ -12,7 +12,7 @@ artifacts:
     setup_script: setup.sql
 
     default_web_endpoint:
-        service: app.controld
+        service: app.dashboard
         endpoint: web
 
     container_services:
