@@ -35,6 +35,12 @@ export type SandboxConfig =
           stageName: string;
       };
 
+export type SlackConfig = {
+    botToken: string | null;
+    appToken: string | null;
+    signingSecret: string | null;
+};
+
 export type ServerConfig = {
     port: number;
     nodeEnv: string;
@@ -51,6 +57,7 @@ export type ServerConfig = {
         defaultUser?: string;
     };
     sandbox: SandboxConfig;
+    slack: SlackConfig;
 };
 
 function readFileIfExistsSync(filePath: string): string | null {
@@ -86,6 +93,19 @@ function buildSandboxConfig(localStoragePath: string): SandboxConfig {
         hostStorageRoot: process.env.P67_HOST_STORAGE_ROOT || undefined,
         containerStorageRoot: localStoragePath,
     };
+}
+
+function resolveGoogleRedirectUri(): string {
+    if (process.env.GOOGLE_REDIRECT_URI) {
+        return process.env.GOOGLE_REDIRECT_URI;
+    }
+
+    const snowflakeHost = process.env.SNOWFLAKE_HOST;
+    if (snowflakeHost) {
+        return `https://${snowflakeHost}/api/auth/google/callback`;
+    }
+
+    return 'http://localhost:3002/api/auth/google/callback';
 }
 
 export const loadConfig = (): ServerConfig => {
@@ -127,6 +147,25 @@ export const loadConfig = (): ServerConfig => {
         console.log('🔥 RUH-ROH: missing encryption key');
     }
 
+    const slackBotToken =
+        readFileIfExistsSync(
+            '/opt/creds/slack_bot_token/secret_string',
+        )?.trim() ??
+        process.env.SLACK_BOT_TOKEN ??
+        null;
+    const slackAppToken =
+        readFileIfExistsSync(
+            '/opt/creds/slack_app_token/secret_string',
+        )?.trim() ??
+        process.env.SLACK_APP_TOKEN ??
+        null;
+    const slackSigningSecret =
+        readFileIfExistsSync(
+            '/opt/creds/slack_signing_secret/secret_string',
+        )?.trim() ??
+        process.env.SLACK_SIGNING_SECRET ??
+        null;
+
     const localStoragePath = resolve(
         __dirname,
         process.env.DATA_ROOT || createTempDir(),
@@ -140,9 +179,7 @@ export const loadConfig = (): ServerConfig => {
             google: {
                 clientId: googleClientId ?? '<not set>',
                 clientSecret: googleClientSecret ?? '<not set>',
-                redirectUri:
-                    process.env.GOOGLE_REDIRECT_URI ||
-                    'http://localhost:3002/api/auth/google/callback',
+                redirectUri: resolveGoogleRedirectUri(),
             },
         },
         database: {
@@ -156,5 +193,10 @@ export const loadConfig = (): ServerConfig => {
             defaultUser: process.env.DEBUG_DEFAULT_USER,
         },
         sandbox: buildSandboxConfig(localStoragePath),
+        slack: {
+            botToken: slackBotToken,
+            appToken: slackAppToken,
+            signingSecret: slackSigningSecret,
+        },
     };
 };

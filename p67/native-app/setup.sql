@@ -135,7 +135,7 @@ create or replace procedure app.stop_app()
 as $$
 begin
     drop service if exists app.dashboard;
-    drop service if exists app.controld;
+    drop service if exists app.controld force;
     return 'STOP_APP COMPLETE';
 end
 $$;

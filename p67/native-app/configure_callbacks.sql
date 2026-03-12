@@ -33,12 +33,15 @@ begin
             }';
         when 'SNOWFLAKE_EGRESS_EAI' then
             -- NOTE: SPCS does not support wildcards in network rules.
-            -- Use the exact Snowflake account hostname(s) that workflows connect to.
+            -- Includes Snowflake account hostname(s) and Slack API hosts for egress.
             return '{
                 "type": "CONFIGURATION",
                 "payload": {
                     "host_ports": [
-                        "SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2.snowflakecomputing.com"
+                        "SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2.snowflakecomputing.com",
+                        "api.slack.com",
+                        "wss-primary.slack.com",
+                        "slack.com"
                     ],
                     "allowed_secrets": "NONE"
                 }
@@ -61,6 +64,27 @@ begin
                 }
             }';
         when 'ENCRYPTION_KEY' then
+            return '{
+                "type": "CONFIGURATION",
+                "payload": {
+                    "type": "GENERIC_STRING"
+                }
+            }';
+        when 'SLACK_BOT_TOKEN' then
+            return '{
+                "type": "CONFIGURATION",
+                "payload": {
+                    "type": "GENERIC_STRING"
+                }
+            }';
+        when 'SLACK_APP_TOKEN' then
+            return '{
+                "type": "CONFIGURATION",
+                "payload": {
+                    "type": "GENERIC_STRING"
+                }
+            }';
+        when 'SLACK_SIGNING_SECRET' then
             return '{
                 "type": "CONFIGURATION",
                 "payload": {

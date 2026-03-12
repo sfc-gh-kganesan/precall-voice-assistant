@@ -111,8 +111,7 @@ export function registerSlackWebhookRoutes(server: FastifyInstance) {
         },
         async (request, reply) => {
             try {
-                // Verify Slack signature if signing secret is configured
-                const signingSecret = process.env.SLACK_SIGNING_SECRET;
+                const signingSecret = server.config.slack.signingSecret;
                 if (signingSecret) {
                     if (!verifySlackSignature(request, signingSecret)) {
                         console.error('Invalid Slack signature');
@@ -120,13 +119,8 @@ export function registerSlackWebhookRoutes(server: FastifyInstance) {
                             .code(401)
                             .send({ error: 'Invalid signature' });
                     }
-                } else {
-                    console.warn(
-                        'SLACK_SIGNING_SECRET not set - skipping signature verification',
-                    );
                 }
 
-                // Slack sends the payload as a form-encoded string
                 const body = request.body as { payload?: string };
                 if (!body.payload) {
                     return reply.code(400).send({ error: 'Missing payload' });
@@ -258,8 +252,7 @@ export function registerSlackWebhookRoutes(server: FastifyInstance) {
         },
         async (request, reply) => {
             try {
-                // Verify Slack signature if signing secret is configured
-                const signingSecret = process.env.SLACK_SIGNING_SECRET;
+                const signingSecret = server.config.slack.signingSecret;
                 if (signingSecret) {
                     if (!verifySlackSignature(request, signingSecret)) {
                         console.error(
@@ -269,13 +262,8 @@ export function registerSlackWebhookRoutes(server: FastifyInstance) {
                             .code(401)
                             .send({ error: 'Invalid signature' });
                     }
-                } else {
-                    console.warn(
-                        'SLACK_SIGNING_SECRET not set - skipping signature verification',
-                    );
                 }
 
-                // Slack sends slash command data as form-encoded body
                 const body = request.body as SlackSlashCommandPayload;
 
                 console.log(

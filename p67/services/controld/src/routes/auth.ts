@@ -14,11 +14,6 @@ const SlackLinkQuerySchema = z.object({
     slack_team: z.string(),
 });
 
-const SlackLinkResponseSchema = z.object({
-    success: z.boolean(),
-    message: z.string(),
-});
-
 const authRoutes = async (server: FastifyInstance) => {
     const fastify = server.withTypeProvider<ZodTypeProvider>();
     const { config } = fastify;
@@ -98,23 +93,34 @@ const authRoutes = async (server: FastifyInstance) => {
         },
     );
 
-    // POST /api/auth/slack/link
+    // GET /api/auth/slack/link
     // Complete the Slack account linking process
-    // Called when user clicks the link URL from /workflow link command
-    fastify.post(
+    // User clicks the link URL from /p67-workflow link command, Snowflake auth
+    // identifies them via sf-context-current-user header, and we create the mapping.
+    fastify.get(
         '/slack/link',
         {
             schema: {
                 description: 'Complete Slack account linking',
                 tags: ['Auth'],
                 querystring: SlackLinkQuerySchema,
-                response: {
-                    200: SlackLinkResponseSchema,
-                    400: SlackLinkResponseSchema,
-                },
             },
         },
         async (request, reply) => {
+            const htmlResponse = (
+                title: string,
+                message: string,
+                success: boolean,
+            ) => {
+                const color = success ? '#2ea44f' : '#d1242f';
+                return reply.type('text/html').send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${title}</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f6f8fa}
+.card{background:#fff;border:1px solid #d0d7de;border-radius:12px;padding:40px;max-width:480px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+h1{color:${color};margin:0 0 16px}p{color:#57606a;line-height:1.5}</style></head>
+<body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`);
+            };
+
             try {
                 const { token, slack_user, slack_team } = request.query as {
                     token: string;
@@ -122,67 +128,44 @@ const authRoutes = async (server: FastifyInstance) => {
                     slack_team: string;
                 };
 
-                // Validate the link token
                 const pendingLink = pendingLinkTokens.get(token);
                 if (!pendingLink) {
-                    return reply.code(400).send({
-                        success: false,
-                        message:
-                            'Invalid or expired link token. Please run /workflow link again.',
-                    });
+                    return htmlResponse(
+                        'Link Expired',
+                        'This link is invalid or has expired. Please run <code>/p67-workflow link</code> again in Slack.',
+                        false,
+                    );
                 }
 
-                // Verify the token matches the Slack user info
                 if (
                     pendingLink.slackUserId !== slack_user ||
                     pendingLink.slackTeamId !== slack_team
                 ) {
-                    return reply.code(400).send({
-                        success: false,
-                        message:
-                            'Link token mismatch. Please run /workflow link again.',
-                    });
+                    return htmlResponse(
+                        'Link Error',
+                        'Token mismatch. Please run <code>/p67-workflow link</code> again in Slack.',
+                        false,
+                    );
                 }
 
-                // Check if token has expired
                 if (pendingLink.expiresAt < Date.now()) {
                     pendingLinkTokens.delete(token);
-                    return reply.code(400).send({
-                        success: false,
-                        message:
-                            'Link token has expired. Please run /workflow link again.',
-                    });
+                    return htmlResponse(
+                        'Link Expired',
+                        'This link has expired. Please run <code>/p67-workflow link</code> again in Slack.',
+                        false,
+                    );
                 }
 
-                // Get the authenticated user from the request
                 const userId = request.user?.id;
                 if (!userId) {
-                    return reply.code(400).send({
-                        success: false,
-                        message:
-                            'You must be logged in to link your Slack account.',
-                    });
+                    return htmlResponse(
+                        'Authentication Required',
+                        'Could not identify your Snowflake user. Please ensure you are signed in.',
+                        false,
+                    );
                 }
 
-                // Check if this Slack user is already linked to a different P67 user
-                const existingLink = await fastify.db.slackUser.findUnique({
-                    where: {
-                        slackUserId_slackTeamId: {
-                            slackUserId: slack_user,
-                            slackTeamId: slack_team,
-                        },
-                    },
-                });
-
-                if (existingLink && existingLink.userId !== userId) {
-                    return reply.code(400).send({
-                        success: false,
-                        message:
-                            'This Slack account is already linked to a different P67 user.',
-                    });
-                }
-
-                // Create or update the link
                 await fastify.db.slackUser.upsert({
                     where: {
                         slackUserId_slackTeamId: {
@@ -203,23 +186,20 @@ const authRoutes = async (server: FastifyInstance) => {
                     },
                 });
 
-                // Clean up the pending token
                 pendingLinkTokens.delete(token);
 
-                return reply.code(200).send({
-                    success: true,
-                    message:
-                        'Your Slack account has been linked successfully! You can now use /workflow commands.',
-                });
+                return htmlResponse(
+                    'Account Linked!',
+                    `Your Slack account (<strong>${pendingLink.slackUsername}</strong>) has been linked to your Snowflake identity (<strong>${request.user.snowflakeUser}</strong>). You can close this tab and return to Slack.`,
+                    true,
+                );
             } catch (error) {
                 console.error('Error linking Slack account:', error);
-                return reply.code(400).send({
-                    success: false,
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : 'Failed to link account',
-                });
+                return htmlResponse(
+                    'Error',
+                    'Something went wrong. Please try again.',
+                    false,
+                );
             }
         },
     );

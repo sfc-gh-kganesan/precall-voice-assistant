@@ -3,6 +3,7 @@ import type { SandboxConfig } from '@controld/config.js';
 import type { PrismaClient } from '@p67/db';
 import type { LogService } from './LogService.js';
 import { Runner } from './runner.js';
+import { executeSql } from './runtime/spcs-sql.js';
 import {
     addReaction,
     postMessage,
@@ -55,6 +56,39 @@ export interface CommandDependencies {
     logService: LogService;
     sandboxConfig: SandboxConfig;
     linkBaseUrl?: string; // Base URL for account linking
+}
+
+let _cachedIngressUrl: string | null = null;
+
+async function resolveIngressUrl(fallback?: string): Promise<string> {
+    if (_cachedIngressUrl) return _cachedIngressUrl;
+
+    if (process.env.SPCS_INGRESS_URL) {
+        _cachedIngressUrl = process.env.SPCS_INGRESS_URL;
+        return _cachedIngressUrl;
+    }
+
+    try {
+        const rows = await executeSql('SHOW ENDPOINTS IN SERVICE app.controld');
+        for (const row of rows) {
+            const isPublic = row.is_public ?? row.IS_PUBLIC;
+            const ingressUrl = row.ingress_url ?? row.INGRESS_URL;
+            if (
+                (isPublic === true ||
+                    isPublic === 'true' ||
+                    isPublic === 'TRUE') &&
+                ingressUrl
+            ) {
+                _cachedIngressUrl = `https://${ingressUrl}`;
+                console.log(`Resolved SPCS ingress URL: ${_cachedIngressUrl}`);
+                return _cachedIngressUrl;
+            }
+        }
+    } catch (err) {
+        console.warn('Failed to resolve SPCS ingress URL via SQL:', err);
+    }
+
+    return fallback || process.env.P67_WEB_URL || 'http://localhost:5173';
 }
 
 /**
@@ -206,9 +240,12 @@ async function executeRunCommand(
     }
 
     // Post initial message to channel to start a thread
+    const workflowLabel = workflow.name
+        ? `*${workflow.name}* (\`${command.workflowId}\`)`
+        : `\`${command.workflowId}\``;
     const initialMessage = await postMessage(
         slackPayload.channel_id,
-        `:hourglass_flowing_sand: *Running workflow* \`${command.workflowId}\``,
+        `:hourglass_flowing_sand: *Running workflow* ${workflowLabel}`,
     );
 
     if (!initialMessage.ok || !initialMessage.ts) {
@@ -218,7 +255,7 @@ async function executeRunCommand(
         );
         return {
             success: true,
-            message: `⏳ Starting workflow \`${command.workflowId}\`... (thread unavailable)`,
+            message: `⏳ Starting workflow ${workflowLabel}... (thread unavailable)`,
         };
     }
 
@@ -242,7 +279,7 @@ async function executeRunCommand(
     runWorkflowAsync(
         runnerInstance,
         workflow.id,
-        command.workflowId,
+        workflow.name || command.workflowId,
         channelId,
         threadTs,
         deps,
@@ -252,7 +289,7 @@ async function executeRunCommand(
         updateMessage(
             channelId,
             threadTs,
-            `:x: *Workflow* \`${command.workflowId}\` *failed to start*\nError: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            `:x: *Workflow* ${workflowLabel} *failed to start*\nError: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         removeReaction(channelId, threadTs, 'runner');
         addReaction(channelId, threadTs, 'x');
@@ -461,28 +498,38 @@ function buildInterruptBlocks(interrupt: {
         },
     ];
 
-    // If options are provided, create buttons
-    if (payload.options && Array.isArray(payload.options)) {
-        const buttons = payload.options.slice(0, 5).map((opt, index) => ({
-            type: 'button',
-            text: {
-                type: 'plain_text',
-                text: opt.label || `Option ${index + 1}`,
-                emoji: true,
-            },
-            value: JSON.stringify({
-                interruptId: interrupt.interruptId,
-                value: opt.value,
-            }),
-            action_id: `interrupt_action_${index}`,
-        }));
+    const options =
+        payload.options && Array.isArray(payload.options)
+            ? payload.options
+            : [
+                  { label: 'Approve', value: 'approved' },
+                  { label: 'Reject', value: 'rejected' },
+              ];
 
-        blocks.push({
-            type: 'actions',
-            block_id: `interrupt_${interrupt.interruptId}`,
-            elements: buttons,
-        });
-    }
+    const buttons = options.slice(0, 5).map((opt, index) => ({
+        type: 'button',
+        text: {
+            type: 'plain_text',
+            text: opt.label || `Option ${index + 1}`,
+            emoji: true,
+        },
+        value: JSON.stringify({
+            interruptId: interrupt.interruptId,
+            value: opt.value,
+        }),
+        action_id: `interrupt_action_${index}`,
+        ...(opt.value === 'approved'
+            ? { style: 'primary' }
+            : opt.value === 'rejected'
+              ? { style: 'danger' }
+              : {}),
+    }));
+
+    blocks.push({
+        type: 'actions',
+        block_id: `interrupt_${interrupt.interruptId}`,
+        elements: buttons,
+    });
 
     return blocks;
 }
@@ -529,7 +576,10 @@ async function executeListCommand(
     }
 
     const workflowList = workflows
-        .map((w) => `• \`${w.id}\` (${w.visibility.toLowerCase()})`)
+        .map((w) => {
+            const label = w.name ? `*${w.name}* (\`${w.id}\`)` : `\`${w.id}\``;
+            return `• ${label} — ${w.visibility.toLowerCase()}`;
+        })
         .join('\n');
 
     return {
@@ -599,9 +649,12 @@ async function executeStatusCommand(
         Interrupted: '⏸️',
     };
 
+    const wfLabel = run.workflow?.name
+        ? `*${run.workflow.name}* (\`${run.workflowId}\`)`
+        : `\`${run.workflowId}\``;
     let message = `*Workflow Run Status*\n`;
     message += `• ID: \`${run.id}\`\n`;
-    message += `• Workflow: \`${run.workflowId}\`\n`;
+    message += `• Workflow: ${wfLabel}\n`;
     message += `• Status: ${statusEmoji[run.status] || '❓'} ${run.status}\n`;
     message += `• Started: ${run.startedAt.toISOString()}\n`;
 
@@ -621,12 +674,13 @@ async function executeStatusCommand(
 
 /**
  * Execute the 'link' command
+ * Generates a link URL pointing to the SPCS ingress. When the user clicks it,
+ * Snowflake auth identifies them, and the GET handler creates the SlackUser mapping.
  */
 async function executeLinkCommand(
     slackPayload: SlackSlashCommandPayload,
     deps: CommandDependencies,
 ): Promise<CommandResult> {
-    // Check if already linked
     const existingLink = await deps.db.slackUser.findUnique({
         where: {
             slackUserId_slackTeamId: {
@@ -637,22 +691,10 @@ async function executeLinkCommand(
         include: { user: true },
     });
 
-    if (existingLink) {
-        return {
-            success: true,
-            message: `Your Slack account is already linked to P67 user \`${existingLink.user.snowflakeUser}\`.`,
-        };
-    }
-
-    // Generate a link token (stored temporarily)
     const linkToken = crypto.randomUUID();
-    const baseUrl =
-        deps.linkBaseUrl || process.env.P67_WEB_URL || 'http://localhost:5173';
-    const linkUrl = `${baseUrl}/auth/slack-link?token=${linkToken}&slack_user=${slackPayload.user_id}&slack_team=${slackPayload.team_id}`;
+    const baseUrl = await resolveIngressUrl(deps.linkBaseUrl);
+    const linkUrl = `${baseUrl}/api/auth/slack/link?token=${linkToken}&slack_user=${slackPayload.user_id}&slack_team=${slackPayload.team_id}`;
 
-    // Store the pending link token (expires in 10 minutes)
-    // In production, you'd store this in Redis or the database
-    // For now, we'll use an in-memory store with expiration
     pendingLinkTokens.set(linkToken, {
         slackUserId: slackPayload.user_id,
         slackTeamId: slackPayload.team_id,
@@ -660,9 +702,16 @@ async function executeLinkCommand(
         expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
+    if (existingLink) {
+        return {
+            success: true,
+            message: `Your Slack account is currently linked to \`${existingLink.user.snowflakeUser}\`. To re-link to a different Snowflake user, click here:\n${linkUrl}\n\n_This link expires in 10 minutes._`,
+        };
+    }
+
     return {
         success: true,
-        message: `To link your Slack account to P67, click here:\n${linkUrl}\n\n_This link expires in 10 minutes._`,
+        message: `To link your Slack account to P67, click here:\n${linkUrl}\n\n_You'll be asked to sign in with Snowflake. This link expires in 10 minutes._`,
     };
 }
 
@@ -672,20 +721,20 @@ async function executeLinkCommand(
 function executeHelpCommand(): CommandResult {
     const helpText = `*P67 Workflow Commands*
 
-\`/workflow run <workflow-id> [params]\`
+\`/p67-workflow run <workflow-id> [params]\`
   Run a workflow. Parameters are optional key=value pairs.
-  Example: \`/workflow run data-pipeline customer=acme\`
+  Example: \`/p67-workflow run data-pipeline customer=acme\`
 
-\`/workflow list\`
+\`/p67-workflow list\`
   List all workflows you have access to.
 
-\`/workflow status <run-id>\`
+\`/p67-workflow status <run-id>\`
   Check the status of a workflow run.
 
-\`/workflow link\`
-  Link your Slack account to your P67 account.
+\`/p67-workflow link\`
+  Link your Slack account to your Snowflake identity. Opens a Snowflake login page.
 
-\`/workflow help\`
+\`/p67-workflow help\`
   Show this help message.`;
 
     return {

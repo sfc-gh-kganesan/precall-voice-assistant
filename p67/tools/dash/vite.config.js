@@ -48,19 +48,8 @@ export default defineConfig({
         port: 3001,
         proxy: {
             '/api': {
-                target: process.env.P67_API_URL || 'http://localhost:3002',
+                target: 'http://controld.ghw6if.svc.spcs.internal:80',
                 changeOrigin: true,
-                configure: (proxy) => {
-                    proxy.on('proxyReq', (proxyReq) => {
-                        // Add default test user header for local development
-                        if (!proxyReq.getHeader('sf-context-current-user')) {
-                            proxyReq.setHeader(
-                                'sf-context-current-user',
-                                process.env.P67_TEST_USER || 'TEST_USER',
-                            );
-                        }
-                    });
-                },
             },
         },
     },

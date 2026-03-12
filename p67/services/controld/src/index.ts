@@ -1,3 +1,4 @@
+import { configureSlackClient } from '@controld/lib/slack-client.js';
 import { SlackSocketModeService } from '@controld/lib/slack-socket-mode.js';
 import apiRouter from '@controld/routes/api.js';
 import { buildServer } from '@controld/server.js';
@@ -5,12 +6,15 @@ import { buildServer } from '@controld/server.js';
 const server = await buildServer();
 await server.register(apiRouter, { prefix: '/api' });
 
+configureSlackClient(server.config.slack.botToken);
+
 // Initialize Slack Socket Mode service for handling interactive events
 const slackSocketMode = new SlackSocketModeService(
     server.db,
     server.runnerRegistry,
     server.logService,
     server.config.sandbox,
+    server.config.slack.appToken ?? undefined,
 );
 
 const start = async () => {
@@ -35,6 +39,16 @@ const start = async () => {
         server.log.debug(
             `Swagger UI available at http://localhost:${server.config.port}/docs`,
         );
+        if (server.config.slack.botToken) {
+            server.log.debug(
+                'Slack Bot Token configured (from SPCS secret or env)',
+            );
+        }
+        if (server.config.slack.appToken) {
+            server.log.debug(
+                'Slack App Token configured (Socket Mode enabled)',
+            );
+        }
         if (server.config.debug.enableDefaultUser) {
             server.log.debug(
                 `Running in debug mode with default user: ${server.config.debug.defaultUser}`,

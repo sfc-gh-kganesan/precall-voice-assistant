@@ -9,7 +9,6 @@ spec:
               PORT: 80
               DATA_ROOT: /opt/local-storage
               P67_RUNNER_IMAGE: /p67_src/core/img_repo/p67-runner:latest
-              GOOGLE_REDIRECT_URI: https://jnb46h6e-sfengineering-aifde.snowflakecomputing.app/api/auth/google/callback
               SNOWFLAKE_WEBHOOK_SECRET: p67-webhook-secret-token
           resources:
               requests:
@@ -31,6 +30,15 @@ spec:
               - snowflakeSecret:
                     objectReference: encryption_key
                 directoryPath: /opt/creds/encryption_key
+              - snowflakeSecret:
+                    objectReference: slack_bot_token
+                directoryPath: /opt/creds/slack_bot_token
+              - snowflakeSecret:
+                    objectReference: slack_app_token
+                directoryPath: /opt/creds/slack_app_token
+              - snowflakeSecret:
+                    objectReference: slack_signing_secret
+                directoryPath: /opt/creds/slack_signing_secret
     volumes:
         - name: local-storage
           source: block

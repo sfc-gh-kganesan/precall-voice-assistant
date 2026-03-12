@@ -4,22 +4,24 @@ import { WebClient } from '@slack/web-api';
  * Slack client singleton for posting messages
  */
 let webClient: WebClient | null = null;
+let configuredBotToken: string | null = null;
 
-/**
- * Get or create the Slack Web API client
- */
+export function configureSlackClient(botToken: string | null): void {
+    configuredBotToken = botToken;
+    webClient = null;
+}
+
 export function getSlackClient(): WebClient | null {
-    const botToken = process.env.SLACK_BOT_TOKEN;
+    const botToken = configuredBotToken ?? process.env.SLACK_BOT_TOKEN;
 
     if (!botToken) {
-        console.warn(
-            '⚠️  SLACK_BOT_TOKEN not set - cannot post messages to Slack',
-        );
         return null;
     }
 
     if (!webClient) {
-        webClient = new WebClient(botToken);
+        webClient = new WebClient(botToken, {
+            slackApiUrl: 'https://api.slack.com/api/',
+        });
     }
 
     return webClient;

@@ -82,6 +82,33 @@ references:
           register_callback: v1.register_reference
           configuration_callback: v1.configure_reference
           required_at_setup: true
+    - slack_bot_token:
+          label: "Slack Bot Token"
+          description: "Secret holding Slack Bot Token (xoxb-...) for posting messages to Slack channels"
+          privileges:
+              - READ
+          object_type: SECRET
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: false
+    - slack_app_token:
+          label: "Slack App Token (Socket Mode)"
+          description: "Secret holding Slack App-Level Token (xapp-...) for Socket Mode WebSocket connection"
+          privileges:
+              - READ
+          object_type: SECRET
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: false
+    - slack_signing_secret:
+          label: "Slack Signing Secret"
+          description: "Secret holding Slack Signing Secret for verifying inbound webhook requests from Slack"
+          privileges:
+              - READ
+          object_type: SECRET
+          register_callback: v1.register_reference
+          configuration_callback: v1.configure_reference
+          required_at_setup: false
 
 lifecycle_callbacks:
     version_initializer: v1.init

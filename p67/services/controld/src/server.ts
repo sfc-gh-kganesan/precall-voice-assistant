@@ -6,6 +6,7 @@ import type { Runner } from '@controld/lib/runner.js';
 import { SecretService } from '@controld/lib/SecretService.js';
 import { WorkflowService } from '@controld/lib/WorkflowService.js';
 import cors from '@fastify/cors';
+import formbody from '@fastify/formbody';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -89,7 +90,29 @@ export async function buildServer(): Promise<FastifyInstance> {
     // Register runner registry for tracking active workflow runners (used by HITL interrupts)
     server.decorate('runnerRegistry', new Map<string, Runner>());
 
+    await server.register(formbody);
     await server.register(multipart);
+
+    server.addHook('preParsing', async (request, _reply, payload) => {
+        if (
+            request.headers['content-type']?.includes(
+                'application/x-www-form-urlencoded',
+            )
+        ) {
+            const chunks: Buffer[] = [];
+            for await (const chunk of payload) {
+                chunks.push(
+                    typeof chunk === 'string' ? Buffer.from(chunk) : chunk,
+                );
+            }
+            const rawBody = Buffer.concat(chunks);
+            (request as unknown as { rawBody: string }).rawBody =
+                rawBody.toString();
+            const { Readable } = await import('node:stream');
+            return Readable.from(rawBody);
+        }
+        return payload;
+    });
 
     await server.register(cors, {
         origin: true,

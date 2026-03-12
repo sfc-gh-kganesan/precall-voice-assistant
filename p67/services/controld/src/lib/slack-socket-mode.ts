@@ -1,6 +1,6 @@
 import type { SandboxConfig } from '@controld/config.js';
 import type { PrismaClient } from '@p67/db';
-import { SocketModeClient } from '@slack/socket-mode';
+import { LogLevel, SocketModeClient } from '@slack/socket-mode';
 import type { LogService } from './LogService.js';
 import type { Runner } from './runner.js';
 import {
@@ -87,7 +87,21 @@ export class SlackSocketModeService {
 
         this.socketModeClient = new SocketModeClient({
             appToken,
+            logLevel: LogLevel.DEBUG,
+            pingPongLoggingEnabled: false,
+            clientOptions: {
+                slackApiUrl: 'https://api.slack.com/api/',
+            },
         });
+
+        this.socketModeClient.on(
+            'slack_event',
+            (event: { type: string; body: unknown; envelope_id: string }) => {
+                console.log(
+                    `📨 Raw slack_event received: type=${event.type}, envelope_id=${event.envelope_id}`,
+                );
+            },
+        );
 
         // Listen for interactive events (button clicks, modal submissions, etc.)
         this.socketModeClient.on(
@@ -131,12 +145,15 @@ export class SlackSocketModeService {
                     sandboxConfig: this.sandboxConfig,
                 });
 
-                // Acknowledge with immediate response
-                await ack({
-                    response_type: 'ephemeral',
-                    text: result.message,
-                    blocks: result.blocks,
-                });
+                if (result.message || result.blocks) {
+                    await ack({
+                        response_type: 'ephemeral',
+                        text: result.message || ' ',
+                        blocks: result.blocks,
+                    });
+                } else {
+                    await ack();
+                }
 
                 // If the command kicked off async work (like running a workflow),
                 // further updates will be sent via response_url in executeCommand

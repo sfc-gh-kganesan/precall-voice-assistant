@@ -1,8 +1,14 @@
 import { AppShell, Container, NavLink, Text, Title } from '@mantine/core';
 import { useState } from 'react';
+import { SlackLink } from './pages/SlackLink';
 
 function App() {
+    const path = window.location.pathname;
     const [activeSection, setActiveSection] = useState('studio');
+
+    if (path === '/auth/slack-link') {
+        return <SlackLink />;
+    }
 
     return (
         <AppShell
