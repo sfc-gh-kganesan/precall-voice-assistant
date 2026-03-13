@@ -80,7 +80,16 @@ export function registerStatusRoute(server: FastifyInstance) {
                 const log: string[] = [];
                 for (const entry of run.logs) {
                     const msg = entry.message;
-                    if (entry.source === 'RuntimeHost') {
+                    const attrs = entry.attributes as Record<
+                        string,
+                        unknown
+                    > | null;
+                    if (
+                        entry.source === 'RuntimeHost' &&
+                        attrs?.stream === 'stderr'
+                    ) {
+                        stderr.push(msg);
+                    } else if (entry.source === 'RuntimeHost') {
                         log.push(msg);
                     } else if (entry.source === 'ToolCall') {
                         stdout.push(msg);

@@ -39,6 +39,9 @@ from p67_sdk.types import (
     CortexStreamDelta,
     CortexStreamChoice,
     CortexStreamChunk,
+    # Cortex Code types
+    CortexCodeOptions,
+    CortexCodeResponse,
 )
 from p67_sdk.ipc import _handle_resume_interrupt
 
@@ -79,4 +82,7 @@ __all__ = [
     "CortexStreamDelta",
     "CortexStreamChoice",
     "CortexStreamChunk",
+    # Cortex Code types
+    "CortexCodeOptions",
+    "CortexCodeResponse",
 ]

@@ -1033,14 +1033,18 @@ export class Runner {
                     `SELECT SYSTEM$GET_SERVICE_LOGS('app.${jobName}', 0, 'runner') AS LOG`,
                 );
                 for (const row of logRows) {
-                    const logLine = String(row.LOG ?? '');
-                    if (logLine) {
-                        stderr.push(logLine);
-                        logger.stderr(logLine);
-                        await writeLog(
-                            'RuntimeHost',
-                            `[runner stderr] ${logLine}`,
-                        );
+                    const blob = String(row.LOG ?? '');
+                    if (blob) {
+                        for (const logLine of blob.split('\n')) {
+                            const trimmed = logLine.trim();
+                            if (trimmed) {
+                                stderr.push(trimmed);
+                                logger.stderr(trimmed);
+                                await writeLog('RuntimeHost', trimmed, {
+                                    stream: 'stderr',
+                                });
+                            }
+                        }
                     }
                 }
             } catch (logErr) {
@@ -1063,10 +1067,9 @@ export class Runner {
                     if (logLine && !stderr.includes(logLine)) {
                         stderr.push(logLine);
                         logger.stderr(logLine);
-                        await writeLog(
-                            'RuntimeHost',
-                            `[runner stderr fallback] ${logLine}`,
-                        );
+                        await writeLog('RuntimeHost', logLine, {
+                            stream: 'stderr',
+                        });
                     }
                 }
             } catch {
@@ -1103,17 +1106,54 @@ export class Runner {
         }
 
         // 4. Retrieve container logs (stderr)
+        // Use SYSTEM$GET_SERVICE_LOGS directly — SPCS_GET_LOGS() is often
+        // unavailable after EXECUTE JOB SERVICE completes.
+        let logsRetrieved = false;
         try {
-            const logRows = await executeSql(adapter.buildGetLogsSQL(jobName));
+            const logRows = await executeSql(
+                `SELECT SYSTEM$GET_SERVICE_LOGS('app.${jobName}', 0, 'runner') AS LOG`,
+            );
             for (const row of logRows) {
-                const logLine = String(row.LOG ?? '');
-                if (logLine) {
-                    stderr.push(logLine);
-                    logger.stderr(logLine);
+                const blob = String(row.LOG ?? '');
+                if (blob) {
+                    for (const logLine of blob.split('\n')) {
+                        const trimmed = logLine.trim();
+                        if (trimmed) {
+                            stderr.push(trimmed);
+                            logger.stderr(trimmed);
+                            await writeLog('RuntimeHost', trimmed, {
+                                stream: 'stderr',
+                            });
+                        }
+                    }
+                    logsRetrieved = true;
                 }
             }
         } catch {
-            logger.debug('Could not retrieve SPCS container logs');
+            logger.debug(
+                'Could not retrieve SPCS logs via SYSTEM$GET_SERVICE_LOGS',
+            );
+        }
+
+        // Fallback to SPCS_GET_LOGS() if SYSTEM$GET_SERVICE_LOGS failed
+        if (!logsRetrieved) {
+            try {
+                const logRows = await executeSql(
+                    adapter.buildGetLogsSQL(jobName),
+                );
+                for (const row of logRows) {
+                    const logLine = String(row.LOG ?? '');
+                    if (logLine) {
+                        stderr.push(logLine);
+                        logger.stderr(logLine);
+                        await writeLog('RuntimeHost', logLine, {
+                            stream: 'stderr',
+                        });
+                    }
+                }
+            } catch {
+                logger.debug('Could not retrieve SPCS container logs');
+            }
         }
 
         // 5. Download results NDJSON from stage and parse messages

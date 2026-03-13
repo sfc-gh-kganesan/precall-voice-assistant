@@ -110,3 +110,31 @@ class CortexAgentOptions:
     """Name of the Cortex Agent to call."""
     parent_message_id: Optional[str] = None
     """Parent message ID for conversation context."""
+
+
+@dataclass
+class CortexCodeOptions:
+    """Options for invoking Cortex Code CLI."""
+    prompt: str
+    """The prompt/instruction to send to Cortex Code."""
+    timeout: int = 900
+    """Timeout in seconds (default 15 min)."""
+    work_dir: Optional[str] = None
+    """Working directory for the cortex process."""
+    model: Optional[str] = None
+    """Model to use (e.g., 'opus', 'sonnet')."""
+    allow_all_tool_calls: bool = False
+    """Skip tool-call confirmations."""
+
+
+@dataclass
+class CortexCodeResponse:
+    """Response from a Cortex Code CLI invocation."""
+    success: bool
+    """Whether the invocation succeeded (exit code 0)."""
+    output: str
+    """Standard output from the cortex process."""
+    error: Optional[str] = None
+    """Error message if the invocation failed."""
+    exit_code: Optional[int] = None
+    """Process exit code."""

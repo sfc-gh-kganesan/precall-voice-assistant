@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import socket
+import subprocess
 import urllib.request
 import urllib.error
 from typing import Any, Dict, Iterator, List, Optional, TypeVar
@@ -35,6 +36,8 @@ from p67_sdk.types import (
     CortexStreamDeltaToolCallFunction,
     SubworkflowOptions,
     SubworkflowResponse,
+    CortexCodeOptions,
+    CortexCodeResponse,
 )
 from p67_sdk.ipc import send_interrupt, wait_for_resume
 
@@ -1159,6 +1162,102 @@ class WorkflowSDK:
             return SubworkflowResponse(
                 success=False,
                 error=str(e),
+            )
+    
+    def cortex_code(
+        self,
+        options: CortexCodeOptions,
+    ) -> CortexCodeResponse:
+        """
+        Invoke the Cortex Code CLI to perform agentic coding tasks.
+        
+        Runs the ``cortex`` CLI as a subprocess with the given prompt and
+        returns the output.
+        
+        Args:
+            options: CortexCodeOptions containing:
+                - prompt: The prompt/instruction to send (required)
+                - timeout: Timeout in seconds (default 900 = 15 min)
+                - work_dir: Working directory for the process
+                - model: Model to use (e.g., 'opus', 'sonnet')
+                - allow_all_tool_calls: Skip tool-call confirmations (default False)
+            
+        Returns:
+            CortexCodeResponse with success status, output, and optional error.
+            Never raises - errors are returned in the response object.
+            
+        Example:
+            response = sdk.cortex_code(CortexCodeOptions(
+                prompt='Read the file data.csv and summarize the contents.',
+                timeout=300,
+            ))
+            if response.success:
+                print(response.output)
+            else:
+                print(f"Error: {response.error}")
+        """
+        if not options.prompt:
+            return CortexCodeResponse(
+                success=False,
+                output='',
+                error='prompt is required',
+            )
+        
+        args = ['cortex', '-p', options.prompt, '--bypass']
+        
+        if options.model:
+            args.extend(['--model', options.model])
+        
+        if options.allow_all_tool_calls:
+            args.append('--dangerously-allow-all-tool-calls')
+        
+        try:
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                timeout=options.timeout,
+                cwd=options.work_dir,
+            )
+            
+            if result.returncode != 0:
+                error_msg = (
+                    result.stderr.strip()
+                    if result.stderr
+                    else result.stdout.strip()
+                    if result.stdout
+                    else f"cortex exited with code {result.returncode}"
+                )
+                return CortexCodeResponse(
+                    success=False,
+                    output=result.stdout or '',
+                    error=error_msg,
+                    exit_code=result.returncode,
+                )
+            
+            return CortexCodeResponse(
+                success=True,
+                output=result.stdout or '',
+                exit_code=0,
+            )
+        
+        except subprocess.TimeoutExpired:
+            return CortexCodeResponse(
+                success=False,
+                output='',
+                error=f"Cortex Code timed out after {options.timeout} seconds",
+            )
+        except FileNotFoundError:
+            return CortexCodeResponse(
+                success=False,
+                output='',
+                error="The cortex CLI is not installed or not in PATH.",
+            )
+        except Exception as e:
+            return CortexCodeResponse(
+                success=False,
+                output='',
+                error=f"Unexpected error: {str(e)}",
             )
     
     def close(self) -> None:

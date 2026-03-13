@@ -43,17 +43,29 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm --filter=@p67/controld deploy --legacy --prod /deployed
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────
-FROM node:20-alpine AS runtime
+FROM node:20-slim AS runtime
 
 # Python runtime for Python workflows (g++ needed to build snowflake-connector-python)
-RUN apk add --no-cache python3 py3-pip g++ python3-dev
+# curl needed for Cortex Code installer
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3 python3-dev python3-pip python3-venv \
+        g++ curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Python host + deps
 COPY containers/runner/requirements.txt ./
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt \
+    && apt-get purge -y --auto-remove python3-dev g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY containers/runner/host.py /app/host.py
+
+# Install Cortex Code (coco) CLI
+RUN curl -LsS https://ai.snowflake.com/static/cc-scripts/install.sh | SKIP_PODMAN=1 sh
+ENV PATH="/root/.local/bin:$PATH"
 
 # Go supervisor
 COPY --from=go-builder /build/p67-runner /usr/local/bin/p67-runner

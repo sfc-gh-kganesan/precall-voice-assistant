@@ -13,6 +13,8 @@ from p67_sdk.types import (
     HttpResponse,
     CortexAnalystResponse,
     CortexAgentResponse,
+    CortexCodeOptions,
+    CortexCodeResponse,
 )
 
 T = TypeVar('T')
@@ -322,6 +324,49 @@ class WorkflowSDK:
             if approved == "yes":
                 # Continue with export
                 pass
+            ```
+        """
+        ...
+
+    def cortex_code(
+        self,
+        options: CortexCodeOptions,
+    ) -> CortexCodeResponse:
+        """
+        Invoke the Cortex Code CLI to perform agentic coding tasks.
+
+        Runs the ``cortex`` CLI as a subprocess with the given prompt and
+        returns the output. Cortex Code is an AI coding agent that can
+        read/write files, run commands, search code, and interact with
+        Snowflake.
+
+        Args:
+            options: CortexCodeOptions containing:
+                - prompt: The prompt/instruction to send (required)
+                - timeout: Timeout in seconds (default 900 = 15 min)
+                - work_dir: Working directory for the process
+                - model: Model to use (e.g., 'opus', 'sonnet')
+                - allow_all_tool_calls: Skip tool-call confirmations (default False)
+
+        Returns:
+            CortexCodeResponse with:
+                - success: Whether the invocation succeeded
+                - output: Standard output from the cortex process
+                - error: Error message if failed
+                - exit_code: Process exit code
+
+        Example:
+            ```python
+            from p67_sdk.types import CortexCodeOptions
+
+            response = sdk.cortex_code(CortexCodeOptions(
+                prompt='Read data.csv and summarize the contents.',
+                timeout=300,
+            ))
+            if response.success:
+                print(response.output)
+            else:
+                print(f"Error: {response.error}")
             ```
         """
         ...

@@ -332,3 +332,26 @@ class CortexStreamChunk:
     model: str
     choices: List[CortexStreamChoice]
     usage: Optional[CortexTokenUsage] = None
+
+
+# =============================================================================
+# Cortex Code Types
+# =============================================================================
+
+@dataclass
+class CortexCodeOptions:
+    """Options for invoking Cortex Code CLI."""
+    prompt: str
+    timeout: int = 900  # seconds (default 15 min)
+    work_dir: Optional[str] = None
+    model: Optional[str] = None
+    allow_all_tool_calls: bool = False
+
+
+@dataclass
+class CortexCodeResponse:
+    """Response from a Cortex Code CLI invocation."""
+    success: bool
+    output: str
+    error: Optional[str] = None
+    exit_code: Optional[int] = None

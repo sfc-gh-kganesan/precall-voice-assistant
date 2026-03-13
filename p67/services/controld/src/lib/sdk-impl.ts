@@ -5,7 +5,11 @@
  * Workflow SDK Implementation for P67 platform
  */
 
+import * as child_process from 'node:child_process';
 import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import * as readline from 'node:readline';
 import {
     type Binds,
@@ -14,6 +18,8 @@ import {
     type CortexAnalystResponse,
     type CortexChoice,
     type CortexChoiceMessage,
+    type CortexCodeOptions,
+    type CortexCodeResponse,
     type CortexCompleteOptions,
     type CortexCompleteRequestInfo,
     type CortexCompleteResponse,
@@ -1547,15 +1553,170 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             };
         }
     }
+
+    /**
+     * Invokes the Cortex Code CLI as a subprocess
+     */
+    async cortexCode(options: CortexCodeOptions): Promise<CortexCodeResponse> {
+        const {
+            prompt,
+            timeout = 900,
+            workDir,
+            model,
+            allowAllToolCalls,
+        } = options;
+
+        if (!prompt) {
+            return {
+                success: false,
+                output: '',
+                error: 'prompt is required',
+            };
+        }
+
+        const args = ['-p', prompt, '--bypass'];
+
+        if (model) {
+            args.push('--model', model);
+        }
+
+        if (allowAllToolCalls) {
+            args.push('--dangerously-allow-all-tool-calls');
+        }
+
+        // Write a temporary connections.toml so the cortex CLI can authenticate
+        let snowflakeHome: string | undefined;
+        try {
+            const cfg = this.cfg();
+            if (cfg.account && (cfg.token || cfg.password)) {
+                snowflakeHome = fs.mkdtempSync(
+                    path.join(os.tmpdir(), 'p67-cortex-'),
+                );
+                const lines: string[] = [
+                    'default_connection_name = "default"',
+                    '',
+                    '[connections.default]',
+                ];
+                if (cfg.account) lines.push(`account = "${cfg.account}"`);
+                if (cfg.username) lines.push(`user = "${cfg.username}"`);
+                if (cfg.token) {
+                    lines.push('authenticator = "programmatic_access_token"');
+                    lines.push(`token = "${cfg.token}"`);
+                } else if (cfg.password) {
+                    lines.push(`password = "${cfg.password}"`);
+                }
+                if (cfg.accessUrl)
+                    lines.push(
+                        `host = "${cfg.accessUrl.replace(/^https?:\/\//, '')}"`,
+                    );
+                if (cfg.warehouse) lines.push(`warehouse = "${cfg.warehouse}"`);
+                if (cfg.database) lines.push(`database = "${cfg.database}"`);
+                if (cfg.schema) lines.push(`schema = "${cfg.schema}"`);
+                lines.push('');
+                fs.writeFileSync(
+                    path.join(snowflakeHome, 'config.toml'),
+                    lines.join('\n'),
+                    { mode: 0o600 },
+                );
+            }
+        } catch {
+            // If we can't build a connections file, proceed without one —
+            // cortex will report the missing-connection error itself.
+        }
+
+        try {
+            return await new Promise<CortexCodeResponse>((resolve) => {
+                const child = child_process.execFile(
+                    'cortex',
+                    args,
+                    {
+                        cwd: workDir,
+                        timeout: timeout * 1000,
+                        maxBuffer: 50 * 1024 * 1024, // 50 MB
+                        env: {
+                            ...process.env,
+                            ...(snowflakeHome
+                                ? { SNOWFLAKE_HOME: snowflakeHome }
+                                : {}),
+                        },
+                    },
+                    (error, stdout, stderr) => {
+                        if (error) {
+                            // Timeout
+                            if (
+                                error.killed ||
+                                error.message.includes('TIMEOUT')
+                            ) {
+                                resolve({
+                                    success: false,
+                                    output: '',
+                                    error: `Cortex Code timed out after ${timeout} seconds`,
+                                    exitCode: error.code
+                                        ? Number(error.code)
+                                        : undefined,
+                                });
+                                return;
+                            }
+
+                            // Non-zero exit
+                            const errorMsg =
+                                stderr.trim() ||
+                                stdout.trim() ||
+                                `cortex exited with code ${error.code}`;
+                            resolve({
+                                success: false,
+                                output: stdout,
+                                error: errorMsg,
+                                exitCode: error.code
+                                    ? Number(error.code)
+                                    : undefined,
+                            });
+                            return;
+                        }
+
+                        resolve({
+                            success: true,
+                            output: stdout,
+                            exitCode: 0,
+                        });
+                    },
+                );
+
+                // Handle spawn errors (e.g., cortex not found)
+                child.on('error', (err) => {
+                    resolve({
+                        success: false,
+                        output: '',
+                        error: err.message.includes('ENOENT')
+                            ? 'The cortex CLI is not installed or not in PATH.'
+                            : `Failed to spawn cortex: ${err.message}`,
+                    });
+                });
+            });
+        } catch (error) {
+            return {
+                success: false,
+                output: '',
+                error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+            };
+        } finally {
+            // Clean up the temporary connections file
+            if (snowflakeHome) {
+                try {
+                    fs.rmSync(snowflakeHome, { recursive: true, force: true });
+                } catch {
+                    // Ignore cleanup errors
+                }
+            }
+        }
+    }
 }
 
 function validateConfig(config: P67ConfigValue): P67ConfigValue {
     // Patch config and fix accessURL if it's missing
     if (!config.accessUrl) {
         if (config.account) {
-            const accountLocator = config.account
-                .replaceAll('_', '-')
-                .toLowerCase();
+            const accountLocator = config.account.toLowerCase();
             config.accessUrl = `https://${accountLocator}.snowflakecomputing.com`;
         }
     }

@@ -1,0 +1,20 @@
+---
+name: coco-test
+config:
+  - config_name: default
+    account:
+      value: SFENGINEERING-AIFDE
+    username:
+      value: NWIEGAND
+    authenticator:
+      value: programmatic_access_token
+    token:
+      secretRef: aifde_pat
+    role:
+      value: ACCOUNTADMIN
+    warehouse:
+      value: P67_APP_WH
+    database:
+      value: P67
+    schema:
+      value: PUBLIC

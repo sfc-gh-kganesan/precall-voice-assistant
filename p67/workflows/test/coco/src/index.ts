@@ -1,0 +1,77 @@
+import { Annotation, StateGraph } from '@langchain/langgraph';
+import type { WorkflowSDK } from './sdk';
+
+// Define the state structure
+const StateAnnotation = Annotation.Root({
+    messages: Annotation<string[]>({
+        reducer: (left, right) => left.concat(right),
+    }),
+    currentNode: Annotation<string>({
+        reducer: (_, right) => right,
+    }),
+    sdk: Annotation<WorkflowSDK>({
+        reducer: (_, right) => right,
+    }),
+});
+
+// Node 1: Initialize
+async function nodeOne(_state: typeof StateAnnotation.State) {
+    console.log('Executing Node 1: Initialize');
+    return {
+        messages: ['Node 1 executed'],
+        currentNode: 'node1',
+    };
+}
+
+// Node 2: Process
+async function nodeTwo(state: typeof StateAnnotation.State) {
+    console.log('Executing Node 2: Calling Cortex Code...');
+    const response = await state.sdk.cortexCode({
+        prompt: 'tell me a joke about my ip address',
+    });
+    const msg = response.success
+        ? `Cortex Code responded: ${response.output}`
+        : `Cortex Code failed: ${response.error}`;
+    console.log(msg);
+    return {
+        messages: [msg],
+        currentNode: 'node2',
+    };
+}
+
+// Node 3: Finalize
+async function nodeThree(_state: typeof StateAnnotation.State) {
+    console.log('Executing Node 3: Finalize');
+    return {
+        messages: ['Node 3 executed'],
+        currentNode: 'node3',
+    };
+}
+
+// Create the graph
+const workflow = new StateGraph(StateAnnotation)
+    .addNode('node1', nodeOne)
+    .addNode('node2', nodeTwo)
+    .addNode('node3', nodeThree)
+    .addEdge('__start__', 'node1')
+    .addEdge('node1', 'node2')
+    .addEdge('node2', 'node3')
+    .addEdge('node3', '__end__');
+
+// Compile the graph
+const app = workflow.compile();
+
+// Execute the graph
+export async function main(sdk: WorkflowSDK) {
+    console.log('Starting LangGraph execution...\n');
+
+    const result = await app.invoke({
+        messages: [],
+        currentNode: '',
+        sdk: sdk,
+    });
+
+    console.log('\n=== Final Result ===');
+    console.log('Messages:', result.messages);
+    console.log('Final Node:', result.currentNode);
+}
