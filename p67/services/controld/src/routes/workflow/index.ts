@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { registerByNameRoutes } from './byName.js';
 import { registerCreateRoute } from './create.js';
 import { registerDeleteRoute } from './delete.js';
+import { registerGraphRoute } from './graph.js';
 import { registerInterruptRoutes } from './interrupt.js';
 import { registerListRoute } from './list.js';
 import { registerManifestRoute } from './manifest.js';
@@ -16,6 +17,8 @@ const workflowRoutes = async (server: FastifyInstance) => {
     registerListRoute(server);
     console.log('[WorkflowRoutes] Registering manifest route...');
     registerManifestRoute(server);
+    console.log('[WorkflowRoutes] Registering graph route...');
+    registerGraphRoute(server);
     console.log('[WorkflowRoutes] Registering run route...');
     registerRunRoute(server);
     console.log('[WorkflowRoutes] Registering visibility route...');

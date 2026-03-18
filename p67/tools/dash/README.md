@@ -63,19 +63,30 @@ A React-based dashboard built with Snowflake's Stellar design system for managin
    ```
    Runs on http://localhost:3001
 
-### API Proxy Configuration
+### API Configuration
 
-The Vite dev server proxies `/api` requests to the backend:
+By default, the dev server proxies `/api/*` requests to local controld at `http://localhost:3002`.
 
-| Environment | Target |
-|-------------|--------|
-| Local dev (default) | `http://localhost:3002` |
-| Custom | Set `P67_API_URL` env var |
-| SPCS internal | `http://controld.ghw6if.svc.spcs.internal:80` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_TARGET` | `http://localhost:3002` | Backend URL to proxy `/api/*` requests to. |
+| `MOCK_API` | _(unset)_ | Set to `1` to use the mock API plugin instead of proxying. |
 
-To use a different backend:
+**Default** (proxy to local controld):
 ```bash
-P67_API_URL=https://your-endpoint.snowflakecomputing.app pnpm dev
+pnpm dev
+```
+
+**Proxy to SPCS**:
+```bash
+API_TARGET=https://<ingress-url>.snowflakecomputing.app pnpm dev
+```
+
+**Mock mode** (no backend needed):
+```bash
+MOCK_API=1 pnpm dev
+# Serves fake data from dev-mock-plugin.ts
+# Includes test workflows: with_interrupt, number_one, decision_demo, no_graph, auto_extracted
 ```
 
 ## Project Structure

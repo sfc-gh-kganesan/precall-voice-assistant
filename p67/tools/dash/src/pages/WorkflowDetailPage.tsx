@@ -3,7 +3,11 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { WorkflowRunStatusResponse } from '@/api/types';
 import { AppShell } from '@/components/AppShell';
+import { CollapsibleSection } from '@/components/CollapsibleSection';
+import type { WorkflowGraphDef } from '@/components/WorkflowGraph';
+import { WorkflowGraph } from '@/components/WorkflowGraph';
 import { useRuns } from '@/hooks/useRuns';
+import { useWorkflowGraph } from '@/hooks/useWorkflowGraph';
 import {
     useRunStatus,
     useRunWorkflow,
@@ -17,6 +21,7 @@ export function WorkflowDetailPage() {
     const { workflowId } = useParams<{ workflowId: string }>();
     const { data: workflowsData } = useWorkflows();
     const { data: manifestData } = useWorkflowManifest(workflowId ?? '');
+    const { data: graphData } = useWorkflowGraph(workflowId ?? '');
     const { data: runsData, isLoading: runsLoading } = useRuns(
         workflowId ?? '',
     );
@@ -30,6 +35,10 @@ export function WorkflowDetailPage() {
     const [isRunning, setIsRunning] = useState(false);
     const [executionResult, setExecutionResult] =
         useState<WorkflowRunStatusResponse | null>(null);
+
+    const hasGraph = !!graphData?.graph;
+    const manifestParams = manifestData?.params ?? {};
+    const hasParams = Object.keys(manifestParams).length > 0;
 
     const latestRunId = useMemo(() => {
         if (!runsData?.runs.length) return null;
@@ -88,7 +97,6 @@ export function WorkflowDetailPage() {
         );
     }
 
-    const manifestParams = manifestData?.params ?? {};
     const totalRuns = runsData?.runs.length ?? 0;
     const successfulRuns =
         runsData?.runs.filter((r) => r.status === 'completed').length ?? 0;
@@ -219,18 +227,27 @@ export function WorkflowDetailPage() {
                     </div>
                 </div>
 
-                {Object.keys(manifestParams).length > 0 && (
-                    <div className="card" style={{ marginBottom: '24px' }}>
-                        <div className="card-header">
-                            <span className="card-title">Parameters</span>
+                {hasGraph && graphData?.graph && (
+                    <CollapsibleSection title="Workflow Graph">
+                        <div style={{ padding: 0 }}>
+                            <WorkflowGraph
+                                graph={graphData.graph as WorkflowGraphDef}
+                                height={480}
+                            />
                         </div>
-                        <div className="card-body">
+                    </CollapsibleSection>
+                )}
+
+                {hasParams && (
+                    <CollapsibleSection title="Parameters">
+                        <div style={{ padding: 20 }}>
                             <div
                                 style={{
                                     display: 'grid',
                                     gridTemplateColumns:
                                         'repeat(auto-fit, minmax(280px, 1fr))',
                                     gap: '16px',
+                                    marginBottom: 16,
                                 }}
                             >
                                 {Object.entries(manifestParams).map(
@@ -272,64 +289,113 @@ export function WorkflowDetailPage() {
                                     ),
                                 )}
                             </div>
+                            <Button onClick={handleRun} disabled={isRunning}>
+                                {isRunning ? (
+                                    <span
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                        }}
+                                    >
+                                        <span className="spinner" />
+                                        Running...
+                                    </span>
+                                ) : (
+                                    'Run Workflow'
+                                )}
+                            </Button>
                         </div>
+                    </CollapsibleSection>
+                )}
+
+                {!hasParams && (
+                    <div className="run-button-area">
+                        <Button onClick={handleRun} disabled={isRunning}>
+                            {isRunning ? (
+                                <span
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                    }}
+                                >
+                                    <span className="spinner" />
+                                    Running...
+                                </span>
+                            ) : (
+                                'Run Workflow'
+                            )}
+                        </Button>
                     </div>
                 )}
 
-                <div className="run-button-area">
-                    <Button onClick={handleRun} disabled={isRunning}>
-                        {isRunning ? (
-                            <span
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                }}
-                            >
-                                <span className="spinner" />
-                                Running...
+                <CollapsibleSection
+                    title="Run History"
+                    badge={
+                        totalRuns > 0 ? (
+                            <span className="text-muted text-xs">
+                                {totalRuns} runs
                             </span>
-                        ) : (
-                            'Run Workflow'
-                        )}
-                    </Button>
-                </div>
-
-                {lastResult && (
-                    <div className="card" style={{ marginBottom: '24px' }}>
-                        <div className="card-header">
+                        ) : undefined
+                    }
+                >
+                    {lastResult && (
+                        <div
+                            style={{
+                                padding: 20,
+                                borderBottom: '1px solid var(--sf-gray-100)',
+                            }}
+                        >
                             <div
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '12px',
+                                    justifyContent: 'space-between',
+                                    marginBottom: 12,
                                 }}
                             >
-                                <span className="card-title">Latest Run</span>
-                                <Link
-                                    to={`/workflow/${workflowId}/run/${lastResult.runId}`}
-                                    className="link"
+                                <div
                                     style={{
-                                        fontSize: '12px',
-                                        fontFamily: 'monospace',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
                                     }}
                                 >
-                                    {lastResult.runId.slice(0, 8)}
-                                </Link>
+                                    <span
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: 'var(--sf-gray-600)',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.04em',
+                                        }}
+                                    >
+                                        Latest Run
+                                    </span>
+                                    <Link
+                                        to={`/workflow/${workflowId}/run/${lastResult.runId}`}
+                                        className="link"
+                                        style={{
+                                            fontSize: '12px',
+                                            fontFamily: 'monospace',
+                                        }}
+                                    >
+                                        {lastResult.runId.slice(0, 8)}
+                                    </Link>
+                                </div>
+                                <StatusBadge
+                                    variant={
+                                        lastResult.status === 'completed'
+                                            ? 'success'
+                                            : lastResult.status === 'failed'
+                                              ? 'critical'
+                                              : 'caution'
+                                    }
+                                >
+                                    {lastResult.status}
+                                </StatusBadge>
                             </div>
-                            <StatusBadge
-                                variant={
-                                    lastResult.status === 'completed'
-                                        ? 'success'
-                                        : lastResult.status === 'failed'
-                                          ? 'critical'
-                                          : 'caution'
-                                }
-                            >
-                                {lastResult.status}
-                            </StatusBadge>
-                        </div>
-                        <div className="card-body">
                             {lastResult.result !== undefined && (
                                 <div style={{ marginBottom: '12px' }}>
                                     <p className="form-label">Result</p>
@@ -389,21 +455,10 @@ export function WorkflowDetailPage() {
                                     </p>
                                 )}
                         </div>
-                    </div>
-                )}
-
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-title">Run History</span>
-                        {totalRuns > 0 && (
-                            <span className="text-muted text-xs">
-                                {totalRuns} runs
-                            </span>
-                        )}
-                    </div>
+                    )}
 
                     {runsLoading && (
-                        <div className="card-body">
+                        <div style={{ padding: 20 }}>
                             <div
                                 style={{
                                     display: 'flex',
@@ -570,7 +625,7 @@ export function WorkflowDetailPage() {
                             </tbody>
                         </table>
                     )}
-                </div>
+                </CollapsibleSection>
             </div>
         </AppShell>
     );

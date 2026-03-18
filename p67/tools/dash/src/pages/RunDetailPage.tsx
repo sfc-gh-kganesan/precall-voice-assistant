@@ -3,9 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { LogEntry, LogSource } from '@/api/types';
 import { AppShell } from '@/components/AppShell';
+import { CollapsibleSection } from '@/components/CollapsibleSection';
+import type { WorkflowGraphDef } from '@/components/WorkflowGraph';
+import { WorkflowGraph } from '@/components/WorkflowGraph';
+import { useExecutionOverlay } from '@/hooks/useExecutionOverlay';
 import { useInterrupts } from '@/hooks/useInterrupts';
 import { useLogs } from '@/hooks/useLogs';
 import { useRuns } from '@/hooks/useRuns';
+import { useWorkflowGraph } from '@/hooks/useWorkflowGraph';
 import { useRunStatus, useWorkflows } from '@/hooks/useWorkflows';
 import { formatDuration, timeAgo } from '@/utils/time';
 
@@ -23,6 +28,7 @@ export function RunDetailPage() {
     }>();
     const { data: runsData } = useRuns(workflowId ?? '');
     const { data: workflowsData } = useWorkflows();
+    const { data: graphData } = useWorkflowGraph(workflowId ?? '');
     const [sourceFilter, setSourceFilter] = useState<LogSource | undefined>(
         undefined,
     );
@@ -51,6 +57,16 @@ export function RunDetailPage() {
         (w) => w.workflowId === workflowId,
     );
     const workflowName = workflow?.name || workflowId || '';
+
+    const hasGraph = !!graphData?.graph;
+
+    const pendingInterruptNodeId = runStatus?.pendingInterrupt?.nodeId ?? null;
+    const executionStates = useExecutionOverlay(
+        graphData?.graph as WorkflowGraphDef | null | undefined,
+        runStatus?.status ?? run?.status,
+        logsData?.logs,
+        pendingInterruptNodeId,
+    );
 
     useEffect(() => {
         if (autoRefresh && logContainerRef.current) {
@@ -128,34 +144,42 @@ export function RunDetailPage() {
                             </div>
                         )}
                     </div>
-                    {run && (
-                        <StatusBadge
-                            variant={
-                                run.status === 'completed'
-                                    ? 'success'
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                        }}
+                    >
+                        {run && (
+                            <StatusBadge
+                                variant={
+                                    run.status === 'completed'
+                                        ? 'success'
+                                        : run.status === 'failed'
+                                          ? 'critical'
+                                          : run.status === 'interrupted'
+                                            ? 'caution'
+                                            : 'active'
+                                }
+                            >
+                                {run.status === 'completed'
+                                    ? 'Success'
                                     : run.status === 'failed'
-                                      ? 'critical'
+                                      ? 'Failed'
                                       : run.status === 'interrupted'
-                                        ? 'caution'
-                                        : 'active'
-                            }
-                        >
-                            {run.status === 'completed'
-                                ? 'Success'
-                                : run.status === 'failed'
-                                  ? 'Failed'
-                                  : run.status === 'interrupted'
-                                    ? 'Interrupted'
-                                    : 'Running'}
-                        </StatusBadge>
-                    )}
+                                        ? 'Interrupted'
+                                        : 'Running'}
+                            </StatusBadge>
+                        )}
+                    </div>
                 </div>
 
                 {isInterrupted && pendingInterrupts.length > 0 && (
                     <div
                         className="card"
                         style={{
-                            marginBottom: '24px',
+                            marginBottom: '16px',
                             borderLeft: '3px solid var(--sf-yellow-500)',
                         }}
                     >
@@ -231,23 +255,41 @@ export function RunDetailPage() {
                     </div>
                 )}
 
-                {runStatus && runStatus.status !== 'running' && (
-                    <div className="card" style={{ marginBottom: '24px' }}>
-                        <div className="card-header">
-                            <span className="card-title">Run Result</span>
-                            <StatusBadge
-                                variant={
-                                    runStatus.status === 'completed'
-                                        ? 'success'
-                                        : runStatus.status === 'failed'
-                                          ? 'critical'
-                                          : 'caution'
-                                }
-                            >
-                                {runStatus.status}
-                            </StatusBadge>
+                {hasGraph && graphData?.graph && (
+                    <CollapsibleSection title="Execution Graph">
+                        <div style={{ padding: 0 }}>
+                            <WorkflowGraph
+                                graph={graphData.graph as WorkflowGraphDef}
+                                executionStates={executionStates}
+                                height={480}
+                            />
                         </div>
-                        <div className="card-body">
+                    </CollapsibleSection>
+                )}
+
+                {runStatus && runStatus.status !== 'running' && (
+                    <CollapsibleSection title="Run Result" defaultOpen={true}>
+                        <div style={{ padding: 20 }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                <StatusBadge
+                                    variant={
+                                        runStatus.status === 'completed'
+                                            ? 'success'
+                                            : runStatus.status === 'failed'
+                                              ? 'critical'
+                                              : 'caution'
+                                    }
+                                >
+                                    {runStatus.status}
+                                </StatusBadge>
+                            </div>
                             {runStatus.result !== undefined && (
                                 <div style={{ marginBottom: '12px' }}>
                                     <p className="form-label">Result</p>
@@ -321,17 +363,27 @@ export function RunDetailPage() {
                                     </p>
                                 )}
                         </div>
-                    </div>
+                    </CollapsibleSection>
                 )}
 
-                <div className="card">
-                    <div
-                        className="card-header"
-                        style={{ flexWrap: 'wrap', gap: '12px' }}
-                    >
-                        <span className="card-title">
-                            Logs ({logsData?.total ?? 0})
+                <CollapsibleSection
+                    title="Logs"
+                    badge={
+                        <span className="text-muted text-xs">
+                            {logsData?.total ?? 0}
                         </span>
+                    }
+                >
+                    <div
+                        style={{
+                            padding: '8px 16px',
+                            display: 'flex',
+                            gap: '8px',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            borderBottom: '1px solid var(--sf-gray-100)',
+                        }}
+                    >
                         <div className="log-toolbar">
                             {LOG_SOURCES.map((source) => (
                                 <button
@@ -364,7 +416,7 @@ export function RunDetailPage() {
                     </div>
 
                     {isLoading && (
-                        <div className="card-body">
+                        <div style={{ padding: 20 }}>
                             <div
                                 style={{
                                     display: 'flex',
@@ -401,7 +453,7 @@ export function RunDetailPage() {
                             )}
                         </div>
                     )}
-                </div>
+                </CollapsibleSection>
             </div>
         </AppShell>
     );

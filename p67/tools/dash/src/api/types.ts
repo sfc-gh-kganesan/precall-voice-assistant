@@ -96,6 +96,43 @@ export interface WorkflowManifestResponse {
     params?: Record<string, ManifestParamValue>;
 }
 
+export interface GraphNodeDef {
+    id: string;
+    type: string;
+    name: string;
+    description?: string;
+    action_name?: string;
+    subgraph_name?: string;
+    question?: string;
+    human_role?: string;
+    human_task?: string;
+    end_type?: string;
+    branches?: Array<{ label: string; condition: string }>;
+}
+
+export interface GraphEdgeDef {
+    id: string;
+    from_node: string;
+    to_node: string;
+    label?: string;
+}
+
+export interface WorkflowGraphDef {
+    name?: string;
+    description?: string;
+    nodes: GraphNodeDef[];
+    edges: GraphEdgeDef[];
+    variables?: Array<{
+        name: string;
+        data_type: string;
+        description: string;
+    }>;
+}
+
+export interface WorkflowGraphResponse {
+    graph: WorkflowGraphDef | null;
+}
+
 export interface WhoamiResponse {
     id: string;
     snowflakeUser: string;

@@ -2,6 +2,10 @@ import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import stylexPlugin from 'unplugin-stylex/vite';
 import { defineConfig } from 'vite';
+import { devMockApi } from './dev-mock-plugin';
+
+const apiTarget = process.env.API_TARGET ?? 'http://localhost:3002';
+const useMockApi = process.env.MOCK_API === '1';
 
 export default defineConfig({
     plugins: [
@@ -25,6 +29,7 @@ export default defineConfig({
             },
         }),
         stylexPlugin(),
+        ...(useMockApi ? [devMockApi()] : []),
     ],
     resolve: {
         extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -47,11 +52,16 @@ export default defineConfig({
     },
     server: {
         port: 3001,
-        proxy: {
-            '/api': {
-                target: 'http://controld.ghw6if.svc.spcs.internal:80',
-                changeOrigin: true,
-            },
-        },
+        ...(!useMockApi
+            ? {
+                  proxy: {
+                      '/api': {
+                          target: apiTarget,
+                          changeOrigin: true,
+                          secure: true,
+                      },
+                  },
+              }
+            : {}),
     },
 });

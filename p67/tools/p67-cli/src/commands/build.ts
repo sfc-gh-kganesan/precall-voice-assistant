@@ -1,14 +1,109 @@
 import * as fs from 'node:fs';
 import { copyFile, cp, mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Command } from '@p67-cli/Command.ts';
 import { ctx } from '@p67-cli/context';
 import { projectConfig } from '@p67-cli/middleware/project-config';
 import { zipSync } from 'fflate';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+async function extractLangGraph(
+    entrypoint: string,
+    buildDir: string,
+    projectDir: string,
+): Promise<void> {
+    const outputPath = path.join(buildDir, 'graph.json');
+    const runnerPath = path.join(projectDir, '__extract_graph_runner.mjs');
+
+    const runnerCode = `
+import * as fs from 'node:fs';
+
+function toTitleCase(s) {
+    return s.replace(/[-_]/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
+}
+function mapNodeId(id) {
+    if (id === '__start__') return 'start';
+    if (id === '__end__') return 'end';
+    return id;
+}
+function mapNodeType(id) {
+    if (id === '__start__' || id === 'start') return 'start_node';
+    if (id === '__end__' || id === 'end') return 'end_node';
+    return 'action_node';
+}
+function mapNodeName(id, node) {
+    if (id === '__start__') return 'Start';
+    if (id === '__end__') return 'End';
+    if (node.name && node.name !== id) return node.name;
+    return toTitleCase(id);
+}
+
+let lgMod;
+try { lgMod = await import('@langchain/langgraph'); } catch {
+    console.log('⊘ No LangGraph found, skipping graph extraction');
+    process.exit(0);
+}
+
+const { StateGraph } = lgMod;
+if (!StateGraph?.prototype?.compile) {
+    console.log('⊘ StateGraph.compile not found, skipping');
+    process.exit(0);
+}
+
+const captured = [];
+const orig = StateGraph.prototype.compile;
+StateGraph.prototype.compile = function(...args) {
+    const c = orig.apply(this, args);
+    captured.push(c);
+    return c;
+};
+
+try { await import(${JSON.stringify(entrypoint)}); } catch (e) {
+    console.warn('⊘ Graph extraction skipped: ' + (e?.message || e));
+    process.exit(0);
+} finally {
+    StateGraph.prototype.compile = orig;
+}
+
+if (!captured.length) {
+    console.log('⊘ No LangGraph compile() detected, skipping');
+    process.exit(0);
+}
+
+const graph = captured[captured.length - 1].getGraph();
+const nodes = [];
+const edges = [];
+
+for (const [id, node] of Object.entries(graph.nodes)) {
+    nodes.push({ id: mapNodeId(id), type: mapNodeType(id), name: mapNodeName(id, node) });
+}
+let ei = 0;
+for (const edge of graph.edges) {
+    ei++;
+    const e = { id: 'e' + ei, from_node: mapNodeId(edge.source), to_node: mapNodeId(edge.target) };
+    if (edge.data && edge.conditional) e.label = edge.data;
+    edges.push(e);
+}
+
+const result = { name: 'Workflow', description: 'Auto-extracted from LangGraph', nodes, edges };
+fs.writeFileSync(${JSON.stringify(outputPath)}, JSON.stringify(result, null, 2));
+console.log('✔︎ Extracted graph to ' + ${JSON.stringify(outputPath)});
+`;
+
+    fs.writeFileSync(runnerPath, runnerCode);
+
+    try {
+        const proc = Bun.spawn(['bun', 'run', runnerPath], {
+            stdout: 'inherit',
+            stderr: 'inherit',
+            cwd: projectDir,
+        });
+        await proc.exited;
+    } finally {
+        if (fs.existsSync(runnerPath)) {
+            fs.unlinkSync(runnerPath);
+        }
+    }
+}
 
 async function buildTypeScript(
     entrypoint: string,
@@ -110,6 +205,11 @@ export const buildCommand = new Command('build')
         } catch (error) {
             console.error('Build failed:', error);
             throw error;
+        }
+
+        // Auto-extract LangGraph topology (TypeScript only, no-op if no LangGraph)
+        if (language === 'typescript') {
+            await extractLangGraph(entrypoint, buildDir, projectDir);
         }
 
         // Copy manifest.yaml to buildDir

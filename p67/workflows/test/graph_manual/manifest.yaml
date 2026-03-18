@@ -1,0 +1,17 @@
+name: GRAPH_MANUAL
+visibility: public
+
+params:
+  text:
+    required: true
+    description: Text to transform
+  operation:
+    description: "Transform operation: uppercase, lowercase, or reverse"
+
+config:
+  - config_name: default
+    parameters:
+      text:
+        value: "Hello World"
+      operation:
+        value: "uppercase"

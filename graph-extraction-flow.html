@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>LangGraph Extraction Flow</title>
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<style>body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; padding: 20px; background: #f8f9fa; }</style>
+</head>
+<body>
+<div id="vis"></div>
+<script>
+const spec = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "title": {"text": "LangGraph Extraction: Invocation Stack", "fontSize": 16, "anchor": "start"},
+  "width": 700,
+  "height": 450,
+  "data": {
+    "values": [
+      {"step_order": 1, "step": "p67 build", "category": "CLI Entry", "location": "build.ts:195"},
+      {"step_order": 2, "step": "buildTypeScript()", "category": "Build Phase", "location": "build.ts:119"},
+      {"step_order": 3, "step": "extractLangGraph()", "category": "Extract Phase", "location": "build.ts:223"},
+      {"step_order": 4, "step": "Check manifest.yaml", "category": "Extract Phase", "location": "build.ts:14"},
+      {"step_order": 5, "step": "Generate runner .mjs", "category": "Extract Phase", "location": "build.ts:28"},
+      {"step_order": 6, "step": "Bun.spawn(runner)", "category": "Child Process", "location": "build.ts:106"},
+      {"step_order": 7, "step": "Monkey-patch compile()", "category": "Child Process", "location": "runner:65"},
+      {"step_order": 8, "step": "import(entrypoint)", "category": "Child Process", "location": "runner:71"},
+      {"step_order": 9, "step": "getGraph()", "category": "Child Process", "location": "runner:83"},
+      {"step_order": 10, "step": "Map nodes & edges", "category": "Child Process", "location": "runner:87"},
+      {"step_order": 11, "step": "Write graph.json", "category": "Child Process", "location": "runner:99"},
+      {"step_order": 12, "step": "Cleanup runner .mjs", "category": "Extract Phase", "location": "build.ts:113"},
+      {"step_order": 13, "step": "GET /:id/graph", "category": "Serve Phase", "location": "graph.ts:16"},
+      {"step_order": 14, "step": "Try manifest.graph", "category": "Serve Phase", "location": "graph.ts:51"},
+      {"step_order": 15, "step": "Fallback graph.json", "category": "Serve Phase", "location": "graph.ts:68"}
+    ]
+  },
+  "encoding": {
+    "y": {"field": "step", "type": "nominal", "sort": {"field": "step_order"}, "title": null, "axis": {"labelFontSize": 12, "labelLimit": 250}},
+    "x": {"field": "step_order", "type": "quantitative", "title": "Invocation Order", "axis": {"tickMinStep": 1, "grid": false}},
+    "color": {
+      "field": "category",
+      "type": "nominal",
+      "title": "Phase",
+      "scale": {
+        "domain": ["CLI Entry", "Build Phase", "Extract Phase", "Child Process", "Serve Phase"],
+        "range": ["#6366f1", "#06b6d4", "#f59e0b", "#ef4444", "#22c55e"]
+      }
+    }
+  },
+  "layer": [
+    {
+      "mark": {"type": "bar", "cornerRadiusEnd": 4, "height": 22},
+      "encoding": {
+        "x": {"field": "step_order"},
+        "tooltip": [
+          {"field": "step", "title": "Step"},
+          {"field": "category", "title": "Phase"},
+          {"field": "location", "title": "Source Location"},
+          {"field": "step_order", "title": "Order"}
+        ]
+      }
+    },
+    {
+      "mark": {"type": "text", "align": "left", "dx": 5, "fontSize": 11},
+      "encoding": {
+        "x": {"field": "step_order"},
+        "text": {"field": "location"},
+        "color": {"value": "#555"}
+      }
+    }
+  ],
+  "config": {
+    "view": {"stroke": null},
+    "axis": {"domainColor": "#ccc", "tickColor": "#ccc"}
+  }
+};
+vegaEmbed('#vis', spec, {actions: false});
+</script>
+</body>
+</html>

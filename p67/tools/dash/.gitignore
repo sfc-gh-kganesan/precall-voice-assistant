@@ -1,0 +1,6 @@
+# tsc -b composite output (vite config files)
+*.tsbuildinfo
+vite.config.js
+dev-mock-plugin.js
+dev-mock-plugin.d.ts
+vite.config.d.ts

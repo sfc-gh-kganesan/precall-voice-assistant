@@ -1,0 +1,13 @@
+name: GRAPH_HITL
+visibility: public
+
+params:
+  report_title:
+    required: true
+    description: Title of the report to generate and approve
+
+config:
+  - config_name: default
+    parameters:
+      report_title:
+        value: "Q1 Sales Summary"

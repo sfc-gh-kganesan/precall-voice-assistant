@@ -642,6 +642,104 @@ body {
     margin-bottom: 24px;
 }
 
+.collapsible-section {
+    background: var(--sf-surface);
+    border: 1px solid var(--sf-gray-200);
+    border-radius: var(--sf-radius);
+    box-shadow: var(--sf-shadow-sm);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: box-shadow var(--sf-transition);
+}
+
+.collapsible-section:hover {
+    box-shadow: var(--sf-shadow-md);
+}
+
+.collapsible-section.expanded-full {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    margin: 0;
+    border-radius: 0;
+    overflow: auto;
+}
+
+.section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 20px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sf-gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background var(--sf-transition);
+    user-select: none;
+}
+
+.section-toggle:hover {
+    background: var(--sf-gray-50);
+}
+
+.section-toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-chevron {
+    display: inline-flex;
+    transition: transform 200ms ease;
+    color: var(--sf-gray-400);
+}
+
+.section-chevron.collapsed {
+    transform: rotate(-90deg);
+}
+
+.section-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.section-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--sf-gray-200);
+    border-radius: var(--sf-radius-sm);
+    cursor: pointer;
+    color: var(--sf-gray-400);
+    transition: all var(--sf-transition);
+}
+
+.section-action-btn:hover {
+    background: var(--sf-gray-50);
+    border-color: var(--sf-gray-300);
+    color: var(--sf-gray-600);
+}
+
+.section-body {
+    border-top: 1px solid var(--sf-gray-100);
+}
+
+.section-body.collapsed {
+    display: none;
+}
+
 .log-toolbar {
     display: flex;
     gap: 8px;

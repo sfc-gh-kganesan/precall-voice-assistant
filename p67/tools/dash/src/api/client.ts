@@ -4,6 +4,7 @@ import type {
     LogListResponse,
     RunListResponse,
     WhoamiResponse,
+    WorkflowGraphResponse,
     WorkflowListResponse,
     WorkflowManifestResponse,
     WorkflowRunAccepted,
@@ -47,6 +48,9 @@ export const api = {
             fetchApi<WorkflowManifestResponse>(
                 `/workflow/${workflowId}/manifest`,
             ),
+
+        getGraph: (workflowId: string) =>
+            fetchApi<WorkflowGraphResponse>(`/workflow/${workflowId}/graph`),
 
         run: (
             workflowId: string,

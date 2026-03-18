@@ -143,6 +143,49 @@ export const WorkflowManifestResponseSchema = z.object({
     params: z.record(z.string(), ManifestParamValueSchema).optional(),
 });
 
+export const WorkflowGraphNodeSchema = z.object({
+    id: z.string(),
+    type: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    action_name: z.string().optional(),
+    subgraph_name: z.string().optional(),
+    question: z.string().optional(),
+    human_role: z.string().optional(),
+    human_task: z.string().optional(),
+    end_type: z.string().optional(),
+    branches: z
+        .array(z.object({ label: z.string(), condition: z.string() }))
+        .optional(),
+});
+
+export const WorkflowGraphEdgeSchema = z.object({
+    id: z.string(),
+    from_node: z.string(),
+    to_node: z.string(),
+    label: z.string().optional(),
+});
+
+export const WorkflowGraphResponseSchema = z.object({
+    graph: z
+        .object({
+            name: z.string().optional(),
+            description: z.string().optional(),
+            nodes: z.array(WorkflowGraphNodeSchema),
+            edges: z.array(WorkflowGraphEdgeSchema),
+            variables: z
+                .array(
+                    z.object({
+                        name: z.string(),
+                        data_type: z.string(),
+                        description: z.string(),
+                    }),
+                )
+                .optional(),
+        })
+        .nullable(),
+});
+
 export type WorkflowManifestResponse = z.infer<
     typeof WorkflowManifestResponseSchema
 >;

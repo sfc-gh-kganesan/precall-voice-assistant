@@ -12,7 +12,9 @@
         "@snowflake/stellar-tokens": "file:./packages/snowflake-stellar-tokens-0.22.3.tgz",
         "@stylexjs/stylex": "^0.10.1",
         "@tanstack/react-query": "^5.56.2",
+        "@xyflow/react": "^12.10.1",
         "clsx": "^2.1.1",
+        "dagre": "^0.8.5",
         "pg": "^8.20.0",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
@@ -21,6 +23,7 @@
     },
     "devDependencies": {
         "@stylexjs/babel-plugin": "^0.16.3",
+        "@types/dagre": "^0.7.54",
         "@types/node": "^20.10.0",
         "@types/react": "^18.3.0",
         "@types/react-dom": "^18.3.0",
