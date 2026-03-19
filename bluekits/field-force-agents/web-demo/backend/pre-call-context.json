@@ -1,0 +1,213 @@
+{
+  "hcp_id": "2002148484",
+  "hcp_name": "Dr. Cesar Chavarria",
+  "call_date": "January 16, 2026",
+  "specialty": "Pulmonary Disease Physician (PDP)",
+  "segment": "Bio-Hesitant Supporter (Tier 2)",
+  "brand_focus": "DUPIXENT PULM (Asthma)",
+
+  "executive_summary": {
+    "recent_call": "January 12, 2026 (4 days ago)",
+    "past_6_months_calls": 52,
+    "call_frequency": "2 calls/week",
+    "co_calling_rep": "Therese Ogbonna Dodds",
+    "call_fatigue_risk": true,
+    "risk_note": "The frequency and dual-rep approach may be overwhelming this physician. Consider spacing and differentiation."
+  },
+
+  "prescribing_trends": {
+    "dupixent_asthma": {
+      "december_2025": 4.91,
+      "24_month_average": 4.78,
+      "control_limits": {
+        "ucl": 9.52,
+        "center": 4.78,
+        "lcl": 0.05
+      },
+      "trend": "Stable prescribing with August 2024 peak (9.74 TRX - above UCL), indicating capacity for higher volume"
+    },
+    "xolair_competitive_threat": {
+      "december_2025": 2.00,
+      "average": 1.10,
+      "ucl": 1.74,
+      "status": "ABOVE UCL - Special Cause Variation",
+      "spike_percentage": "82% above normal levels",
+      "note": "XOLAIR is gaining ground"
+    },
+    "laba_ics_baseline": {
+      "december_2025": 19.27,
+      "average": 14.40,
+      "note": "Largest volume of therapy - patient pool on ICS/LABA who need escalation to biologics"
+    }
+  },
+
+  "smart_alerts": {
+    "total_alerts_90_days": 21,
+    "pull_through_failures": {
+      "count": 3,
+      "description": "Asthma enrollments with Prior Authorization Approved but NOT shipped DUPIXENT",
+      "root_cause": "Breakdown between prescription and patient receiving medication"
+    },
+    "persistence_risk": {
+      "count": 1,
+      "description": "Asthma patient had first fill but NO copay card redemption (Dec 2025)",
+      "risk": "Patient may discontinue due to cost concerns"
+    },
+    "untapped_opportunity": {
+      "count": 21,
+      "description": "Patients with Asthma on ICS/LABA who received ≥2 refills of oral corticosteroids WITHOUT ever receiving DUPIXENT",
+      "growth_trend": "12 patients (Aug) → 20 patients (Sept) → 21 patients (Oct-Nov)",
+      "profile": "IDEAL DUPIXENT candidates: uncontrolled asthma with Type 2 inflammation markers, OCS-dependent"
+    },
+    "copd_expansion": {
+      "count": 1,
+      "description": "Patient newly diagnosed with COPD had NBRx of DUPIXENT (positive signal)"
+    }
+  },
+
+  "primary_objective": "ADDRESS THE 21 OCS-DEPENDENT ASTHMA PATIENTS NOT ON DUPIXENT",
+
+  "critical_insight": "Dr. Chavarria has 21 patients suffering on ICS/LABA + multiple rounds of oral corticosteroids - these patients are struggling with uncontrolled Type 2 inflammation and are at risk for serious complications. They represent the EXACT patient profile that benefits most from DUPIXENT, yet they haven't been prescribed biologic therapy. Given his 'Bio-Hesitant Supporter' profile, your role is to help him see the clinical imperative to intervene earlier with biologics.",
+
+  "recommended_approach": [
+    {
+      "step": 1,
+      "title": "Open with Empathy and Partnership",
+      "message": "Dr. Chavarria, I know Therese and I have been in regularly, and I truly appreciate your time. I'm here today because I've been reviewing some clinical data on your patient panel, and I see an opportunity where we can partner to help some patients who may be struggling."
+    },
+    {
+      "step": 2,
+      "title": "Present the Data Insight",
+      "message": "You currently have 21 patients with asthma who are on ICS/LABA and have needed multiple rounds of oral corticosteroids over recent months. These patients are showing clear markers of Type 2 inflammation - they're eosinophilic and OCS-dependent. The data suggests they're uncontrolled despite maximal conventional therapy.",
+      "key_question": "When you see patients requiring ≥2 bursts of OCS while on ICS/LABA, what's your current decision-making process about escalating to biologic therapy?"
+    },
+    {
+      "step": 3,
+      "title": "Address Bio-Hesitancy with Clinical Evidence",
+      "message": "Many uncontrolled asthma patients who have Type 2 inflammation are eosinophilic (EOS ≥150 cells/µL) or OCS-dependent - exactly like these 21 patients. The clinical evidence shows these patients benefit significantly from DUPIXENT by addressing the root cause: IL-4 and IL-13 mediated Type 2 inflammation.",
+      "key_question": "I understand adopting biologics more broadly can feel like a significant shift. What barriers or concerns do you have about earlier biologic intervention for your OCS-dependent patients?"
+    },
+    {
+      "step": 4,
+      "title": "Tackle the XOLAIR Competitive Threat",
+      "message": "I noticed you've been using XOLAIR recently. For patients with both elevated eosinophils AND IgE, DUPIXENT's mechanism directly blocks IL-4 and IL-13, the key drivers of Type 2 inflammation. Our clinical data shows strong efficacy in this exact population - patients with elevated EOS who are on multiple OCS courses."
+    },
+    {
+      "step": 5,
+      "title": "Solve the Pull-Through Problem",
+      "message": "I also see that some patients you've prescribed DUPIXENT to have had Prior Authorization approved but haven't started therapy. This tells me there may be a gap in the pull-through process.",
+      "key_questions": [
+        "After you prescribe DUPIXENT, what education is provided to patients to ensure they follow through?",
+        "Can I offer resources to simplify the pathway and ensure patients actually start therapy?"
+      ],
+      "resources": [
+        "HCP Checklist for streamlined workflow",
+        "Wall Chart for patient education",
+        "Co-pay Card information",
+        "FRM (Field Reimbursement Manager) in-service for office staff training",
+        "Patient education on their role in the process"
+      ]
+    },
+    {
+      "step": 6,
+      "title": "Address Persistence",
+      "message": "One patient recently filled their first prescription but didn't use a copay card. Let's make sure your patients know about copay assistance to prevent cost from becoming a barrier to continuing therapy. I can connect your staff with our support services team."
+    }
+  ],
+
+  "key_commitments": [
+    {
+      "commitment": "Patient Identification Commitment",
+      "ask": "For your asthma patients on ICS/LABA who need ≥2 OCS bursts in a year, will you commit to evaluating them for Type 2 inflammation markers (EOS ≥150) and considering DUPIXENT as your first-line biologic?"
+    },
+    {
+      "commitment": "Process Optimization",
+      "ask": "Can we schedule 15 minutes with your office manager and our Field Reimbursement Manager to streamline the pull-through process and ensure every patient you prescribe DUPIXENT to actually receives it?"
+    },
+    {
+      "commitment": "Follow-up Action",
+      "ask": "Let's review one of those 21 OCS-dependent patients together. What does that ideal next DUPIXENT patient look like in your practice?"
+    }
+  ],
+
+  "objection_handling": [
+    {
+      "objection": "I'm comfortable with my current approach. These patients are doing okay on ICS/LABA plus OCS when needed.",
+      "response": "I respect that, Dr. Chavarria. But needing multiple OCS bursts suggests these patients aren't truly controlled - they're experiencing breakthrough exacerbations. Each OCS course carries risks: hyperglycemia, osteoporosis, adrenal suppression. DUPIXENT targets the underlying Type 2 inflammation to reduce those OCS bursts and the associated risks. Wouldn't that be a better outcome for your patients?"
+    },
+    {
+      "objection": "Biologics are expensive and hard to get approved.",
+      "response": "That's a valid concern, but the data shows your patients ARE getting approved - you have patients with PA approved right now. The challenge isn't access, it's pull-through. Let me connect you with our reimbursement team to make the process seamless. Plus, with copay assistance, most commercially insured patients pay $0 out of pocket."
+    },
+    {
+      "objection": "I've been using XOLAIR successfully.",
+      "response": "XOLAIR is a good option for allergic asthma. But for your OCS-dependent patients with elevated eosinophils, DUPIXENT's MOA directly blocks IL-4 and IL-13 - the central drivers of Type 2 inflammation. In patients with both elevated EOS and IgE, the data supports DUPIXENT's efficacy. Have you seen the QUEST and VENTURE study designs that demonstrate this?"
+    },
+    {
+      "objection": "I don't have time to add more complexity to my workflow.",
+      "response": "That's exactly why I want to simplify it for you. Our FRM can train your staff on the HCP Checklist and pull-through process - it takes one 30-minute session and then it runs on autopilot. Your staff handles the logistics; you focus on clinical decisions. Less work for you, better outcomes for patients."
+    }
+  ],
+
+  "role_play_qa": [
+    {
+      "question": "How do I identify which patients have Type 2 inflammation?",
+      "answer": "Look for markers like eosinophil count ≥150 cells/µL, FeNO ≥25 ppb, or patients requiring frequent OCS bursts. These are signs of Type 2 inflammation. The wall chart I'll leave can help your staff identify these patients at the point of care."
+    },
+    {
+      "question": "What if a patient doesn't respond to DUPIXENT?",
+      "answer": "In clinical trials, the majority of patients showed significant improvement in lung function and reduction in exacerbations. If a patient doesn't respond as expected, our MSL team can discuss the case with you to explore factors like adherence, proper administration technique, or comorbidities. We're here to support you."
+    },
+    {
+      "question": "Why are you and Therese both coming in? It feels like a lot.",
+      "answer": "That's excellent feedback, and I appreciate your honesty. We both cover different aspects of DUPIXENT - Therese focuses on [her specific focus] and I focus on asthma opportunities. But you're right - we should coordinate better to respect your time. Would you prefer we alternate visits or combine into a single quarterly update?"
+    },
+    {
+      "question": "I want to see real-world results before I commit to broader use.",
+      "answer": "That's fair. Let's start with your most appropriate candidate from those 21 OCS-dependent patients. Prescribe DUPIXENT for that one patient, and let's schedule a follow-up in 12 weeks to review their outcomes. If they improve - reduced OCS use, better symptom control - will you commit to identifying the next appropriate patient?"
+    }
+  ],
+
+  "resources_to_bring": [
+    "HCP Checklist for patient identification and workflow",
+    "Wall Chart for Type 2 inflammation markers",
+    "Key 3 messaging on efficacy, safety, dosing",
+    "Co-pay Card information",
+    "Contact info for FRM (Field Reimbursement Manager) and Link/DMW Support Services",
+    "QUEST and VENTURE study design materials"
+  ],
+
+  "strategic_summary": {
+    "good_news": [
+      "He's prescribing DUPIXENT (4.78 TRX average)",
+      "Demonstrated capacity for much higher volume (9.74 TRX peak in Aug 2024)",
+      "Has 21 IDEAL candidates in his practice",
+      "Already gotten PAs approved, so access isn't the issue"
+    ],
+    "challenges": [
+      {
+        "challenge": "Call Fatigue",
+        "description": "You and Therese are visiting 2x/week. That's too much. The physician is tuning out. You need to make fewer, higher-impact visits with clear objectives."
+      },
+      {
+        "challenge": "Bio-Hesitancy",
+        "description": "He's not adopting biologics broadly because he lacks confidence or sees barriers. Your job is to educate, support, and remove friction - not just detail product benefits."
+      },
+      {
+        "challenge": "Pull-Through Breakdown",
+        "description": "Patients are getting prescribed and approved but not starting therapy. This is a process failure, not a clinical one."
+      },
+      {
+        "challenge": "Competitive Threat",
+        "description": "XOLAIR is spiking. If you don't act now, he'll shift more patients there."
+      }
+    ],
+    "action_plan": [
+      "Focus this call on the 21 OCS-dependent patients - it's data-driven, patient-centric, and impossible to ignore",
+      "Position yourself as a problem-solver, not a sales rep. Offer FRM support, streamline processes, and ask diagnostic questions",
+      "Request one specific commitment: Evaluate ONE of those 21 patients for DUPIXENT and let's review outcomes together",
+      "Coordinate with Therese to reduce visit frequency and increase impact. Propose alternating visits or quarterly joint updates"
+    ],
+    "bottom_line": "Dr. Chavarria wants to do right by his patients, but he needs confidence that biologics are the answer and support to make it easy. You give him both, and you'll unlock significant growth while genuinely improving patient outcomes. This is a trust-building conversation, not a transactional one."
+  }
+}

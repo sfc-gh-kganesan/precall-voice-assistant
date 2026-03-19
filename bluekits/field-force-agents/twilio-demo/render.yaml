@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: precall-voice-assistant
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+      - key: PORT
+        value: 3000
+    healthCheckPath: /health
