@@ -1,0 +1,17 @@
+{
+    "name": "p67",
+    "description": "P67 agentic workflow platform — CLI usage, workflow authoring, and deployment skills",
+    "ownerTeam": "P67",
+    "version": "0.1.0",
+    "skillRepos": [
+        {
+            "snowflake_stage": "@P67.COCO_SKILLS.P67_CLI/skills/p67-cli/"
+        }
+    ],
+    "mcpServers": {},
+    "commandRepos": [],
+    "hooks": {},
+    "envVars": {},
+    "settingsOverrides": {},
+    "allowedRoles": ["P67_USER_RL"]
+}
