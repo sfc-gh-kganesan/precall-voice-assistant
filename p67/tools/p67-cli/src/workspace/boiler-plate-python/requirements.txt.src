@@ -1,2 +1,3 @@
 # Add your workflow dependencies here
 # The p67_sdk is automatically bundled by 'p67 build'
+langgraph>=0.2.0

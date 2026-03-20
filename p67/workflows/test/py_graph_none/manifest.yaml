@@ -1,0 +1,12 @@
+name: PY_GRAPH_NONE
+visibility: public
+
+params:
+    message:
+        description: A message to echo back
+
+config:
+    - config_name: default
+      parameters:
+          message:
+              value: "ping"

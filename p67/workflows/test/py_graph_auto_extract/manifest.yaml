@@ -1,0 +1,13 @@
+name: PY_GRAPH_AUTO_EXTRACT
+visibility: public
+
+params:
+    input:
+        required: true
+        description: Input text to process
+
+config:
+    - config_name: default
+      parameters:
+          input:
+              value: "hello world"

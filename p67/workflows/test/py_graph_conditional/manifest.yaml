@@ -1,0 +1,13 @@
+name: PY_GRAPH_CONDITIONAL
+visibility: public
+
+params:
+    input:
+        required: true
+        description: Input text to classify and route
+
+config:
+    - config_name: default
+      parameters:
+          input:
+              value: "Hi there!"

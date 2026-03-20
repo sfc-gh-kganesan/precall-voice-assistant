@@ -105,6 +105,131 @@ console.log('✔︎ Extracted graph to ' + ${JSON.stringify(outputPath)});
     }
 }
 
+async function extractLangGraphPython(
+    entrypoint: string,
+    buildDir: string,
+    projectDir: string,
+): Promise<void> {
+    const reqPath = path.join(projectDir, 'requirements.txt');
+    if (!fs.existsSync(reqPath)) return;
+    const reqContent = fs.readFileSync(reqPath, 'utf-8');
+    if (!reqContent.match(/langgraph/i)) return;
+
+    console.log('Extracting LangGraph topology (Python)...');
+
+    const outputPath = path.join(buildDir, 'graph.json');
+    const scriptPath = path.join(projectDir, '__extract_graph.py');
+    const venvDir = path.join(projectDir, '__extract_venv');
+
+    const scriptCode = `
+import sys, json, os, importlib.util
+
+entrypoint = ${JSON.stringify(entrypoint)}
+output_path = ${JSON.stringify(outputPath)}
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(entrypoint)))
+
+try:
+    from langgraph.graph import StateGraph
+except ImportError:
+    print('No langgraph found, skipping')
+    sys.exit(0)
+
+captured = []
+orig_compile = StateGraph.compile
+
+def patched_compile(self, *args, **kwargs):
+    c = orig_compile(self, *args, **kwargs)
+    captured.append(c)
+    return c
+
+StateGraph.compile = patched_compile
+
+try:
+    spec = importlib.util.spec_from_file_location("workflow", entrypoint)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+except Exception as e:
+    print(f"Graph extraction skipped: {e}")
+    sys.exit(0)
+finally:
+    StateGraph.compile = orig_compile
+
+if not captured:
+    print('No LangGraph compile() detected, skipping')
+    sys.exit(0)
+
+graph = captured[-1].get_graph()
+
+def map_id(nid):
+    if nid == '__start__': return 'start'
+    if nid == '__end__': return 'end'
+    return nid
+
+def map_type(nid):
+    if nid in ('__start__', 'start'): return 'start_node'
+    if nid in ('__end__', 'end'): return 'end_node'
+    return 'action_node'
+
+def map_name(nid, node):
+    if nid == '__start__': return 'Start'
+    if nid == '__end__': return 'End'
+    name = getattr(node, 'name', nid)
+    if name and name != nid: return name
+    return nid.replace('_', ' ').replace('-', ' ').title()
+
+nodes = [{'id': map_id(nid), 'type': map_type(nid), 'name': map_name(nid, node)}
+         for nid, node in graph.nodes.items()]
+
+edges = []
+for i, edge in enumerate(graph.edges, 1):
+    e = {'id': f'e{i}', 'from_node': map_id(edge.source), 'to_node': map_id(edge.target)}
+    if edge.data and edge.conditional:
+        e['label'] = edge.data
+    edges.append(e)
+
+result = {'name': 'Workflow', 'description': 'Auto-extracted from LangGraph', 'nodes': nodes, 'edges': edges}
+with open(output_path, 'w') as f:
+    json.dump(result, f, indent=2)
+print(f'Extracted graph to {output_path} - nodes: {len(nodes)} edges: {len(edges)}')
+`;
+
+    fs.writeFileSync(scriptPath, scriptCode);
+
+    try {
+        const venvResult = Bun.spawnSync(['python3', '-m', 'venv', venvDir], {
+            cwd: projectDir,
+            stdout: 'inherit',
+            stderr: 'inherit',
+        });
+        if (venvResult.exitCode !== 0) {
+            console.warn(
+                '⚠ Failed to create venv for graph extraction, skipping',
+            );
+            return;
+        }
+
+        const pip = path.join(venvDir, 'bin', 'pip');
+        Bun.spawnSync([pip, 'install', '-q', '-r', reqPath], {
+            cwd: projectDir,
+            stdout: 'inherit',
+            stderr: 'inherit',
+        });
+
+        const python = path.join(venvDir, 'bin', 'python');
+        const proc = Bun.spawn([python, scriptPath], {
+            stdout: 'inherit',
+            stderr: 'inherit',
+            cwd: projectDir,
+        });
+        await proc.exited;
+    } finally {
+        if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
+        if (fs.existsSync(venvDir))
+            fs.rmSync(venvDir, { recursive: true, force: true });
+    }
+}
+
 async function buildTypeScript(
     entrypoint: string,
     buildDir: string,
@@ -207,9 +332,11 @@ export const buildCommand = new Command('build')
             throw error;
         }
 
-        // Auto-extract LangGraph topology (TypeScript only, no-op if no LangGraph)
+        // Auto-extract LangGraph topology (no-op if no LangGraph)
         if (language === 'typescript') {
             await extractLangGraph(entrypoint, buildDir, projectDir);
+        } else if (language === 'python') {
+            await extractLangGraphPython(entrypoint, buildDir, projectDir);
         }
 
         // Copy manifest.yaml to buildDir
