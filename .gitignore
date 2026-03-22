@@ -294,7 +294,9 @@ support-data-agent/.claude/
 *.sql.tmp
 
 # Ensure global user settings aren't retained
-.claude/
+# Note: .claude/skills/ is tracked for project-scoped skills
+.claude/settings*
+.claude/skills/create-aifde-user/local_settings.json
 
 knowledge-builder/nltk_data/
 /knowledge-builder/output

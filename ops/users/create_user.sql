@@ -11,3 +11,4 @@ CREATE USER IF NOT EXISTS <% login_name %>
 
 GRANT ROLE SIADMIN TO USER <% login_name %>;
 GRANT ROLE P67_USER_RL TO USER <% login_name %>;
+GRANT ROLE ACCOUNTADMIN TO USER <% login_name %>;

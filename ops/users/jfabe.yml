@@ -1,0 +1,9 @@
+---
+login_name: jfabe
+display_name: jfabe
+first_name: Josh
+last_name: Fabe
+email: josh.fabe@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public

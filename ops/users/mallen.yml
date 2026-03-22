@@ -1,0 +1,9 @@
+---
+login_name: mallen
+display_name: mallen
+first_name: Mac
+last_name: Allen
+email: mac.allen@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
