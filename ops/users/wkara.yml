@@ -1,0 +1,9 @@
+---
+login_name: wkara
+display_name: wkara
+first_name: Walid
+last_name: Kara
+email: walid.kara@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
