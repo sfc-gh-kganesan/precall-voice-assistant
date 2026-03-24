@@ -1,0 +1,47 @@
+name: "Pattern-IQ: Upload Skills"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "sandbox/jsummer/pattern-iq/.cortex/skills/**"
+
+jobs:
+  upload-skills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: sandbox/jsummer/pattern-iq
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Configure Snowflake connection
+        env:
+          SF_ACCOUNT: ${{ secrets.AIFDE_CI_SNOWFLAKE_ACCOUNT }}
+          SF_USER: ${{ secrets.AIFDE_CI_SNOWFLAKE_USER }}
+          SF_PRIVATE_KEY: ${{ secrets.AIFDE_CI_SNOWFLAKE_PRIVATE_KEY }}
+        run: |
+          echo "$SF_PRIVATE_KEY" > /tmp/snowflake_key.p8
+          chmod 600 /tmp/snowflake_key.p8
+          mkdir -p ~/.snowflake
+          cat > ~/.snowflake/connections.toml <<EOF
+          [default]
+          account = "${SF_ACCOUNT}"
+          user = "${SF_USER}"
+          private_key_file = "/tmp/snowflake_key.p8"
+          role = "PATTERN_IQ"
+          warehouse = "COMPUTE_WH"
+          database = "PATTERN_IQ"
+          schema = "PUBLIC"
+          authenticator = "SNOWFLAKE_JWT"
+          EOF
+          sed -i 's/^[[:space:]]*//' ~/.snowflake/connections.toml
+
+      - name: Upload skills to Snowflake stage
+        run: sandbox/jsummer/pattern-iq/scripts/upload_skills.sh --connection default

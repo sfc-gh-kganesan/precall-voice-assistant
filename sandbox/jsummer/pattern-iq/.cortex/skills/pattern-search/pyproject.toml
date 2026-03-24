@@ -1,0 +1,8 @@
+[project]
+name = "pattern-search"
+version = "0.1.0"
+description = "Search the pattern catalog via Cortex Search Python API"
+requires-python = ">=3.10"
+dependencies = [
+    "snowflake>=1.0.0",
+]

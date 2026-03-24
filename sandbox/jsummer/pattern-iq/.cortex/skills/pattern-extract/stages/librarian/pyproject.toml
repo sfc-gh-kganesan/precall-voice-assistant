@@ -1,0 +1,8 @@
+[project]
+name = "pattern-librarian"
+version = "0.1.0"
+description = "Generate synthetic intent queries and store patterns in Snowflake"
+requires-python = ">=3.10"
+dependencies = [
+    "snowflake-connector-python>=3.0",
+]

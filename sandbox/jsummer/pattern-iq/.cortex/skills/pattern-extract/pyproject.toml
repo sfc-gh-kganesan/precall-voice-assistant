@@ -1,0 +1,6 @@
+[project]
+name = "pattern-extract"
+version = "0.2.0"
+description = "Orchestrator skill: chains Architect, Distiller, and Librarian for end-to-end pattern extraction"
+requires-python = ">=3.10"
+dependencies = []

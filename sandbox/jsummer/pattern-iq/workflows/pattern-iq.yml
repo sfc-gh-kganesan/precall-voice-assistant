@@ -1,0 +1,116 @@
+name: Pattern IQ
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_path:
+        description: "Subdirectory to scan (mono-repos). Empty = entire repo."
+        required: false
+        type: string
+      connection:
+        description: "Snowflake connection name"
+        required: false
+        default: "default"
+        type: string
+
+  # Future: uncomment to auto-run on push to main.
+  # Each run does a full re-extraction with reconciliation,
+  # so patterns stay fresh as code evolves.
+  # push:
+  #   branches: [main]
+  #   paths-ignore:
+  #     - '**/*.md'
+  #     - '.github/**'
+  #     - 'docs/**'
+
+env:
+  PATTERN_IQ_CI: "true"
+
+jobs:
+  pattern-iq:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Install Cortex Code CLI
+        run: curl -LsS https://ai.snowflake.com/static/cc-scripts/install.sh | sh
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Configure Snowflake connection
+        env:
+          SF_ACCOUNT: ${{ secrets.AIFDE_CI_SNOWFLAKE_ACCOUNT }}
+          SF_USER: ${{ secrets.AIFDE_CI_SNOWFLAKE_USER }}
+          SF_PRIVATE_KEY: ${{ secrets.AIFDE_CI_SNOWFLAKE_PRIVATE_KEY }}
+        run: |
+          echo "$SF_PRIVATE_KEY" > /tmp/snowflake_key.p8
+          chmod 600 /tmp/snowflake_key.p8
+          mkdir -p ~/.snowflake
+          CONNECTION="${{ inputs.connection || 'default' }}"
+          cat > ~/.snowflake/connections.toml <<EOF
+          [$CONNECTION]
+          account = "${SF_ACCOUNT}"
+          user = "${SF_USER}"
+          private_key_file = "/tmp/snowflake_key.p8"
+          role = "PATTERN_IQ"
+          warehouse = "COMPUTE_WH"
+          database = "PATTERN_IQ"
+          schema = "PUBLIC"
+          authenticator = "SNOWFLAKE_JWT"
+          EOF
+          sed -i 's/^[[:space:]]*//' ~/.snowflake/connections.toml
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download skills from Snowflake stage
+        run: |
+          CONNECTION="${{ inputs.connection || 'default' }}"
+          uv run --with snowflake-connector-python python -c "
+          import snowflake.connector, tempfile, tarfile, os, sys
+          conn = snowflake.connector.connect(connection_name='$CONNECTION')
+          cur = conn.cursor()
+          tmpdir = tempfile.mkdtemp()
+          cur.execute(f\"GET @PATTERN_IQ.PUBLIC.SKILLS_STAGE/pattern-iq-skills.tar.gz file://{tmpdir}\")
+          cur.close(); conn.close()
+          with tarfile.open(os.path.join(tmpdir, 'pattern-iq-skills.tar.gz'), 'r:gz') as tar:
+              tar.extractall(path='.')
+          print('Skills extracted', file=sys.stderr)
+          "
+
+      - name: Build prompt
+        id: prompt
+        run: |
+          CONNECTION="${{ inputs.connection || 'default' }}"
+          TARGET_DIR="${GITHUB_WORKSPACE}"
+          if [ -n "${{ inputs.target_path }}" ]; then
+            TARGET_DIR="${TARGET_DIR}/${{ inputs.target_path }}"
+          fi
+          cat > /tmp/cortex-prompt.txt <<PROMPT_EOF
+          Run \$pattern-extract on the repo at $TARGET_DIR.
+          Use Snowflake connection "$CONNECTION".
+          This is an automated CI run — PATTERN_IQ_CI is set to true.
+          Auto-approve all stages and complete the full pipeline.
+          PROMPT_EOF
+
+      - name: Run Cortex Code
+        run: |
+          CONNECTION="${{ inputs.connection || 'default' }}"
+          ~/.local/bin/cortex \
+            -p "$(cat /tmp/cortex-prompt.txt)" \
+            -c "$CONNECTION" \
+            --bypass \
+            --no-auto-update \
+            --output-format stream-json \
+            2>&1 | tee cortex-output.log
+
+      - name: Upload output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pattern-iq-output
+          path: cortex-output.log
+          retention-days: 14
