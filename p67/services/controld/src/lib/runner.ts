@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import { basename, resolve } from 'node:path';
-import type { SandboxConfig } from '@controld/config.js';
+import type { SandboxConfig, SecretBackend } from '@controld/config.js';
 import type { LogService } from '@controld/lib/LogService.js';
 import type { Manifest } from '@controld/lib/manifest.js';
 import { detectLanguage, parseManifest } from '@controld/lib/manifest.js';
@@ -224,6 +224,75 @@ async function sendSlackNotification(
     }
 }
 
+/**
+ * Regex for validating a fully-qualified Snowflake SECRET name.
+ * Matches: DB.SCHEMA.NAME or "DB"."SCHEMA"."NAME" (alphanumeric + underscores).
+ * Rejects anything with SQL injection characters.
+ */
+const SF_SECRET_FQN_RE =
+    /^[A-Za-z_][A-Za-z0-9_$]*\.[A-Za-z_][A-Za-z0-9_$]*\.[A-Za-z_][A-Za-z0-9_$]*$/;
+
+export type CollectedSecrets = {
+    /** Entries for the SPCS job spec's secrets section */
+    specSecrets: Array<{ objectName: string; envVarName: string }>;
+    /** Maps config field paths to their SPCS env var names */
+    envMappings: Record<string, string>;
+};
+
+/**
+ * Walk a manifest and collect all secretRef values that are fully-qualified
+ * Snowflake SECRET names. Returns the data needed to mount them in an SPCS
+ * job spec and map them back to config fields in the host.
+ *
+ * Only used when SECRET_BACKEND=snowflake. Simple (non-FQN) secretRef values
+ * are skipped — they fall back to the legacy Postgres path.
+ */
+export function collectSnowflakeSecrets(manifest: Manifest): CollectedSecrets {
+    const specSecrets: CollectedSecrets['specSecrets'] = [];
+    const envMappings: Record<string, string> = {};
+    let idx = 0;
+
+    function collect(fieldPath: string, value: { secretRef?: string }) {
+        if (!value.secretRef) return;
+        if (!SF_SECRET_FQN_RE.test(value.secretRef)) return;
+
+        const envVarName = `P67_SECRET_${idx}`;
+        specSecrets.push({ objectName: value.secretRef, envVarName });
+        envMappings[fieldPath] = envVarName;
+        idx++;
+    }
+
+    // Walk config entries
+    const configFields = [
+        'account',
+        'username',
+        'authenticator',
+        'accessUrl',
+        'token',
+        'password',
+        'warehouse',
+        'database',
+        'schema',
+        'email_integration',
+    ] as const;
+
+    for (const configEntry of manifest.config) {
+        const prefix = `config.${configEntry.config_name}`;
+        for (const field of configFields) {
+            const val = configEntry[field];
+            if (val) collect(`${prefix}.${field}`, val);
+        }
+        // Walk nested parameters within config entries
+        if (configEntry.parameters) {
+            for (const [key, val] of Object.entries(configEntry.parameters)) {
+                collect(`${prefix}.parameters.${key}`, val);
+            }
+        }
+    }
+
+    return { specSecrets, envMappings };
+}
+
 export class Runner {
     private workflowId: string;
     private proc: ChildProcess | null = null;
@@ -235,6 +304,7 @@ export class Runner {
     private completionResolve: ((value: RunResult) => void) | null = null;
     private valueManager: ValueManager | null = null;
     private mergedParams: Record<string, string> = {};
+    private collectedSecrets: CollectedSecrets | null = null;
 
     constructor(
         private readonly workflowDir: string,
@@ -243,6 +313,7 @@ export class Runner {
         private readonly logService: LogService,
         private readonly params: Record<string, string>,
         private readonly sandboxConfig: SandboxConfig,
+        private readonly secretBackend: SecretBackend = 'postgres',
     ) {
         // Extract workflow ID from directory name (e.g., "wf-abc123")
         this.workflowId = basename(workflowDir);
@@ -370,10 +441,17 @@ export class Runner {
      * Serializes a P67Config (with Map) to a plain object for IPC.
      */
     private serializeConfig(config: P67Config): SerializedP67Config {
-        return {
+        const serialized: SerializedP67Config = {
             snowflakeConfig: Object.fromEntries(config.snowflakeConfig),
             parameters: this.mergedParams,
         };
+
+        // Include env var mappings so the host can resolve SPCS-mounted secrets
+        if (this.collectedSecrets?.specSecrets.length) {
+            serialized.secretEnvMappings = this.collectedSecrets.envMappings;
+        }
+
+        return serialized;
     }
 
     public async start(): Promise<RunResult> {
@@ -490,6 +568,68 @@ export class Runner {
                 for (const [key, value] of Object.entries(this.params ?? {})) {
                     if (key in config.parameters) {
                         config.parameters[key] = { value };
+                    }
+                }
+            }
+        }
+
+        // When using Snowflake secrets, collect FQN secretRef values and
+        // replace them with placeholder values in the manifest so the legacy
+        // ValueManager hydration skips them. The host will resolve them from
+        // SPCS-mounted env vars.
+        if (this.secretBackend === 'snowflake') {
+            this.collectedSecrets = collectSnowflakeSecrets(manifest);
+
+            if (this.collectedSecrets.specSecrets.length > 0) {
+                console.log(
+                    `Snowflake secrets mode: collected ${this.collectedSecrets.specSecrets.length} secret(s) for SPCS mounting`,
+                );
+
+                // Replace matched secretRef values with a placeholder so
+                // ValueManager doesn't try to look them up in Postgres.
+                // The host resolves these from env vars before SDK creation.
+                const collectedFQNs = new Set(
+                    this.collectedSecrets.specSecrets.map((s) => s.objectName),
+                );
+
+                const configFields = [
+                    'account',
+                    'username',
+                    'authenticator',
+                    'accessUrl',
+                    'token',
+                    'password',
+                    'warehouse',
+                    'database',
+                    'schema',
+                    'email_integration',
+                ] as const;
+
+                for (const configEntry of manifest.config) {
+                    for (const field of configFields) {
+                        const val = configEntry[field];
+                        if (
+                            val?.secretRef &&
+                            collectedFQNs.has(val.secretRef)
+                        ) {
+                            // Replace with a placeholder value so hydration
+                            // passes through without a Postgres lookup.
+                            val.value = `__SPCS_SECRET_PENDING__`;
+                            val.secretRef = undefined;
+                        }
+                    }
+                    if (configEntry.parameters) {
+                        for (const val of Object.values(
+                            configEntry.parameters,
+                        )) {
+                            if (
+                                val?.secretRef &&
+                                collectedFQNs.has(val.secretRef)
+                            ) {
+                                val.value = `__SPCS_SECRET_PENDING__`;
+                                val.secretRef = undefined;
+                            }
+                        }
                     }
                 }
             }
@@ -1008,6 +1148,7 @@ export class Runner {
             runWorkflowMessage,
             undefined,
             controldUrl,
+            this.collectedSecrets?.specSecrets,
         );
 
         try {

@@ -64,7 +64,37 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt \
 COPY containers/runner/host.py /app/host.py
 
 # Install Cortex Code (coco) CLI
-RUN curl -LsS https://ai.snowflake.com/static/cc-scripts/install.sh | SKIP_PODMAN=1 sh
+# The standard install script executes the binary to verify the install, which
+# fails under QEMU/Rosetta emulation when building linux/amd64 on arm64 Macs
+# (SIGILL, exit code 132). If this is fixed upstream, restore the original:
+#
+#   RUN curl -LsS https://ai.snowflake.com/static/cc-scripts/install.sh | SKIP_PODMAN=1 sh
+#
+# Until then, we do a direct download-and-extract that skips binary execution.
+# S3 URL is extracted from the install script so it stays in sync.
+RUN set -e \
+    && INSTALL_SCRIPT=$(curl -fsSL https://ai.snowflake.com/static/cc-scripts/install.sh) \
+    && S3_BUCKET=$(echo "$INSTALL_SCRIPT" | grep 'S3_BUCKET=' | grep -v dev | head -1 | sed 's/.*"\(.*\)".*/\1/') \
+    && S3_PREFIX=$(echo "$INSTALL_SCRIPT" | grep 'S3_PREFIX=' | head -1 | sed 's/.*"\(.*\)".*/\1/') \
+    && S3_BASE="https://${S3_BUCKET}/${S3_PREFIX}" \
+    && CHANNEL="stable" \
+    && VERSION=$(curl -fsSL "${S3_BASE}/${CHANNEL}_version.txt" | tr -d '[:space:]') \
+    && ENCODED_VERSION=$(echo "$VERSION" | sed 's/+/%2B/g') \
+    && MANIFEST_URL="${S3_BASE}/${ENCODED_VERSION}/manifest.json" \
+    && ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
+    && TAR_NAME=$(curl -fsSL "$MANIFEST_URL" | \
+         node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
+                   console.log(d.packages.linux['${ARCH}'].name)") \
+    && ENCODED_TAR=$(echo "$TAR_NAME" | sed 's/+/%2B/g') \
+    && TAR_URL="${S3_BASE}/${ENCODED_VERSION}/${ENCODED_TAR}" \
+    && mkdir -p /root/.local/bin /root/.local/share/cortex \
+    && curl -fSL "$TAR_URL" -o /tmp/coco.tar.gz \
+    && tar -xzf /tmp/coco.tar.gz -C /tmp \
+    && EXTRACTED_DIR=$(find /tmp -maxdepth 1 -type d -name 'coco-*' | head -1) \
+    && mv "$EXTRACTED_DIR" "/root/.local/share/cortex/${VERSION}" \
+    && ln -sf "/root/.local/share/cortex/${VERSION}/cortex" /root/.local/bin/cortex \
+    && rm -f /tmp/coco.tar.gz \
+    && echo "Cortex Code v${VERSION} installed (binary not verified — will run on target platform)"
 ENV PATH="/root/.local/bin:$PATH"
 
 # Go supervisor

@@ -202,6 +202,10 @@ export class SPCSAdapter {
 
     /**
      * Build the EXECUTE JOB SERVICE SQL statement.
+     *
+     * @param secrets Optional list of Snowflake SECRET objects to mount as env vars.
+     *   Only used when SECRET_BACKEND=snowflake. SPCS reads the secret values and
+     *   injects them into the container — controld never sees the plaintext.
      */
     buildJobServiceSQL(
         jobName: string,
@@ -209,6 +213,7 @@ export class SPCSAdapter {
         runWorkflowMessage: Message,
         resourceRequests?: { cpu?: string; memory?: string },
         controldUrl?: string,
+        secrets?: Array<{ objectName: string; envVarName: string }>,
     ): string {
         const cpu = resourceRequests?.cpu ?? '0.5';
         const memory = resourceRequests?.memory ?? '512Mi';
@@ -226,6 +231,18 @@ export class SPCSAdapter {
         const controldEnvLine = controldUrl
             ? `\n      P67_CONTROLD_URL: "${controldUrl}"`
             : '';
+
+        // Build the secrets YAML block for Snowflake SECRET object mounting.
+        // Each secret is mounted as an env var in the container by SPCS.
+        let secretsBlock = '';
+        if (secrets && secrets.length > 0) {
+            const lines = secrets.map(
+                (s) =>
+                    `    - snowflakeSecret:\n        objectName: ${s.objectName}\n      secretKeyRef: secret_string\n      envVarName: ${s.envVarName}`,
+            );
+            secretsBlock = `\n    secrets:\n${lines.join('\n')}`;
+        }
+
         const spec = `
 spec:
   containers:
@@ -247,7 +264,7 @@ spec:
         memory: "${memory}"
       limits:
         cpu: "${limitCpu}"
-        memory: "${limitMemory}"
+        memory: "${limitMemory}"${secretsBlock}
   volumes:
   - name: workflow-files
     source: "@${this.stageName}/${stagePath}"

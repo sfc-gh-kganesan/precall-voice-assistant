@@ -222,6 +222,50 @@ async function handleMessage(message: Message) {
 
     try {
         const config = deserializeConfig(data.config);
+
+        // When SECRET_BACKEND=snowflake, secrets are mounted as env vars by SPCS.
+        // Resolve the env var references into the config before creating the SDK.
+        if (data.config.secretEnvMappings) {
+            for (const [fieldPath, envVarName] of Object.entries(
+                data.config.secretEnvMappings,
+            )) {
+                const value = process.env[envVarName];
+                if (!value) {
+                    console.warn(
+                        `Warning: Secret env var ${envVarName} for ${fieldPath} is not set`,
+                    );
+                    continue;
+                }
+
+                // fieldPath is like "config.snowflake.token" or
+                // "config.snowflake.parameters.MY_SECRET"
+                // Inject resolved secret value into the snowflakeConfig map
+                const parts = fieldPath.split('.');
+                if (parts[0] === 'config' && parts.length >= 3) {
+                    const configName = parts[1];
+                    const configEntry = config.snowflakeConfig.get(configName);
+                    if (configEntry && typeof configEntry === 'object') {
+                        const entry = configEntry as Record<string, unknown>;
+                        if (parts.length === 3) {
+                            // config.<name>.<field> → direct field set
+                            entry[parts[2]] = value;
+                        } else if (
+                            parts.length === 4 &&
+                            parts[2] === 'parameters'
+                        ) {
+                            // config.<name>.parameters.<key> → nested set
+                            if (!entry.parameters) {
+                                entry.parameters = {};
+                            }
+                            (entry.parameters as Record<string, string>)[
+                                parts[3]
+                            ] = value;
+                        }
+                    }
+                }
+            }
+        }
+
         const sdk = new WorkflowSDKImpl({
             config,
             oauthTokenResolver: createIPCOAuthTokenResolver(),

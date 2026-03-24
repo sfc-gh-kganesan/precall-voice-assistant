@@ -33,6 +33,13 @@ const BaseMessageSchema = z.object({
 const SerializedP67ConfigSchema = z.object({
     snowflakeConfig: z.record(z.string(), P67ConfigValueSchema),
     parameters: z.record(z.string(), z.string()),
+    /**
+     * Maps config field paths to environment variable names containing
+     * Snowflake SECRET values mounted by SPCS. Only present when
+     * SECRET_BACKEND=snowflake. The host resolves these from process.env
+     * before creating the SDK.
+     */
+    secretEnvMappings: z.record(z.string(), z.string()).optional(),
 });
 
 export type SerializedP67Config = z.infer<typeof SerializedP67ConfigSchema>;

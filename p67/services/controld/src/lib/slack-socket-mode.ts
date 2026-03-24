@@ -1,4 +1,4 @@
-import type { SandboxConfig } from '@controld/config.js';
+import type { SandboxConfig, SecretBackend } from '@controld/config.js';
 import type { PrismaClient } from '@p67/db';
 import { LogLevel, SocketModeClient } from '@slack/socket-mode';
 import type { LogService } from './LogService.js';
@@ -69,6 +69,7 @@ export class SlackSocketModeService {
         private readonly runnerRegistry: RunnerRegistry,
         private readonly logService: LogService,
         private readonly sandboxConfig: SandboxConfig,
+        private readonly secretBackend: SecretBackend,
         private readonly appToken?: string,
     ) {}
 
@@ -143,6 +144,7 @@ export class SlackSocketModeService {
                     runnerRegistry: this.runnerRegistry,
                     logService: this.logService,
                     sandboxConfig: this.sandboxConfig,
+                    secretBackend: this.secretBackend,
                 });
 
                 if (result.message || result.blocks) {

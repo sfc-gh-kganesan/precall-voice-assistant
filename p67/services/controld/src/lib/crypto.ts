@@ -10,6 +10,7 @@ let encryptionKey: Buffer | null = null;
  * Initialize the crypto module with an encryption key.
  * Must be called before encrypt/decrypt operations.
  * @param key Base64-encoded 32-byte key
+ * @deprecated Use SECRET_BACKEND=snowflake. Snowflake handles encryption at rest natively.
  */
 export function initCrypto(key: string): void {
     const keyBuffer = Buffer.from(key, 'base64');
@@ -41,6 +42,7 @@ function getKey(): Buffer {
  * Encrypt a plaintext string using AES-256-GCM.
  * @param plaintext The string to encrypt
  * @returns Base64-encoded string containing iv + authTag + ciphertext
+ * @deprecated Use SECRET_BACKEND=snowflake. Snowflake handles encryption at rest natively.
  */
 export function encrypt(plaintext: string): string {
     const key = getKey();
@@ -62,6 +64,7 @@ export function encrypt(plaintext: string): string {
  * Decrypt a ciphertext string using AES-256-GCM.
  * @param encoded Base64-encoded string containing iv + authTag + ciphertext
  * @returns The decrypted plaintext string
+ * @deprecated Use SECRET_BACKEND=snowflake. Snowflake handles encryption at rest natively.
  */
 export function decrypt(encoded: string): string {
     const key = getKey();

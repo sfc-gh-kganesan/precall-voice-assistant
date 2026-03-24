@@ -41,6 +41,8 @@ export type SlackConfig = {
     signingSecret: string | null;
 };
 
+export type SecretBackend = 'postgres' | 'snowflake';
+
 export type ServerConfig = {
     port: number;
     nodeEnv: string;
@@ -49,6 +51,7 @@ export type ServerConfig = {
     database: {
         url: string;
     };
+    /** @deprecated Use SECRET_BACKEND=snowflake with Snowflake SECRET objects instead. */
     encryption: {
         key: string;
     };
@@ -58,6 +61,12 @@ export type ServerConfig = {
     };
     sandbox: SandboxConfig;
     slack: SlackConfig;
+    /**
+     * Controls which backend is used for user/workflow secret storage.
+     * - 'postgres': Legacy. Secrets stored in Postgres, encrypted with AES-256-GCM.
+     * - 'snowflake': Secrets are Snowflake SECRET objects, mounted into SPCS jobs natively.
+     */
+    secretBackend: SecretBackend;
 };
 
 function readFileIfExistsSync(filePath: string): string | null {
@@ -171,6 +180,15 @@ export const loadConfig = (): ServerConfig => {
         process.env.DATA_ROOT || createTempDir(),
     );
 
+    const secretBackend: SecretBackend =
+        process.env.SECRET_BACKEND === 'snowflake' ? 'snowflake' : 'postgres';
+
+    if (secretBackend === 'postgres') {
+        console.warn(
+            '⚠️  SECRET_BACKEND=postgres is deprecated. Migrate to Snowflake SECRET objects by setting SECRET_BACKEND=snowflake.',
+        );
+    }
+
     return {
         port: parseInt(process.env.PORT || '3002', 10),
         nodeEnv: process.env.NODE_ENV || 'development',
@@ -198,5 +216,6 @@ export const loadConfig = (): ServerConfig => {
             appToken: slackAppToken,
             signingSecret: slackSigningSecret,
         },
+        secretBackend,
     };
 };

@@ -14,6 +14,7 @@ const slackSocketMode = new SlackSocketModeService(
     server.runnerRegistry,
     server.logService,
     server.config.sandbox,
+    server.config.secretBackend,
     server.config.slack.appToken ?? undefined,
 );
 

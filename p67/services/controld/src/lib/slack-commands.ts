@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import type { SandboxConfig } from '@controld/config.js';
+import type { SandboxConfig, SecretBackend } from '@controld/config.js';
 import type { PrismaClient } from '@p67/db';
 import type { LogService } from './LogService.js';
 import { Runner } from './runner.js';
@@ -55,6 +55,7 @@ export interface CommandDependencies {
     runnerRegistry: Map<string, Runner>;
     logService: LogService;
     sandboxConfig: SandboxConfig;
+    secretBackend: SecretBackend;
     linkBaseUrl?: string; // Base URL for account linking
 }
 
@@ -273,6 +274,7 @@ async function executeRunCommand(
         deps.logService,
         command.params || {},
         deps.sandboxConfig,
+        deps.secretBackend,
     );
 
     // Don't await - let it run in background and post updates to thread

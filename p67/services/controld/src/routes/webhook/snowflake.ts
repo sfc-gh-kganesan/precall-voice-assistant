@@ -140,6 +140,7 @@ export function registerSnowflakeWebhookRoutes(server: FastifyInstance) {
                             server.logService,
                             params,
                             server.config.sandbox,
+                            server.config.secretBackend,
                         );
 
                         const runId = await runnerInstance.init();

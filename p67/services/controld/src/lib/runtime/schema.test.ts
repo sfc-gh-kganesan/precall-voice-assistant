@@ -16,6 +16,16 @@ const testConfig: SerializedP67Config = {
     parameters: {},
 };
 
+// Test helper: config with secretEnvMappings
+const testConfigWithMappings: SerializedP67Config = {
+    snowflakeConfig: {},
+    parameters: {},
+    secretEnvMappings: {
+        'config.snowflake.token': 'P67_SECRET_0',
+        'params.API_KEY': 'P67_SECRET_1',
+    },
+};
+
 describe('runtime/schema', () => {
     describe('MessageType enum', () => {
         it('should have RunWorkflow type', () => {
@@ -280,6 +290,69 @@ describe('runtime/schema', () => {
             expect(MessageSchema.safeParse('string').success).toBe(false);
             expect(MessageSchema.safeParse(123).success).toBe(false);
             expect(MessageSchema.safeParse(true).success).toBe(false);
+        });
+    });
+
+    describe('SerializedP67Config secretEnvMappings', () => {
+        it('should accept config without secretEnvMappings', () => {
+            const message = makeRunWorkflowMessage({
+                dir: '/test',
+                config: testConfig,
+            });
+            const result = RunWorkflowMessageSchema.safeParse(message);
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.config.secretEnvMappings).toBeUndefined();
+            }
+        });
+
+        it('should accept config with secretEnvMappings', () => {
+            const message = makeRunWorkflowMessage({
+                dir: '/test',
+                config: testConfigWithMappings,
+            });
+            const result = RunWorkflowMessageSchema.safeParse(message);
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.config.secretEnvMappings).toEqual({
+                    'config.snowflake.token': 'P67_SECRET_0',
+                    'params.API_KEY': 'P67_SECRET_1',
+                });
+            }
+        });
+
+        it('should accept config with empty secretEnvMappings', () => {
+            const config: SerializedP67Config = {
+                snowflakeConfig: {},
+                parameters: {},
+                secretEnvMappings: {},
+            };
+            const message = makeRunWorkflowMessage({
+                dir: '/test',
+                config,
+            });
+            const result = RunWorkflowMessageSchema.safeParse(message);
+
+            expect(result.success).toBe(true);
+        });
+
+        it('should reject secretEnvMappings with non-string values', () => {
+            const message = {
+                type: MessageType.RunWorkflow,
+                dir: '/test',
+                config: {
+                    snowflakeConfig: {},
+                    parameters: {},
+                    secretEnvMappings: {
+                        'config.snowflake.token': 123,
+                    },
+                },
+            };
+            const result = RunWorkflowMessageSchema.safeParse(message);
+
+            expect(result.success).toBe(false);
         });
     });
 });

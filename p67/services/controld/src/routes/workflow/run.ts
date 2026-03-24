@@ -64,6 +64,7 @@ export function registerRunRoute(server: FastifyInstance) {
                     fastify.logService,
                     params,
                     fastify.config.sandbox,
+                    fastify.config.secretBackend,
                 );
 
                 // Create the run record before starting so we can return the runId

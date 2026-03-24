@@ -1754,7 +1754,10 @@ function validateConfig(config: P67ConfigValue): P67ConfigValue {
  * @param manifest - The manifest to hydrate the config from
  * @returns The hydrated config
  *
- * TODO(nwiegand): Take in the secrets manager here and resolve the secrets here.
+ * Note: When SECRET_BACKEND=snowflake, FQN secretRef values are replaced with
+ * placeholders before this function runs. The actual secret values are resolved
+ * by the SPCS platform (mounted as env vars) and injected by host.ts after
+ * deserialization. See SNOWFLAKE_SECRETS_MIGRATION.md for details.
  */
 export async function hydrateConfig(
     manifest: Manifest,

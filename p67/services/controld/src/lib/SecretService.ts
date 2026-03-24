@@ -17,6 +17,11 @@ export interface SecretMetadata {
     updatedAt: Date;
 }
 
+/**
+ * @deprecated Use SECRET_BACKEND=snowflake with Snowflake SECRET objects.
+ * This service stores user secrets in Postgres with AES-256-GCM encryption.
+ * It will be removed once all deployments migrate to the Snowflake secret backend.
+ */
 export class SecretService {
     private db: PrismaClient;
 

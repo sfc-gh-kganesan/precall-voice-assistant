@@ -74,6 +74,10 @@ export class ValueManager {
         return value;
     }
 
+    /**
+     * @deprecated Use SECRET_BACKEND=snowflake. Secrets are mounted directly
+     * into SPCS job containers via the job spec, bypassing this method entirely.
+     */
     async getSecret(secretRef: string): Promise<string> {
         const secret = await this.db.secret.findFirst({
             where: {
@@ -88,6 +92,9 @@ export class ValueManager {
         return secret.secret;
     }
 
+    /**
+     * @deprecated Use SECRET_BACKEND=snowflake. Snowflake handles encryption at rest natively.
+     */
     async decryptSecret(secret: string): Promise<string> {
         return decrypt(secret);
     }
