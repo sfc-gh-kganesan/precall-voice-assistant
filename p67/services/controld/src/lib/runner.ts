@@ -1086,13 +1086,15 @@ export class Runner {
         logger.debug(`SPCS mode: launching job ${jobName}`);
 
         // 1. Upload workflow files to stage
-        const { putSQL, stagePath } = adapter.buildStageUploadSQL(
+        const { putStatements, stagePath } = adapter.buildStageUploadSQL(
             jobName,
             this.workflowDir,
         );
         try {
             logger.debug(`Uploading workflow to stage: ${stagePath}`);
-            await executeSql(putSQL);
+            for (const putSQL of putStatements) {
+                await executeSql(putSQL);
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             logger.error(`Failed to upload workflow to stage: ${message}`);

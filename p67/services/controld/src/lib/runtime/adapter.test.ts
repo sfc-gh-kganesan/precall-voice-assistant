@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { SPCSAdapter } from '@controld/lib/runtime/adapter.js';
 import { describe, expect, it } from 'vitest';
 import { makeRunWorkflowMessage } from './schema.js';
@@ -132,5 +133,105 @@ describe('SPCSAdapter.buildJobServiceSQL - secrets', () => {
         expect(sql).toContain('results');
         // And secrets
         expect(sql).toContain('objectName: db.schema.my_secret');
+    });
+});
+
+describe('SPCSAdapter.buildStageUploadSQL', () => {
+    const tmpBase = '/tmp/p67-adapter-test-' + Date.now();
+
+    function setupDir(files: string[], dirs: string[]): string {
+        const dir = tmpBase + '/' + Math.random().toString(36).slice(2);
+        fs.mkdirSync(dir, { recursive: true });
+        for (const f of files) {
+            fs.writeFileSync(`${dir}/${f}`, 'test');
+        }
+        for (const d of dirs) {
+            fs.mkdirSync(`${dir}/${d}`, { recursive: true });
+            fs.writeFileSync(`${dir}/${d}/file.txt`, 'test');
+        }
+        return dir;
+    }
+
+    it('should use single glob when no subdirectories exist', () => {
+        const dir = setupDir(['index.js', 'manifest.yaml'], []);
+        const adapter = createAdapter();
+        const { putStatements, stagePath } = adapter.buildStageUploadSQL(
+            'runner_test',
+            dir,
+        );
+
+        expect(stagePath).toBe('runner_test');
+        expect(putStatements).toHaveLength(1);
+        expect(putStatements[0]).toContain(`PUT 'file://${dir}/*'`);
+        expect(putStatements[0]).toContain('@test_stage/runner_test/');
+    });
+
+    it('should upload files individually and subdirs with glob when subdirectories exist', () => {
+        const dir = setupDir(['index.js', 'manifest.yaml'], ['p67_sdk']);
+        const adapter = createAdapter();
+        const { putStatements } = adapter.buildStageUploadSQL(
+            'runner_test',
+            dir,
+        );
+
+        // 2 individual files + 1 subdir glob = 3 statements
+        expect(putStatements).toHaveLength(3);
+
+        // Top-level files uploaded individually (no wildcard glob)
+        expect(putStatements[0]).toContain(`PUT 'file://${dir}/index.js'`);
+        expect(putStatements[1]).toContain(`PUT 'file://${dir}/manifest.yaml'`);
+
+        // Subdirectory uploaded with its own glob
+        expect(putStatements[2]).toContain(`PUT 'file://${dir}/p67_sdk/*'`);
+        expect(putStatements[2]).toContain('@test_stage/runner_test/p67_sdk/');
+    });
+
+    it('should handle multiple subdirectories', () => {
+        const dir = setupDir(['main.py'], ['p67_sdk', 'utils']);
+        const adapter = createAdapter();
+        const { putStatements } = adapter.buildStageUploadSQL(
+            'runner_test',
+            dir,
+        );
+
+        // 1 file + 2 subdir globs = 3 statements
+        expect(putStatements).toHaveLength(3);
+        expect(putStatements[0]).toContain(`PUT 'file://${dir}/main.py'`);
+        expect(putStatements[1]).toContain(`PUT 'file://${dir}/p67_sdk/*'`);
+        expect(putStatements[1]).toContain('@test_stage/runner_test/p67_sdk/');
+        expect(putStatements[2]).toContain(`PUT 'file://${dir}/utils/*'`);
+        expect(putStatements[2]).toContain('@test_stage/runner_test/utils/');
+    });
+
+    it('should never use top-level glob when subdirectories are present', () => {
+        const dir = setupDir(['main.py'], ['p67_sdk']);
+        const adapter = createAdapter();
+        const { putStatements } = adapter.buildStageUploadSQL(
+            'runner_test',
+            dir,
+        );
+
+        // No statement should be a top-level dir/* glob (which causes EISDIR)
+        for (const stmt of putStatements) {
+            expect(stmt).not.toMatch(
+                new RegExp(
+                    `PUT 'file://${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/\\*'`,
+                ),
+            );
+        }
+    });
+
+    it('should include AUTO_COMPRESS and OVERWRITE in all statements', () => {
+        const dir = setupDir(['index.js'], ['p67_sdk']);
+        const adapter = createAdapter();
+        const { putStatements } = adapter.buildStageUploadSQL(
+            'runner_test',
+            dir,
+        );
+
+        for (const stmt of putStatements) {
+            expect(stmt).toContain('AUTO_COMPRESS=FALSE');
+            expect(stmt).toContain('OVERWRITE=TRUE');
+        }
     });
 });

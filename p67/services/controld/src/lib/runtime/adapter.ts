@@ -11,6 +11,8 @@
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { SandboxConfig } from '@controld/config.js';
 import type { Message } from '@controld/lib/runtime/schema.js';
 
@@ -289,16 +291,48 @@ spec:
     }
 
     /**
-     * Build SQL to upload workflow files to the stage.
-     * Returns [putSQL, stagePath] where stagePath is the sub-directory on stage.
+     * Build SQL statements to upload workflow files to the stage.
+     * Snowflake PUT with a glob (*) throws EISDIR if the directory contains
+     * subdirectories, so we upload each top-level file individually and
+     * then PUT each subdirectory's contents with its own glob.
      */
     buildStageUploadSQL(
         jobName: string,
         workflowDir: string,
-    ): { putSQL: string; stagePath: string } {
+    ): { putStatements: string[]; stagePath: string } {
         const stagePath = jobName;
-        const putSQL = `PUT 'file://${workflowDir}/*' '@${this.stageName}/${stagePath}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`;
-        return { putSQL, stagePath };
+        const statements: string[] = [];
+
+        const entries = readdirSync(workflowDir, { withFileTypes: true });
+        const hasSubdirs = entries.some((e) => e.isDirectory());
+
+        if (!hasSubdirs) {
+            // No subdirectories — safe to use top-level glob
+            statements.push(
+                `PUT 'file://${workflowDir}/*' '@${this.stageName}/${stagePath}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
+            );
+        } else {
+            // Upload each top-level file individually
+            for (const entry of entries) {
+                if (entry.isFile()) {
+                    const filePath = join(workflowDir, entry.name);
+                    statements.push(
+                        `PUT 'file://${filePath}' '@${this.stageName}/${stagePath}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
+                    );
+                }
+            }
+            // Upload each subdirectory's contents with a glob
+            for (const entry of entries) {
+                if (entry.isDirectory()) {
+                    const subDir = join(workflowDir, entry.name);
+                    statements.push(
+                        `PUT 'file://${subDir}/*' '@${this.stageName}/${stagePath}/${entry.name}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
+                    );
+                }
+            }
+        }
+
+        return { putStatements: statements, stagePath };
     }
 
     /**

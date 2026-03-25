@@ -48,6 +48,20 @@ begin
             return 'INIT PARTIAL — service not updated: ' || sqlerrm;
     end;
 
+    -- Explicitly resume the runner compute pool. Exclusive app-owned pools
+    -- with auto_resume=true should auto-resume when EXECUTE JOB SERVICE is
+    -- called, but in practice the pool can get stuck in SUSPENDED state
+    -- indefinitely — the job never registers (num_jobs stays 0) and the
+    -- pool never provisions a node. ACCOUNTADMIN cannot ALTER an exclusive
+    -- app-owned pool, so the only fix is to resume from within the app.
+    -- Running this on every INIT (i.e. every deploy) ensures the pool is
+    -- ready before any workflow runs.
+    begin
+        alter compute pool if exists runner_compute_pool resume;
+    exception
+        when other then null; -- Pool may already be active
+    end;
+
     -- Create service function after the service has been updated with the webhook endpoint
     begin
         create or replace function app.trigger_new_user_workflow(row_data variant)

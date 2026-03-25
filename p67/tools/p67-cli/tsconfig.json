@@ -19,7 +19,8 @@
         "paths": {
             "@p67-cli/*": ["./src/*"],
             "@coco/*": ["../../coco/*"],
-            "@workflow-sdk/*": ["../../packages/workflow-sdk/src/*"]
+            "@workflow-sdk/*": ["../../packages/workflow-sdk/src/*"],
+            "@workflow-sdk-python/*": ["../../packages/workflow-sdk-python/*"]
         },
 
         // Best practices

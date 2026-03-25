@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { Command } from '@p67-cli/Command.ts';
 import { ctx } from '@p67-cli/context';
 import { projectConfig } from '@p67-cli/middleware/project-config';
+import { pythonSdkFiles } from '@p67-cli/workspace/Workspace';
 import { zipSync } from 'fflate';
 
 async function extractLangGraph(
@@ -270,37 +271,16 @@ async function buildPython(
         console.log(`✔︎ Copied requirements.txt to ${buildDir}`);
     }
 
-    // Bundle the p67_sdk package (full implementation) with the workflow
-    // In compiled Bun binaries, __dirname returns a virtual path (/$bunfs/root).
-    // Use process.execPath to get the actual binary location.
-    const binaryDir = path.dirname(process.execPath);
-    let sdkSrcDir: string | null = null;
-    let currentDir = binaryDir;
-
-    // Walk up from the binary location to find the packages directory
-    for (let i = 0; i < 10; i++) {
-        const candidateSdk = path.join(
-            currentDir,
-            'packages',
-            'workflow-sdk-python',
-            'p67_sdk',
-        );
-        if (fs.existsSync(candidateSdk)) {
-            sdkSrcDir = candidateSdk;
-            break;
-        }
-        const parent = path.dirname(currentDir);
-        if (parent === currentDir) break; // Hit filesystem root
-        currentDir = parent;
+    // Bundle the p67_sdk package (full implementation) with the workflow.
+    // SDK files are embedded in the binary at compile time via Bun's
+    // `with { type: 'file' }` imports, so this works from any install location.
+    const sdkDestDir = path.join(buildDir, 'p67_sdk');
+    await mkdir(sdkDestDir, { recursive: true });
+    for (const [ref, filename] of Object.entries(pythonSdkFiles)) {
+        const src = await Bun.file(ref).text();
+        await Bun.write(path.join(sdkDestDir, filename), src);
     }
-
-    if (sdkSrcDir) {
-        const sdkDestDir = path.join(buildDir, 'p67_sdk');
-        await cp(sdkSrcDir, sdkDestDir, { recursive: true });
-        console.log(`✔︎ Bundled p67_sdk with workflow`);
-    } else {
-        console.warn('⚠ Could not find p67_sdk package to bundle');
-    }
+    console.log('✔︎ Bundled p67_sdk with workflow');
 }
 
 export const buildCommand = new Command('build')

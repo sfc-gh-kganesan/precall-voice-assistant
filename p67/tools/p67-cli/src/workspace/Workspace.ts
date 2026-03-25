@@ -1,5 +1,4 @@
-import { existsSync } from 'node:fs';
-import { cp, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 // TypeScript-specific boilerplate files
 import tsLearnWorkflow from '@p67-cli/workspace/boiler-plate/LEARN_WORKFLOW.md.src' with {
@@ -36,6 +35,36 @@ import pythonMainpy from '@p67-cli/workspace/boiler-plate-python/src/main.py.src
 };
 // @ts-expect-error - Bun's with { type: 'file' } returns a file path string
 import sdksrc from '@workflow-sdk/index.ts' with { type: 'file' };
+// Python SDK full implementation (for p67 build — bundled with workflow)
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import pySdkInit from '@workflow-sdk-python/p67_sdk/__init__.py' with {
+    type: 'file',
+};
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import pySdkIpc from '@workflow-sdk-python/p67_sdk/ipc.py' with {
+    type: 'file',
+};
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import pySdkSdk from '@workflow-sdk-python/p67_sdk/sdk.py' with {
+    type: 'file',
+};
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import pySdkTypes from '@workflow-sdk-python/p67_sdk/types.py' with {
+    type: 'file',
+};
+// Python SDK stubs (for p67 init — IDE/type-checking support)
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import pyStubInit from '@workflow-sdk-python/p67_sdk_stubs/__init__.py' with {
+    type: 'file',
+};
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import pyStubSdk from '@workflow-sdk-python/p67_sdk_stubs/sdk.py' with {
+    type: 'file',
+};
+// @ts-expect-error - Bun's with { type: 'file' } returns a file path string
+import pyStubTypes from '@workflow-sdk-python/p67_sdk_stubs/types.py' with {
+    type: 'file',
+};
 import { file } from 'bun';
 
 export type WorkflowLanguage = 'typescript' | 'python';
@@ -54,6 +83,21 @@ const typescriptFiles: Record<string, string> = {
     [packagejson]: 'package.json',
     [tsconfigjson]: 'tsconfig.json',
     [tsLearnWorkflow]: 'LEARN_WORKFLOW.md',
+};
+
+// Python SDK stubs — written to project by p67 init for IDE support
+const pythonStubFiles: Record<string, string> = {
+    [pyStubInit]: 'p67_sdk/__init__.py',
+    [pyStubSdk]: 'p67_sdk/sdk.py',
+    [pyStubTypes]: 'p67_sdk/types.py',
+};
+
+// Python SDK full implementation — bundled with workflow by p67 build
+export const pythonSdkFiles: Record<string, string> = {
+    [pySdkInit]: '__init__.py',
+    [pySdkSdk]: 'sdk.py',
+    [pySdkTypes]: 'types.py',
+    [pySdkIpc]: 'ipc.py',
 };
 
 // Python-specific files
@@ -101,44 +145,17 @@ export class Workspace {
 
     /**
      * Copy the Python SDK stubs to the project for IDE/VSCode support.
-     * The stubs contain only type signatures and docstrings, not implementation.
-     * The actual SDK is bundled at build time by 'p67 build'.
+     * The stubs are embedded in the binary at compile time, so this works
+     * whether running from the repo or from a standalone installed binary.
      */
     private async copyPythonSdk() {
-        // In compiled Bun binaries, process.argv[0] and Bun.main return virtual paths (/$bunfs/root).
-        // Use process.execPath which returns the actual path to the compiled binary.
-        const binaryPath = process.execPath;
-        const binaryDir = dirname(binaryPath);
-
-        let sdkDir: string | null = null;
-        let currentDir = binaryDir;
-
-        // Walk up from the binary location to find the packages directory
-        // Look for the stubs directory (interface-only, no implementation)
-        for (let i = 0; i < 10; i++) {
-            const candidateSdk = join(
-                currentDir,
-                'packages',
-                'workflow-sdk-python',
-                'p67_sdk_stubs',
-            );
-            if (existsSync(candidateSdk)) {
-                sdkDir = candidateSdk;
-                break;
-            }
-            const parent = dirname(currentDir);
-            if (parent === currentDir) break; // Hit filesystem root
-            currentDir = parent;
+        for (const [ref, relPath] of Object.entries(pythonStubFiles)) {
+            const outPath = join(this.projectDir, relPath);
+            const outDir = dirname(outPath);
+            await mkdir(outDir, { recursive: true });
+            await this.materialize(ref, outPath);
         }
-
-        if (sdkDir) {
-            // Copy stubs to p67_sdk/ so imports work correctly
-            const sdkDestDir = join(this.projectDir, 'p67_sdk');
-            await cp(sdkDir, sdkDestDir, { recursive: true });
-            console.log('✔︎ Copied p67_sdk stubs for IDE support');
-        } else {
-            console.warn('⚠ Could not find p67_sdk stubs for IDE support');
-        }
+        console.log('✔︎ Copied p67_sdk stubs for IDE support');
     }
 
     async materialize(ref: string, outPath: string) {
