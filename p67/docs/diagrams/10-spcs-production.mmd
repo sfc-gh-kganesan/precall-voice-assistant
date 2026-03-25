@@ -1,0 +1,44 @@
+graph TB
+    subgraph "Snowflake Native App (p67)"
+        subgraph "service_compute_pool (cpu_x64_xs, 1-5 nodes)"
+            CD_SVC["app.controld<br/>Port 80 (ingress)"]
+            DASH_SVC["app.dashboard<br/>Port 3001 (ingress)"]
+        end
+
+        subgraph "runner_compute_pool (cpu_x64_xs, 1-10 nodes)"
+            JOB["EXECUTE JOB SERVICE<br/>p67-runner (per workflow run)"]
+        end
+
+        STAGE["app.workflow_stage<br/>Encrypted (SSE)"]
+        WH["p67_app_wh (XS)"]
+    end
+
+    subgraph "Provider Account (p67_src)"
+        IMG_REPO["img_repo<br/>controld:latest<br/>p67-runner:latest"]
+        DASH_REPO["dash/img_repo<br/>p67-dash:latest"]
+    end
+
+    subgraph "External References (consumer-provided)"
+        EAI_GOOGLE["Google OAuth EAI"]
+        EAI_SF["Snowflake Egress EAI"]
+        EAI_PG["Postgres EAI"]
+        SEC_PG["Postgres Connection URL"]
+        SEC_ENC["Encryption Key"]
+        SEC_GOOGLE_ID["Google OAuth Client ID"]
+        SEC_GOOGLE_SECRET["Google OAuth Client Secret"]
+        SEC_SLACK["Slack tokens (optional)"]
+    end
+
+    CD_SVC --> STAGE
+    CD_SVC --> WH
+    CD_SVC --> JOB
+
+    DASH_SVC -- "http://controld-dns:80" --> CD_SVC
+
+    IMG_REPO -.-> CD_SVC
+    IMG_REPO -.-> JOB
+    DASH_REPO -.-> DASH_SVC
+
+    EAI_GOOGLE -.-> CD_SVC
+    EAI_SF -.-> CD_SVC
+    EAI_PG -.-> CD_SVC

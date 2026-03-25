@@ -48,6 +48,24 @@ jobs:
           echo "Valid release branch: $BRANCH"
         working-directory: .
 
+  bundle-user-package:
+    name: Bundle User Package
+    needs: [check-valid-release-branch]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build user bundle
+        run: bash ops/bundle-user-package.sh --archive
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: p67-user-bundle
+          path: p67/dist/p67-user-bundle.tar.gz
+          retention-days: 7
+
   build:
     name: Build ${{ matrix.platform }}
     needs: [check-valid-release-branch]
@@ -161,7 +179,7 @@ jobs:
 
   create-github-release:
     name: Create GitHub Release
-    needs: [build]
+    needs: [build, bundle-user-package]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -233,6 +251,10 @@ jobs:
           Expand-Archive p67-windows-x64.zip -DestinationPath .
           .\p67.exe --version
           ```
+
+          ### User Bundle
+
+          `p67-user-bundle.tar.gz` contains everything needed to get started — docs, examples, setup scripts, and architecture diagrams. Extract it and run `./setup.sh` to install the CoCo profile.
           BODY_EOF
           )
 
@@ -249,6 +271,7 @@ jobs:
               artifacts/p67-linux-x64/* \
               artifacts/p67-linux-arm64/* \
               artifacts/p67-windows-x64/* \
+              artifacts/p67-user-bundle/* \
               --clobber
           else
             echo "Creating new draft release ${TAG_NAME}..."
@@ -279,7 +302,8 @@ jobs:
               artifacts/p67-darwin-x64/* \
               artifacts/p67-linux-x64/* \
               artifacts/p67-linux-arm64/* \
-              artifacts/p67-windows-x64/*
+              artifacts/p67-windows-x64/* \
+              artifacts/p67-user-bundle/*
 
             echo ""
             echo "Draft release created successfully!"

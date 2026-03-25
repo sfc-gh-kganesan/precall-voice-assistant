@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant Dev as Developer
+    participant CLI as p67 CLI
+    participant CD as controld
+    participant FS as File Storage
+    participant DB as PostgreSQL
+
+    Dev->>CLI: p67 build
+    Note over CLI: Bun.build (TS) or copy (Python)<br/>Extract LangGraph topology → graph.json<br/>Create workflow.zip
+
+    Dev->>CLI: p67 workflow deploy
+    CLI->>CD: POST /api/workflow/create<br/>(multipart ZIP upload)
+    CD->>FS: Unzip to localStoragePath/workflowId/
+    CD->>FS: Parse manifest.yaml
+    CD->>DB: INSERT Workflow record<br/>(name, version, visibility)
+    CD-->>CLI: 200 { workflowId }
+    Note over CLI: Save workflowId to .p67 state file

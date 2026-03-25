@@ -1,0 +1,73 @@
+erDiagram
+    User {
+        uuid id PK
+        string snowflakeUser UK
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    SlackUser {
+        uuid id PK
+        string slackUserId
+        string slackTeamId
+        string slackUsername
+        uuid userId FK
+    }
+
+    Workflow {
+        uuid id PK
+        string name "nullable, versions share a name"
+        string storagePath
+        uuid ownerId FK
+        enum visibility "Private | Public"
+        datetime createdAt
+    }
+
+    WorkflowRun {
+        uuid id PK
+        uuid workflowId FK
+        uuid userId FK
+        enum status "Running | Completed | Failed | Cancelled | Interrupted"
+        json result "nullable"
+        int exitCode "nullable"
+        datetime startedAt
+        datetime completedAt "nullable"
+    }
+
+    Log {
+        uuid id PK
+        uuid runId FK
+        string workflowId
+        string userId
+        enum source "RuntimeHost | WorkflowNode | ToolCall"
+        string message
+        json attributes
+        datetime timestamp
+    }
+
+    Secret {
+        uuid id PK
+        string name
+        uuid ownerId FK
+        string secret "encrypted"
+        enum type "Secret | OAuth"
+    }
+
+    WorkflowInterrupt {
+        uuid id PK
+        uuid runId FK
+        string workflowId
+        json payload
+        string nodeId "nullable"
+        enum status "Pending | Resumed | Expired"
+        json response "nullable"
+        datetime resumedAt "nullable"
+    }
+
+    User ||--o{ Workflow : owns
+    User ||--o{ WorkflowRun : executes
+    User ||--o{ Secret : owns
+    User ||--o{ SlackUser : linked
+    Workflow ||--o{ WorkflowRun : has
+    WorkflowRun ||--o{ Log : produces
+    WorkflowRun ||--o{ WorkflowInterrupt : paused_by

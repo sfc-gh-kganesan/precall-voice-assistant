@@ -1,0 +1,39 @@
+graph TB
+    subgraph "User Interfaces"
+        CLI["p67 CLI<br/><i>Bun + Commander.js</i>"]
+        DASH["Dashboard<br/><i>React + Mantine</i>"]
+        SLACK["Slack Bot<br/><i>Socket Mode + Webhooks</i>"]
+        SFUNC["Snowflake External Function<br/><i>SQL to HTTP</i>"]
+    end
+
+    subgraph "Control Plane"
+        CONTROLD["controld<br/><i>Fastify + Prisma</i>"]
+    end
+
+    subgraph "Execution Layer"
+        DOCKER_ADAPTER["Docker Adapter<br/><i>local dev</i>"]
+        SPCS_ADAPTER["SPCS Adapter<br/><i>production</i>"]
+        RUNNER["p67-runner Container<br/><i>Runtime Host + Workflow SDK</i>"]
+    end
+
+    subgraph "Data Layer"
+        PG["PostgreSQL<br/><i>Prisma ORM</i>"]
+        FS["File Storage<br/><i>Workflow ZIPs on disk</i>"]
+        SF["Snowflake<br/><i>SQL, Cortex, Secrets, Stages</i>"]
+    end
+
+    CLI -- "REST API<br/>PAT auth" --> CONTROLD
+    DASH -- "REST API<br/>sf-context-current-user" --> CONTROLD
+    SLACK -- "Slash commands<br/>Interactive buttons" --> CONTROLD
+    SFUNC -- "POST /webhook/snowflake/:name" --> CONTROLD
+
+    CONTROLD -- "docker run -i" --> DOCKER_ADAPTER
+    CONTROLD -- "EXECUTE JOB SERVICE" --> SPCS_ADAPTER
+    DOCKER_ADAPTER --> RUNNER
+    SPCS_ADAPTER --> RUNNER
+
+    RUNNER -. "NDJSON over stdin/stdout<br/>(IPC protocol)" .-> CONTROLD
+
+    CONTROLD --> PG
+    CONTROLD --> FS
+    RUNNER --> SF

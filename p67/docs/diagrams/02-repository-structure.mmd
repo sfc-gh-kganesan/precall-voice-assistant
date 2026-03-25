@@ -1,0 +1,42 @@
+graph LR
+    subgraph "Monorepo Root"
+        direction TB
+        ROOT["p67/"]
+    end
+
+    subgraph "packages/"
+        DB["db/<br/>Prisma schema + migrations<br/><i>@p67/db</i>"]
+        SDK_TS["workflow-sdk/<br/>TypeScript SDK types<br/><i>@p67/workflow-sdk</i>"]
+        SDK_PY["workflow-sdk-python/<br/>Python SDK impl<br/><i>p67-workflow-sdk</i>"]
+        WEB["web/<br/>React frontend scaffold<br/><i>@p67/web</i>"]
+    end
+
+    subgraph "services/"
+        CONTROLD2["controld/<br/>Control plane API<br/><i>@p67/controld</i>"]
+    end
+
+    subgraph "tools/"
+        CLI2["p67-cli/<br/>CLI application<br/><i>@p67/cli</i>"]
+        DASHTOOLS["dash/<br/>Dashboard build<br/><i>p67-dash image</i>"]
+    end
+
+    subgraph "native-app/"
+        MANIFEST["manifest.yml"]
+        SETUP["setup.sql"]
+    end
+
+    subgraph "example_workflows/"
+        EX1["number_one/<br/>Basic LangGraph"]
+        EX2["with_interrupt/<br/>HITL pattern"]
+    end
+
+    ROOT --> DB
+    ROOT --> SDK_TS
+    ROOT --> SDK_PY
+    ROOT --> WEB
+    ROOT --> CONTROLD2
+    ROOT --> CLI2
+    ROOT --> DASHTOOLS
+    ROOT --> MANIFEST
+    ROOT --> EX1
+    ROOT --> EX2

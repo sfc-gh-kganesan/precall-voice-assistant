@@ -1,0 +1,41 @@
+sequenceDiagram
+    participant CLI as p67 CLI
+    participant CD as controld
+    participant RA as Runtime Adapter<br/>(Docker or SPCS)
+    participant RUN as p67-runner
+    participant SF as Snowflake
+    participant DB as PostgreSQL
+
+    CLI->>CD: POST /api/workflow/:id/run
+    CD->>DB: Create WorkflowRun (status=Running)
+    CD-->>CLI: 202 { runId, status: "running" }
+
+    Note over CD: Background execution begins
+
+    CD->>CD: Parse manifest.yaml<br/>Hydrate config (secrets, OAuth tokens)
+    CD->>RA: Spawn runner container
+
+    alt Docker (local)
+        RA->>RUN: docker run -i -v /workflow:ro
+    else SPCS (production)
+        RA->>SF: Upload workflow to stage
+        RA->>RUN: EXECUTE JOB SERVICE<br/>(inline spec YAML)
+    end
+
+    Note over CD,RUN: NDJSON IPC over stdin/stdout
+
+    CD->>RUN: RunWorkflow message<br/>(config, params, credentials)
+    RUN->>RUN: Load index.js/main.py<br/>Call main(sdk)
+
+    loop Workflow execution
+        RUN->>SF: SDK calls (SQL, Cortex, HTTP...)
+        SF-->>RUN: Results
+    end
+
+    RUN-->>CD: { type: "result", data: ... }
+    CD->>DB: Update WorkflowRun<br/>(status=Completed, result)
+
+    loop Polling
+        CLI->>CD: GET /api/workflow/runs/:runId
+        CD-->>CLI: { status, result }
+    end

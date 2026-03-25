@@ -1,0 +1,12 @@
+graph TB
+    subgraph "Docker Compose"
+        PG["postgres:17-alpine<br/>Port 5432"]
+        CD["controld<br/>Port 3002"]
+        CD -- "Docker socket mount<br/>/var/run/docker.sock" --> DOCK["Docker Engine"]
+        DOCK --> RUNNER["p67-runner:latest<br/>(spawned per run)"]
+    end
+
+    CD --> PG
+    RUNNER -. "NDJSON IPC" .-> CD
+
+    DEV["Developer"] -- "p67 CLI<br/>or curl" --> CD

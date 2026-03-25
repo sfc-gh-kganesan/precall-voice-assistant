@@ -1,0 +1,38 @@
+graph LR
+    API["/api"]
+
+    API --> HEALTH["/health<br/>GET"]
+    API --> WF["/workflow"]
+    API --> SEC["/secret"]
+    API --> LOG["/log"]
+    API --> AUTH["/auth"]
+    API --> WHO["/whoami<br/>GET"]
+    API --> WH["/webhook"]
+
+    WF --> WF_CREATE["POST /create<br/>Upload ZIP"]
+    WF --> WF_LIST["GET /list<br/>List workflows"]
+    WF --> WF_MANIFEST["GET /:id/manifest"]
+    WF --> WF_GRAPH["GET /:id/graph"]
+    WF --> WF_RUN["POST /:id/run<br/>Execute workflow"]
+    WF --> WF_POLL["GET /runs/:runId<br/>Poll status"]
+    WF --> WF_VIS["PATCH /:id/visibility"]
+    WF --> WF_DEL["DELETE /:id"]
+    WF --> WF_NAME_RUN["POST /name/:name/run"]
+    WF --> WF_VERSIONS["GET /name/:name/versions"]
+    WF --> WF_INTERRUPTS["GET|POST /interrupts"]
+
+    SEC --> SEC_SAVE["POST /save"]
+    SEC --> SEC_LIST["GET /list"]
+    SEC --> SEC_GET["GET /:name"]
+    SEC --> SEC_DEL["DELETE /:name"]
+    SEC --> SEC_OAUTH["POST /oauth/refresh"]
+
+    LOG --> LOG_LIST["GET /list"]
+    LOG --> LOG_RUNS["GET /runs"]
+
+    AUTH --> AUTH_GOOGLE["GET /google/authorize|callback"]
+    AUTH --> AUTH_SLACK["GET /slack/link"]
+
+    WH --> WH_SLACK_INT["POST /slack/interactions"]
+    WH --> WH_SLACK_CMD["POST /slack/commands"]
+    WH --> WH_SF["POST /snowflake/:workflowName"]

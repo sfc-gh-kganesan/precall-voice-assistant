@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant WF as Workflow Code
+    participant HOST as Runtime Host
+    participant CD as controld
+    participant DB as PostgreSQL
+    participant SLACK as Slack (optional)
+    participant HUMAN as Human
+
+    WF->>HOST: sdk.interrupt(payload)
+    HOST->>CD: IPC: Interrupt message
+    CD->>DB: Create WorkflowInterrupt<br/>(status=Pending)
+    CD->>DB: Update WorkflowRun<br/>(status=Interrupted)
+
+    opt Slack notification
+        CD->>SLACK: Post message with action buttons
+    end
+
+    Note over HOST: Workflow process pauses<br/>(awaiting stdin resume message)
+
+    alt Via API
+        HUMAN->>CD: POST /interrupts/:id/resume<br/>{ response }
+    else Via Slack
+        HUMAN->>SLACK: Click approve/reject button
+        SLACK->>CD: POST /webhook/slack/interactions
+    end
+
+    CD->>DB: Update WorkflowInterrupt<br/>(status=Resumed, response)
+    CD->>HOST: IPC: ResumeInterrupt message
+    HOST->>WF: Return response to sdk.interrupt()
+    Note over WF: Workflow continues execution

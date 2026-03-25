@@ -1,0 +1,34 @@
+graph TB
+    P67["p67"]
+
+    P67 --> INIT["init [name]<br/>Scaffold new workflow project<br/>(TS or Python template)"]
+    P67 --> BUILD["build<br/>Bundle workflow + create ZIP"]
+    P67 --> WF["workflow"]
+    P67 --> SEC["secret"]
+    P67 --> OAUTH["oauth"]
+    P67 --> CONN["connection"]
+    P67 --> LOGS["logs"]
+    P67 --> MCFG["manifest"]
+
+    WF --> WF_DEPLOY["deploy<br/>Upload ZIP to controld"]
+    WF --> WF_RUN["run [id]<br/>Execute with param prompts"]
+    WF --> WF_LIST["list<br/>Group by name, show versions"]
+    WF --> WF_DELETE["delete"]
+    WF --> WF_VERSIONS["versions"]
+    WF --> WF_RUNS["runs<br/>Interactive run history"]
+
+    SEC --> SEC_SAVE["save"]
+    SEC --> SEC_LIST["list"]
+    SEC --> SEC_DEL["delete"]
+
+    OAUTH --> OAUTH_CONNECT["connect provider<br/>Full OAuth flow"]
+    OAUTH --> OAUTH_LIST["list"]
+    OAUTH --> OAUTH_REFRESH["refresh"]
+    OAUTH --> OAUTH_REVOKE["revoke"]
+
+    CONN --> CONN_ADD["add"]
+    CONN --> CONN_LIST["list"]
+    CONN --> CONN_REMOVE["remove"]
+    CONN --> CONN_DEFAULT["set-default"]
+
+    MCFG --> MCFG_FC["from-connection<br/>Generate manifest config<br/>from Snowflake connection"]

@@ -1,0 +1,28 @@
+stateDiagram-v2
+    [*] --> Installed : snow app run
+    Installed --> Initialized : v1.init()
+    note right of Initialized
+        ALTERs services with EAIs
+        Creates webhook service function
+        Discovers controld DNS for dashboard
+    end note
+
+    Initialized --> ServicesCreated : v1.create_services()
+    note right of ServicesCreated
+        Creates service_compute_pool (1-5 nodes)
+        Creates runner_compute_pool (1-10 nodes)
+        Creates workflow_stage
+        Starts controld + dashboard
+    end note
+
+    ServicesCreated --> Running : Services ready
+
+    Running --> Stopped : app.stop_app()
+    note right of Stopped
+        DROP SERVICE dashboard
+        DROP SERVICE controld FORCE
+    end note
+
+    Stopped --> Running : v1.start_controld() + v1.start_dashboard()
+
+    Running --> [*] : DROP APPLICATION
