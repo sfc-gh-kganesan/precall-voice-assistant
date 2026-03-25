@@ -52,6 +52,10 @@ cp "${REPO_ROOT}/ops/coco-profile/skills/p67-cli/SKILL.md" \
 cp "${REPO_ROOT}/ops/coco-profile/skills/p67-cli/templates/quickstart.md" \
    "${BUNDLE_DIR}/docs/cli-quickstart.md"
 
+# Trigger workflow from SQL (streams, tasks, service functions)
+cp "${REPO_ROOT}/ops/coco-profile/skills/trigger-workflow/SKILL.md" \
+   "${BUNDLE_DIR}/docs/trigger-workflow.md"
+
 # Architecture diagrams (SVG for rendering, MMD for editing)
 cp "${REPO_ROOT}/docs/diagrams/"*.svg "${BUNDLE_DIR}/docs/diagrams/"
 cp "${REPO_ROOT}/docs/diagrams/"*.mmd "${BUNDLE_DIR}/docs/diagrams/"
@@ -195,6 +199,7 @@ p67 workflow run --name my-workflow
 | [cli-reference.md](docs/cli-reference.md) | Complete P67 CLI command reference with all flags and options |
 | [cli-quickstart.md](docs/cli-quickstart.md) | Quick-reference cheat sheet for common CLI patterns |
 | [secrets-guide.md](docs/secrets-guide.md) | Guide for using Snowflake SECRET objects with P67 workflows |
+| [trigger-workflow.md](docs/trigger-workflow.md) | Trigger workflows from SQL — streams, tasks, and service functions |
 | [slack-setup.md](docs/slack-setup.md) | Slack bot integration setup instructions |
 
 ### Examples (`examples/`)

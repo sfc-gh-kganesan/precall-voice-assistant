@@ -6,6 +6,9 @@
     "skillRepos": [
         {
             "snowflake_stage": "@P67.COCO_SKILLS.P67_CLI/skills/p67-cli/"
+        },
+        {
+            "snowflake_stage": "@P67.COCO_SKILLS.P67_CLI/skills/trigger-workflow/"
         }
     ],
     "mcpServers": {},
