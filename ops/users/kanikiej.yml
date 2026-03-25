@@ -1,0 +1,9 @@
+---
+login_name: kanikiej
+display_name: kanikiej
+first_name: Kamil
+last_name: Anikiej
+email: kamil.anikiej@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
