@@ -1,0 +1,9 @@
+---
+login_name: nejain
+display_name: nejain
+first_name: Neeraj
+last_name: Jain
+email: neeraj.jain@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
