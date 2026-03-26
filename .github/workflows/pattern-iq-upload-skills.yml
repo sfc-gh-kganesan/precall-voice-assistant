@@ -42,6 +42,7 @@ jobs:
           authenticator = "SNOWFLAKE_JWT"
           EOF
           sed -i 's/^[[:space:]]*//' ~/.snowflake/connections.toml
+          chmod 0600 ~/.snowflake/connections.toml
 
       - name: Upload skills to Snowflake stage
         run: sandbox/jsummer/pattern-iq/scripts/upload_skills.sh --connection default

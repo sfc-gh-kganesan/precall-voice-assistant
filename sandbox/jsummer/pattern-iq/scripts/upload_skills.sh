@@ -40,7 +40,6 @@ uv run --project "$PROJECT_ROOT" python -c "
 import snowflake.connector
 conn = snowflake.connector.connect(connection_name='$CONNECTION')
 cur = conn.cursor()
-cur.execute(\"CREATE STAGE IF NOT EXISTS PATTERN_IQ.PUBLIC.SKILLS_STAGE COMMENT = 'Stores pattern-extract skill tarballs for CI distribution'\")
 cur.execute(\"PUT file://$TARBALL @PATTERN_IQ.PUBLIC.SKILLS_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE\")
 result = cur.fetchall()
 print(f'Upload result: {result}')
