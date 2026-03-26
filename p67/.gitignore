@@ -5,8 +5,8 @@ dist
 *.log
 .pnpm-debug.log
 output
-/Makefile
 .certs
+.build-tag
 
 # Override parent gitignore to track .claude/ config
 !.claude/
