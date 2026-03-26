@@ -84,6 +84,42 @@ for f in "${SKILL_DIR}"/templates/* "${SKILL_DIR}"/references/*; do
   " -c "${CONNECTION}"
 done
 
+# ── Step 2b: Upload command files to stage ────────────────────────────────────
+COMMANDS_DIR="$(dirname "$0")/commands"
+COMMANDS_STAGE_PATH="@${SKILL_STAGE}/commands/"
+if [ -d "${COMMANDS_DIR}" ]; then
+  echo "==> Uploading command files from ${COMMANDS_DIR} to ${COMMANDS_STAGE_PATH}..."
+  for f in "${COMMANDS_DIR}"/*.md; do
+    [ -f "$f" ] || continue
+    echo "    Uploading ${f} -> ${COMMANDS_STAGE_PATH}"
+    snow sql -q "
+      USE ROLE ${STAGE_ROLE};
+      USE WAREHOUSE ${WAREHOUSE};
+      PUT 'file://${f}' '${COMMANDS_STAGE_PATH}' AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+    " -c "${CONNECTION}"
+  done
+else
+  echo "==> No commands/ directory found, skipping command upload."
+fi
+
+# ── Step 2c: Upload script files to stage ─────────────────────────────────────
+SCRIPTS_DIR="$(dirname "$0")/scripts"
+SCRIPTS_STAGE_PATH="@${SKILL_STAGE}/scripts/"
+if [ -d "${SCRIPTS_DIR}" ]; then
+  echo "==> Uploading script files from ${SCRIPTS_DIR} to ${SCRIPTS_STAGE_PATH}..."
+  for f in "${SCRIPTS_DIR}"/*; do
+    [ -f "$f" ] || continue
+    echo "    Uploading ${f} -> ${SCRIPTS_STAGE_PATH}"
+    snow sql -q "
+      USE ROLE ${STAGE_ROLE};
+      USE WAREHOUSE ${WAREHOUSE};
+      PUT 'file://${f}' '${SCRIPTS_STAGE_PATH}' AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+    " -c "${CONNECTION}"
+  done
+else
+  echo "==> No scripts/ directory found, skipping script upload."
+fi
+
 # ── Step 3: Verify profile JSON exists ────────────────────────────────────────
 echo "==> Using profile JSON: ${PROFILE_JSON}"
 if [ ! -f "${PROFILE_JSON}" ]; then

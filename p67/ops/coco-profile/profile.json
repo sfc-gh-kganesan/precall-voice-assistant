@@ -12,8 +12,19 @@
         }
     ],
     "mcpServers": {},
-    "commandRepos": [],
-    "hooks": {},
+    "commandRepos": [
+        {
+            "snowflake_stage": "@P67.COCO_SKILLS.P67_CLI/commands/"
+        }
+    ],
+    "hooks": [
+        {
+            "type": "command",
+            "event": "SessionStart",
+            "command": "p67-health-check.sh",
+            "timeout": 10
+        }
+    ],
     "envVars": {},
     "settingsOverrides": {},
     "allowedRoles": ["P67_USER_RL"]
