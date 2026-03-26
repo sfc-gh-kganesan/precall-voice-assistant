@@ -33,6 +33,20 @@ import pythonRequirementstxt from '@p67-cli/workspace/boiler-plate-python/requir
 import pythonMainpy from '@p67-cli/workspace/boiler-plate-python/src/main.py.src' with {
     type: 'file',
 };
+import helloWorldManifest from '@p67-cli/workspace/templates/hello-world/manifest.yaml.src' with {
+    type: 'file',
+};
+// Template: hello-world
+import helloWorldIndexTs from '@p67-cli/workspace/templates/hello-world/src/index.ts.src' with {
+    type: 'file',
+};
+import hitlManifest from '@p67-cli/workspace/templates/hitl/manifest.yaml.src' with {
+    type: 'file',
+};
+// Template: hitl
+import hitlIndexTs from '@p67-cli/workspace/templates/hitl/src/index.ts.src' with {
+    type: 'file',
+};
 // @ts-expect-error - Bun's with { type: 'file' } returns a file path string
 import sdksrc from '@workflow-sdk/index.ts' with { type: 'file' };
 // Python SDK full implementation (for p67 build — bundled with workflow)
@@ -107,6 +121,22 @@ const pythonFiles: Record<string, string> = {
     [pythonLearnWorkflow]: 'LEARN_WORKFLOW.md',
 };
 
+// Template-specific files (only the files that differ from default boilerplate)
+const templateFiles: Record<string, Record<string, string>> = {
+    'hello-world': {
+        [helloWorldIndexTs]: 'src/index.ts',
+        [helloWorldManifest]: 'manifest.yaml',
+    },
+    hitl: {
+        [hitlIndexTs]: 'src/index.ts',
+        [hitlManifest]: 'manifest.yaml',
+    },
+};
+
+export function listTemplates(): string[] {
+    return Object.keys(templateFiles);
+}
+
 export class Workspace {
     private projectDir: string;
     private language: WorkflowLanguage;
@@ -131,6 +161,51 @@ export class Workspace {
         const langFiles =
             this.language === 'python' ? pythonFiles : typescriptFiles;
         for (const [key, value] of Object.entries(langFiles)) {
+            const outPath = join(this.projectDir, value);
+            const outDir = dirname(outPath);
+            await mkdir(outDir, { recursive: true });
+            await this.materialize(key, outPath);
+        }
+
+        // For Python projects, copy the SDK stubs for IDE support
+        if (this.language === 'python') {
+            await this.copyPythonSdk();
+        }
+    }
+
+    async bootstrapTemplate(templateName: string) {
+        const tmplFiles = templateFiles[templateName];
+        if (!tmplFiles) {
+            throw new Error(
+                `Unknown template "${templateName}". Available templates: ${listTemplates().join(', ')}`,
+            );
+        }
+
+        await this.ensureSrcDirExists();
+
+        // Copy common files (gitignore, workflow_graph_schema)
+        // but skip manifest.yaml since templates provide their own
+        for (const [key, value] of Object.entries(commonFiles)) {
+            if (value === 'manifest.yaml') continue;
+            const outPath = join(this.projectDir, value);
+            const outDir = dirname(outPath);
+            await mkdir(outDir, { recursive: true });
+            await this.materialize(key, outPath);
+        }
+
+        // Copy language-specific files, but skip src/index.ts since template provides its own
+        const langFiles =
+            this.language === 'python' ? pythonFiles : typescriptFiles;
+        for (const [key, value] of Object.entries(langFiles)) {
+            if (value === 'src/index.ts') continue;
+            const outPath = join(this.projectDir, value);
+            const outDir = dirname(outPath);
+            await mkdir(outDir, { recursive: true });
+            await this.materialize(key, outPath);
+        }
+
+        // Copy template-specific files (index.ts + manifest.yaml)
+        for (const [key, value] of Object.entries(tmplFiles)) {
             const outPath = join(this.projectDir, value);
             const outDir = dirname(outPath);
             await mkdir(outDir, { recursive: true });

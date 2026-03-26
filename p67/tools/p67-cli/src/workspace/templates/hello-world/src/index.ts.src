@@ -1,0 +1,65 @@
+import { Annotation, StateGraph } from '@langchain/langgraph';
+
+// Define the state structure
+const StateAnnotation = Annotation.Root({
+    messages: Annotation<string[]>({
+        reducer: (left, right) => left.concat(right),
+    }),
+    currentNode: Annotation<string>({
+        reducer: (_, right) => right,
+    }),
+});
+
+// Node 1: Initialize
+async function nodeOne(_: typeof StateAnnotation.State) {
+    console.log('Executing Node 1: Initialize');
+    return {
+        messages: ['Node 1 executed'],
+        currentNode: 'node1',
+    };
+}
+
+// Node 2: Process
+async function nodeTwo(_: typeof StateAnnotation.State) {
+    console.log('Executing Node 2: Process');
+    return {
+        messages: ['Node 2 executed'],
+        currentNode: 'node2',
+    };
+}
+
+// Node 3: Finalize
+async function nodeThree(_: typeof StateAnnotation.State) {
+    console.log('Executing Node 3: Finalize');
+    return {
+        messages: ['Node 3 executed'],
+        currentNode: 'node3',
+    };
+}
+
+// Create the graph
+const workflow = new StateGraph(StateAnnotation)
+    .addNode('node1', nodeOne)
+    .addNode('node2', nodeTwo)
+    .addNode('node3', nodeThree)
+    .addEdge('__start__', 'node1')
+    .addEdge('node1', 'node2')
+    .addEdge('node2', 'node3')
+    .addEdge('node3', '__end__');
+
+// Compile the graph
+const app = workflow.compile();
+
+// Execute the graph
+export async function main() {
+    console.log('Starting LangGraph execution...\n');
+
+    const result = await app.invoke({
+        messages: [],
+        currentNode: '',
+    });
+
+    console.log('\n=== Final Result ===');
+    console.log('Messages:', result.messages);
+    console.log('Final Node:', result.currentNode);
+}

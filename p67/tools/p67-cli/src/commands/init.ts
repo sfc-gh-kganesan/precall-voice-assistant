@@ -10,7 +10,11 @@ import {
     type ProjectOptions,
     projectConfig,
 } from '@p67-cli/middleware/project-config';
-import { type WorkflowLanguage, Workspace } from '@p67-cli/workspace/Workspace';
+import {
+    listTemplates,
+    type WorkflowLanguage,
+    Workspace,
+} from '@p67-cli/workspace/Workspace';
 
 export const initCommand = new Command('init')
     .description('Initialize a new p67 configuration file')
@@ -19,12 +23,16 @@ export const initCommand = new Command('init')
         '-l, --language <language>',
         'Workflow language (typescript or python)',
     )
+    .option(
+        '-t, --template <name>',
+        `Scaffold from a pre-built template (${listTemplates().join(', ')})`,
+    )
     .use<ProjectConfigOptions>(projectConfig, {
         requireConfigFileToExist: false,
     })
     .action(async (name?: string) => {
         const options = initCommand.optsWithGlobals<
-            ProjectOptions & { language?: string }
+            ProjectOptions & { language?: string; template?: string }
         >();
         const targetDir = path.resolve(options.project as string, name || '');
         const configPath = path.join(targetDir, 'p67.yml');
@@ -91,6 +99,18 @@ export const initCommand = new Command('init')
             });
         }
 
+        // Resolve template
+        const template: string | undefined = options.template;
+        if (template !== undefined) {
+            const available = listTemplates();
+            if (!available.includes(template)) {
+                console.error(
+                    `✗ Unknown template "${template}". Available templates: ${available.join(', ')}`,
+                );
+                return;
+            }
+        }
+
         console.log(`\nInitializing ${language} workflow project...`);
 
         const config = ProjectConfig.default(targetDir);
@@ -116,9 +136,15 @@ export const initCommand = new Command('init')
 
         // bootstrap workspace files
         const workspc = new Workspace(targetDir, language);
-        await workspc.bootstrap();
-
-        console.log(`✔︎ Created ${language} workflow files`);
+        if (template) {
+            await workspc.bootstrapTemplate(template);
+            console.log(
+                `✔︎ Created ${language} workflow from template "${template}"`,
+            );
+        } else {
+            await workspc.bootstrap();
+            console.log(`✔︎ Created ${language} workflow files`);
+        }
 
         // Install dependencies based on language
         if (language === 'typescript') {
