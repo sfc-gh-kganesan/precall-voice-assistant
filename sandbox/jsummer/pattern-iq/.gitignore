@@ -10,3 +10,11 @@ build/
 .pytest_cache/
 .uv/
 uv.lock
+
+# Agent objects - operational scaffolding (not needed for reproducibility)
+agent_objects/**/*_fastgen_request.json
+agent_objects/**/*_metadata.json
+agent_objects/**/test_*.json
+agent_objects/**/change_manifest.md
+agent_objects/**/evals/
+agent_objects/**/optimization_log.md
