@@ -15,6 +15,30 @@ ACCOUNT="SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2"
 PROFILE_NAME="p67"
 CONNECTIONS_DIR="${HOME}/.snowflake"
 CONNECTIONS_FILE="${CONNECTIONS_DIR}/connections.toml"
+CONFIG_FILE="${CONNECTIONS_DIR}/config.toml"
+
+# Check if a connection exists in either connections.toml or config.toml.
+# connections.toml uses [name], config.toml uses [connections.name].
+connection_exists() {
+    local name="$1"
+    if [[ -f "${CONNECTIONS_FILE}" ]] && grep -q "^\[${name}\]" "${CONNECTIONS_FILE}"; then
+        return 0
+    fi
+    if [[ -f "${CONFIG_FILE}" ]] && grep -q "^\[connections\.${name}\]" "${CONFIG_FILE}"; then
+        return 0
+    fi
+    return 1
+}
+
+# List available connections from both files.
+list_connections() {
+    if [[ -f "${CONNECTIONS_FILE}" ]]; then
+        grep '^\[' "${CONNECTIONS_FILE}" | tr -d '[]' | sed 's/^/  /'
+    fi
+    if [[ -f "${CONFIG_FILE}" ]]; then
+        grep '^\[connections\.' "${CONFIG_FILE}" | sed 's/\[connections\.\(.*\)\]/  \1/'
+    fi
+}
 
 echo ""
 echo "=========================================="
@@ -51,9 +75,9 @@ case "${choice}" in
 
     mkdir -p "${CONNECTIONS_DIR}"
 
-    if [[ -f "${CONNECTIONS_FILE}" ]] && grep -q '^\[snowhouse\]' "${CONNECTIONS_FILE}"; then
+    if connection_exists "snowhouse"; then
       echo ""
-      echo "WARNING: A [snowhouse] connection already exists in ${CONNECTIONS_FILE}."
+      echo "WARNING: A 'snowhouse' connection already exists."
       read -rp "Overwrite it? [y/N]: " overwrite
       if [[ "${overwrite}" != "y" && "${overwrite}" != "Y" ]]; then
         echo "Keeping existing connection."
@@ -103,20 +127,14 @@ EOF
     read -rp "Connection name [snowhouse]: " CONNECTION
     CONNECTION="${CONNECTION:-snowhouse}"
 
-    if [[ -f "${CONNECTIONS_FILE}" ]]; then
-      if ! grep -q "^\[${CONNECTION}\]" "${CONNECTIONS_FILE}"; then
-        echo "ERROR: Connection '${CONNECTION}' not found in ${CONNECTIONS_FILE}."
+    if ! connection_exists "${CONNECTION}"; then
+        echo "ERROR: Connection '${CONNECTION}' not found."
         echo ""
         echo "Available connections:"
-        grep '^\[' "${CONNECTIONS_FILE}" | tr -d '[]' | sed 's/^/  /'
+        list_connections
         echo ""
         echo "Re-run this script and choose option 1 to create a new connection."
         exit 1
-      fi
-    else
-      echo "ERROR: ${CONNECTIONS_FILE} not found."
-      echo "Re-run this script and choose option 1 to create a connection."
-      exit 1
     fi
     echo "Using connection: ${CONNECTION}"
     ;;
