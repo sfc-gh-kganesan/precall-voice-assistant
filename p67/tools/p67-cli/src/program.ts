@@ -3,6 +3,7 @@ import { buildCommand } from '@p67-cli/commands/build';
 import { cocoCommand } from '@p67-cli/commands/coco/index';
 import { connectionCommand } from '@p67-cli/commands/connection';
 import { createProjectRootCommand } from '@p67-cli/commands/createProjectRoot.ts';
+import { doctorCommand } from '@p67-cli/commands/doctor';
 import { initCommand } from '@p67-cli/commands/init.ts';
 import { logsCommand } from '@p67-cli/commands/log';
 import { manifestCommand } from '@p67-cli/commands/manifest-config';
@@ -25,4 +26,5 @@ export const program = new Command()
     .addCommand(oauthCommand)
     .addCommand(cocoCommand)
     .addCommand(buildCommand)
-    .addCommand(connectionCommand);
+    .addCommand(connectionCommand)
+    .addCommand(doctorCommand);
