@@ -1,6 +1,7 @@
 import { input } from '@inquirer/prompts';
 import { Command } from '@p67-cli/Command';
 import { ConnectionConfig } from '@p67-cli/config/ConnectionConfig';
+import { discoverEndpoint } from '@p67-cli/utils/snow-cli';
 
 export const addCommand = new Command('add')
     .description('Add a new P67 connection')
@@ -8,6 +9,14 @@ export const addCommand = new Command('add')
     .option('-e, --endpoint <url>', 'Runtime endpoint URL')
     .option('-p, --pat <token>', 'Snowflake Programmatic Access Token (PAT)')
     .option('--set-default', 'Set as default connection')
+    .option(
+        '--discover',
+        'Auto-discover the endpoint URL via snow sql (calls P67.V1.APP_URL())',
+    )
+    .option(
+        '--snow-connection <name>',
+        'Snowflake connection name to use with snow CLI (for --discover)',
+    )
     .action(
         async (
             name?: string,
@@ -15,6 +24,8 @@ export const addCommand = new Command('add')
                 endpoint?: string;
                 pat?: string;
                 setDefault?: boolean;
+                discover?: boolean;
+                snowConnection?: string;
             },
         ) => {
             try {
@@ -36,12 +47,35 @@ export const addCommand = new Command('add')
                         },
                     }));
 
-                // Prompt for endpoint if not provided
+                // Discover endpoint if --discover is passed
+                let discoveredEndpoint: string | undefined;
+                if (options?.discover) {
+                    try {
+                        console.log('Discovering endpoint via snow sql...');
+                        discoveredEndpoint = await discoverEndpoint(
+                            options.snowConnection,
+                        );
+                        console.log(
+                            `Discovered endpoint: ${discoveredEndpoint}`,
+                        );
+                    } catch (error) {
+                        console.error(
+                            `\nFailed to discover endpoint: ${error instanceof Error ? error.message : error}`,
+                        );
+                        console.log(
+                            'Falling back to manual endpoint prompt.\n',
+                        );
+                    }
+                }
+
+                // Prompt for endpoint if not provided via --endpoint flag.
+                // If --discover found a URL, use it as the default (user can override).
                 const endpoint =
                     options?.endpoint ||
                     (await input({
                         message: 'Runtime endpoint URL:',
                         default:
+                            discoveredEndpoint ??
                             'https://jnb46h6e-sfengineering-aifde.snowflakecomputing.app',
                         validate: (value) => {
                             if (!value.trim()) {
