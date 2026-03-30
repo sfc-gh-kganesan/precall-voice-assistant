@@ -1,0 +1,9 @@
+---
+login_name: ddudek
+display_name: ddudek
+first_name: David
+last_name: Dudek
+email: david.dudek@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
