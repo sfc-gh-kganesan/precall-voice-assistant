@@ -10,6 +10,11 @@
 #
 #   --archive    Also create dist/p67-user-bundle.tar.gz
 #
+# TODO: Delete dead code that this bundle replaces:
+#   - coco/setup.sh (superseded by ops/coco-profile/setup.sh)
+#   - tools/p67-cli/install.sh (superseded by bundle setup.sh)
+#   - coco/commands/*.md (identical copies in ops/coco-profile/commands/)
+#   - coco/commands/p67/utils.py + __init__.py (unused prototype)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -61,11 +66,11 @@ cp "${REPO_ROOT}/docs/diagrams/"*.svg "${BUNDLE_DIR}/docs/diagrams/"
 cp "${REPO_ROOT}/docs/diagrams/"*.mmd "${BUNDLE_DIR}/docs/diagrams/"
 
 # -------------------------------------------------------------------
-# 2. CoCo profile setup script
+# 2. Unified setup script
 # -------------------------------------------------------------------
 echo "Copying setup script..."
 
-cp "${REPO_ROOT}/ops/coco-profile/setup.sh" "${BUNDLE_DIR}/setup.sh"
+cp "${REPO_ROOT}/ops/bundle-setup.sh" "${BUNDLE_DIR}/setup.sh"
 chmod +x "${BUNDLE_DIR}/setup.sh"
 
 # -------------------------------------------------------------------
@@ -111,6 +116,34 @@ echo "Sanitizing hardcoded values..."
 find "${BUNDLE_DIR}/examples" -name "p67.yml" -exec rm -f {} \;
 
 # -------------------------------------------------------------------
+# 4b. CLI binary (injected by CI or copied from local build)
+# -------------------------------------------------------------------
+echo "Copying CLI binary..."
+
+CLI_BIN="${REPO_ROOT}/tools/p67-cli/bin/p67"
+if [ -f "${CLI_BIN}" ]; then
+  mkdir -p "${BUNDLE_DIR}/bin"
+  cp "${CLI_BIN}" "${BUNDLE_DIR}/bin/p67"
+  chmod +x "${BUNDLE_DIR}/bin/p67"
+else
+  echo "  WARNING: CLI binary not found at ${CLI_BIN}. Bundle will not include the binary."
+  echo "  (CI injects the binary per-platform after bundling.)"
+fi
+
+# -------------------------------------------------------------------
+# 4c. CoCo commands
+# -------------------------------------------------------------------
+echo "Copying CoCo commands..."
+
+COMMANDS_SRC="${REPO_ROOT}/ops/coco-profile/commands"
+if [ -d "${COMMANDS_SRC}" ]; then
+  mkdir -p "${BUNDLE_DIR}/commands"
+  cp "${COMMANDS_SRC}"/*.md "${BUNDLE_DIR}/commands/"
+else
+  echo "  WARNING: CoCo commands not found at ${COMMANDS_SRC}."
+fi
+
+# -------------------------------------------------------------------
 # 5. Generate the bundle README
 # -------------------------------------------------------------------
 echo "Generating README..."
@@ -124,33 +157,21 @@ P67 is a platform for building, deploying, and running **agentic workflows** on 
 
 ## Getting Started
 
-### 1. Get Access
+### 1. Run Setup
+
+```bash
+./setup.sh
+```
+
+This installs the `p67` CLI to `~/.local/bin` and optionally configures the Cortex Code (CoCo) profile.
+
+Options:
+- `./setup.sh --global` — Install to `/usr/local/bin` (may require sudo)
+- `./setup.sh --help` — Show all options
+
+### 2. Get Access
 
 Request the **`P67_USER_RL`** role via a Lift ticket (or ask a SECURITYADMIN). This role grants access to the deployed P67 app and the CoCo profile.
-
-### 2. Install the CoCo Profile
-
-The P67 CoCo profile teaches Cortex Code how to use the P67 CLI. Once installed, CoCo can scaffold, build, deploy, and run workflows on your behalf.
-
-```bash
-# Run the setup script (creates a Snowhouse connection + installs the profile)
-./setup.sh
-
-# Or do it manually:
-cortex profile add p67 -c snowhouse
-cortex profile set-default p67
-```
-
-Verify:
-```bash
-cortex -c snowhouse
-# Inside CoCo: /skill list
-# You should see "p67-cli"
-```
-
-> **Note**: Profiles work in CoCo Desktop and CoCo CLI only (not Snowsight).
-
-To update later: `cortex profile sync p67 -c snowhouse`
 
 ### 3. Connect to controld
 
@@ -270,9 +291,11 @@ FILE_COUNT=$(find "${BUNDLE_DIR}" -type f | wc -l | tr -d ' ')
 echo "  Location: ${BUNDLE_DIR}"
 echo "  Files:    ${FILE_COUNT}"
 echo ""
+echo "  bin/           — p67 CLI binary (if available; CI injects per-platform)"
+echo "  commands/      — CoCo commands (define-workflow, generate-workflow, etc.)"
 echo "  docs/          — Architecture, quickstart, CLI reference, secrets guide, Slack setup"
 echo "  examples/      — hello-world, human-in-the-loop, workflow-editor-template"
-echo "  setup.sh       — CoCo profile onboarding (run this first)"
+echo "  setup.sh       — Unified installer: CLI + CoCo profile (run this first)"
 echo "  README.md      — Start here"
 echo ""
 

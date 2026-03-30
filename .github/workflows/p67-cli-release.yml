@@ -18,6 +18,7 @@ defaults:
     working-directory: p67
 
 permissions:
+  actions: write
   contents: write
 
 env:
@@ -47,24 +48,6 @@ jobs:
 
           echo "Valid release branch: $BRANCH"
         working-directory: .
-
-  bundle-user-package:
-    name: Bundle User Package
-    needs: [check-valid-release-branch]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build user bundle
-        run: bash ops/bundle-user-package.sh --archive
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: p67-user-bundle
-          path: p67/dist/p67-user-bundle.tar.gz
-          retention-days: 7
 
   build:
     name: Build ${{ matrix.platform }}
@@ -177,17 +160,93 @@ jobs:
           path: p67/tools/p67-cli/bin/p67-${{ matrix.platform }}.${{ matrix.archive_ext }}
           retention-days: 7
 
+  bundle:
+    name: Bundle per-platform packages
+    needs: [build]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-arm64
+            archive_ext: tar.gz
+            binary_name: p67
+          - platform: darwin-x64
+            archive_ext: tar.gz
+            binary_name: p67
+          - platform: linux-x64
+            archive_ext: tar.gz
+            binary_name: p67
+          - platform: linux-arm64
+            archive_ext: tar.gz
+            binary_name: p67
+          - platform: windows-x64
+            archive_ext: zip
+            binary_name: p67.exe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: p67-${{ matrix.platform }}
+          path: p67/binary-artifact
+
+      - name: Build base bundle
+        run: bash ops/bundle-user-package.sh
+
+      - name: Inject platform binary into bundle
+        shell: bash
+        run: |
+          mkdir -p dist/p67-user-bundle/bin
+
+          # Extract binary from the build artifact archive
+          if [[ "${{ matrix.archive_ext }}" == "tar.gz" ]]; then
+            tar -xzf "binary-artifact/p67-${{ matrix.platform }}.tar.gz" -C dist/p67-user-bundle/bin/
+          else
+            cd dist/p67-user-bundle/bin
+            unzip -o "../../../binary-artifact/p67-${{ matrix.platform }}.zip"
+            cd ../../..
+          fi
+
+          chmod +x "dist/p67-user-bundle/bin/${{ matrix.binary_name }}" 2>/dev/null || true
+
+          echo "Bundle contents:"
+          find dist/p67-user-bundle -type f | head -30
+
+      - name: Create platform bundle archive (unix)
+        if: matrix.archive_ext == 'tar.gz'
+        run: |
+          cd dist
+          tar -czf "p67-bundle-${{ matrix.platform }}.tar.gz" p67-user-bundle
+
+      - name: Create platform bundle archive (windows)
+        if: matrix.archive_ext == 'zip'
+        shell: bash
+        run: |
+          cd dist
+          zip -r "p67-bundle-${{ matrix.platform }}.zip" p67-user-bundle
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: p67-bundle-${{ matrix.platform }}
+          path: p67/dist/p67-bundle-${{ matrix.platform }}.${{ matrix.archive_ext }}
+          retention-days: 7
+
   create-github-release:
     name: Create GitHub Release
-    needs: [build, bundle-user-package]
+    needs: [build, bundle]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download all bundle artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: p67-bundle-*
           path: artifacts
 
       - name: Configure git
@@ -227,34 +286,37 @@ jobs:
 
           ### Installation
 
-          Download the archive for your platform, extract, and place the binary in your PATH.
+          Download the bundle for your platform, extract it, and run `setup.sh`:
 
-          **macOS** (unsigned — run once after downloading):
+          **macOS / Linux**:
           ```sh
-          tar -xzf p67-darwin-*.tar.gz
-          xattr -cr ./p67
-          chmod +x ./p67
-          sudo mv ./p67 /usr/local/bin/
-          p67 --version
+          tar -xzf p67-bundle-<platform>.tar.gz
+          cd p67-user-bundle
+          ./setup.sh
           ```
 
-          **Linux**:
-          ```sh
-          tar -xzf p67-linux-*.tar.gz
-          chmod +x ./p67
-          sudo mv ./p67 /usr/local/bin/
-          p67 --version
-          ```
-
-          **Windows** (unsigned — if SmartScreen blocks it, right-click the exe > Properties > Unblock):
+          **Windows**:
           ```powershell
-          Expand-Archive p67-windows-x64.zip -DestinationPath .
-          .\p67.exe --version
+          Expand-Archive p67-bundle-windows-x64.zip -DestinationPath .
+          cd p67-user-bundle
+          # Run setup.sh in Git Bash or WSL, or manually copy bin\p67.exe to your PATH
           ```
 
-          ### User Bundle
+          Each bundle includes the CLI binary, documentation, example workflows, CoCo commands, and a setup script.
 
-          `p67-user-bundle.tar.gz` contains everything needed to get started — docs, examples, setup scripts, and architecture diagrams. Extract it and run `./setup.sh` to install the CoCo profile.
+          Options:
+          - `./setup.sh --global` — Install CLI to `/usr/local/bin` (may require sudo)
+          - `./setup.sh --help` — Show all options
+
+          ### Platforms
+
+          | Bundle | Platform |
+          |--------|----------|
+          | `p67-bundle-darwin-arm64.tar.gz` | macOS Apple Silicon |
+          | `p67-bundle-darwin-x64.tar.gz` | macOS Intel |
+          | `p67-bundle-linux-x64.tar.gz` | Linux x86_64 |
+          | `p67-bundle-linux-arm64.tar.gz` | Linux ARM64 |
+          | `p67-bundle-windows-x64.zip` | Windows x86_64 |
           BODY_EOF
           )
 
@@ -266,12 +328,11 @@ jobs:
             echo "Release ${TAG_NAME} already exists. Uploading assets..."
             gh release upload "${TAG_NAME}" \
               latest.txt \
-              artifacts/p67-darwin-arm64/* \
-              artifacts/p67-darwin-x64/* \
-              artifacts/p67-linux-x64/* \
-              artifacts/p67-linux-arm64/* \
-              artifacts/p67-windows-x64/* \
-              artifacts/p67-user-bundle/* \
+              artifacts/p67-bundle-darwin-arm64/* \
+              artifacts/p67-bundle-darwin-x64/* \
+              artifacts/p67-bundle-linux-x64/* \
+              artifacts/p67-bundle-linux-arm64/* \
+              artifacts/p67-bundle-windows-x64/* \
               --clobber
           else
             echo "Creating new draft release ${TAG_NAME}..."
@@ -298,12 +359,11 @@ jobs:
               --notes "$RELEASE_BODY" \
               --target "$CURRENT_BRANCH" \
               latest.txt \
-              artifacts/p67-darwin-arm64/* \
-              artifacts/p67-darwin-x64/* \
-              artifacts/p67-linux-x64/* \
-              artifacts/p67-linux-arm64/* \
-              artifacts/p67-windows-x64/* \
-              artifacts/p67-user-bundle/*
+              artifacts/p67-bundle-darwin-arm64/* \
+              artifacts/p67-bundle-darwin-x64/* \
+              artifacts/p67-bundle-linux-x64/* \
+              artifacts/p67-bundle-linux-arm64/* \
+              artifacts/p67-bundle-windows-x64/*
 
             echo ""
             echo "Draft release created successfully!"
@@ -312,3 +372,25 @@ jobs:
             echo "  2. Publish when ready"
             echo "  3. Merge the release branch PR to main"
           fi
+
+  cleanup:
+    name: Delete intermediate artifacts
+    needs: [create-github-release]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete raw binary artifacts
+        shell: bash
+        working-directory: .
+        run: |
+          for name in p67-darwin-arm64 p67-darwin-x64 p67-linux-x64 p67-linux-arm64 p67-windows-x64; do
+            echo "Deleting artifact: ${name}"
+            ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+              --jq ".artifacts[] | select(.name == \"${name}\") | .id" 2>/dev/null || true)
+            if [ -n "${ARTIFACT_ID}" ]; then
+              gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}" 2>/dev/null || true
+              echo "  Deleted (id: ${ARTIFACT_ID})"
+            else
+              echo "  Not found, skipping"
+            fi
+          done

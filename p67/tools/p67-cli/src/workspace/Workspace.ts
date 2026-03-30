@@ -33,6 +33,9 @@ import pythonRequirementstxt from '@p67-cli/workspace/boiler-plate-python/requir
 import pythonMainpy from '@p67-cli/workspace/boiler-plate-python/src/main.py.src' with {
     type: 'file',
 };
+// TODO: Templates are agent-generated stubs. hello-world doesn't use the P67 SDK at all,
+// hitl has untyped sdk param. Both should demonstrate real P67 features (sdk.sql,
+// sdk.complete, Cortex AI, secrets). See templates/ directory.
 import helloWorldManifest from '@p67-cli/workspace/templates/hello-world/manifest.yaml.src' with {
     type: 'file',
 };
