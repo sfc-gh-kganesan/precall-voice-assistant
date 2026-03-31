@@ -1,0 +1,16 @@
+name: JIRA_MCP_POC
+visibility: public
+
+params:
+    jql_query:
+        description: JQL query to search Jira issues
+
+config:
+    - config_name: default
+      parameters:
+          jql_query:
+              value: "project = SNOW ORDER BY created DESC"
+          JIRA_API_TOKEN:
+              secretRef: "YOUR_DB.SECRETS.JIRA_API_TOKEN"
+          JIRA_EMAIL:
+              secretRef: "YOUR_DB.SECRETS.JIRA_EMAIL"

@@ -74,6 +74,14 @@ export function registerManifestRoute(server: FastifyInstance) {
                     }
                 }
 
+                // Filter out secret-backed and OAuth-backed params — these are
+                // resolved at runtime and should not be shown as user inputs
+                for (const [key, val] of Object.entries(allParams)) {
+                    if (val.secretRef || val.oauthRef) {
+                        delete allParams[key];
+                    }
+                }
+
                 return reply.code(200).send({
                     params:
                         Object.keys(allParams).length > 0

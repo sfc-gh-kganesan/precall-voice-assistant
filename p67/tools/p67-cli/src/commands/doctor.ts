@@ -60,11 +60,17 @@ export async function checkConnection(): Promise<CheckResult> {
 
 export async function checkEndpointReachable(
     endpoint: string,
+    pat?: string,
 ): Promise<CheckResult> {
     try {
         const url = `${endpoint}/api/health`;
+        const headers: Record<string, string> = {};
+        if (pat) {
+            headers.Authorization = `Snowflake Token="${pat}"`;
+        }
         const response = await fetch(url, {
             signal: AbortSignal.timeout(5000),
+            headers,
         });
         if (response.status === 200) {
             return {
@@ -91,11 +97,17 @@ export async function checkEndpointReachable(
 
 export async function checkControldHealthy(
     endpoint: string,
+    pat?: string,
 ): Promise<CheckResult> {
     try {
         const url = `${endpoint}/api/health`;
+        const headers: Record<string, string> = {};
+        if (pat) {
+            headers.Authorization = `Snowflake Token="${pat}"`;
+        }
         const response = await fetch(url, {
             signal: AbortSignal.timeout(5000),
+            headers,
         });
         if (response.status !== 200) {
             return {
@@ -176,20 +188,22 @@ export async function runDoctorChecks(): Promise<CheckResult[]> {
 
     // 3 & 4. Endpoint reachable + Controld healthy (need default connection endpoint)
     let endpoint: string | undefined;
+    let pat: string | undefined;
     try {
         const config = new ConnectionConfig();
         const defaultName = config.getDefault();
         if (defaultName) {
             const conn = config.getConnection(defaultName);
             endpoint = conn?.endpoint;
+            pat = conn?.pat;
         }
     } catch {
         // Connection config already checked above
     }
 
     if (endpoint) {
-        results.push(await checkEndpointReachable(endpoint));
-        results.push(await checkControldHealthy(endpoint));
+        results.push(await checkEndpointReachable(endpoint, pat));
+        results.push(await checkControldHealthy(endpoint, pat));
     } else {
         results.push({
             name: 'Endpoint reachable',

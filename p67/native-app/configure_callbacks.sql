@@ -33,7 +33,8 @@ begin
             }';
         when 'SNOWFLAKE_EGRESS_EAI' then
             -- NOTE: SPCS does not support wildcards in network rules.
-            -- Includes Snowflake account hostname(s) and Slack API hosts for egress.
+            -- Includes Snowflake account hostname(s), Slack API hosts, and
+            -- Atlassian MCP server for workflow MCP client access.
             return '{
                 "type": "CONFIGURATION",
                 "payload": {
@@ -41,7 +42,8 @@ begin
                         "SFCOGSOPS-SNOWHOUSE_AWS_US_WEST_2.snowflakecomputing.com",
                         "api.slack.com",
                         "wss-primary.slack.com",
-                        "slack.com"
+                        "slack.com",
+                        "mcp.atlassian.com"
                     ],
                     "allowed_secrets": "NONE"
                 }

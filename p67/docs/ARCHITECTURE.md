@@ -185,6 +185,49 @@ See [`diagrams/08-workflow-sdk.mmd`](diagrams/08-workflow-sdk.mmd)
 
 ---
 
+## MCP Integration (Workflows as MCP Clients)
+
+P67 workflows can connect to external [Model Context Protocol (MCP)](https://modelcontextprotocol.io) servers as clients. This enables workflows to use tools exposed by services like Atlassian Jira/Confluence, GitHub, Slack, or any MCP-compatible server.
+
+### Pattern
+
+```
+P67 Workflow (SPCS container)
+  └── @modelcontextprotocol/sdk (MCP Client)
+        └── StreamableHTTPClientTransport
+              └── https://remote-mcp-server.com/mcp
+                    ├── Auth (Basic, Bearer, or OAuth)
+                    ├── client.listTools()
+                    └── client.callTool({ name, arguments })
+```
+
+### How it works
+
+1. **Credentials** are stored as Snowflake secrets and referenced via `secretRef` in the manifest. The SDK resolves them at runtime via `sdk.getParameter()`.
+2. **Network egress** requires the MCP server hostname to be listed in the External Access Integration (EAI) network rule. For the P67 app, this is the `SNOWFLAKE_EGRESS_EAI` reference configured in `native-app/configure_callbacks.sql`.
+3. **The workflow** uses `@modelcontextprotocol/sdk` to create a `Client`, connect via `StreamableHTTPClientTransport` (or `SSEClientTransport` for older servers), discover tools with `client.listTools()`, and call them with `client.callTool()`.
+
+### Atlassian MCP example
+
+The `workflows/test/jira_mcp/` PoC demonstrates this pattern with Atlassian's remote MCP server (`mcp.atlassian.com`). Key learnings:
+
+- **Auth**: Basic Auth (`base64(email:api_token)`) — the API token must be created with the **Rovo MCP** scope, not the "Jira" scope. Without the correct scope, only Teamwork Graph read-only tools are available.
+- **CloudId**: API token auth is not bound to a specific Atlassian site. The workflow must first call `getAccessibleAtlassianResources` to resolve the `cloudId`, then pass it to every tool call.
+- **Tools**: With proper scoping, 37 tools are available (Jira CRUD, Confluence CRUD, JSM Ops, Teamwork Graph, Rovo Search).
+
+### Adding new MCP server hosts
+
+To allow workflows to reach a new MCP server:
+
+1. Add the hostname to the `SNOWFLAKE_EGRESS_EAI` callback in `native-app/configure_callbacks.sql`
+2. For existing deployments, also update the network rule directly:
+   ```sql
+   ALTER NETWORK RULE P67_APP_DATA.CONFIGURATION.P67_SNOWFLAKE_EGRESS_EAI_NETWORK_RULE
+     SET VALUE_LIST = ('<existing hosts>', '<new-mcp-host>');
+   ```
+
+---
+
 ## Deployment Topology
 
 ### Local Development

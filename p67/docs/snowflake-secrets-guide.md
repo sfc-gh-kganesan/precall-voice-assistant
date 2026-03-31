@@ -251,6 +251,27 @@ OAuth-based secrets (`TYPE = OAUTH2`) are not yet supported through `secretRef`.
 For OAuth workflows, use the existing `oauthRef` field which handles token refresh
 automatically.
 
+## External service tokens (e.g., Atlassian, GitHub)
+
+Workflows can connect to external services using API tokens stored as Snowflake
+secrets. A common pattern is storing both an API token and an associated email/username:
+
+```yaml
+config:
+    - config_name: default
+      parameters:
+          JIRA_API_TOKEN:
+              secretRef: "MY_DB.SECRETS.JIRA_API_TOKEN"
+          JIRA_EMAIL:
+              secretRef: "MY_DB.SECRETS.JIRA_EMAIL"
+```
+
+**Atlassian Rovo MCP note:** When creating an Atlassian API token for use with the
+MCP server (`mcp.atlassian.com`), select the **Rovo MCP** app scope — not "Jira".
+The "Jira" scope is for direct REST API access; the MCP server requires its own scope
+to surface Jira/Confluence tools. Without the correct scope, only Teamwork Graph
+read-only tools will be available.
+
 ## Migrating from legacy secrets
 
 If you have existing workflows using the legacy P67-managed secret store (simple
