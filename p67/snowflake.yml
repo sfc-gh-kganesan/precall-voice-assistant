@@ -3,6 +3,7 @@ env:
     db: p67_src
     schema: core
     admin_rl: p67_provider_admin_rl
+    user_rl: p67_user_rl
     image_repo: img_repo
     warehouse: p67_provider_wh
     warehouse_size: xsmall

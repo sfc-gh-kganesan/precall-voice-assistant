@@ -51,6 +51,10 @@ dbmigrate:
 
 deploy: login build push ## Deploy to Snowflake (login, build, push, and run app)
 	snow app run -c $(SNOW_CONNECTION)
+	@echo "Granting application roles to account roles..."
+	snow sql -q "GRANT APPLICATION ROLE P67.app_admin TO ROLE P67_PROVIDER_ADMIN_RL" -c $(SNOW_CONNECTION) || true
+	snow sql -q "GRANT APPLICATION ROLE P67.app_user TO ROLE P67_USER_RL" -c $(SNOW_CONNECTION) || true
+	@echo "Application role grants complete."
 
 describe: ## Describe the p67.app.controld service
 	snow spcs service describe p67.app.controld --format json -c $(SNOW_CONNECTION)

@@ -1,6 +1,8 @@
 use role accountadmin;
 create role if not exists <% ctx.env.admin_rl %>;
+create role if not exists <% ctx.env.user_rl %>;
 grant role <% ctx.env.admin_rl %> to role accountadmin;
+grant role <% ctx.env.user_rl %> to role <% ctx.env.admin_rl %>;
 grant create integration on account to role <% ctx.env.admin_rl %>;
 grant create compute pool on account to role <% ctx.env.admin_rl %>;
 grant create warehouse on account to role <% ctx.env.admin_rl %>;
