@@ -1,0 +1,4 @@
+# MCP client SDK (Streamable HTTP + SSE transports)
+mcp>=1.8.0
+# LangGraph (optional — remove if not using graph-based orchestration)
+langgraph>=0.2.0

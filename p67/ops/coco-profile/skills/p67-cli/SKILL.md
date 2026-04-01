@@ -36,13 +36,26 @@ Scaffold a new workflow project.
 ```bash
 p67 init myworkflow
 p67 init myworkflow --language python
+p67 init myworkflow --template mcp-client
+p67 init myworkflow --template mcp-client --language python
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-l, --language <lang>` | `typescript` (default) or `python` |
+| `-t, --template <name>` | Scaffold from a pre-built template (see below) |
 
 Creates: `p67.yml` manifest, source files, `package.json` or Python equivalents.
+
+**Available templates:**
+
+| Template | Description |
+|----------|-------------|
+| `hello-world` | Minimal LangGraph workflow with three sequential nodes. Good starting point for graph-based workflows. |
+| `hitl` | Human-in-the-loop workflow demonstrating `sdk.interrupt()` for approval gates. |
+| `mcp-client` | Connect to a remote MCP server as a client. Includes auth, tool discovery, and tool calling via the MCP SDK. Supports both TypeScript (`@modelcontextprotocol/sdk`) and Python (`mcp` package). Requires Snowflake secrets for auth credentials — see `manifest.yaml` secretRef entries. |
+
+When no `--template` is specified, a default project with boilerplate and SDK stubs is created.
 
 ### `p67 build`
 

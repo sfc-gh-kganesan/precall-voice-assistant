@@ -1,0 +1,19 @@
+name: mcp_client_workflow
+visibility: public
+
+# User-facing parameters (shown in dashboard / CLI run form)
+params:
+    query:
+        description: Input to pass to the MCP tool
+
+# Snowflake connection + secret-backed credentials
+# secretRef values are NOT shown in the run form — they are resolved at runtime.
+config:
+    - config_name: default
+      parameters:
+          query:
+              value: "hello"
+          MCP_AUTH_TOKEN:
+              secretRef: "YOUR_DB.SECRETS.MCP_AUTH_TOKEN"
+          MCP_AUTH_EMAIL:
+              secretRef: "YOUR_DB.SECRETS.MCP_AUTH_EMAIL"

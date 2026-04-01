@@ -50,6 +50,23 @@ import hitlManifest from '@p67-cli/workspace/templates/hitl/manifest.yaml.src' w
 import hitlIndexTs from '@p67-cli/workspace/templates/hitl/src/index.ts.src' with {
     type: 'file',
 };
+import mcpClientManifest from '@p67-cli/workspace/templates/mcp-client/manifest.yaml.src' with {
+    type: 'file',
+};
+import mcpClientPackageJson from '@p67-cli/workspace/templates/mcp-client/package.json.src' with {
+    type: 'file',
+};
+import mcpClientRequirementsTxt from '@p67-cli/workspace/templates/mcp-client/requirements.txt.src' with {
+    type: 'file',
+};
+// Template: mcp-client (TypeScript)
+import mcpClientIndexTs from '@p67-cli/workspace/templates/mcp-client/src/index.ts.src' with {
+    type: 'file',
+};
+// Template: mcp-client (Python)
+import mcpClientMainPy from '@p67-cli/workspace/templates/mcp-client/src/main.py.src' with {
+    type: 'file',
+};
 // @ts-expect-error - Bun's with { type: 'file' } returns a file path string
 import sdksrc from '@workflow-sdk/index.ts' with { type: 'file' };
 // Python SDK full implementation (for p67 build — bundled with workflow)
@@ -124,15 +141,45 @@ const pythonFiles: Record<string, string> = {
     [pythonLearnWorkflow]: 'LEARN_WORKFLOW.md',
 };
 
-// Template-specific files (only the files that differ from default boilerplate)
-const templateFiles: Record<string, Record<string, string>> = {
+// Template-specific files (only the files that differ from default boilerplate).
+// `common` files apply to all languages. `typescript` / `python` files are
+// copied only when that language is selected and override the corresponding
+// boilerplate file.
+interface TemplateEntry {
+    common: Record<string, string>;
+    typescript?: Record<string, string>;
+    python?: Record<string, string>;
+}
+
+const templateFiles: Record<string, TemplateEntry> = {
     'hello-world': {
-        [helloWorldIndexTs]: 'src/index.ts',
-        [helloWorldManifest]: 'manifest.yaml',
+        common: {
+            [helloWorldManifest]: 'manifest.yaml',
+        },
+        typescript: {
+            [helloWorldIndexTs]: 'src/index.ts',
+        },
     },
     hitl: {
-        [hitlIndexTs]: 'src/index.ts',
-        [hitlManifest]: 'manifest.yaml',
+        common: {
+            [hitlManifest]: 'manifest.yaml',
+        },
+        typescript: {
+            [hitlIndexTs]: 'src/index.ts',
+        },
+    },
+    'mcp-client': {
+        common: {
+            [mcpClientManifest]: 'manifest.yaml',
+        },
+        typescript: {
+            [mcpClientIndexTs]: 'src/index.ts',
+            [mcpClientPackageJson]: 'package.json',
+        },
+        python: {
+            [mcpClientMainPy]: 'src/main.py',
+            [mcpClientRequirementsTxt]: 'requirements.txt',
+        },
     },
 };
 
@@ -177,8 +224,8 @@ export class Workspace {
     }
 
     async bootstrapTemplate(templateName: string) {
-        const tmplFiles = templateFiles[templateName];
-        if (!tmplFiles) {
+        const tmplEntry = templateFiles[templateName];
+        if (!tmplEntry) {
             throw new Error(
                 `Unknown template "${templateName}". Available templates: ${listTemplates().join(', ')}`,
             );
@@ -186,33 +233,43 @@ export class Workspace {
 
         await this.ensureSrcDirExists();
 
-        // Copy common files (gitignore, workflow_graph_schema)
-        // but skip manifest.yaml since templates provide their own
+        // Collect all output paths that the template will provide so we can
+        // skip the corresponding boilerplate files (common + language-specific).
+        const langKey = this.language === 'python' ? 'python' : 'typescript';
+        const langOverrides = tmplEntry[langKey] ?? {};
+        const allTemplateOutputPaths = new Set([
+            ...Object.values(tmplEntry.common),
+            ...Object.values(langOverrides),
+        ]);
+
+        // Copy common boilerplate files, skipping any that the template overrides
         for (const [key, value] of Object.entries(commonFiles)) {
-            if (value === 'manifest.yaml') continue;
+            if (allTemplateOutputPaths.has(value)) continue;
             const outPath = join(this.projectDir, value);
             const outDir = dirname(outPath);
             await mkdir(outDir, { recursive: true });
             await this.materialize(key, outPath);
         }
 
-        // Copy language-specific files, but skip src/index.ts since template provides its own
+        // Copy language-specific boilerplate, skipping template overrides
         const langFiles =
             this.language === 'python' ? pythonFiles : typescriptFiles;
         for (const [key, value] of Object.entries(langFiles)) {
-            if (value === 'src/index.ts') continue;
+            if (allTemplateOutputPaths.has(value)) continue;
             const outPath = join(this.projectDir, value);
             const outDir = dirname(outPath);
             await mkdir(outDir, { recursive: true });
             await this.materialize(key, outPath);
         }
 
-        // Copy template-specific files (index.ts + manifest.yaml)
-        for (const [key, value] of Object.entries(tmplFiles)) {
-            const outPath = join(this.projectDir, value);
-            const outDir = dirname(outPath);
-            await mkdir(outDir, { recursive: true });
-            await this.materialize(key, outPath);
+        // Copy template files: common first, then language-specific
+        for (const files of [tmplEntry.common, langOverrides]) {
+            for (const [key, value] of Object.entries(files)) {
+                const outPath = join(this.projectDir, value);
+                const outDir = dirname(outPath);
+                await mkdir(outDir, { recursive: true });
+                await this.materialize(key, outPath);
+            }
         }
 
         // For Python projects, copy the SDK stubs for IDE support

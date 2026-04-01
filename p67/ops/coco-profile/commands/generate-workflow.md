@@ -1240,6 +1240,79 @@ The generated `tsconfig.json` is already configured correctly:
 
 **Do not modify**: This configuration is optimized for P67 workflows.
 
+## MCP Client Integration
+
+Workflows can act as **MCP clients** — connecting to remote MCP servers to discover and call tools. Use the `mcp-client` template to scaffold this pattern:
+
+```bash
+p67 init my-mcp-workflow --template mcp-client
+# or for Python:
+p67 init my-mcp-workflow --template mcp-client --language python
+```
+
+### Key Concepts
+
+1. **Auth via Snowflake secrets**: MCP server credentials (API tokens, emails) are stored as Snowflake secrets and referenced via `secretRef` in `manifest.yaml`. They are resolved at runtime and never shown in the dashboard UI.
+
+2. **Transport**: The MCP SDK supports Streamable HTTP (preferred) and SSE (fallback). The template tries Streamable HTTP first.
+
+3. **Tool discovery**: After connecting, call `client.listTools()` (TS) or `session.list_tools()` (Python) to see what the remote server offers.
+
+4. **Tool calling**: Use `client.callTool({ name, arguments })` (TS) or `session.call_tool(name, arguments={})` (Python). Results come back as content arrays with text items.
+
+5. **EAI network rules**: When running on SPCS, the MCP server's hostname must be in the External Access Integration network rule, or DNS resolution will fail. See `configure_callbacks.sql` for the host list.
+
+6. **Atlassian-specific**: For Atlassian Rovo MCP (`mcp.atlassian.com`), use Basic Auth (`base64(email:api_token)`), select the **Rovo MCP** scope when creating the API token, and resolve the `cloudId` via `getAccessibleAtlassianResources` before calling site-scoped tools.
+
+### TypeScript Example (abbreviated)
+
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { WorkflowSDK } from "./sdk";
+
+export async function main(sdk: WorkflowSDK) {
+    const token = sdk.getParameter("MCP_AUTH_TOKEN");  // from secretRef
+    const headers = { Authorization: `Basic ${btoa(`user:${token}`)}` };
+
+    const client = new Client({ name: "my-workflow", version: "1.0.0" });
+    await client.connect(
+        new StreamableHTTPClientTransport(new URL("https://mcp-server.example.com/mcp"), {
+            requestInit: { headers },
+        }),
+    );
+
+    const { tools } = await client.listTools();
+    const result = await client.callTool({ name: tools[0].name, arguments: {} });
+    await client.close();
+
+    return { tools: tools.map((t) => t.name), result };
+}
+```
+
+### Python Example (abbreviated)
+
+```python
+import asyncio, base64
+from mcp.client.streamable_http import streamablehttp_client
+from mcp import ClientSession
+from p67_sdk import WorkflowSDK
+
+async def _run(sdk: WorkflowSDK):
+    token = sdk.get_parameter("MCP_AUTH_TOKEN")
+    headers = {"Authorization": f"Basic {base64.b64encode(f'user:{token}'.encode()).decode()}"}
+
+    async with streamablehttp_client("https://mcp-server.example.com/mcp", headers=headers) as (r, w, _):
+        async with ClientSession(r, w) as session:
+            await session.initialize()
+            tools = (await session.list_tools()).tools
+            result = await session.call_tool(tools[0].name, arguments={})
+            return {"tools": [t.name for t in tools]}
+
+def main(sdk: WorkflowSDK):
+    return asyncio.run(_run(sdk))
+```
+
 ## Final Checklist
 
 Before completion:

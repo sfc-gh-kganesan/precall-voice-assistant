@@ -1,0 +1,132 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import type { WorkflowSDK } from "./sdk";
+
+// TODO: Replace with your MCP server's endpoint URL
+const MCP_ENDPOINT = "https://your-mcp-server.example.com/mcp";
+const MCP_ENDPOINT_SSE = "https://your-mcp-server.example.com/sse";
+
+/**
+ * Connect to a remote MCP server.
+ *
+ * This template uses Basic Auth (email:token). Adjust the auth strategy
+ * to match your MCP server's requirements (Bearer token, API key, etc.).
+ *
+ * Tries Streamable HTTP first, then falls back to SSE transport.
+ */
+async function connectMcp(email: string, apiToken: string): Promise<Client> {
+    const basicAuth = Buffer.from(`${email}:${apiToken}`).toString("base64");
+    const headers = { Authorization: `Basic ${basicAuth}` };
+
+    try {
+        console.log("[mcp] Connecting via Streamable HTTP...");
+        const client = new Client({ name: "p67-mcp-client", version: "1.0.0" });
+        const transport = new StreamableHTTPClientTransport(
+            new URL(MCP_ENDPOINT),
+            { requestInit: { headers } },
+        );
+        await client.connect(transport);
+        console.log("[mcp] Connected via Streamable HTTP");
+        return client;
+    } catch (err) {
+        console.log(
+            `[mcp] Streamable HTTP failed: ${err instanceof Error ? err.message : err}`,
+        );
+    }
+
+    console.log("[mcp] Falling back to SSE transport...");
+    const client = new Client({ name: "p67-mcp-client", version: "1.0.0" });
+    const transport = new SSEClientTransport(new URL(MCP_ENDPOINT_SSE), {
+        requestInit: { headers },
+    });
+    await client.connect(transport);
+    console.log("[mcp] Connected via SSE");
+    return client;
+}
+
+/**
+ * Discover available tools on the remote MCP server.
+ */
+async function discoverTools(
+    client: Client,
+): Promise<{ name: string; description?: string }[]> {
+    const { tools } = await client.listTools();
+    console.log(`[mcp] Found ${tools.length} tools:`);
+    for (const t of tools) {
+        console.log(`  - ${t.name}: ${t.description?.slice(0, 80) || "(no description)"}`);
+    }
+    return tools.map((t) => ({ name: t.name, description: t.description }));
+}
+
+/**
+ * Call a tool on the remote MCP server and return its text content.
+ */
+async function callTool(
+    client: Client,
+    toolName: string,
+    args: Record<string, unknown>,
+): Promise<string> {
+    console.log(`[mcp] Calling tool: ${toolName}`);
+    const result = await client.callTool({ name: toolName, arguments: args });
+
+    const texts: string[] = [];
+    if (Array.isArray(result.content)) {
+        for (const item of result.content) {
+            if (item.type === "text" && typeof item.text === "string") {
+                texts.push(item.text);
+            }
+        }
+    }
+    return texts.join("\n");
+}
+
+/**
+ * Main workflow entry point.
+ *
+ * Reads auth credentials from manifest secrets, connects to the remote
+ * MCP server, discovers tools, calls one, and returns the result.
+ */
+export async function main(sdk: WorkflowSDK) {
+    // These come from secretRef entries in manifest.yaml
+    const email = sdk.getParameter("MCP_AUTH_EMAIL");
+    const token = sdk.getParameter("MCP_AUTH_TOKEN");
+
+    if (!email || !token) {
+        throw new Error(
+            "Missing required secrets: MCP_AUTH_EMAIL and MCP_AUTH_TOKEN. " +
+                "Configure them as secretRef entries in manifest.yaml.",
+        );
+    }
+
+    console.log("=== MCP Client Workflow ===\n");
+
+    // Step 1: Connect
+    const client = await connectMcp(email, token);
+
+    // Step 2: Discover tools
+    const tools = await discoverTools(client);
+
+    // Step 3: Call a tool
+    // TODO: Replace with the tool you want to call and its arguments
+    let toolResult = "";
+    if (tools.length > 0) {
+        const firstTool = tools[0].name;
+        toolResult = await callTool(client, firstTool, {});
+        console.log(`\n[result] ${firstTool}:\n${toolResult.slice(0, 500)}`);
+    }
+
+    // Cleanup
+    try {
+        await client.close();
+    } catch {
+        // Ignore close errors
+    }
+
+    return {
+        success: true,
+        toolCount: tools.length,
+        tools: tools.map((t) => t.name),
+        result: toolResult,
+    };
+}

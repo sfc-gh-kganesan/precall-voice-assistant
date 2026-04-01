@@ -1,0 +1,81 @@
+"""
+P67 Workflow — MCP Client Template
+
+Connects to a remote MCP server, discovers tools, calls one, and
+returns the result.  Adjust MCP_ENDPOINT, the auth strategy, and the
+tool call to match your MCP server.
+"""
+
+import asyncio
+import base64
+import json
+
+from mcp.client.streamable_http import streamablehttp_client
+from mcp import ClientSession
+
+from p67_sdk import WorkflowSDK
+
+# TODO: Replace with your MCP server's endpoint URL
+MCP_ENDPOINT = "https://your-mcp-server.example.com/mcp"
+
+
+async def _run(sdk: WorkflowSDK):
+    """Async inner implementation (the MCP Python SDK is async)."""
+
+    email = sdk.get_parameter("MCP_AUTH_EMAIL")
+    token = sdk.get_parameter("MCP_AUTH_TOKEN")
+
+    if not email or not token:
+        raise RuntimeError(
+            "Missing required secrets: MCP_AUTH_EMAIL and MCP_AUTH_TOKEN. "
+            "Configure them as secretRef entries in manifest.yaml."
+        )
+
+    # Build auth header — adjust to match your MCP server's auth scheme
+    basic = base64.b64encode(f"{email}:{token}".encode()).decode()
+    headers = {"Authorization": f"Basic {basic}"}
+
+    print("=== MCP Client Workflow ===\n")
+
+    # Step 1: Connect to the remote MCP server
+    print(f"[mcp] Connecting to {MCP_ENDPOINT}...")
+    async with streamablehttp_client(
+        MCP_ENDPOINT, headers=headers
+    ) as (read_stream, write_stream, _):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            print("[mcp] Connected")
+
+            # Step 2: Discover tools
+            resp = await session.list_tools()
+            tools = resp.tools
+            print(f"[mcp] Found {len(tools)} tools:")
+            for t in tools:
+                desc = (t.description or "(no description)")[:80]
+                print(f"  - {t.name}: {desc}")
+
+            # Step 3: Call the first available tool
+            # TODO: Replace with the tool you want to call and its arguments
+            tool_result = ""
+            if tools:
+                first_tool = tools[0].name
+                result = await session.call_tool(first_tool, arguments={})
+                for item in result.content:
+                    if hasattr(item, "text"):
+                        tool_result += item.text + "\n"
+                print(f"\n[result] {first_tool}:\n{tool_result[:500]}")
+
+    return {
+        "success": True,
+        "tool_count": len(tools),
+        "tools": [t.name for t in tools],
+        "result": tool_result,
+    }
+
+
+def main(sdk: WorkflowSDK):
+    """
+    Sync entry point required by the P67 runtime.
+    Wraps the async MCP client logic with asyncio.run().
+    """
+    return asyncio.run(_run(sdk))
