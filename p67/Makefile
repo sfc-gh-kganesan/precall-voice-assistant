@@ -5,6 +5,9 @@ CONTROLD_IMAGE=controld
 DASH_IMAGE=p67-dash
 DASH_DIR=tools/dash
 TAG_FILE=.build-tag
+RUNNER_PLATFORM_FILE=containers/runner/runner-platform.json
+RUNNER_PYTHON_VERSION := $(shell jq -r .python_version $(RUNNER_PLATFORM_FILE))
+RUNNER_DOCKER_PLATFORM := $(shell jq -r .docker_platform $(RUNNER_PLATFORM_FILE))
 .PHONY: help build build-controld build-dash ci deploy describe dev fix \
 ensure-encryption-key init-provider-account install-cli list-services login logs logs-dash push push-controld push-dash \
 url dash-url dbmigrate cert spcs-data-secret spcs-snowflake-eai
@@ -25,10 +28,11 @@ build-controld: ## Build controld Docker image for linux/amd64
 	$(eval TAG := $(shell git rev-parse --short HEAD)-$(shell date +%s))
 	@echo "$(TAG)" > $(TAG_FILE)
 	docker build \
-		--platform linux/amd64 \
+		--platform $(RUNNER_DOCKER_PLATFORM) \
 		--target runner \
 		--build-arg SERVICE_NAME=controld \
 		--build-arg SERVICE_PORT=8000 \
+		--build-arg PYTHON_VERSION=$(RUNNER_PYTHON_VERSION) \
 		-t $(CONTROLD_IMAGE):$(TAG) \
 		.
 	@echo "Built $(CONTROLD_IMAGE):$(TAG)"

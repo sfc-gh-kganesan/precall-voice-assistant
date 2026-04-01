@@ -11,7 +11,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SandboxConfig } from '@controld/config.js';
 import type { Message } from '@controld/lib/runtime/schema.js';
@@ -292,45 +292,50 @@ spec:
 
     /**
      * Build SQL statements to upload workflow files to the stage.
-     * Snowflake PUT with a glob (*) throws EISDIR if the directory contains
-     * subdirectories, so we upload each top-level file individually and
-     * then PUT each subdirectory's contents with its own glob.
+     * Uploads a single workflow.zip file instead of individual files —
+     * the runner extracts it at startup. This reduces stage upload from
+     * potentially hundreds of PUT statements to just one.
      */
     buildStageUploadSQL(
         jobName: string,
         workflowDir: string,
     ): { putStatements: string[]; stagePath: string } {
         const stagePath = jobName;
+        const zipPath = join(workflowDir, 'workflow.zip');
+
+        if (existsSync(zipPath)) {
+            // Single zip upload — runner will extract at startup
+            return {
+                putStatements: [
+                    `PUT 'file://${zipPath}' '@${this.stageName}/${stagePath}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
+                ],
+                stagePath,
+            };
+        }
+
+        // Fallback: upload individual files for workflows deployed before
+        // the zip-based upload was introduced (no workflow.zip on disk).
         const statements: string[] = [];
-
-        const entries = readdirSync(workflowDir, { withFileTypes: true });
-        const hasSubdirs = entries.some((e) => e.isDirectory());
-
-        if (!hasSubdirs) {
-            // No subdirectories — safe to use top-level glob
-            statements.push(
-                `PUT 'file://${workflowDir}/*' '@${this.stageName}/${stagePath}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
-            );
-        } else {
-            // Upload each top-level file individually
+        const collectFiles = (dir: string, relPrefix: string): void => {
+            const entries = readdirSync(dir, { withFileTypes: true });
             for (const entry of entries) {
                 if (entry.isFile()) {
-                    const filePath = join(workflowDir, entry.name);
+                    const filePath = join(dir, entry.name);
+                    const stageTarget = relPrefix
+                        ? `${stagePath}/${relPrefix}`
+                        : stagePath;
                     statements.push(
-                        `PUT 'file://${filePath}' '@${this.stageName}/${stagePath}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
+                        `PUT 'file://${filePath}' '@${this.stageName}/${stageTarget}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
                     );
+                } else if (entry.isDirectory()) {
+                    const nextRel = relPrefix
+                        ? `${relPrefix}/${entry.name}`
+                        : entry.name;
+                    collectFiles(join(dir, entry.name), nextRel);
                 }
             }
-            // Upload each subdirectory's contents with a glob
-            for (const entry of entries) {
-                if (entry.isDirectory()) {
-                    const subDir = join(workflowDir, entry.name);
-                    statements.push(
-                        `PUT 'file://${subDir}/*' '@${this.stageName}/${stagePath}/${entry.name}/' AUTO_COMPRESS=FALSE OVERWRITE=TRUE`,
-                    );
-                }
-            }
-        }
+        };
+        collectFiles(workflowDir, '');
 
         return { putStatements: statements, stagePath };
     }

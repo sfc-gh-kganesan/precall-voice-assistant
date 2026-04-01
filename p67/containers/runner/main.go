@@ -17,13 +17,15 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
-  "encoding/base64"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -39,6 +41,18 @@ func main() {
 	info, err := os.Stat(workflowDir)
 	if err != nil || !info.IsDir() {
 		fatal("workflow directory does not exist: %s", workflowDir)
+	}
+
+	// If the workflow was uploaded as a single zip, extract it before proceeding.
+	// This avoids hundreds of individual stage PUT/GET operations.
+	zipPath := filepath.Join(workflowDir, "workflow.zip")
+	if fileExists(zipPath) {
+		fmt.Fprintf(os.Stderr, "[p67-runner] extracting workflow.zip...\n")
+		if err := extractZip(zipPath, workflowDir); err != nil {
+			fatal("failed to extract workflow.zip: %v", err)
+		}
+		os.Remove(zipPath) // free disk space
+		fmt.Fprintf(os.Stderr, "[p67-runner] extraction complete\n")
 	}
 
 	// Detect workflow language and resolve the host command.
@@ -179,6 +193,58 @@ func detectLanguage(workflowDir string) (string, []string) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// extractZip extracts a zip archive into destDir.
+// Includes path traversal protection — entries that escape destDir are skipped.
+func extractZip(zipPath, destDir string) error {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return fmt.Errorf("open zip: %w", err)
+	}
+	defer r.Close()
+
+	cleanDest := filepath.Clean(destDir) + string(os.PathSeparator)
+
+	for _, f := range r.File {
+		target := filepath.Join(destDir, f.Name)
+
+		// Path traversal protection: ensure the resolved path stays within destDir.
+		if !strings.HasPrefix(filepath.Clean(target)+string(os.PathSeparator), cleanDest) &&
+			filepath.Clean(target) != filepath.Clean(destDir) {
+			fmt.Fprintf(os.Stderr, "[p67-runner] skipping unsafe zip entry: %s\n", f.Name)
+			continue
+		}
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(target, 0o755)
+			continue
+		}
+
+		// Ensure parent directory exists
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return fmt.Errorf("mkdir %s: %w", filepath.Dir(target), err)
+		}
+
+		outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return fmt.Errorf("create %s: %w", target, err)
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			outFile.Close()
+			return fmt.Errorf("open entry %s: %w", f.Name, err)
+		}
+
+		_, err = io.Copy(outFile, rc)
+		rc.Close()
+		outFile.Close()
+		if err != nil {
+			return fmt.Errorf("extract %s: %w", f.Name, err)
+		}
+	}
+	return nil
 }
 
 func fatal(format string, args ...any) {

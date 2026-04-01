@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readdir, readFile, rm } from 'node:fs/promises';
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PrismaClient, WorkflowWithOwner } from '@p67/db';
 import { parseManifest } from './manifest.js';
@@ -84,6 +84,11 @@ export class WorkflowService {
         }
         const dest = join(this.localStoragePath, workflowId);
         const { dir } = await unzip(zipFileBuffer, dest);
+
+        // Save the original zip for efficient stage upload (1 PUT vs hundreds).
+        // The runner extracts it at startup.
+        const zipDest = join(dest, 'workflow.zip');
+        await writeFile(zipDest, zipFileBuffer);
 
         // Extract workflow name and visibility from manifest if present
         let workflowName: string | undefined;

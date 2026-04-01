@@ -45,11 +45,17 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # ── Stage 3: Runtime ─────────────────────────────────────────────────
 FROM node:20-slim AS runtime
 
+# Default fallback — the canonical value is in runner-platform.json,
+# passed via --build-arg by the Makefile. This default exists so bare
+# `docker build` invocations don't fail with an empty variable.
+ARG PYTHON_VERSION=3.11
+
 # Python runtime for Python workflows (g++ needed to build snowflake-connector-python)
 # curl needed for Cortex Code installer
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        python3 python3-dev python3-pip python3-venv \
+        python${PYTHON_VERSION} python${PYTHON_VERSION}-dev \
+        python3-pip python${PYTHON_VERSION}-venv \
         g++ curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -57,8 +63,8 @@ WORKDIR /app
 
 # Python host + deps
 COPY containers/runner/requirements.txt ./
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt \
-    && apt-get purge -y --auto-remove python3-dev g++ \
+RUN python${PYTHON_VERSION} -m pip install --no-cache-dir --break-system-packages -r requirements.txt \
+    && apt-get purge -y --auto-remove python${PYTHON_VERSION}-dev g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY containers/runner/host.py /app/host.py

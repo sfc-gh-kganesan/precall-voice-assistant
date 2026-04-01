@@ -137,10 +137,10 @@ describe('SPCSAdapter.buildJobServiceSQL - secrets', () => {
 });
 
 describe('SPCSAdapter.buildStageUploadSQL', () => {
-    const tmpBase = '/tmp/p67-adapter-test-' + Date.now();
+    const tmpBase = `/tmp/p67-adapter-test-${Date.now()}`;
 
     function setupDir(files: string[], dirs: string[]): string {
-        const dir = tmpBase + '/' + Math.random().toString(36).slice(2);
+        const dir = `${tmpBase}/${Math.random().toString(36).slice(2)}`;
         fs.mkdirSync(dir, { recursive: true });
         for (const f of files) {
             fs.writeFileSync(`${dir}/${f}`, 'test');

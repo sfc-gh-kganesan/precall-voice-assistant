@@ -1,0 +1,6 @@
+{
+    "python_version": "3.11",
+    "pip_platform": "manylinux2014_x86_64",
+    "pip_implementation": "cp",
+    "docker_platform": "linux/amd64"
+}

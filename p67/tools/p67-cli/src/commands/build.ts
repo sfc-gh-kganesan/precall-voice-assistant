@@ -7,6 +7,27 @@ import { projectConfig } from '@p67-cli/middleware/project-config';
 import { pythonSdkFiles } from '@p67-cli/workspace/Workspace';
 import { zipSync } from 'fflate';
 
+// Runner platform config — embedded at compile time.
+// Single source of truth shared with the Dockerfile and Makefile.
+import runnerPlatformPath from '../../../../containers/runner/runner-platform.json' with {
+    type: 'file',
+};
+
+interface RunnerPlatform {
+    python_version: string;
+    pip_platform: string;
+    pip_implementation: string;
+    docker_platform: string;
+}
+
+function getRunnerPlatform(): RunnerPlatform {
+    // Bun's `with { type: 'file' }` returns a file path string at runtime,
+    // but TypeScript sees it as the parsed JSON type. Cast to string for fs.
+    return JSON.parse(
+        fs.readFileSync(runnerPlatformPath as unknown as string, 'utf-8'),
+    );
+}
+
 async function extractLangGraph(
     entrypoint: string,
     buildDir: string,
@@ -263,12 +284,57 @@ async function buildPython(
         throw new Error(`Source directory not found: ${srcDir}`);
     }
 
-    // Copy requirements.txt if it exists
+    // Copy requirements.txt if it exists, then vendor dependencies
     const requirementsSrc = path.join(projectDir, 'requirements.txt');
     if (fs.existsSync(requirementsSrc)) {
         const requirementsDest = path.join(buildDir, 'requirements.txt');
         await copyFile(requirementsSrc, requirementsDest);
         console.log(`✔︎ Copied requirements.txt to ${buildDir}`);
+
+        // Vendor dependencies into build dir (analogous to esbuild bundling for TS).
+        // Uses --platform and --python-version to download pre-built wheels
+        // matching the runner container, regardless of the developer's local machine.
+        // All vendored files (including native .so extensions) are included in
+        // workflow.zip. The runner unzips them to real filesystem paths, so
+        // zipimport limitations don't apply.
+        const content = fs.readFileSync(requirementsSrc, 'utf-8');
+        const hasPackages = content
+            .split('\n')
+            .some((line) => line.trim() && !line.trim().startsWith('#'));
+
+        if (hasPackages) {
+            const platform = getRunnerPlatform();
+            console.log('Installing Python dependencies...');
+            const pipResult = Bun.spawnSync(
+                [
+                    'python3',
+                    '-m',
+                    'pip',
+                    'install',
+                    '-r',
+                    requirementsSrc,
+                    '--target',
+                    buildDir,
+                    '--platform',
+                    platform.pip_platform,
+                    '--only-binary=:all:',
+                    '--python-version',
+                    platform.python_version,
+                    '--implementation',
+                    platform.pip_implementation,
+                    '--no-compile',
+                    '-q',
+                ],
+                { cwd: projectDir, stdout: 'inherit', stderr: 'inherit' },
+            );
+            if (pipResult.exitCode === 0) {
+                console.log('✔︎ Vendored Python dependencies into build');
+            } else {
+                console.warn(
+                    `⚠ pip install failed (exit ${pipResult.exitCode}). Dependencies may be missing at runtime.`,
+                );
+            }
+        }
     }
 
     // Bundle the p67_sdk package (full implementation) with the workflow.

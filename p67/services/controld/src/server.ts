@@ -41,6 +41,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
 
     const server = Fastify({
+        bodyLimit: 50 * 1024 * 1024, // 50 MB — supports large workflow zips
         logger: {
             level: 'debug',
             transport: {
@@ -91,7 +92,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     server.decorate('runnerRegistry', new Map<string, Runner>());
 
     await server.register(formbody);
-    await server.register(multipart);
+    await server.register(multipart, {
+        limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+    });
 
     server.addHook('preParsing', async (request, _reply, payload) => {
         if (
