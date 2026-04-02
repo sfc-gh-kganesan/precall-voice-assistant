@@ -1,3 +1,21 @@
 name: hello_world
 visibility: public
-config: []
+
+params:
+    topic:
+        description: Topic for Cortex AI to write about
+
+# Snowflake connection is required for sdk.cortexComplete().
+# Replace the placeholder values below with your account details.
+# See boiler-plate-common/manifest.yaml for the full config reference.
+config:
+    - config_name: default
+      account:
+          value: "YOUR_ACCOUNT" # e.g. MYORG-MYACCOUNT
+      authenticator:
+          value: "programmatic_access_token"
+      token:
+          secretRef: "YOUR_DB.SECRETS.YOUR_PAT_SECRET"
+      parameters:
+          topic:
+              value: "Snowflake data warehousing"

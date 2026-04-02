@@ -1,31 +1,45 @@
-export async function main(sdk) {
-    console.log('Starting interrupt workflow...');
+import type { WorkflowSDK } from './sdk';
 
-    console.log('Step 1: Doing some initial work...');
-    console.log('Step 1 complete.');
+/**
+ * Human-in-the-loop (HITL) workflow — demonstrates:
+ *   sdk.getParameter()  – reads a user-supplied parameter from the manifest
+ *   sdk.interrupt<T>()  – pauses execution and waits for a human decision
+ *
+ * No Snowflake credentials are required in manifest.yaml for this workflow.
+ */
+export async function main(sdk: WorkflowSDK) {
+	// Step 1: Read the action that requires human approval
+	const action = sdk.getParameter('action');
+	console.log(`[hitl] Requesting approval for: "${action}"`);
 
-    console.log('Step 2: Requesting human approval...');
-    const response = await sdk.interrupt(
-        {
-            type: 'approval',
-            question: 'Do you approve this workflow to continue?',
-            context: {
-                items: [
-                    'Updated API endpoints',
-                    'New dashboard features',
-                    'Bug fixes for user auth',
-                ],
-                version: '2.1.0',
-                environment: 'production',
-            },
-        },
-        { nodeId: 'approval_node' },
-    );
+	// Step 2: Pause the workflow and wait for a human to approve or reject.
+	// The payload is surfaced in the dashboard and via the CLI.
+	// Execution resumes only after a human responds via sdk.resumeInterrupt().
+	const approved = await sdk.interrupt<boolean>(
+		{
+			type: 'approval',
+			question: 'Do you approve the following action?',
+			context: { action },
+		},
+		{ nodeId: 'human_approval' },
+	);
 
-    console.log('Received human response:', JSON.stringify(response));
+	console.log(`[hitl] Human responded: approved=${approved}`);
 
-    console.log('Step 3: Completing workflow with response...');
-    console.log('Workflow finished successfully!');
+	// Step 3: Branch based on the human's decision
+	if (approved) {
+		console.log(`[hitl] Approved — proceeding with: "${action}"`);
+		return {
+			status: 'approved',
+			action,
+			message: `Action approved and executed: ${action}`,
+		};
+	}
 
-    return { approved: response, status: 'done' };
+	console.log('[hitl] Rejected — action will not proceed');
+	return {
+		status: 'rejected',
+		action,
+		message: 'Action was rejected by the reviewer',
+	};
 }

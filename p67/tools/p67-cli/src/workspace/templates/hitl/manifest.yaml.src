@@ -1,3 +1,12 @@
 name: hitl_workflow
 visibility: public
-config: []
+
+params:
+    action:
+        description: Action or change to request human approval for
+
+config:
+    - config_name: default
+      parameters:
+          action:
+              value: "Deploy the latest model to production"
