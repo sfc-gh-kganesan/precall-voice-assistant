@@ -36,6 +36,7 @@ export const RunStatusSchema = z.enum([
     'completed',
     'interrupted',
     'failed',
+    'cancelled',
 ]);
 
 export const PendingInterruptSchema = z.object({
@@ -250,6 +251,19 @@ export type WorkflowDeleteResponse = z.infer<
     typeof WorkflowDeleteResponseSchema
 >;
 
+export const WorkflowRunCancelParamsSchema = z.object({
+    runId: z.string().uuid(),
+});
+
+export const WorkflowRunCancelResponseSchema = z.object({
+    cancelled: z.boolean(),
+    runId: z.string(),
+});
+
+export type WorkflowRunCancelResponse = z.infer<
+    typeof WorkflowRunCancelResponseSchema
+>;
+
 export const SecretTypeSchema = z.enum(['Secret', 'OAuth']);
 
 export const SecretSaveBodySchema = z.object({
@@ -359,7 +373,13 @@ export const RunListQuerySchema = z.object({
 export const RunEntrySchema = z.object({
     id: z.string(),
     workflowId: z.string(),
-    status: z.enum(['running', 'completed', 'failed', 'interrupted']),
+    status: z.enum([
+        'running',
+        'completed',
+        'failed',
+        'interrupted',
+        'cancelled',
+    ]),
     startedAt: z.string(),
     completedAt: z.string().nullable(),
     exitCode: z.number().nullable(),

@@ -71,6 +71,7 @@ export function registerStatusRoute(server: FastifyInstance) {
                     Completed: 'completed',
                     Interrupted: 'interrupted',
                     Failed: 'failed',
+                    Cancelled: 'cancelled',
                 };
                 const status = statusMap[run.status] ?? 'running';
 
@@ -117,7 +118,8 @@ export function registerStatusRoute(server: FastifyInstance) {
                         | 'running'
                         | 'completed'
                         | 'interrupted'
-                        | 'failed',
+                        | 'failed'
+                        | 'cancelled',
                     exitCode: run.exitCode,
                     result:
                         status !== 'running'

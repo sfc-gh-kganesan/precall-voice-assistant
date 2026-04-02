@@ -43,7 +43,12 @@ export interface WorkflowRunAccepted {
     status: 'running';
 }
 
-export type RunStatus = 'running' | 'completed' | 'interrupted' | 'failed';
+export type RunStatus =
+    | 'running'
+    | 'completed'
+    | 'interrupted'
+    | 'failed'
+    | 'cancelled';
 
 export interface WorkflowRunStatusResponse {
     runId: string;
@@ -374,6 +379,21 @@ export class ControldClient {
         }
 
         return (await response.json()) as WorkflowRunStatusResponse;
+    }
+
+    async cancelRun(
+        runId: string,
+    ): Promise<{ cancelled: boolean; runId: string }> {
+        const response = await this.post(
+            `/api/workflow/runs/${encodeURIComponent(runId)}/cancel`,
+        );
+
+        if (!response.ok) {
+            const error = (await response.json()) as ErrorResponse;
+            throw new Error(error.message || error.error);
+        }
+
+        return (await response.json()) as { cancelled: boolean; runId: string };
     }
 
     async pollForCompletion(

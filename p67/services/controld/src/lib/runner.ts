@@ -32,7 +32,12 @@ import { ValueManager } from '@controld/lib/value-manager.js';
 import type { PrismaClient } from '@p67/db';
 import type { InterruptPayload, P67Config } from '@p67/workflow-sdk';
 
-export type RunStatus = 'running' | 'completed' | 'interrupted' | 'failed';
+export type RunStatus =
+    | 'running'
+    | 'completed'
+    | 'interrupted'
+    | 'failed'
+    | 'cancelled';
 
 export type RunResult = {
     stdout: string[];
@@ -305,6 +310,8 @@ export class Runner {
     private valueManager: ValueManager | null = null;
     private mergedParams: Record<string, string> = {};
     private collectedSecrets: CollectedSecrets | null = null;
+    private spcsJobName: string | null = null;
+    private _cancelled = false;
 
     constructor(
         private readonly workflowDir: string,
@@ -365,6 +372,30 @@ export class Runner {
     }
     public getWorkflowId(): string {
         return this.workflowId;
+    }
+
+    /**
+     * Cancel the running workflow.
+     * For Docker mode, sends SIGTERM to the child process.
+     * For SPCS mode, drops the job service.
+     */
+    public async cancel(): Promise<void> {
+        this._cancelled = true;
+        if (this.proc) {
+            this.proc.kill('SIGTERM');
+        }
+        if (this.spcsJobName) {
+            const { executeSql } = await import(
+                '@controld/lib/runtime/spcs-sql.js'
+            );
+            try {
+                await executeSql(
+                    `DROP SERVICE IF EXISTS app.${this.spcsJobName}`,
+                );
+            } catch {
+                // Best-effort — job may already be gone
+            }
+        }
     }
 
     /**
@@ -971,7 +1002,7 @@ export class Runner {
                     errors,
                     exitCode: 1,
                     runId,
-                    status: 'failed',
+                    status: this._cancelled ? 'cancelled' : 'failed',
                     result: workflowResult,
                 };
                 resolve(result);
@@ -993,7 +1024,7 @@ export class Runner {
                     errors,
                     exitCode: 1,
                     runId,
-                    status: 'failed',
+                    status: this._cancelled ? 'cancelled' : 'failed',
                     result: workflowResult,
                 };
                 resolve(result);
@@ -1017,7 +1048,11 @@ export class Runner {
                     errors,
                     exitCode: code || 0,
                     runId,
-                    status: code === 0 ? 'completed' : 'failed',
+                    status: this._cancelled
+                        ? 'cancelled'
+                        : code === 0
+                          ? 'completed'
+                          : 'failed',
                     result: workflowResult,
                 };
                 // Always resolve the completion promise on exit
@@ -1035,8 +1070,12 @@ export class Runner {
         adapter.sendMessage(proc, m);
         const result = await getResult;
 
-        // Complete the run record only if workflow completed (not interrupted)
-        if (this.logService && result.status !== 'interrupted') {
+        // Complete the run record only if workflow completed (not interrupted or cancelled)
+        if (
+            this.logService &&
+            result.status !== 'interrupted' &&
+            result.status !== 'cancelled'
+        ) {
             await this.logService.completeRun(
                 runId,
                 result.exitCode,
@@ -1081,6 +1120,7 @@ export class Runner {
         const errors: Array<{ error: WorkflowError; message: string }> = [];
 
         const jobName = adapter.createJobId();
+        this.spcsJobName = jobName;
 
         await writeLog('RuntimeHost', `Starting SPCS job: ${jobName}`);
         logger.debug(`SPCS mode: launching job ${jobName}`);
@@ -1226,6 +1266,20 @@ export class Runner {
                 );
             } catch {
                 // Best-effort cleanup
+            }
+
+            // If cancelled, return immediately without writing a failed status to DB
+            // (the cancel route already updated the DB to Cancelled)
+            if (this._cancelled) {
+                return {
+                    stdout: [],
+                    stderr,
+                    log: logger.dump(),
+                    exitCode: 1,
+                    errors: [],
+                    runId,
+                    status: 'cancelled',
+                };
             }
 
             if (this.logService) {
@@ -1405,9 +1459,13 @@ export class Runner {
         }
 
         const exitCode = errors.length > 0 ? 1 : 0;
-        const status: RunStatus = errors.length > 0 ? 'failed' : 'completed';
+        const status: RunStatus = this._cancelled
+            ? 'cancelled'
+            : errors.length > 0
+              ? 'failed'
+              : 'completed';
 
-        if (this.logService) {
+        if (this.logService && status !== 'cancelled') {
             await this.logService.completeRun(runId, exitCode, workflowResult);
         }
 

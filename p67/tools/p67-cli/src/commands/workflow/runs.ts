@@ -32,6 +32,8 @@ function statusLabel(run: RunEntry): string {
             return 'interrupted';
         case 'running':
             return 'running...';
+        case 'cancelled':
+            return 'cancelled';
         default:
             return run.status;
     }
