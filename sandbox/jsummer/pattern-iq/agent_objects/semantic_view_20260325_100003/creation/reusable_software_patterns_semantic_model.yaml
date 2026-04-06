@@ -156,6 +156,16 @@ tables:
         expr: SEARCH_CONTENT
         data_type: VARCHAR
         description: Concatenated text field combining pattern name, description, usage notes, and tags for full-text search purposes.
+      - name: STARS
+        expr: STARS
+        data_type: NUMBER
+        description: Number of stars (upvotes) the pattern has received from users, indicating popularity and usefulness.
+        synonyms:
+          - star count
+          - votes
+          - popularity
+          - likes
+          - upvotes
     time_dimensions:
       - name: CREATED_AT
         expr: CREATED_AT
@@ -180,6 +190,13 @@ tables:
         description: Numeric complexity score used for aggregation calculations such as average complexity across pattern groups.
         synonyms:
           - complexity value
+      - name: STARS_FACT
+        expr: STARS
+        data_type: NUMBER
+        description: Star count used for aggregation calculations such as total stars, average stars, and most popular patterns.
+        synonyms:
+          - star value
+          - vote count
     metrics:
       - name: PATTERN_COUNT
         expr: COUNT(PATTERN_ID)
@@ -209,6 +226,20 @@ tables:
           - lowest complexity
           - simplest
           - least complex
+      - name: TOTAL_STARS
+        expr: SUM(STARS)
+        description: Total number of stars across patterns matching the given criteria.
+        synonyms:
+          - sum of stars
+          - total votes
+          - total likes
+      - name: AVG_STARS
+        expr: AVG(STARS)
+        description: Average number of stars per pattern matching the given criteria.
+        synonyms:
+          - average stars
+          - mean stars
+          - average votes
     filters:
       - name: PYTHON_PATTERNS
         expr: LANGUAGE = 'python'
@@ -225,3 +256,6 @@ tables:
       - name: CORTEX_SEARCH_PATTERNS
         expr: FRAMEWORK = 'cortex-search'
         description: Filter to show only Cortex Search framework patterns.
+      - name: POPULAR_PATTERNS
+        expr: STARS > 0
+        description: Filter to show only patterns that have received at least one star.

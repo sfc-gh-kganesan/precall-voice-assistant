@@ -59,17 +59,13 @@ Display the agent's response to the user. The agent is instructed to return resu
 
 ### Step 4: User Actions
 
-After presenting results, offer these actions:
-
-1. **View abstracted code** — Display the clean-room template code for a selected pattern. Explain that this is a generalized, reusable version of the pattern with placeholders (e.g., database names, table names, config values) that the engineer can customize for their specific use case. Walk through the key placeholders and explain what each one controls. If the code was not included in the initial response, run a follow-up query: `--query "Show me the abstracted code for the <pattern_name> pattern"`.
-
-2. **View source repo** — Display the source repository link for a selected pattern so the engineer can study the original, full implementation. If the link was not in the initial response, run a follow-up query: `--query "What is the source repo link for the <pattern_name> pattern?"`.
-
-3. **View dependencies** — Show the dependency graph and complexity details for a selected pattern. Run a follow-up query if needed: `--query "Show me the dependencies for the <pattern_name> pattern"`.
-
-4. **Ask follow-up** — The engineer can ask a follow-up question to narrow results, compare patterns, get more detail, or explore related patterns. Run the script again with the new query and optionally the same `--context`.
-
-5. **Copy snippet** — Offer to insert the abstracted code into the engineer's current project, adapting the placeholders to the project's actual values where possible.
+Offer these actions:
+1. **View abstracted code** — display the clean-room template for a selected pattern
+2. **View dependencies** — show the dependency graph and complexity details
+3. **Refine search** — run a new query with adjusted terms or filters
+4. **Copy snippet** — offer to insert the abstracted code into the user's current project
+5. **Star pattern** — star a selected pattern to show support or indicate it was useful. Execute via SQL: `CALL PATTERN_IQ.PUBLIC.STAR_PATTERN('<PATTERN_ID>')`
+6. **Remove pattern** — permanently delete a selected pattern from the catalog. Confirm the pattern name and ID with the user before executing. Execute via SQL: `CALL PATTERN_IQ.PUBLIC.REMOVE_PATTERN('<PATTERN_ID>')`
 
 ## Stopping Points
 

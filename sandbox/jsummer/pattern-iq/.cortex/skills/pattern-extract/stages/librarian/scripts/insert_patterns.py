@@ -49,13 +49,13 @@ def _insert_row(cursor, p):
             SOURCE_REPO_LINK, REPO_NAME, COMPLEXITY_SCORE,
             DEPENDENCIES, DEPENDENCY_GRAPH, SYNTHETIC_QUERIES,
             USAGE_NOTES, TAGS, LANGUAGE, FRAMEWORK,
-            CREATED_BY, SEARCH_CONTENT
+            CREATED_BY, SEARCH_CONTENT, STARS
         ) SELECT
             %s, %s, %s, %s, %s,
             %s, %s, %s,
             PARSE_JSON(%s), PARSE_JSON(%s), PARSE_JSON(%s),
             %s, PARSE_JSON(%s), %s, %s,
-            CURRENT_USER(), %s
+            CURRENT_USER(), %s, 0
         """,
         (
             pattern_id,
