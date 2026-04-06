@@ -17,21 +17,22 @@ If the environment variable `PATTERN_IQ_CI` is set to `true`, this pipeline is r
 - **Skip all mandatory stopping points** — do NOT use `AskUserQuestion` for approval gates
 - Auto-approve each stage output and proceed directly to the next phase
 - Continue through the full pipeline (Architect → Distiller → Librarian) without pausing
+- **Do NOT re-read source files** — the `file_reader.py` script in Phase 2 loads all necessary content. Do not use the `read` tool on target repository files during Phase 2.
+- **Extract patterns inline** — in Phase 2, extract patterns directly in the main agent context from `distiller-input.json`. Do NOT use subagents — they cannot write files in headless mode. See Distiller SKILL.md "CI Mode" section.
+
+> **Note**: For large repos (10+ high-utility domains), CI inline extraction may be slow or hit context limits. Prefer running locally in interactive mode, which uses parallel background subagents for better performance.
 
 ## Prerequisites
 
 - `uv` installed (`uv --version`)
 - Snowflake connection with access to `PATTERN_IQ` database
 
-### Snowflake Object Setup
+### Snowflake Object Verification
 
-Before running the pipeline, ensure the required Snowflake objects exist. Run each statement from `<PROJECT_ROOT>/sql/setup.sql` via `snowflake_sql_execute`. The statements are idempotent (`IF NOT EXISTS` / `OR REPLACE`):
+Before running the pipeline, verify the required Snowflake objects exist. Do NOT attempt to create them — the CI role may lack DDL privileges.
 
-1. `CREATE DATABASE IF NOT EXISTS PATTERN_IQ`
-2. `CREATE TABLE IF NOT EXISTS PATTERN_IQ.PUBLIC.REUSABLE_PATTERNS (...)` — see `sql/setup.sql` for full schema
-3. `CREATE OR REPLACE CORTEX SEARCH SERVICE PATTERN_IQ.PUBLIC.PATTERN_SEARCH_SVC (...)` — see `sql/setup.sql` for full definition
-
-`<PROJECT_ROOT>` is the root of the **pattern-iq** project (parent of `.cortex/`), NOT the target repository being scanned.
+1. `SHOW DATABASES LIKE 'PATTERN_IQ'` — if 0 rows, **STOP** immediately: "ERROR: PATTERN_IQ database does not exist. A privileged role must run sql/setup.sql first."
+2. `DESCRIBE TABLE PATTERN_IQ.PUBLIC.REUSABLE_PATTERNS` — if error, **STOP** immediately: "ERROR: REUSABLE_PATTERNS table does not exist or is inaccessible. A privileged role must run sql/setup.sql first."
 
 ## Pipeline
 

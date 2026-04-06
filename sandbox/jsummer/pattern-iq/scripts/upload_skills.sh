@@ -30,7 +30,8 @@ tar -czf "$TARBALL" -C "$PROJECT_ROOT" \
     --exclude='.venv' \
     --exclude='__pycache__' \
     --exclude='uv.lock' \
-    .cortex/skills
+    .cortex/skills \
+    .cortex/agents
 
 echo "Tarball created: $TARBALL ($(du -h "$TARBALL" | cut -f1))"
 

@@ -29,7 +29,7 @@ env:
 jobs:
   pattern-iq:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Install Cortex Code CLI

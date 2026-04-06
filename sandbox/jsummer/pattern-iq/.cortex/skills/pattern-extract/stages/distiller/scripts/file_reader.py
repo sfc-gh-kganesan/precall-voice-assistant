@@ -102,20 +102,36 @@ def main():
     manifest = load_manifest(args.manifest)
     domains = manifest.get("domains", [])
 
-    result = {
-        "domains": [process_domain(d, args.repo_root, args.threshold) for d in domains]
-    }
-
-    result["domains"] = [d for d in result["domains"] if d["files"]]
-
-    output_json = json.dumps(result, indent=2)
+    processed = [process_domain(d, args.repo_root, args.threshold) for d in domains]
+    processed = [d for d in processed if d["files"]]
 
     if args.output:
+        # Write per-domain files and a manifest
+        out_dir = os.path.dirname(args.output) or "."
+        domain_files = []
+        for i, domain in enumerate(processed):
+            domain_path = os.path.join(out_dir, f"distiller-domain-{i}.json")
+            with open(domain_path, "w", encoding="utf-8") as f:
+                json.dump(domain, f, indent=2)
+                f.write("\n")
+            domain_files.append({
+                "index": i,
+                "name": domain["name"],
+                "file": domain_path,
+                "file_count": len(domain["files"]),
+                "truncated_count": domain.get("truncated_count", 0),
+            })
+
+        manifest = {"domain_count": len(domain_files), "domains": domain_files}
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(output_json)
+            json.dump(manifest, f, indent=2)
             f.write("\n")
+
+        print(f"Wrote {len(domain_files)} domain files + manifest to {args.output}")
     else:
-        print(output_json)
+        # Legacy: single JSON to stdout
+        result = {"domains": processed}
+        print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
