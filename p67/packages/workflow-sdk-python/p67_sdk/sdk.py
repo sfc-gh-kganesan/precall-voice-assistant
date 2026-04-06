@@ -8,8 +8,10 @@ Snowflake and external services.
 from __future__ import annotations
 
 import json
+import os
 import socket
 import subprocess
+import tempfile
 import urllib.request
 import urllib.error
 from typing import Any, Dict, Iterator, List, Optional, TypeVar
@@ -1211,6 +1213,56 @@ class WorkflowSDK:
         if options.allow_all_tool_calls:
             args.append('--dangerously-allow-all-tool-calls')
         
+        # Write a temporary config.toml so the cortex CLI can authenticate.
+        # Mirrors the TypeScript sdk-impl.ts cortexCode() approach.
+        snowflake_home = None
+        try:
+            cfg = self._get_config()
+        except ValueError:
+            cfg = {}
+        
+        account = cfg.get('account')
+        token = cfg.get('token')
+        password = cfg.get('password')
+        
+        if account and (token or password):
+            snowflake_home = tempfile.mkdtemp(prefix='p67-cortex-')
+            lines = [
+                'default_connection_name = "default"',
+                '',
+                '[connections.default]',
+                f'account = "{account}"',
+            ]
+            username = cfg.get('username')
+            if username:
+                lines.append(f'user = "{username}"')
+            if token:
+                lines.append('authenticator = "programmatic_access_token"')
+                lines.append(f'token = "{token}"')
+            elif password:
+                lines.append(f'password = "{password}"')
+            access_url = cfg.get('accessUrl')
+            if access_url:
+                host = access_url
+                if host.startswith('https://'):
+                    host = host[8:]
+                elif host.startswith('http://'):
+                    host = host[7:]
+                lines.append(f'host = "{host}"')
+            for key in ('warehouse', 'database', 'schema'):
+                val = cfg.get(key)
+                if val:
+                    lines.append(f'{key} = "{val}"')
+            
+            config_path = os.path.join(snowflake_home, 'config.toml')
+            with open(config_path, 'w') as f:
+                f.write('\n'.join(lines) + '\n')
+            os.chmod(config_path, 0o600)
+        
+        env = {**os.environ}
+        if snowflake_home:
+            env['SNOWFLAKE_HOME'] = snowflake_home
+        
         try:
             result = subprocess.run(
                 args,
@@ -1218,6 +1270,7 @@ class WorkflowSDK:
                 text=True,
                 timeout=options.timeout,
                 cwd=options.work_dir,
+                env=env,
             )
             
             if result.returncode != 0:
@@ -1259,6 +1312,10 @@ class WorkflowSDK:
                 output='',
                 error=f"Unexpected error: {str(e)}",
             )
+        finally:
+            if snowflake_home:
+                import shutil
+                shutil.rmtree(snowflake_home, ignore_errors=True)
     
     def close(self) -> None:
         """

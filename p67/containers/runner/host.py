@@ -10,7 +10,9 @@ This is the Python equivalent of host.ts for TypeScript workflows.
 
 import sys
 import json
+import asyncio
 import importlib.util
+import inspect
 import os
 import threading
 from pathlib import Path
@@ -145,6 +147,9 @@ def handle_run_workflow(data: Dict[str, Any]) -> None:
         
         sdk = WorkflowSDK(config)
         result = module.main(sdk)
+        # If main is async, the call above returns a coroutine — run it.
+        if inspect.isawaitable(result):
+            result = asyncio.run(result)
         
         # Restore stdout for sending the result message
         sys.stdout = original_stdout
