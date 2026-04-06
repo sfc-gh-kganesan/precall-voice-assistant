@@ -1,0 +1,33 @@
+set dotenv-load := true
+set export := true
+set positional-arguments := true
+
+default: help
+
+help:
+    echo "Semantic Forge"
+    echo ""
+    @just --list --unsorted
+    echo ""
+
+install:
+    uv sync
+
+dev: install
+    uv run streamlit run app.py --server.port 8501 --server.headless true
+
+check:
+    uv run ruff check --select I
+    uv run ruff check
+    uv run ruff format --check
+
+fmt:
+    uv run ruff check --fix . --no-cache
+    uv run ruff format . --no-cache
+
+clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true
+    rm -rf dist/ build/ *.egg-info/ 2>/dev/null || true

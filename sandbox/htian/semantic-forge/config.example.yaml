@@ -1,0 +1,31 @@
+connection_name: coco
+
+source:
+  database: CLIENT_IQ
+  schema: SANDBOX
+
+target:
+  database: CLIENT_IQ
+  schema: HTIAN
+
+warehouse: CLIENTIQ_WH_S
+
+cortex:
+  model: openai-gpt-4.1
+
+storage:
+  database: CLIENT_IQ
+  schema: HTIAN
+  table: SV_DEPLOYMENT_HISTORY
+
+registry:
+  sv_table: SEMANTIC_VIEW_METADATA_SEARCH_SRC
+  sv_service: SEMANTIC_VIEW_METADATA_SEARCH
+  column_table: COLUMN_METADATA_SEARCH_SRC
+  column_service: COLUMN_METADATA_SEARCH
+
+agent:
+  name: SEMANTIC_FORGE_AGENT
+  retrieval_tool: RETRIEVAL_TOOL
+  sql_gen_tool: SQL_GEN_TOOL
+  sql_exec_tool: SQL_EXEC_TOOL
