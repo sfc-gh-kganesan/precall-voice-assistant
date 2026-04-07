@@ -41,6 +41,11 @@ async function fetchApi<T>(
 export const api = {
     whoami: () => fetchApi<WhoamiResponse>('/whoami'),
 
+    async getConfig(): Promise<{ controldEndpoint: string | null }> {
+        const res = await fetch('/config');
+        return res.json();
+    },
+
     workflows: {
         list: () => fetchApi<WorkflowListResponse>('/workflow/list'),
 

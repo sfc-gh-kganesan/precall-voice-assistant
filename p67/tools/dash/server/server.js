@@ -10,6 +10,11 @@ const P67_API_URL =
     process.env.P67_API_URL || 'http://controld.ghw6if.svc.spcs.internal:80';
 
 console.log('Starting server with P67_API_URL:', P67_API_URL);
+if (!process.env.P67_CONTROLD_ENDPOINT) {
+    console.warn(
+        'P67_CONTROLD_ENDPOINT not set — API Endpoint will show as "Not available" in the dashboard UI',
+    );
+}
 
 // Test connectivity on startup - use https for https URLs
 const testUrl = new URL(P67_API_URL);
@@ -42,6 +47,12 @@ httpModule
     });
 
 app.get('/health', (_req, res) => res.json({ status: 'healthy' }));
+
+app.get('/config', (_req, res) =>
+    res.json({
+        controldEndpoint: process.env.P67_CONTROLD_ENDPOINT || null,
+    }),
+);
 
 app.use((req, _res, next) => {
     console.log('Incoming request:', req.method, req.url);

@@ -4,6 +4,7 @@ spec:
       image: /p67_src/dash/img_repo/p67-dash:latest
       env:
         P67_API_URL: {{ controld_url }}
+        P67_CONTROLD_ENDPOINT: {{ controld_endpoint }}
         PORT: "3001"
       resources:
         requests:

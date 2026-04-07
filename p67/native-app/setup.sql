@@ -30,6 +30,7 @@ as $$
     declare
         controld_url varchar;
         controld_dns varchar;
+        controld_endpoint varchar;
 begin
     begin
         alter service if exists app.controld from specification_file='controld_service_spec.yml';
@@ -38,8 +39,13 @@ begin
         show services like 'CONTROLD' in schema app;
         select "dns_name" into :controld_dns from table(result_scan(last_query_id())) limit 1;
         controld_url := '"http://' || controld_dns || ':80"';
+
+        show endpoints in service app.controld;
+        select "ingress_url" into :controld_endpoint from table(result_scan(last_query_id())) limit 1;
+        controld_endpoint := '"https://' || controld_endpoint || '"';
+
         alter service if exists app.dashboard from specification_template_file='dashboard_service_spec.yml'
-            using (controld_url => :controld_url);
+            using (controld_url => :controld_url, controld_endpoint => :controld_endpoint);
     exception
         when other then
             -- New references (e.g. encryption_key) may not be bound yet during upgrade.
@@ -111,15 +117,20 @@ as $$
     declare
         controld_url varchar;
         controld_dns varchar;
+        controld_endpoint varchar;
 begin
     show services like 'CONTROLD' in schema app;
     select "dns_name" into :controld_dns from table(result_scan(last_query_id())) limit 1;
     controld_url := '"http://' || controld_dns || ':80"';
 
+    show endpoints in service app.controld;
+    select "ingress_url" into :controld_endpoint from table(result_scan(last_query_id())) limit 1;
+    controld_endpoint := '"https://' || controld_endpoint || '"';
+
     create service if not exists app.dashboard
         in compute pool identifier(:pool_name)
         from specification_template_file='dashboard_service_spec.yml'
-        using (controld_url => :controld_url)
+        using (controld_url => :controld_url, controld_endpoint => :controld_endpoint)
         query_warehouse = 'p67_app_wh';
     grant usage on service app.dashboard to application role app_user;
     grant monitor on service app.dashboard to application role app_user;

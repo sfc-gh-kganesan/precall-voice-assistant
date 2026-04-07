@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { api } from '@/api/client';
+import { UserMenu } from '@/components/UserMenu';
 
 interface AppShellProps {
     children: ReactNode;
@@ -129,36 +130,7 @@ export function AppShell({ children }: AppShellProps) {
                         })}
                     </nav>
                 </div>
-                {user && (
-                    <div
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            fontSize: '13px',
-                            color: 'var(--sf-gray-500)',
-                            fontWeight: 500,
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '50%',
-                                background: 'var(--sf-blue-600)',
-                                color: '#fff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                            }}
-                        >
-                            {user.charAt(0).toUpperCase()}
-                        </div>
-                        {user}
-                    </div>
-                )}
+                {user && <UserMenu user={user} />}
             </header>
             <main style={{ flex: 1 }}>{children}</main>
         </div>

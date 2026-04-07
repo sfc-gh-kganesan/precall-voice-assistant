@@ -14,6 +14,7 @@ IMAGE_REPO="p67_src/dash/img_repo"
 IMAGE_NAME="p67-dash"
 SERVICE_NAME="P67_SRC.DASH.P67_DASH"
 COMPUTE_POOL="SANDBOX_COMPUTE_POOL_CPU"
+SNOW_CONN="${SNOW_CONN:-default}"
 P67_API_URL="http://controld.ghw6if.svc.spcs.internal:80"
 
 # Parse arguments
@@ -79,6 +80,14 @@ echo ""
 
 # Step 4: Update SPCS service
 echo "[4/5] Updating SPCS service..."
+
+# Resolve controld's public ingress URL dynamically for dashboard UI display
+CONTROLD_INGRESS=$(snow sql -c "${SNOW_CONN}" -q "SHOW ENDPOINTS IN SERVICE P67.APP.CONTROLD" --format json 2>/dev/null | jq -r '.[0].ingress_url // empty')
+if [ -n "$CONTROLD_INGRESS" ]; then
+  P67_CONTROLD_ENDPOINT="https://${CONTROLD_INGRESS}"
+  echo "Resolved controld endpoint: ${P67_CONTROLD_ENDPOINT}"
+fi
+
 SPEC=$(cat <<EOF
 spec:
   containers:
@@ -86,6 +95,7 @@ spec:
       image: /${IMAGE_REPO}/${IMAGE_NAME}:${VERSION}
       env:
         P67_API_URL: "${P67_API_URL}"
+        P67_CONTROLD_ENDPOINT: "${P67_CONTROLD_ENDPOINT}"
         PORT: "3001"
       resources:
         requests:
@@ -104,7 +114,7 @@ spec:
 EOF
 )
 
-snow sql -q "ALTER SERVICE ${SERVICE_NAME} FROM SPECIFICATION \$\$${SPEC}\$\$"
+snow sql -c "${SNOW_CONN}" -q "ALTER SERVICE ${SERVICE_NAME} FROM SPECIFICATION \$\$${SPEC}\$\$"
 echo "Service update initiated."
 echo ""
 
@@ -116,7 +126,7 @@ ATTEMPT=0
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   ATTEMPT=$((ATTEMPT + 1))
   
-  STATUS=$(snow sql -q "SELECT SYSTEM\$GET_SERVICE_STATUS('${SERVICE_NAME}')" --format json 2>/dev/null | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+  STATUS=$(snow sql -c "${SNOW_CONN}" -q "SELECT SYSTEM\$GET_SERVICE_STATUS('${SERVICE_NAME}')" --format json 2>/dev/null | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
   
   if [ "$STATUS" = "READY" ]; then
     echo "Service is READY!"
@@ -140,7 +150,7 @@ echo ""
 echo "=========================================="
 echo "Deployment Complete!"
 echo "=========================================="
-ENDPOINT=$(snow sql -q "SHOW ENDPOINTS IN SERVICE ${SERVICE_NAME}" --format json 2>/dev/null | grep -o '"ingress_url":"[^"]*"' | cut -d'"' -f4)
+ENDPOINT=$(snow sql -c "${SNOW_CONN}" -q "SHOW ENDPOINTS IN SERVICE ${SERVICE_NAME}" --format json 2>/dev/null | jq -r '.[0].ingress_url // empty')
 echo "Endpoint: https://${ENDPOINT}"
 echo "Version: ${VERSION}"
 echo ""

@@ -1,12 +1,14 @@
 import { Button, StatusBadge, TextInput } from '@snowflake/stellar-components';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { WorkflowRunStatusResponse } from '@/api/types';
+import type { RunEntry, WorkflowRunStatusResponse } from '@/api/types';
 import { AppShell } from '@/components/AppShell';
 import { CollapsibleSection } from '@/components/CollapsibleSection';
+import { SortableHeader } from '@/components/SortableHeader';
 import type { WorkflowGraphDef } from '@/components/WorkflowGraph';
 import { WorkflowGraph } from '@/components/WorkflowGraph';
 import { useRuns } from '@/hooks/useRuns';
+import { useSort } from '@/hooks/useSort';
 import { useWorkflowGraph } from '@/hooks/useWorkflowGraph';
 import {
     useRunStatus,
@@ -27,6 +29,12 @@ export function WorkflowDetailPage() {
     );
     const runWorkflow = useRunWorkflow();
     const setVisibility = useSetVisibility();
+    const {
+        sortKey: runSortKey,
+        sortDir: runSortDir,
+        onSort: onRunSort,
+        sortData: sortRuns,
+    } = useSort<RunEntry>('startedAt', 'desc');
 
     const workflow = workflowsData?.workflows.find(
         (w) => w.workflowId === workflowId,
@@ -478,15 +486,39 @@ export function WorkflowDetailPage() {
                             <thead>
                                 <tr>
                                     <th>Run ID</th>
-                                    <th>Started</th>
-                                    <th>Duration</th>
-                                    <th>Status</th>
+                                    <SortableHeader
+                                        label="Started"
+                                        sortKey="startedAt"
+                                        currentSort={runSortKey as string}
+                                        currentDir={runSortDir}
+                                        onSort={(k) =>
+                                            onRunSort(k as keyof RunEntry)
+                                        }
+                                    />
+                                    <SortableHeader
+                                        label="Duration"
+                                        sortKey="completedAt"
+                                        currentSort={runSortKey as string}
+                                        currentDir={runSortDir}
+                                        onSort={(k) =>
+                                            onRunSort(k as keyof RunEntry)
+                                        }
+                                    />
+                                    <SortableHeader
+                                        label="Status"
+                                        sortKey="status"
+                                        currentSort={runSortKey as string}
+                                        currentDir={runSortDir}
+                                        onSort={(k) =>
+                                            onRunSort(k as keyof RunEntry)
+                                        }
+                                    />
                                     <th>Logs</th>
                                     <th style={{ width: '60px' }}></th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {runsData.runs.map((run) => (
+                                {sortRuns(runsData.runs).map((run) => (
                                     <tr key={run.id}>
                                         <td
                                             style={{

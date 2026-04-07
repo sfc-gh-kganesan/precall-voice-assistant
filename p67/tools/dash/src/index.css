@@ -51,48 +51,46 @@
     color-scheme: light dark;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --sf-bg: #0b1120;
-        --sf-surface: #151e2e;
-        --sf-surface-raised: #1c2738;
-        --sf-gray-50: #0f1729;
-        --sf-gray-100: #151e2e;
-        --sf-gray-200: #1e293b;
-        --sf-gray-300: #334155;
-        --sf-gray-400: #475569;
-        --sf-gray-500: #94a3b8;
-        --sf-gray-600: #cbd5e1;
-        --sf-gray-700: #e2e8f0;
-        --sf-gray-800: #f1f5f9;
-        --sf-gray-900: #f8fafc;
-        --sf-blue-50: #0c1a3d;
-        --sf-blue-100: #172554;
-        --sf-blue-500: #38bdf8;
-        --sf-blue-600: #38bdf8;
-        --sf-blue-700: #7dd3fc;
-        --sf-green-50: #052e16;
-        --sf-green-500: #4ade80;
-        --sf-green-600: #86efac;
-        --sf-yellow-50: #422006;
-        --sf-yellow-500: #facc15;
-        --sf-red-50: #450a0a;
-        --sf-red-500: #f87171;
-        --sf-badge-success-bg: #052e16;
-        --sf-badge-success-fg: #86efac;
-        --sf-badge-warning-bg: #422006;
-        --sf-badge-warning-fg: #fde68a;
-        --sf-badge-error-bg: #450a0a;
-        --sf-badge-error-fg: #fca5a5;
-        --sf-badge-active-bg: #172554;
-        --sf-badge-active-fg: #93c5fd;
-        --sf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-        --sf-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
-        --sf-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
-        --sf-log-bg: #0b1120;
-        --sf-log-fg: #e2e8f0;
-        --sf-log-attr-bg: rgba(255, 255, 255, 0.08);
-    }
+:root[data-theme="dark"] {
+    --sf-bg: #0b1120;
+    --sf-surface: #151e2e;
+    --sf-surface-raised: #1c2738;
+    --sf-gray-50: #0f1729;
+    --sf-gray-100: #151e2e;
+    --sf-gray-200: #1e293b;
+    --sf-gray-300: #334155;
+    --sf-gray-400: #475569;
+    --sf-gray-500: #94a3b8;
+    --sf-gray-600: #cbd5e1;
+    --sf-gray-700: #e2e8f0;
+    --sf-gray-800: #f1f5f9;
+    --sf-gray-900: #f8fafc;
+    --sf-blue-50: #0c1a3d;
+    --sf-blue-100: #172554;
+    --sf-blue-500: #38bdf8;
+    --sf-blue-600: #38bdf8;
+    --sf-blue-700: #7dd3fc;
+    --sf-green-50: #052e16;
+    --sf-green-500: #4ade80;
+    --sf-green-600: #86efac;
+    --sf-yellow-50: #422006;
+    --sf-yellow-500: #facc15;
+    --sf-red-50: #450a0a;
+    --sf-red-500: #f87171;
+    --sf-badge-success-bg: #052e16;
+    --sf-badge-success-fg: #86efac;
+    --sf-badge-warning-bg: #422006;
+    --sf-badge-warning-fg: #fde68a;
+    --sf-badge-error-bg: #450a0a;
+    --sf-badge-error-fg: #fca5a5;
+    --sf-badge-active-bg: #172554;
+    --sf-badge-active-fg: #93c5fd;
+    --sf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --sf-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
+    --sf-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --sf-log-bg: #0b1120;
+    --sf-log-fg: #e2e8f0;
+    --sf-log-attr-bg: rgba(255, 255, 255, 0.08);
 }
 
 * {
