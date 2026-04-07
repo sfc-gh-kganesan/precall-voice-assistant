@@ -28,11 +28,11 @@ Read the saved connection from `.claude/skills/create-aifde-user/local_settings.
 ```
 
 - If the file does not exist, ask the user for their Snow CLI connection name for the AIFDE account, then write it to `local_settings.json`.
-- If the file exists, display the saved connection and ask if they want to use it or change it.
+- If the file exists, display the saved connection and ask if they want to use it or change it. Ask this questing the ASK_USER tool.
 
 ### Step 2: Collect User Information
 
-Ask the user for:
+Using the ASK_USER tool, prompt the user to provide the following information:
 
 | Field | Description | Example |
 |-------|-------------|---------|

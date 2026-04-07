@@ -1,0 +1,9 @@
+---
+login_name: vidhya
+display_name: vidhya
+first_name: Vidhya
+last_name: Bhat
+email: vidhya.bhat@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
