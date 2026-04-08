@@ -26,6 +26,7 @@ class MessageType(str, Enum):
     THROW_ERROR = "ThrowError"
     INTERRUPT = "Interrupt"
     RESUME_INTERRUPT = "ResumeInterrupt"
+    OAUTH_TOKEN_RESPONSE = "OAuthTokenResponse"
 
 
 class WorkflowError(str, Enum):
@@ -213,6 +214,9 @@ def main() -> None:
             # Forward to SDK via a global callback mechanism
             from p67_sdk import _handle_resume_interrupt
             _handle_resume_interrupt(message)
+        elif msg_type == MessageType.OAUTH_TOKEN_RESPONSE.value:
+            from p67_sdk import _handle_oauth_token_response
+            _handle_oauth_token_response(message)
         else:
             send_error(
                 WorkflowError.MESSAGE_INVALID_TYPE,

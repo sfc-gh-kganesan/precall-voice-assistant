@@ -12,6 +12,10 @@ from p67_sdk.types import (
     CortexAnalystResponse,
     CortexAgentResponse,
     InterruptOptions,
+    SlackTextObject,
+    SlackButtonElement,
+    InterruptButton,
+    SlackNotifyConfig,
     # Cortex Complete types
     CortexInferenceRegion,
     CortexMessageRole,
@@ -43,7 +47,7 @@ from p67_sdk.types import (
     CortexCodeOptions,
     CortexCodeResponse,
 )
-from p67_sdk.ipc import _handle_resume_interrupt
+from p67_sdk.ipc import _handle_resume_interrupt, _handle_oauth_token_response
 
 __version__ = "0.1.0"
 
@@ -54,7 +58,12 @@ __all__ = [
     "CortexAnalystResponse",
     "CortexAgentResponse",
     "InterruptOptions",
+    "SlackTextObject",
+    "SlackButtonElement",
+    "InterruptButton",
+    "SlackNotifyConfig",
     "_handle_resume_interrupt",
+    "_handle_oauth_token_response",
     # Cortex Complete types
     "CortexInferenceRegion",
     "CortexMessageRole",

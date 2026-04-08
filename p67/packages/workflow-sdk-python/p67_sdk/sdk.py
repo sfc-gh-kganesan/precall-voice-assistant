@@ -47,6 +47,32 @@ from p67_sdk.ipc import send_interrupt, wait_for_resume
 T = TypeVar('T')
 
 
+def _to_camel_case(s: str) -> str:
+    parts = s.split('_')
+    return parts[0] + ''.join(p.title() for p in parts[1:])
+
+
+def _camel_case_dict(obj: Any) -> Any:
+    """Recursively convert snake_case dict keys to camelCase, dropping None values."""
+    if isinstance(obj, dict):
+        return {_to_camel_case(k): _camel_case_dict(v) for k, v in obj.items() if v is not None}
+    if isinstance(obj, list):
+        return [_camel_case_dict(item) for item in obj]
+    return obj
+
+
+def _serialize_notify(notify: Any) -> Optional[Dict[str, Any]]:
+    """Convert a SlackNotifyConfig dataclass or dict to a camelCase dict for IPC."""
+    if notify is None:
+        return None
+    if isinstance(notify, dict):
+        return notify  # assume caller already used camelCase keys
+    import dataclasses
+    if dataclasses.is_dataclass(notify) and not isinstance(notify, type):
+        return _camel_case_dict(dataclasses.asdict(notify))
+    return notify
+
+
 class WorkflowSDK:
     """
     P67 Workflow SDK for Python workflows.
@@ -525,7 +551,7 @@ class WorkflowSDK:
         Returns:
             HttpResponse with success status, status code, headers, and data
         """
-        url = options.get('url')
+        url = getattr(options, 'url', None)
         if not url:
             return HttpResponse(
                 success=False,
@@ -534,11 +560,26 @@ class WorkflowSDK:
                 error="url is required",
             )
         
-        method = options.get('method', 'GET')
-        headers = options.get('headers', {})
-        body = options.get('body')
-        timeout = options.get('timeout', 30000) / 1000  # Convert ms to seconds
-        
+        method = getattr(options, 'method', 'GET') or 'GET'
+        headers = getattr(options, 'headers', {}) or {}
+        body = getattr(options, 'body', None)
+        timeout = (getattr(options, 'timeout', 30000) or 30000) / 1000  # Convert ms to seconds
+        oauth_ref = getattr(options, 'oauth_ref', None) or getattr(options, 'oauthRef', None)
+
+        if oauth_ref:
+            from p67_sdk.ipc import request_oauth_token
+            try:
+                access_token = request_oauth_token(oauth_ref)
+                headers = dict(headers)  # copy before mutating
+                headers['Authorization'] = f'Bearer {access_token}'
+            except Exception as e:
+                return HttpResponse(
+                    success=False,
+                    status=0,
+                    headers={},
+                    error=f'Failed to resolve OAuth token "{oauth_ref}": {str(e)}',
+                )
+
         # Prepare request data
         data = None
         if body is not None:
@@ -613,9 +654,11 @@ class WorkflowSDK:
         options = options or {}
         node_id = options.get('nodeId')
         timeout_ms = options.get('timeout')
-        
+
+        notify_dict = _serialize_notify(options.get('notify'))
+
         # Send interrupt and get ID
-        interrupt_id = send_interrupt(payload, node_id)
+        interrupt_id = send_interrupt(payload, node_id=node_id, notify=notify_dict)
         
         # Wait for resume with optional timeout
         timeout_sec = timeout_ms / 1000 if timeout_ms else None

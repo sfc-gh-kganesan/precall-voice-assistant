@@ -41,11 +41,55 @@ class CortexAgentResponse:
     request: Optional[Dict[str, Any]] = None
 
 
+# =============================================================================
+# Slack Block Kit Types (subset for interrupt notifications)
+# =============================================================================
+
+@dataclass
+class SlackTextObject:
+    """Slack text object."""
+    type: str  # 'plain_text' or 'mrkdwn'
+    text: str
+    emoji: Optional[bool] = None
+
+
+@dataclass
+class SlackButtonElement:
+    """Slack button element."""
+    type: str = 'button'
+    text: Optional[Dict[str, Any]] = None
+    action_id: Optional[str] = None
+    value: Optional[str] = None
+    style: Optional[str] = None  # 'primary' or 'danger'
+    url: Optional[str] = None
+
+
+@dataclass
+class InterruptButton:
+    """Simple button configuration for interrupt notifications."""
+    label: str
+    value: str
+    style: Optional[str] = None  # 'primary' or 'danger'
+
+
+@dataclass
+class SlackNotifyConfig:
+    """Slack notification configuration for interrupts."""
+    type: str = 'slack'
+    oauth_ref: str = ''
+    recipient: Optional[str] = None  # 'self' or user/channel ID
+    text: Optional[str] = None
+    buttons: Optional[List['InterruptButton']] = None
+    button_preset: Optional[str] = None  # 'approve_reject', 'yes_no', 'continue_cancel'
+    blocks: Optional[List[Dict[str, Any]]] = None  # Raw Slack Block Kit blocks
+
+
 @dataclass
 class InterruptOptions:
     """Options for interrupt calls."""
     timeout: Optional[int] = None  # Timeout in milliseconds
     node_id: Optional[str] = None  # Optional node identifier
+    notify: Optional[SlackNotifyConfig] = None
 
 
 @dataclass
