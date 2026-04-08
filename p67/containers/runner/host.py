@@ -123,6 +123,36 @@ def handle_run_workflow(data: Dict[str, Any]) -> None:
         )
         return
     
+    # When SECRET_BACKEND=snowflake, secrets are mounted as env vars by SPCS.
+    # Resolve the env var references into the config before creating the SDK.
+    secret_env_mappings = data.get("secretEnvMappings")
+    if secret_env_mappings:
+        for field_path, env_var_name in secret_env_mappings.items():
+            value = os.environ.get(env_var_name)
+            if not value:
+                print(
+                    f"Warning: Secret env var {env_var_name} for {field_path} is not set",
+                    file=sys.stderr,
+                )
+                continue
+
+            # field_path is like "config.<name>.<field>" or
+            # "config.<name>.parameters.<key>"
+            parts = field_path.split(".")
+            if parts[0] == "config" and len(parts) >= 3:
+                config_name = parts[1]
+                snowflake_config = config.get("snowflakeConfig", {})
+                config_entry = snowflake_config.get(config_name)
+                if config_entry and isinstance(config_entry, dict):
+                    if len(parts) == 3:
+                        # config.<name>.<field> → direct field set
+                        config_entry[parts[2]] = value
+                    elif len(parts) == 4 and parts[2] == "parameters":
+                        # config.<name>.parameters.<key> → nested set
+                        if "parameters" not in config_entry:
+                            config_entry["parameters"] = {}
+                        config_entry["parameters"][parts[3]] = value
+
     # Create SDK and execute
     try:
         # Import the SDK - first try from the workflow directory (bundled),

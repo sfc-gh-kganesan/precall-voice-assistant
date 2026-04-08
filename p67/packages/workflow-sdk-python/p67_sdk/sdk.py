@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import subprocess
 import tempfile
@@ -108,6 +109,19 @@ class WorkflowSDK:
             return access_url
         return f"https://{access_url}"
     
+    def _is_connection_healthy(self) -> bool:
+        """Check if the cached connection is healthy by running SELECT 1."""
+        if self._connection is None:
+            return False
+        try:
+            cursor = self._connection.cursor()
+            cursor.execute('SELECT 1')
+            cursor.close()
+            return True
+        except Exception:
+            self._connection = None
+            return False
+
     def _get_connection(self, config_name: Optional[str] = None) -> Any:
         """
         Get or create a Snowflake connection.
@@ -118,7 +132,7 @@ class WorkflowSDK:
         Returns:
             Snowflake connection object
         """
-        if self._connection is not None:
+        if self._connection is not None and self._is_connection_healthy():
             return self._connection
         
         try:
@@ -257,18 +271,18 @@ class WorkflowSDK:
         """
         # Validate query is read-only
         stripped = sql_text.strip()
-        # Remove comments
-        lines = [l for l in stripped.split('\n') if not l.strip().startswith('--')]
-        cleaned = ' '.join(lines)
+        # Remove single-line comments and /* */ block comments
+        without_comments = re.sub(r'--[^\n]*', '', stripped)
+        without_comments = re.sub(r'/\*[\s\S]*?\*/', '', without_comments).strip()
         
-        first_word = cleaned.split()[0].upper() if cleaned.split() else ''
+        first_word = without_comments.split()[0].upper() if without_comments.split() else ''
         if first_word not in ('SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC'):
             raise ValueError(
                 "Only SELECT queries are allowed. "
                 "DML and DDL statements are not permitted."
             )
         
-        if ';' in cleaned:
+        if ';' in without_comments:
             raise ValueError(
                 "Multiple statements are not allowed. "
                 "Only single SELECT queries are permitted."
@@ -303,10 +317,10 @@ class WorkflowSDK:
         cfg = self._get_config(config_name)
         
         try:
-            model = semantic_model
+            model = semantic_model or os.environ.get('CORTEX_ANALYST_SEMANTIC_MODEL')
             if not model:
                 raise ValueError(
-                    "semantic_model is required for Cortex Analyst queries"
+                    "CORTEX_ANALYST_SEMANTIC_MODEL environment variable is required or semantic model must be provided"
                 )
             
             token = cfg.get('token')
@@ -408,21 +422,39 @@ class WorkflowSDK:
                 # Handle streaming response (simplified - just get final result)
                 response_text = resp.read().decode('utf-8')
                 
-                # Parse SSE events to find the final response
+                # Parse SSE events to find the final response.
+                # Track both event: and data: lines per the SSE spec.
                 final_content = None
+                current_event_name = None
                 for line in response_text.split('\n'):
-                    if line.startswith('data: ') and line != 'data: [DONE]':
+                    if line.startswith('event: '):
+                        current_event_name = line[7:].strip()
+                    elif line.startswith('data: ') and line != 'data: [DONE]':
                         try:
                             event_data = json.loads(line[6:])
-                            if event_data.get('content'):
+                            if current_event_name == 'response' and event_data.get('content'):
                                 final_content = event_data.get('content')
                         except json.JSONDecodeError:
                             pass
+                
+                sanitized_headers = {
+                    'Content-Type': headers['Content-Type'],
+                    'Accept': headers['Accept'],
+                }
+                
+                if final_content is None:
+                    return CortexAgentResponse(
+                        success=False,
+                        status_code=200,
+                        error='No complete message received from agent',
+                        request={'url': url, 'method': 'POST'},
+                    )
                 
                 return CortexAgentResponse(
                     success=True,
                     status_code=200,
                     data={"message": {"role": "agent", "content": final_content}},
+                    request={'url': url, 'method': 'POST'},
                 )
                 
         except urllib.error.HTTPError as e:
@@ -1100,19 +1132,26 @@ class WorkflowSDK:
         cfg = self._get_config(config_name)
         
         token = cfg.get('token')
-        access_url = self._normalize_access_url(cfg.get('accessUrl'))
+
+        # In SPCS, the runner job container is separate from controld — use the
+        # controld internal DNS passed via P67_CONTROLD_URL. In local/Docker mode,
+        # the workflow is a child process of controld so localhost works.
+        controld_url = os.environ.get('P67_CONTROLD_URL')
+        port = os.environ.get('PORT', '3002')
+        access_url = controld_url or f"http://localhost:{port}"
         
-        if not token or not access_url:
+        if not token:
             return SubworkflowResponse(
                 success=False,
-                error="token and accessUrl are required in config for subworkflow execution",
+                error="token is required in config for subworkflow execution",
             )
         
-        # Build URL based on whether we're using ID or name
+        # Build URL based on whether we're using ID or name.
+        # Always append sync=true so controld waits for the subworkflow to complete.
         if options.workflow_id is not None:
-            url = f"{access_url}/api/workflow/{quote(options.workflow_id, safe='')}/run"
+            url = f"{access_url}/api/workflow/{quote(options.workflow_id, safe='')}/run?sync=true"
         else:
-            url = f"{access_url}/api/workflow/name/{quote(options.workflow_name, safe='')}/run"
+            url = f"{access_url}/api/workflow/name/{quote(options.workflow_name, safe='')}/run?sync=true"
         
         # Build request body with params
         payload = {}
@@ -1123,6 +1162,13 @@ class WorkflowSDK:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
+
+        # SPCS ingress injects sf-context-current-user for external requests;
+        # for internal service-to-service calls we must set it ourselves so
+        # controld's user plugin can resolve the user.
+        username = cfg.get('username')
+        if username:
+            headers['sf-context-current-user'] = username
         
         timeout_sec = options.timeout / 1000  # Convert ms to seconds
         
@@ -1140,6 +1186,7 @@ class WorkflowSDK:
                     stderr=response_data.get('stderr'),
                     status=response_data.get('status'),
                     run_id=response_data.get('runId'),
+                    result=response_data.get('result'),
                 )
                 
         except urllib.error.HTTPError as e:

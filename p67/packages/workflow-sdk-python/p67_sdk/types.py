@@ -116,6 +116,7 @@ class SubworkflowResponse:
     stderr: Optional[List[str]] = None
     status: Optional[SubworkflowStatus] = None
     run_id: Optional[str] = None
+    result: Optional[Any] = None
     error: Optional[str] = None
 
 
