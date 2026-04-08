@@ -455,3 +455,76 @@ make clean install -C ./tools/p67-cli
 The install script prompts for a directory (default `/usr/local/bin`) and creates a symlink.
 
 Requires: Node.js v20+, Bun v1.1+, pnpm v10+.
+
+## CoCo Skills in Workflows
+
+Workflows can include CoCo skills that are automatically loaded when `sdk.cortexCode()` runs with a `profile` option. Skills can be provided via a Snowflake stage (recommended) or bundled with the workflow.
+
+### Option A: Skills on a stage (recommended)
+
+1. Upload skills to a Snowflake stage:
+   ```sql
+   PUT file:///path/to/my-skill/SKILL.md @DB.SCHEMA.STAGE/skills/my-skill/SKILL.md
+       AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+   ```
+2. Set `SKILL_REPOS` in the profile registry:
+   ```sql
+   UPDATE CORTEX_CODE.CONFIG.PROFILE_REGISTRY
+   SET SKILL_REPOS = '[{"snowflake_stage": "@DB.SCHEMA.STAGE/skills/"}]'
+   WHERE CONFIG_NAME = 'my-profile';
+   ```
+3. Grant READ on the stage to the runner role:
+   ```sql
+   GRANT READ ON STAGE DB.SCHEMA.STAGE TO ROLE P67_USER_RL;
+   ```
+4. The SDK downloads skills at runtime using `LIST` + `SELECT $1::VARCHAR` via its own SQL connection.
+
+### Option B: Bundled skills (fallback)
+
+1. Add a `skills/` directory to your workflow project root.
+2. Each **direct** subdirectory is a skill: `skills/<skill-name>/SKILL.md`. Nested subdirectories (e.g., `skills/parent/child/SKILL.md`) are not supported — each skill must be a direct child of `skills/`.
+3. Call `sdk.cortexCode({ prompt: '...', profile: 'my-profile' })`.
+4. If stage download fails, the SDK copies `skills/` to `$SNOWFLAKE_HOME/cortex/skills/` before running CoCo.
+
+Stage skills override bundled skills of the same name.
+
+### Example structure
+
+```
+my-workflow/
+├── skills/           <- optional; used as fallback if stage download fails
+│   └── my-skill/
+│       └── SKILL.md
+├── src/
+│   └── index.ts
+└── manifest.yaml
+```
+
+### SKILL.md format
+
+```markdown
+---
+name: my-skill
+description: "One-sentence description. Use when: trigger phrases."
+tools:
+  - bash
+---
+
+# My Skill
+
+Skill body — instructions for CoCo to follow.
+```
+
+The `description` field's "Use when:" section controls when CoCo activates the skill.
+
+### Profile registry
+
+The profile metadata (settings, hooks, env vars) is fetched from
+`CORTEX_CODE.CONFIG.PROFILE_REGISTRY` using the SDK's Snowflake connection.
+The `SKILL_REPOS` column points to stages containing skills. The SDK downloads
+them using its own SQL driver (CoCo's internal driver has PAT auth issues in SPCS).
+
+### Reference
+
+- Example workflow: `workflows/test/coco-profile/`
+- Lifecycle docs: `docs/plans/coco-profile-lifecycle.md`

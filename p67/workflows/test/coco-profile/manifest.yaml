@@ -1,0 +1,19 @@
+---
+name: coco_profile_test
+visibility: public
+config:
+  - config_name: default
+    account:
+      value: SFENGINEERING-AIFDE
+    username:
+      value: VB
+    authenticator:
+      value: programmatic_access_token
+    token:
+      secretRef: aifde_pat
+    warehouse:
+      value: P67_APP_WH
+    database:
+      value: P67
+    schema:
+      value: PUBLIC

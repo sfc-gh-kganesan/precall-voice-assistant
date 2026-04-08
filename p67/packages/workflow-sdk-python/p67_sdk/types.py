@@ -346,6 +346,7 @@ class CortexCodeOptions:
     work_dir: Optional[str] = None
     model: Optional[str] = None
     allow_all_tool_calls: bool = False
+    profile: Optional[str] = None  # Profile name; fetched from CORTEX_CODE.CONFIG.PROFILE_REGISTRY
 
 
 @dataclass

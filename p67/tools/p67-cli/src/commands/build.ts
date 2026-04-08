@@ -398,6 +398,14 @@ export const buildCommand = new Command('build')
             );
         }
 
+        // Copy skills/ directory to buildDir if present (for CoCo profile support)
+        const skillsSrc = path.join(projectDir, 'skills');
+        const skillsDest = path.join(buildDir, 'skills');
+        if (fs.existsSync(skillsSrc)) {
+            await cp(skillsSrc, skillsDest, { recursive: true });
+            console.log(`✔︎ Copied skills/ to ${buildDir}`);
+        }
+
         // Zip buildDir contents into workflow.zip
         const zipPath = path.join(buildDir, 'workflow.zip');
         const files: Record<string, Uint8Array> = {};

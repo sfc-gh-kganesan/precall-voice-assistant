@@ -1564,6 +1564,7 @@ export class WorkflowSDKImpl implements WorkflowSDK {
             workDir,
             model,
             allowAllToolCalls,
+            profile,
         } = options;
 
         if (!prompt) {
@@ -1582,6 +1583,10 @@ export class WorkflowSDKImpl implements WorkflowSDK {
 
         if (allowAllToolCalls) {
             args.push('--dangerously-allow-all-tool-calls');
+        }
+
+        if (profile) {
+            args.push('--profile', profile);
         }
 
         // Write a temporary connections.toml so the cortex CLI can authenticate
@@ -1613,15 +1618,368 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                 if (cfg.database) lines.push(`database = "${cfg.database}"`);
                 if (cfg.schema) lines.push(`schema = "${cfg.schema}"`);
                 lines.push('');
+
+                // Write config.toml (used by cortex -p for LLM calls)
                 fs.writeFileSync(
                     path.join(snowflakeHome, 'config.toml'),
                     lines.join('\n'),
+                    { mode: 0o600 },
+                );
+
+                // Also write connections.toml (used by cortex profile add
+                // and other SQL operations like stage downloads).
+                // CoCo's SQL driver reads from connections.toml, not config.toml.
+                const connLines: string[] = ['[default]'];
+                if (cfg.account) connLines.push(`account = "${cfg.account}"`);
+                if (cfg.username) connLines.push(`user = "${cfg.username}"`);
+                if (cfg.token) {
+                    connLines.push(
+                        'authenticator = "programmatic_access_token"',
+                    );
+                    connLines.push(`token = "${cfg.token}"`);
+                } else if (cfg.password) {
+                    connLines.push(`password = "${cfg.password}"`);
+                }
+                if (cfg.accessUrl)
+                    connLines.push(
+                        `host = "${cfg.accessUrl.replace(/^https?:\/\//, '')}"`,
+                    );
+                if (cfg.warehouse)
+                    connLines.push(`warehouse = "${cfg.warehouse}"`);
+                if (cfg.database)
+                    connLines.push(`database = "${cfg.database}"`);
+                if (cfg.schema) connLines.push(`schema = "${cfg.schema}"`);
+                connLines.push('');
+                fs.writeFileSync(
+                    path.join(snowflakeHome, 'connections.toml'),
+                    connLines.join('\n'),
                     { mode: 0o600 },
                 );
             }
         } catch {
             // If we can't build a connections file, proceed without one —
             // cortex will report the missing-connection error itself.
+        }
+
+        const cortexEnv = {
+            ...process.env,
+            ...(snowflakeHome ? { SNOWFLAKE_HOME: snowflakeHome } : {}),
+        };
+
+        // Pre-fetch the profile from the account's registry if requested.
+        // Try `cortex profile add` first (uses connections.toml), then fall
+        // back to querying the registry directly via the SDK's Snowflake connection.
+        if (profile && snowflakeHome) {
+            let profileFetched = false;
+
+            // Attempt 1: cortex profile add -c default
+            // This uses connections.toml which we wrote above.
+            try {
+                child_process.execFileSync(
+                    'cortex',
+                    ['profile', 'add', profile, '--force', '-c', 'default'],
+                    {
+                        env: cortexEnv,
+                        timeout: 30000,
+                        stdio: 'pipe',
+                    },
+                );
+                console.log(
+                    `[SDK] Profile "${profile}" fetched via cortex profile add`,
+                );
+                profileFetched = true;
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.log(
+                    `[SDK] cortex profile add failed (will try direct SQL): ${msg}`,
+                );
+            }
+
+            // Attempt 2: Query registry directly via SDK's Snowflake connection
+            if (!profileFetched) {
+                try {
+                    const conn = await this.getSnowflakeConnection();
+                    const rows = await new Promise<
+                        Array<Record<string, unknown>>
+                    >((resolve, reject) => {
+                        conn.execute({
+                            sqlText: `SELECT CONFIG_NAME, DESCRIPTION, OWNER_TEAM, SKILL_REPOS, MCP_SERVERS,
+                                         COMMAND_REPOS, ENV_VARS, SETTINGS_OVERRIDES, VERSION,
+                                         SYSTEM_PROMPT_REPO, HOOKS, PLUGINS
+                                  FROM CORTEX_CODE.CONFIG.PROFILE_REGISTRY
+                                  WHERE CONFIG_NAME = ? AND ACTIVE = TRUE`,
+                            binds: [profile],
+                            complete: (err, _stmt, rows) => {
+                                if (err) reject(err);
+                                else
+                                    resolve(
+                                        (rows ?? []) as Array<
+                                            Record<string, unknown>
+                                        >,
+                                    );
+                            },
+                        });
+                    });
+
+                    if (rows.length > 0) {
+                        const row = rows[0];
+                        const profileJson = {
+                            name: row.CONFIG_NAME,
+                            description: row.DESCRIPTION || '',
+                            ownerTeam: row.OWNER_TEAM || '',
+                            version: row.VERSION || '1.0',
+                            // Skills are downloaded separately by the SDK from
+                            // the stage. Set skillRepos to empty so CoCo doesn't
+                            // try to download them itself (which hangs in SPCS).
+                            skillRepos: [],
+                            mcpServers: row.MCP_SERVERS || {},
+                            commandRepos: row.COMMAND_REPOS || [],
+                            systemPromptRepo: row.SYSTEM_PROMPT_REPO || null,
+                            hooks: row.HOOKS || null,
+                            plugins: row.PLUGINS || [],
+                            envVars: row.ENV_VARS || {},
+                            settingsOverrides: row.SETTINGS_OVERRIDES || {},
+                        };
+                        const profilesDir = path.join(
+                            snowflakeHome,
+                            'cortex',
+                            'profiles',
+                        );
+                        fs.mkdirSync(profilesDir, { recursive: true });
+                        fs.writeFileSync(
+                            path.join(profilesDir, `${profile}.json`),
+                            JSON.stringify(profileJson, null, 2),
+                        );
+                        console.log(
+                            `[SDK] Profile "${profile}" fetched from registry and written to ${profilesDir}`,
+                        );
+                    } else {
+                        console.log(
+                            `[SDK] Warning: profile "${profile}" not found in CORTEX_CODE.CONFIG.PROFILE_REGISTRY`,
+                        );
+                    }
+                } catch (err) {
+                    const msg =
+                        err instanceof Error ? err.message : String(err);
+                    console.log(
+                        `[SDK] Warning: failed to fetch profile "${profile}" from registry: ${msg}`,
+                    );
+                    // Continue anyway — the profile may already exist locally
+                }
+            } // end if (!profileFetched)
+
+            // Download skills from profile's skillRepos stages, falling back
+            // to bundled skills/ directory. CoCo's internal SQL driver can't
+            // download from stages in headless SPCS mode, so we do it ourselves.
+            const cocoSkillsDir = path.join(snowflakeHome, 'cortex', 'skills');
+            fs.mkdirSync(cocoSkillsDir, { recursive: true });
+            let skillsFound = false;
+
+            // Attempt 1: Download skills from profile's skillRepos stages
+            try {
+                let skillRepos: Array<{ snowflake_stage?: string }> = [];
+
+                // Try to read skillRepos from the registry directly
+                const conn = await this.getSnowflakeConnection();
+                const repoRows = await new Promise<
+                    Array<Record<string, unknown>>
+                >((resolve, reject) => {
+                    conn.execute({
+                        sqlText: `SELECT SKILL_REPOS FROM CORTEX_CODE.CONFIG.PROFILE_REGISTRY WHERE CONFIG_NAME = ? AND ACTIVE = TRUE`,
+                        binds: [profile],
+                        complete: (err, _stmt, rows) => {
+                            if (err) reject(err);
+                            else
+                                resolve(
+                                    (rows ?? []) as Array<
+                                        Record<string, unknown>
+                                    >,
+                                );
+                        },
+                    });
+                });
+
+                if (repoRows.length > 0 && repoRows[0].SKILL_REPOS) {
+                    const raw = repoRows[0].SKILL_REPOS;
+                    skillRepos = (
+                        typeof raw === 'string' ? JSON.parse(raw) : raw
+                    ) as Array<{ snowflake_stage?: string }>;
+                }
+
+                for (const repo of skillRepos) {
+                    if (!repo.snowflake_stage) continue;
+                    const stagePath = repo.snowflake_stage;
+
+                    // Extract database.schema from stage path (e.g. @DB.SCHEMA.STAGE_NAME/...)
+                    // to qualify the temp file format and avoid "no current schema" errors
+                    const stageRef = stagePath.replace(/^@/, '').split('/')[0]; // DB.SCHEMA.STAGE_NAME
+                    const stageParts = stageRef.split('.');
+                    const stageQualifiedSchema =
+                        stageParts.length >= 2
+                            ? `${stageParts[0]}.${stageParts[1]}`
+                            : null;
+
+                    if (stageQualifiedSchema) {
+                        await new Promise<void>((resolve, reject) => {
+                            conn.execute({
+                                sqlText: `USE SCHEMA ${stageQualifiedSchema}`,
+                                complete: (err) =>
+                                    err ? reject(err) : resolve(),
+                            });
+                        });
+                    }
+
+                    // Create temp file format and list skills on stage
+                    await new Promise<void>((resolve, reject) => {
+                        conn.execute({
+                            sqlText: `CREATE TEMPORARY FILE FORMAT IF NOT EXISTS p67_raw_text TYPE='CSV' FIELD_DELIMITER='NONE' RECORD_DELIMITER='NONE'`,
+                            complete: (err) => (err ? reject(err) : resolve()),
+                        });
+                    });
+
+                    const listRows = await new Promise<
+                        Array<Record<string, unknown>>
+                    >((resolve, reject) => {
+                        conn.execute({
+                            sqlText: `LIST ${stagePath}`,
+                            complete: (err, _stmt, rows) => {
+                                if (err) reject(err);
+                                else
+                                    resolve(
+                                        (rows ?? []) as Array<
+                                            Record<string, unknown>
+                                        >,
+                                    );
+                            },
+                        });
+                    });
+
+                    // Group files by skill directory
+                    const skillFiles = new Map<string, string[]>();
+                    for (const row of listRows) {
+                        const name = String(row.name || '');
+                        // name format: stage_name/skills/<skill-name>/<file>
+                        const parts = name.split('/');
+                        // Find the part after 'skills/' in the path
+                        const skillsIdx = parts.indexOf('skills');
+                        if (skillsIdx >= 0 && skillsIdx + 1 < parts.length) {
+                            const skillName = parts[skillsIdx + 1];
+                            const fileName = parts
+                                .slice(skillsIdx + 2)
+                                .join('/');
+                            if (skillName && fileName) {
+                                const existing =
+                                    skillFiles.get(skillName) ?? [];
+                                existing.push(fileName);
+                                skillFiles.set(skillName, existing);
+                            }
+                        }
+                    }
+
+                    // Download each skill file
+                    for (const [skillName, files] of skillFiles) {
+                        const skillDir = path.join(cocoSkillsDir, skillName);
+                        fs.mkdirSync(skillDir, { recursive: true });
+
+                        for (const file of files) {
+                            const fileStage = `${stagePath}${skillName}/${file}`;
+                            try {
+                                const contentRows = await new Promise<
+                                    Array<Record<string, unknown>>
+                                >((resolve, reject) => {
+                                    conn.execute({
+                                        sqlText: `SELECT $1::VARCHAR AS content FROM ${fileStage} (FILE_FORMAT => p67_raw_text)`,
+                                        complete: (err, _stmt, rows) => {
+                                            if (err) reject(err);
+                                            else
+                                                resolve(
+                                                    (rows ?? []) as Array<
+                                                        Record<string, unknown>
+                                                    >,
+                                                );
+                                        },
+                                    });
+                                });
+                                if (contentRows.length > 0) {
+                                    const content = String(
+                                        contentRows[0].CONTENT || '',
+                                    );
+                                    const filePath = path.join(skillDir, file);
+                                    const fileDir = path.dirname(filePath);
+                                    if (fileDir !== skillDir)
+                                        fs.mkdirSync(fileDir, {
+                                            recursive: true,
+                                        });
+                                    fs.writeFileSync(filePath, content);
+                                }
+                            } catch (fileErr) {
+                                console.log(
+                                    `[SDK] Warning: failed to download ${fileStage}: ${fileErr instanceof Error ? fileErr.message : String(fileErr)}`,
+                                );
+                            }
+                        }
+                        console.log(
+                            `[SDK] Downloaded skill "${skillName}" from stage (${files.length} file(s))`,
+                        );
+                        skillsFound = true;
+                    }
+                }
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.log(
+                    `[SDK] Warning: failed to download skills from stage: ${msg}`,
+                );
+            }
+
+            // Attempt 2: Fall back to bundled skills/ directory
+            if (!skillsFound) {
+                try {
+                    const skillsDir = workDir
+                        ? path.join(workDir, 'skills')
+                        : '/workflow/skills';
+                    if (fs.existsSync(skillsDir)) {
+                        for (const entry of fs.readdirSync(skillsDir, {
+                            withFileTypes: true,
+                        })) {
+                            if (entry.isDirectory()) {
+                                const src = path.join(skillsDir, entry.name);
+                                const dest = path.join(
+                                    cocoSkillsDir,
+                                    entry.name,
+                                );
+                                copyDirSync(src, dest);
+                                console.log(
+                                    `[SDK] Copied bundled skill "${entry.name}" to ${dest}`,
+                                );
+                                skillsFound = true;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    const msg =
+                        err instanceof Error ? err.message : String(err);
+                    console.log(
+                        `[SDK] Warning: failed to copy bundled skills: ${msg}`,
+                    );
+                }
+            }
+
+            // Write skills.json if any skills were found
+            if (skillsFound) {
+                const skillsJsonPath = path.join(
+                    snowflakeHome,
+                    'cortex',
+                    'skills.json',
+                );
+                fs.writeFileSync(
+                    skillsJsonPath,
+                    JSON.stringify({ paths: [cocoSkillsDir] }, null, 2),
+                );
+                args.push('--skills', skillsJsonPath);
+                console.log(
+                    `[SDK] Wrote skills.json pointing to ${cocoSkillsDir}, passing --skills flag`,
+                );
+            }
         }
 
         try {
@@ -1633,12 +1991,7 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                         cwd: workDir,
                         timeout: timeout * 1000,
                         maxBuffer: 50 * 1024 * 1024, // 50 MB
-                        env: {
-                            ...process.env,
-                            ...(snowflakeHome
-                                ? { SNOWFLAKE_HOME: snowflakeHome }
-                                : {}),
-                        },
+                        env: cortexEnv,
                     },
                     (error, stdout, stderr) => {
                         if (error) {
@@ -1708,6 +2061,23 @@ export class WorkflowSDKImpl implements WorkflowSDK {
                     // Ignore cleanup errors
                 }
             }
+        }
+    }
+}
+
+/**
+ * Recursively copies a directory from src to dest.
+ * Creates dest if it does not exist.
+ */
+function copyDirSync(src: string, dest: string): void {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+        if (entry.isDirectory()) {
+            copyDirSync(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
         }
     }
 }

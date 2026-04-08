@@ -1213,6 +1213,9 @@ class WorkflowSDK:
         if options.allow_all_tool_calls:
             args.append('--dangerously-allow-all-tool-calls')
         
+        if options.profile:
+            args.extend(['--profile', options.profile])
+        
         # Write a temporary config.toml so the cortex CLI can authenticate.
         # Mirrors the TypeScript sdk-impl.ts cortexCode() approach.
         snowflake_home = None
@@ -1254,14 +1257,207 @@ class WorkflowSDK:
                 if val:
                     lines.append(f'{key} = "{val}"')
             
+            # Write config.toml (used by cortex -p for LLM calls)
             config_path = os.path.join(snowflake_home, 'config.toml')
             with open(config_path, 'w') as f:
                 f.write('\n'.join(lines) + '\n')
             os.chmod(config_path, 0o600)
+            
+            # Write connections.toml (used by cortex profile add for SQL ops)
+            conn_lines = ['[default]']
+            if account:
+                conn_lines.append(f'account = "{account}"')
+            if username:
+                conn_lines.append(f'user = "{username}"')
+            if token:
+                conn_lines.append('authenticator = "programmatic_access_token"')
+                conn_lines.append(f'token = "{token}"')
+            elif password:
+                conn_lines.append(f'password = "{password}"')
+            if access_url:
+                h = access_url
+                if h.startswith('https://'):
+                    h = h[8:]
+                elif h.startswith('http://'):
+                    h = h[7:]
+                conn_lines.append(f'host = "{h}"')
+            for key in ('warehouse', 'database', 'schema'):
+                val = cfg.get(key)
+                if val:
+                    conn_lines.append(f'{key} = "{val}"')
+            conn_path = os.path.join(snowflake_home, 'connections.toml')
+            with open(conn_path, 'w') as f:
+                f.write('\n'.join(conn_lines) + '\n')
+            os.chmod(conn_path, 0o600)
         
         env = {**os.environ}
         if snowflake_home:
             env['SNOWFLAKE_HOME'] = snowflake_home
+        
+        # Pre-fetch the profile from the account's registry if requested.
+        if options.profile and snowflake_home:
+            # Attempt 1: cortex profile add -c default
+            profile_fetched = False
+            try:
+                subprocess.run(
+                    ['cortex', 'profile', 'add', options.profile, '--force', '-c', 'default'],
+                    capture_output=True, text=True, timeout=30, env=env,
+                )
+                print(f'[SDK] Profile "{options.profile}" fetched via cortex profile add')
+                profile_fetched = True
+            except Exception as e:
+                print(f'[SDK] cortex profile add failed (will try direct SQL): {e}')
+            
+            # Attempt 2: Direct SQL query
+            if not profile_fetched:
+                try:
+                    result = self.execute_query(
+                        "SELECT CONFIG_NAME, DESCRIPTION, OWNER_TEAM, SKILL_REPOS, MCP_SERVERS, "
+                        "COMMAND_REPOS, ENV_VARS, SETTINGS_OVERRIDES, VERSION, "
+                        "SYSTEM_PROMPT_REPO, HOOKS, PLUGINS "
+                        "FROM CORTEX_CODE.CONFIG.PROFILE_REGISTRY "
+                        "WHERE CONFIG_NAME = %s AND ACTIVE = TRUE",
+                        [options.profile],
+                    )
+                    if result.rows and len(result.rows) > 0:
+                        row = result.rows[0]
+                        import json as _json
+                        profile_json = {
+                            "name": row[0],
+                            "description": row[1] or "",
+                            "ownerTeam": row[2] or "",
+                            "skillRepos": [],
+                            "mcpServers": _json.loads(row[4]) if isinstance(row[4], str) else (row[4] or {}),
+                            "commandRepos": _json.loads(row[5]) if isinstance(row[5], str) else (row[5] or []),
+                            "envVars": _json.loads(row[6]) if isinstance(row[6], str) else (row[6] or {}),
+                            "settingsOverrides": _json.loads(row[7]) if isinstance(row[7], str) else (row[7] or {}),
+                            "version": row[8] or "1.0",
+                            "systemPromptRepo": _json.loads(row[9]) if isinstance(row[9], str) else row[9],
+                            "hooks": _json.loads(row[10]) if isinstance(row[10], str) else row[10],
+                            "plugins": _json.loads(row[11]) if isinstance(row[11], str) else (row[11] or []),
+                        }
+                        profiles_dir = os.path.join(snowflake_home, 'cortex', 'profiles')
+                        os.makedirs(profiles_dir, exist_ok=True)
+                        profile_path = os.path.join(profiles_dir, f'{options.profile}.json')
+                        with open(profile_path, 'w') as f:
+                            _json.dump(profile_json, f, indent=2)
+                        print(f'[SDK] Profile "{options.profile}" fetched from registry and written to {profiles_dir}')
+                    else:
+                        print(f'[SDK] Warning: profile "{options.profile}" not found in registry')
+                except Exception as e:
+                    print(f'[SDK] Warning: failed to fetch profile "{options.profile}" from registry: {e}')
+            
+            # Download skills from stage (profile's skillRepos) or copy bundled skills
+            import json as _json
+            coco_skills_dir = os.path.join(snowflake_home, 'cortex', 'skills')
+            os.makedirs(coco_skills_dir, exist_ok=True)
+            skills_found = False
+
+            # Attempt 1: Download skills from stage via skillRepos in profile registry
+            if options.profile:
+                try:
+                    repo_result = self.execute_query(
+                        "SELECT SKILL_REPOS FROM CORTEX_CODE.CONFIG.PROFILE_REGISTRY "
+                        "WHERE CONFIG_NAME = %s AND ACTIVE = TRUE",
+                        [options.profile],
+                    )
+                    skill_repos = []
+                    if repo_result.rows and len(repo_result.rows) > 0:
+                        raw = repo_result.rows[0][0]
+                        if raw:
+                            skill_repos = _json.loads(raw) if isinstance(raw, str) else raw
+
+                    for repo in skill_repos:
+                        stage_path = repo.get('snowflake_stage') if isinstance(repo, dict) else None
+                        if not stage_path:
+                            continue
+
+                        # Extract database.schema from stage path (e.g. @DB.SCHEMA.STAGE/...)
+                        stage_ref = stage_path.lstrip('@').split('/')[0]
+                        stage_parts = stage_ref.split('.')
+                        if len(stage_parts) >= 2:
+                            qualified_schema = f"{stage_parts[0]}.{stage_parts[1]}"
+                            self.execute_query(f"USE SCHEMA {qualified_schema}")
+
+                        self.execute_query(
+                            "CREATE TEMPORARY FILE FORMAT IF NOT EXISTS p67_raw_text "
+                            "TYPE='CSV' FIELD_DELIMITER='NONE' RECORD_DELIMITER='NONE'"
+                        )
+
+                        list_result = self.execute_query(f"LIST {stage_path}")
+                        # Group files by skill directory
+                        skill_files: Dict[str, List[str]] = {}
+                        for row in (list_result.rows or []):
+                            name = str(row[0]) if row[0] else ''
+                            parts = name.split('/')
+                            try:
+                                skills_idx = parts.index('skills')
+                            except ValueError:
+                                continue
+                            if skills_idx + 1 < len(parts):
+                                skill_name = parts[skills_idx + 1]
+                                file_name = '/'.join(parts[skills_idx + 2:])
+                                if skill_name and file_name:
+                                    skill_files.setdefault(skill_name, []).append(file_name)
+
+                        for skill_name, files in skill_files.items():
+                            skill_dir = os.path.join(coco_skills_dir, skill_name)
+                            os.makedirs(skill_dir, exist_ok=True)
+                            for file in files:
+                                file_stage = f"{stage_path}{skill_name}/{file}"
+                                try:
+                                    content_result = self.execute_query(
+                                        f"SELECT $1::VARCHAR AS content FROM {file_stage} "
+                                        f"(FILE_FORMAT => p67_raw_text)"
+                                    )
+                                    if content_result.rows and len(content_result.rows) > 0:
+                                        content = str(content_result.rows[0][0] or '')
+                                        file_path = os.path.join(skill_dir, file)
+                                        file_dir = os.path.dirname(file_path)
+                                        if file_dir != skill_dir:
+                                            os.makedirs(file_dir, exist_ok=True)
+                                        with open(file_path, 'w') as f:
+                                            f.write(content)
+                                except Exception as file_err:
+                                    print(f'[SDK] Warning: failed to download {file_stage}: {file_err}')
+                            print(f'[SDK] Downloaded skill "{skill_name}" from stage ({len(files)} file(s))')
+                            skills_found = True
+                except Exception as e:
+                    print(f'[SDK] Warning: failed to download skills from stage: {e}')
+
+            # Attempt 2: Copy bundled skills as fallback
+            if not skills_found:
+                skills_dir = None
+                if options.work_dir:
+                    candidate = os.path.join(options.work_dir, 'skills')
+                    if os.path.isdir(candidate):
+                        skills_dir = candidate
+                else:
+                    spcs_skills = '/workflow/skills'
+                    if os.path.isdir(spcs_skills):
+                        skills_dir = spcs_skills
+                if skills_dir:
+                    try:
+                        import shutil
+                        for entry in os.scandir(skills_dir):
+                            if entry.is_dir():
+                                dest = os.path.join(coco_skills_dir, entry.name)
+                                shutil.copytree(entry.path, dest, dirs_exist_ok=True)
+                                print(f'[SDK] Copied bundled skill "{entry.name}" to {dest}')
+                                skills_found = True
+                    except Exception as e:
+                        print(f'[SDK] Warning: failed to copy bundled skills: {e}')
+
+            # Write skills.json and pass --skills flag if any skills were found
+            if skills_found:
+                try:
+                    skills_json_path = os.path.join(snowflake_home, 'cortex', 'skills.json')
+                    with open(skills_json_path, 'w') as f:
+                        _json.dump({'paths': [coco_skills_dir]}, f, indent=2)
+                    args.extend(['--skills', skills_json_path])
+                    print(f'[SDK] Wrote skills.json pointing to {coco_skills_dir}, passing --skills flag')
+                except Exception as e:
+                    print(f'[SDK] Warning: failed to write skills.json: {e}')
         
         try:
             result = subprocess.run(

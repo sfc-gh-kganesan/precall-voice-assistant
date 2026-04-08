@@ -332,6 +332,8 @@ export interface CortexCodeOptions {
     model?: string;
     /** Allow all tool calls without confirmation (default: false) */
     allowAllToolCalls?: boolean;
+    /** Profile name to apply. Fetched from the account's CORTEX_CODE.CONFIG.PROFILE_REGISTRY. */
+    profile?: string;
 }
 
 /**

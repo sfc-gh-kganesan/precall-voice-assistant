@@ -173,7 +173,7 @@ See [`diagrams/07-hitl-interrupt-flow.mmd`](diagrams/07-hitl-interrupt-flow.mmd)
 
 ## Workflow SDK Capabilities
 
-The SDK is injected into every workflow at runtime. Both TypeScript and Python versions expose the same interface:
+ The SDK is injected into every workflow at runtime. Both TypeScript and Python versions expose the same interface. Key capabilities include SQL execution, Cortex AI (LLM completion, agents, analyst), HTTP, email, HITL interrupts, subworkflows, and **Cortex Code** (`cortexCode`) — which spawns the `cortex` CLI as a subprocess, optionally loading a named profile with skills downloaded from Snowflake stages (or bundled as a fallback). See `docs/plans/coco-profile-lifecycle.md` for details on how profiles and skills work in SPCS.
 
 <img src="diagrams/08-workflow-sdk.svg" alt="Workflow SDK Capabilities" />
 
@@ -486,6 +486,56 @@ export async function main(sdk: WorkflowSDK) {
   return { summary, approved: approval.response };
 }
 ```
+
+### Using CoCo Profiles in Workflows
+
+Workflows can invoke the Cortex Code CLI as a subprocess via `sdk.cortexCode()`. Passing a `profile` name causes the SDK to:
+
+1. Fetch the profile from `CORTEX_CODE.CONFIG.PROFILE_REGISTRY`
+2. Download skills from stages referenced in the profile's `SKILL_REPOS` column
+3. Fall back to bundled skills from the workflow's `skills/` directory if stage download fails
+
+```typescript
+const result = await sdk.cortexCode({
+  prompt: 'What is the secret code?',
+  profile: 'my-profile',   // fetched from CORTEX_CODE.CONFIG.PROFILE_REGISTRY
+  timeout: 120,
+});
+```
+
+**Option A: Skills on a stage (recommended)**
+
+Upload skills to a Snowflake stage and reference it in `SKILL_REPOS`:
+
+```sql
+PUT file:///path/to/my-skill/SKILL.md @MY_DB.MY_SCHEMA.MY_STAGE/skills/my-skill/SKILL.md
+    AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+
+UPDATE CORTEX_CODE.CONFIG.PROFILE_REGISTRY
+SET SKILL_REPOS = '[{"snowflake_stage": "@MY_DB.MY_SCHEMA.MY_STAGE/skills/"}]'
+WHERE CONFIG_NAME = 'my-profile';
+
+-- Grant READ to the runner role
+GRANT READ ON STAGE MY_DB.MY_SCHEMA.MY_STAGE TO ROLE P67_USER_RL;
+```
+
+**Option B: Bundled skills (self-contained fallback)**
+
+```
+my-workflow/
+├── skills/
+│   └── my-skill/
+│       └── SKILL.md    <- copied from disk at runtime
+├── src/
+│   └── index.ts
+└── manifest.yaml
+```
+
+`p67 build` includes `skills/` in the zip automatically. Skills are auto-discovered by CoCo from their `description` frontmatter field — no `$skill-name` prefix in the prompt is required (though it works if used). Stage skills override bundled skills of the same name.
+
+> **How it works**: The SDK downloads skills from stages using its own SQL connection (not CoCo's internal driver, which has PAT auth issues in SPCS). It runs `LIST @stage/skills/` to find skill directories, then `SELECT $1::VARCHAR` to read each file. See [`docs/plans/coco-profile-lifecycle.md`](plans/coco-profile-lifecycle.md) for the full runtime flow.
+
+See [`workflows/test/coco-profile/`](../workflows/test/coco-profile/) for a working example.
 
 ---
 
