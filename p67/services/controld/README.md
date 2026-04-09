@@ -4,7 +4,7 @@ Control plane service for P67 platform.
 
 ## Overview
 
-Controld is a TypeScript-based microservice built with the Fastify web framework. It provides a high-performance API with automatic OpenAPI documentation generation and Swagger UI integration using Zod for type-safe validation.
+Controld is a TypeScript-based microservice built with the Fastify web framework. It provides a high-performance API with automatic OpenAPI documentation generation and Swagger UI integration using Zod for type-safe validation. It manages workflow deployment, execution, secrets, OAuth tokens, logs, and Human-in-the-Loop (HITL) interrupts.
 
 ## Technology Stack
 
@@ -12,7 +12,8 @@ Controld is a TypeScript-based microservice built with the Fastify web framework
 - **Framework**: Fastify 5.2.0 (fast, low-overhead web framework)
 - **API Documentation**: @fastify/swagger, @fastify/swagger-ui
 - **Type Provider**: fastify-type-provider-zod
-- **Validation**: Zod 4.1.13 for schema validation
+- **Validation**: Zod 3.23.8 for schema validation
+- **Database**: PostgreSQL via Prisma (`@p67/db`)
 - **Language**: TypeScript 5.9.3
 - **Target**: ES2022
 
@@ -22,6 +23,7 @@ Controld is a TypeScript-based microservice built with the Fastify web framework
 
 - Node.js 20+
 - pnpm 10.22.0+
+- PostgreSQL (via Docker Compose for local dev)
 
 ### Installation
 
@@ -40,6 +42,12 @@ pnpm dev
 ```
 
 The service will start on `http://localhost:3002` by default.
+
+Alternatively, start all services (including Postgres) via Docker Compose from the repo root:
+
+```bash
+docker compose up
+```
 
 ### Build
 
@@ -73,26 +81,69 @@ Once the service is running, you can access:
 ```json
 {
   "status": "ok",
-  "timestamp": "2025-12-13T10:00:00.000Z"
+  "timestamp": "2025-12-13T10:00:00.000Z",
+  "localStoragePath": "/path/to/storage"
 }
 ```
+
+### Workflows
+
+- `POST /api/workflow/create` - Upload a workflow ZIP
+- `GET /api/workflow/list` - List all workflows
+- `GET /api/workflow/by-name/:name` - Get workflow by name
+- `DELETE /api/workflow/:workflowId` - Delete a workflow
+- `GET /api/workflow/:workflowId/manifest` - Get workflow manifest
+- `GET /api/workflow/:workflowId/graph` - Get workflow graph
+- `PATCH /api/workflow/:workflowId/visibility` - Set workflow visibility
+- `GET /api/workflow/:workflowId/versions` - List workflow versions
+- `POST /api/workflow/:workflowId/run` - Execute a workflow
+- `GET /api/workflow/:workflowId/run/:runId` - Get run status
+- `GET /api/workflow/:workflowId/run/:runId/interrupt` - List interrupts
+- `POST /api/workflow/:workflowId/run/:runId/interrupt/:interruptId/resume` - Resume a HITL interrupt
+
+### Secrets
+
+- `POST /api/secret` - Save a secret
+- `GET /api/secret` - List secrets
+- `DELETE /api/secret/:secretId` - Delete a secret
+- `GET /api/secret/:secretId` - Get a secret
+- `POST /api/secret/:secretId/refresh` - Refresh an OAuth token
+
+### Auth & Identity
+
+- `GET /api/auth/google/callback` - Google OAuth callback
+- `GET /api/whoami` - Get current user info
+
+### Logs
+
+- `GET /api/log` - List structured execution logs
+
+### Webhooks
+
+- `POST /api/webhook` - Incoming webhook endpoint (e.g. Slack)
 
 ## Project Structure
 
 ```
 controld/
 ├── src/
-│   ├── index.ts              # Main Fastify application
+│   ├── index.ts              # Main entry point (Fastify + Slack Socket Mode)
+│   ├── server.ts             # Server factory (buildServer)
 │   ├── config.ts             # Service configuration
 │   ├── schema.ts             # Zod validation schemas
 │   └── routes/
-│       ├── api.ts           # Main API plugin
-│       └── health.ts        # Health check route
+│       ├── api.ts            # Main API plugin (registers all sub-routes)
+│       ├── health.ts         # Health check route
+│       ├── auth.ts           # Google OAuth routes
+│       ├── whoami.ts         # Current user route
+│       ├── log/              # Log routes
+│       ├── secret/           # Secret management routes
+│       ├── webhook/          # Webhook routes (Slack, etc.)
+│       └── workflow/         # Workflow routes (CRUD, run, interrupt, etc.)
 ├── dist/                     # Compiled output (generated)
-├── package.json             # Dependencies and scripts
-├── tsconfig.json            # TypeScript configuration
-├── eslint.config.js         # ESLint configuration
-└── .gitignore              # Git ignore patterns
+├── package.json              # Dependencies and scripts
+├── tsconfig.json             # TypeScript configuration
+└── .gitignore                # Git ignore patterns
 ```
 
 ## Import Paths
@@ -141,23 +192,15 @@ import health from '@controld/routes/health.js';
 
 **Note**: All imports must include the `.js` extension (ESM requirement), even when importing `.ts` files during development.
 
-### Benefits
-
-- **Cleaner imports**: No need to calculate relative path depth (`../../`)
-- **Easy refactoring**: Move files without updating import paths
-- **Better IDE support**: Improved autocomplete and navigation
-- **Consistent**: All imports follow the same `@controld/*` pattern
-
 ## Scripts
 
 - `pnpm dev` - Start development server with hot reload (tsx watch)
 - `pnpm build` - Compile TypeScript to JavaScript and transform path aliases
 - `pnpm start` - Run production server
-- `pnpm lint` - Check code quality with ESLint
-- `pnpm lint:fix` - Auto-fix ESLint issues
-- `pnpm format` - Format code with Prettier
-- `pnpm format:check` - Check code formatting
+- `pnpm check` - Run Biome linting and formatting checks
+- `pnpm fix` - Auto-fix Biome linting and formatting issues
 - `pnpm type:check` - Validate TypeScript types
+- `pnpm test` - Run Vitest tests
 
 ## Configuration
 
@@ -165,12 +208,22 @@ import health from '@controld/routes/health.js';
 
 - `PORT` - Server port (default: 3002)
 - `NODE_ENV` - Environment mode (default: development)
+- `DATABASE_URL` - PostgreSQL connection string
+- `ENCRYPTION_KEY` - Key for encrypting secrets at rest
+- `DEBUG_ENABLE_DEFAULT_USER` - Enable a default debug user (development only)
+- `SLACK_APP_TOKEN` - Slack app-level token (Socket Mode)
+- `SLACK_BOT_TOKEN` - Slack bot token
+- `P67_RUNNER_IMAGE` - Docker image for spawning workflow runner containers
+- `P67_HOST_STORAGE_ROOT` - Host path for workflow storage (Docker volume mount)
+- `SNOWFLAKE_WEBHOOK_SECRET` - Shared secret for validating Snowflake webhook calls
 
 ### Example .env file
 
 ```bash
 PORT=3002
 NODE_ENV=development
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/controld_dev
+ENCRYPTION_KEY=<random-secret>
 ```
 
 ## Development Workflow
@@ -190,68 +243,28 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 const MyResponseSchema = z.object({
-  message: z.string(),
+    message: z.string(),
 });
 
 const myRoute: FastifyPluginAsync = async (server) => {
-  const fastify = server.withTypeProvider<ZodTypeProvider>();
+    const fastify = server.withTypeProvider<ZodTypeProvider>();
 
-  fastify.get(
-    '/',
-    {
-      schema: {
-        tags: ['MyTag'],
-        summary: 'My endpoint',
-        description: 'Description of my endpoint',
-        response: {
-          200: MyResponseSchema,
+    fastify.get(
+        '/',
+        {
+            schema: {
+                tags: ['MyTag'],
+                summary: 'My endpoint',
+                description: 'Description of my endpoint',
+                response: {
+                    200: MyResponseSchema,
+                },
+            },
         },
-      },
-    },
-    async () => {
-      return { message: 'Hello' };
-    },
-  );
-};
-
-export default myRoute;
-```
-
-### Adding Request Validation
-
-```typescript
-import { FastifyPluginAsync } from 'fastify';
-import { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { z } from 'zod';
-
-const RequestBodySchema = z.object({
-  name: z.string(),
-  age: z.number(),
-});
-
-const ResponseSchema = z.object({
-  message: z.string(),
-});
-
-const myRoute: FastifyPluginAsync = async (server) => {
-  const fastify = server.withTypeProvider<ZodTypeProvider>();
-
-  fastify.post(
-    '/',
-    {
-      schema: {
-        tags: ['Users'],
-        body: RequestBodySchema,
-        response: {
-          200: ResponseSchema,
+        async () => {
+            return { message: 'Hello' };
         },
-      },
-    },
-    async (request) => {
-      const { name, age } = request.body;
-      return { message: `Hello ${name}, you are ${age} years old` };
-    },
-  );
+    );
 };
 
 export default myRoute;
@@ -259,18 +272,14 @@ export default myRoute;
 
 ## Code Quality
 
-This project uses:
+This project uses **Biome** as a unified toolchain for linting and formatting.
 
-- **ESLint** for code linting
-- **Prettier** for code formatting
-- **TypeScript** strict mode for type safety
-
-Run all checks before committing:
+Run checks before committing:
 
 ```bash
-pnpm lint
-pnpm format:check
-pnpm type:check
+pnpm check       # Lint and format check
+pnpm fix         # Auto-fix issues
+pnpm type:check  # TypeScript validation
 ```
 
 ## Architecture
@@ -293,40 +302,27 @@ The service uses `fastify-type-provider-zod` and `@fastify/swagger` for:
 - TypeScript type inference from schemas
 - Interactive Swagger UI documentation
 
-### Error Handling
+### Workflow Execution
 
-Fastify provides built-in error handling. Custom error handlers can be added:
+Workflows are executed by spawning isolated child processes (locally) or running `EXECUTE JOB SERVICE` on Snowflake SPCS. The parent process and child communicate via NDJSON messages over stdin/stdout. The `runnerRegistry` on the server instance tracks live runs for HITL interrupt/resume.
 
-```typescript
-fastify.setErrorHandler((error, request, reply) => {
-  fastify.log.error(error);
-  reply.status(500).send({ error: 'Internal Server Error' });
-});
-```
+### Human-in-the-Loop (HITL)
 
-## Logging
-
-Fastify includes Pino logger by default. Access the logger in routes:
-
-```typescript
-fastify.get('/example', async (request, reply) => {
-  request.log.info('Processing request');
-  return { data: 'example' };
-});
-```
+A running workflow can pause mid-execution by sending an `Interrupt` message. The run status becomes `interrupted`. A caller can then `POST .../interrupt/:interruptId/resume` with a response payload to unblock the workflow and let it continue.
 
 ## Contributing
 
 1. Create a new branch for your feature
 2. Make changes following the existing code style
-3. Run `pnpm lint:fix` and `pnpm format` before committing
+3. Run `pnpm fix` before committing
 4. Ensure all type checks pass with `pnpm type:check`
 5. Test your changes with `pnpm dev`
 
 ## Related Services
 
-- **API** (`p67/packages/api`) - Backend service (Fastify-based)
 - **Web** (`p67/packages/web`) - React frontend application
+- **workflow-sdk** (`p67/packages/workflow-sdk`) - TypeScript SDK for workflow authors
+- **db** (`p67/packages/db`) - Prisma database client
 
 ## Resources
 

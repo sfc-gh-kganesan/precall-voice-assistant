@@ -7,13 +7,15 @@ Experimental platform for building, testing, and deploying agentic workflows on 
 ```
 .
 ├── packages/
-│   ├── workflow-sdk/    # Agent SDK for P67 workflows
-│   ├── db/           # Database client with Prisma integration
-│   └── web/          # React 19 + Vite frontend
+│   ├── workflow-sdk/         # TypeScript Agent SDK for P67 workflows
+│   ├── workflow-sdk-python/  # Python Agent SDK for P67 workflows
+│   ├── db/                   # Database client with Prisma integration
+│   └── web/                  # React 19 + Vite frontend
 ├── services/
 │   └── controld/     # Control plane service (Fastify-based)
 ├── tools/
-│   └── p67-cli/      # P67 CLI tool for workflow management
+│   ├── p67-cli/      # P67 CLI tool for workflow management
+│   └── dash/         # React dashboard for workflow management UI
 ├── coco/             # Cortex Code custom commands and demos
 ├── example_workflows/
 │   ├── number_one/   # Example LangGraph workflow
@@ -30,14 +32,13 @@ Experimental platform for building, testing, and deploying agentic workflows on 
 
 **Packages:**
 - **workflow-sdk:** TypeScript SDK for building P67 workflows with Snowflake integration
+- **workflow-sdk-python:** Python SDK for building P67 workflows
 - **db:** Prisma + PostgreSQL adapter for database operations
 - **web:** React 19, TypeScript, Vite, Mantine UI
 
-**Services:**
-- **controld:** Fastify 5.2.0, Zod validation, OpenAPI/Swagger, workflow runtime
-
 **Tools:**
 - **p67-cli:** Bun-based CLI for workflow lifecycle management
+- **dash:** React dashboard for browsing and managing workflows (Snowflake Stellar Components)
 - **Biome:** Code linting and formatting
 - **pnpm:** Package management (v10.22.0)
 
@@ -157,9 +158,12 @@ Located in `services/controld/`, provides workflow execution and management APIs
 
 **Features:**
 - Workflow deployment via ZIP upload
-- Workflow execution runtime using Bun
-- LangGraph workflow support
-- File-based storage
+- Workflow execution via spawned child processes (local) or Snowflake SPCS job services
+- LangGraph and custom workflow support
+- Human-in-the-Loop (HITL) interrupt/resume
+- PostgreSQL storage via Prisma
+- Encrypted secrets and OAuth token management
+- Slack integration (Socket Mode)
 - OpenAPI documentation at `/docs`
 
 **API Endpoints:**
@@ -167,6 +171,11 @@ Located in `services/controld/`, provides workflow execution and management APIs
 - `POST /api/workflow/create` - Upload workflow
 - `GET /api/workflow/list` - List workflows
 - `POST /api/workflow/:workflowId/run` - Execute workflow
+- `GET /api/workflow/:workflowId/run/:runId` - Get run status
+- `POST /api/workflow/:workflowId/run/:runId/interrupt/:interruptId/resume` - Resume HITL interrupt
+- `GET /api/secret`, `POST /api/secret` - Manage secrets
+- `GET /api/log` - Execution logs
+- `GET /api/whoami`, `GET /api/auth/google/callback` - Auth/identity
 - `GET /docs` - Swagger UI
 - `GET /docs/json` - OpenAPI schema
 
@@ -192,6 +201,10 @@ Database utilities with Prisma client and PostgreSQL adapter:
 - Connection management
 - Type-safe database operations
 
+### workflow-sdk-python
+
+Python SDK for building P67 workflows.
+
 ### web
 
 React frontend application with Mantine UI components (currently experimental).
@@ -214,6 +227,8 @@ docker compose down
 Services:
 - **Postgres:** localhost:5432
 - **Controld:** http://localhost:3002
+
+> **Note:** The controld container mounts the Docker socket (`/var/run/docker.sock`) so it can spawn workflow runner containers on the host.
 
 ### Build Docker Image
 
