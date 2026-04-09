@@ -1,0 +1,265 @@
+name: REUSABLE_SOFTWARE_PATTERNS
+description: "Provides engineers with common reusable software patterns used in customer use cases, applications, and frameworks. Each record features a useful pattern that can be leveraged for new work, including its name, category, description, abstracted code, link to the source codebase, dependencies, usage notes, tags, programming language, framework, and synthetic queries to help identify intended purpose."
+tables:
+  - name: REUSABLE_PATTERNS
+    base_table:
+      database: PATTERN_IQ
+      schema: PUBLIC
+      table: REUSABLE_PATTERNS
+    primary_key:
+      columns:
+        - PATTERN_ID
+    dimensions:
+      - name: ABSTRACTED_CODE
+        synonyms:
+          - code
+          - code snippet
+          - implementation
+          - source code
+        description: "Generalized code implementation of the pattern with placeholders, ready to be adapted for new use cases."
+        expr: ABSTRACTED_CODE
+        data_type: VARCHAR(16777216)
+      - name: CATEGORY
+        synonyms:
+          - type
+          - domain
+          - classification
+          - group
+        description: High-level classification of the pattern by domain or use case area.
+        expr: CATEGORY
+        data_type: VARCHAR(16777216)
+        sample_values:
+          - cortex-search
+          - data-pipeline
+          - streamlit-ui
+      - name: COMPLEXITY_SCORE
+        synonyms:
+          - complexity
+          - difficulty
+          - difficulty score
+        description: "Numeric score indicating the relative complexity of the pattern, with higher values representing more complex implementations."
+        expr: COMPLEXITY_SCORE
+        data_type: "NUMBER(38,0)"
+      - name: CREATED_BY
+        synonyms:
+          - author
+          - contributor
+          - creator
+        description: Username of the person who created or contributed the pattern.
+        expr: CREATED_BY
+        data_type: VARCHAR(16777216)
+      - name: DEPENDENCIES
+        synonyms:
+          - required libraries
+          - packages
+          - requirements
+        description: "JSON structure listing external libraries, packages, or services required by the pattern."
+        expr: DEPENDENCIES
+        data_type: VARIANT
+      - name: DEPENDENCY_GRAPH
+        description: JSON structure representing the dependency relationships between components within the pattern.
+        expr: DEPENDENCY_GRAPH
+        data_type: VARIANT
+      - name: DESCRIPTION
+        synonyms:
+          - summary
+          - overview
+          - details
+        description: "Detailed explanation of what the pattern does, when to use it, and the problem it solves."
+        expr: DESCRIPTION
+        data_type: VARCHAR(16777216)
+      - name: FRAMEWORK
+        synonyms:
+          - technology
+          - tech stack
+          - platform
+        description: The Snowflake framework or technology the pattern is built on.
+        expr: FRAMEWORK
+        data_type: VARCHAR(16777216)
+        sample_values:
+          - cortex-search
+          - snowpark
+          - streamlit
+      - name: LANGUAGE
+        synonyms:
+          - programming language
+          - lang
+          - coded in
+        description: Primary programming language used in the pattern implementation.
+        expr: LANGUAGE
+        data_type: VARCHAR(16777216)
+        sample_values:
+          - python
+          - sql
+      - name: PATTERN_ID
+        synonyms:
+          - id
+          - pattern id
+        description: Unique identifier for each reusable software pattern.
+        expr: PATTERN_ID
+        data_type: VARCHAR(16777216)
+      - name: PATTERN_NAME
+        synonyms:
+          - name
+          - title
+          - pattern title
+        description: Human-readable name describing the pattern and its purpose.
+        expr: PATTERN_NAME
+        data_type: VARCHAR(16777216)
+      - name: REPO_NAME
+        synonyms:
+          - repository
+          - project
+          - project name
+          - repo
+        description: Name of the repository from which the pattern was sourced.
+        expr: REPO_NAME
+        data_type: VARCHAR(16777216)
+      - name: SEARCH_CONTENT
+        description: "Concatenated text field combining pattern name, description, usage notes, and tags for full-text search purposes."
+        expr: SEARCH_CONTENT
+        data_type: VARCHAR(16777216)
+      - name: SOURCE_REPO_LINK
+        synonyms:
+          - repo link
+          - repository url
+          - source link
+          - github link
+        description: URL link to the original source repository where the pattern was extracted from.
+        expr: SOURCE_REPO_LINK
+        data_type: VARCHAR(16777216)
+      - name: SYNTHETIC_QUERIES
+        synonyms:
+          - sample questions
+          - use case queries
+          - intended questions
+        description: "JSON array of natural language questions that this pattern is designed to address, used to match patterns to engineering needs."
+        expr: SYNTHETIC_QUERIES
+        data_type: VARIANT
+      - name: TAGS
+        synonyms:
+          - keywords
+          - labels
+        description: Array of keyword tags for categorizing and searching patterns across multiple dimensions.
+        expr: TAGS
+        data_type: ARRAY
+      - name: USAGE_NOTES
+        synonyms:
+          - notes
+          - instructions
+          - how to use
+          - implementation guide
+        description: "Practical guidance on how to implement the pattern, including prerequisites, configuration tips, and common pitfalls."
+        expr: USAGE_NOTES
+        data_type: VARCHAR(16777216)
+      - name: STARS
+        synonyms:
+          - star count
+          - votes
+          - popularity
+          - likes
+          - upvotes
+        description: "Number of stars (upvotes) the pattern has received from users, indicating popularity and usefulness."
+        expr: STARS
+        data_type: "NUMBER(38,0)"
+    facts:
+      - name: COMPLEXITY_SCORE_FACT
+        synonyms:
+          - complexity value
+        description: Numeric complexity score used for aggregation calculations such as average complexity across pattern groups.
+        expr: COMPLEXITY_SCORE
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: STARS_FACT
+        synonyms:
+          - star value
+          - vote count
+        description: "Star count used for aggregation calculations such as total stars, average stars, and most popular patterns."
+        expr: STARS
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+    metrics:
+      - name: AVG_COMPLEXITY
+        synonyms:
+          - average complexity
+          - mean complexity
+          - average difficulty
+        description: Average complexity score across patterns matching the given criteria.
+        expr: AVG(COMPLEXITY_SCORE)
+        access_modifier: public_access
+      - name: MAX_COMPLEXITY
+        synonyms:
+          - highest complexity
+          - most complex
+        description: Maximum complexity score among patterns matching the given criteria.
+        expr: MAX(COMPLEXITY_SCORE)
+        access_modifier: public_access
+      - name: MIN_COMPLEXITY
+        synonyms:
+          - lowest complexity
+          - simplest
+          - least complex
+        description: Minimum complexity score among patterns matching the given criteria.
+        expr: MIN(COMPLEXITY_SCORE)
+        access_modifier: public_access
+      - name: PATTERN_COUNT
+        synonyms:
+          - number of patterns
+          - total patterns
+          - how many patterns
+          - count of patterns
+        description: Total number of patterns matching the given criteria.
+        expr: COUNT(PATTERN_ID)
+        access_modifier: public_access
+      - name: TOTAL_STARS
+        synonyms:
+          - sum of stars
+          - total votes
+          - total likes
+        description: Total number of stars across patterns matching the given criteria.
+        expr: SUM(STARS)
+        access_modifier: public_access
+      - name: AVG_STARS
+        synonyms:
+          - average stars
+          - mean stars
+          - average votes
+        description: Average number of stars per pattern matching the given criteria.
+        expr: AVG(STARS)
+        access_modifier: public_access
+    filters:
+      - name: PYTHON_PATTERNS
+        description: Filter to show only Python-based patterns.
+        expr: LANGUAGE = 'python'
+      - name: SQL_PATTERNS
+        description: Filter to show only SQL-based patterns.
+        expr: LANGUAGE = 'sql'
+      - name: STREAMLIT_PATTERNS
+        description: Filter to show only Streamlit framework patterns.
+        expr: FRAMEWORK = 'streamlit'
+      - name: SNOWPARK_PATTERNS
+        description: Filter to show only Snowpark framework patterns.
+        expr: FRAMEWORK = 'snowpark'
+      - name: CORTEX_SEARCH_PATTERNS
+        description: Filter to show only Cortex Search framework patterns.
+        expr: FRAMEWORK = 'cortex-search'
+      - name: POPULAR_PATTERNS
+        description: Filter to show only patterns that have received at least one star.
+        expr: STARS > 0
+    time_dimensions:
+      - name: CREATED_AT
+        synonyms:
+          - creation date
+          - date added
+          - created date
+        description: Timestamp when the pattern was originally created.
+        expr: CREATED_AT
+        data_type: TIMESTAMP_NTZ(9)
+      - name: UPDATED_AT
+        synonyms:
+          - last updated
+          - modified date
+          - last modified
+        description: Timestamp when the pattern was last modified or updated.
+        expr: UPDATED_AT
+        data_type: TIMESTAMP_NTZ(9)
