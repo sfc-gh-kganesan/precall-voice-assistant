@@ -1,0 +1,9 @@
+---
+login_name: fmeyler
+display_name: fmeyler
+first_name: Fred
+last_name: Meyler
+email: fred.meyler@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public

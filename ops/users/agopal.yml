@@ -1,0 +1,9 @@
+---
+login_name: agopal
+display_name: agopal
+first_name: Akshin
+last_name: Gopal
+email: akshin.gopal@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public

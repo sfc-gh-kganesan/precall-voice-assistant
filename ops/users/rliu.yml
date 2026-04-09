@@ -1,0 +1,9 @@
+---
+login_name: rliu
+display_name: rliu
+first_name: Ruo
+last_name: Liu
+email: ruo.liu@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public

@@ -1,0 +1,9 @@
+---
+login_name: tyli
+display_name: tyli
+first_name: Tyler
+last_name: Li
+email: tyler.li@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public

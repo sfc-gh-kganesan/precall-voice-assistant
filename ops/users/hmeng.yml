@@ -1,0 +1,9 @@
+---
+login_name: hmeng
+display_name: hmeng
+first_name: Howard
+last_name: Meng
+email: howard.meng@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
