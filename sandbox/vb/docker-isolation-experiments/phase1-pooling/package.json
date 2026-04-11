@@ -1,0 +1,17 @@
+{
+  "name": "p67-docker-pooling",
+  "version": "1.0.0",
+  "description": "Container pooling experiments for P67",
+  "type": "module",
+  "scripts": {
+    "test": "node --test pool.test.js",
+    "benchmark": "node benchmark.js",
+    "simulate": "node workflow-simulation.js"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

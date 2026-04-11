@@ -1,0 +1,13 @@
+{
+  "name": "p67-docker-hardening",
+  "version": "1.0.0",
+  "description": "Security hardening experiments for P67 containers",
+  "type": "module",
+  "scripts": {
+    "test": "node --test hardening.test.js",
+    "benchmark": "node benchmark-hardened.js"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.9"
+  }
+}

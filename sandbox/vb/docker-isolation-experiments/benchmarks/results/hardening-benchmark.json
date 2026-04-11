@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-03-05T18:53:49.681Z",
+  "iterations": 10,
+  "performance": {
+    "baseline": {
+      "name": "Baseline (no hardening)",
+      "mean": 207.1650584,
+      "median": 208.211,
+      "p95": 222.50525,
+      "min": 198.98679200000015,
+      "max": 222.50525
+    },
+    "level1": {
+      "name": "Level 1: Standard",
+      "mean": 149.0399457,
+      "median": 150.25462500000003,
+      "p95": 156.96804199999997,
+      "min": 143.269542,
+      "max": 156.96804199999997
+    },
+    "level2": {
+      "name": "Level 2: Hardened",
+      "mean": 161.90743760000026,
+      "median": 153.70883400000002,
+      "p95": 231.45429200000035,
+      "min": 126.37062500000047,
+      "max": 231.45429200000035
+    },
+    "level2_seccomp": {
+      "name": "Level 2: Hardened + Seccomp",
+      "mean": 150.90477090000013,
+      "median": 146.58237499999996,
+      "p95": 200.55083400000058,
+      "min": 123.01600000000053,
+      "max": 200.55083400000058
+    }
+  },
+  "security": [
+    {
+      "name": "mount blocked",
+      "cmd": "mount /dev/sda1 /mnt 2>&1 || echo \"BLOCKED\"",
+      "expectBlocked": true,
+      "output": "mount: /mnt: permission denied.\n       dmesg(1) ma",
+      "blocked": true,
+      "pass": true
+    },
+    {
+      "name": "network blocked (curl)",
+      "cmd": "python3 -c \"import urllib.request; urllib.request.urlopen('http://google.com')\" 2>&1 || echo \"BLOCKED\"",
+      "expectBlocked": true,
+      "output": "Traceback (most recent call last):\n  File \"/usr/lo",
+      "blocked": true,
+      "pass": true
+    },
+    {
+      "name": "process spawn works",
+      "cmd": "python3 -c \"import subprocess; print(subprocess.run(['echo', 'test'], capture_output=True).stdout.decode().strip())\"",
+      "expectBlocked": false,
+      "output": "test",
+      "blocked": false,
+      "pass": true
+    },
+    {
+      "name": "file write to /tmp works",
+      "cmd": "python3 -c \"open('/tmp/test.txt', 'w').write('hello'); print(open('/tmp/test.txt').read())\"",
+      "expectBlocked": false,
+      "output": "hello",
+      "blocked": false,
+      "pass": true
+    },
+    {
+      "name": "file write to / blocked (read-only)",
+      "cmd": "touch /test.txt 2>&1 || echo \"BLOCKED\"",
+      "expectBlocked": true,
+      "output": "touch: cannot touch '/test.txt': Read-only file sy",
+      "blocked": true,
+      "pass": true
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "p67-wasm-phase1",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test:basic": "node --experimental-vm-modules tests/basic_python.js",
+    "test:langgraph": "node --experimental-vm-modules tests/langgraph_import.js",
+    "test:workflow": "node --experimental-vm-modules tests/stateful_workflow.js",
+    "test:host": "node --experimental-vm-modules tests/host_functions.js",
+    "test:all": "npm run test:basic && npm run test:langgraph && npm run test:workflow && npm run test:host"
+  },
+  "dependencies": {
+    "pyodide": "^0.29.3"
+  }
+}

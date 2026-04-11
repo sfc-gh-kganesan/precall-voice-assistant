@@ -1,0 +1,14 @@
+{
+  "name": "p67-gvisor-benchmark",
+  "version": "1.0.0",
+  "description": "gVisor vs runc benchmark for P67",
+  "type": "module",
+  "scripts": {
+    "test": "node --test gvisor.test.js",
+    "benchmark": "node benchmark-gvisor.js",
+    "check": "node check-gvisor.js"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.2"
+  }
+}

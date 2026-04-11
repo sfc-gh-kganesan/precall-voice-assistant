@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-03-05T18:47:30.100Z",
+  "testCases": 5,
+  "results": [
+    {
+      "success": true,
+      "metrics": {
+        "acquireMs": 0,
+        "executeMs": 121,
+        "releaseMs": 0,
+        "totalMs": 160
+      }
+    },
+    {
+      "success": true,
+      "metrics": {
+        "acquireMs": 0,
+        "executeMs": 107,
+        "releaseMs": 0,
+        "totalMs": 146
+      }
+    },
+    {
+      "success": true,
+      "metrics": {
+        "acquireMs": 0,
+        "executeMs": 85,
+        "releaseMs": 0,
+        "totalMs": 122
+      }
+    },
+    {
+      "success": true,
+      "metrics": {
+        "acquireMs": 0,
+        "executeMs": 102,
+        "releaseMs": 0,
+        "totalMs": 139
+      }
+    },
+    {
+      "success": true,
+      "metrics": {
+        "acquireMs": 0,
+        "executeMs": 107,
+        "releaseMs": 0,
+        "totalMs": 144
+      }
+    }
+  ]
+}

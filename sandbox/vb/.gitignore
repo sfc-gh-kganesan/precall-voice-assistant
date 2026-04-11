@@ -1,0 +1,14 @@
+# Override parent gitignore to track spec-kit artifacts
+!.claude/
+!.specify/
+
+# Exclude auto-generated artifacts
+node_modules/
+package-lock.json
+env/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+phase2-test

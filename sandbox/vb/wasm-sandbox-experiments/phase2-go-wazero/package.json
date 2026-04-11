@@ -1,0 +1,12 @@
+{
+  "name": "p67-wasm-phase2-bridge",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "pyodide": "^0.29.3"
+  },
+  "scripts": {
+    "test": "node test_architecture.mjs",
+    "bridge": "node bridge.mjs"
+  }
+}
