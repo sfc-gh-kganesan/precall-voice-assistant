@@ -47,12 +47,16 @@ from p67_sdk.types import (
     CortexCodeOptions,
     CortexCodeResponse,
 )
+from p67_sdk.automation_context import AutomationContext
+from p67_sdk.context_factory import create_context
 from p67_sdk.ipc import _handle_resume_interrupt, _handle_oauth_token_response
 
 __version__ = "0.1.0"
 
 __all__ = [
     "WorkflowSDK",
+    "AutomationContext",
+    "create_context",
     "QueryResult",
     "HttpResponse",
     "CortexAnalystResponse",

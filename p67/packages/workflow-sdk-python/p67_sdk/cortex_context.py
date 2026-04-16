@@ -18,6 +18,8 @@ import logging
 import os
 from typing import Any
 
+from p67_sdk.automation_context import AutomationContext
+
 logger = logging.getLogger("cortex_context")
 
 # SPCS environment defaults
@@ -25,7 +27,7 @@ DEFAULT_TOKEN_PATH = "/snowflake/session/token"
 DEFAULT_SECRETS_DIR = "/snowflake/secrets"
 
 
-class CortexContext:
+class CortexContext(AutomationContext):
     """SDK for Cortex Automation code to interact with Snowflake services.
 
     Usage inside a LangGraph node::
