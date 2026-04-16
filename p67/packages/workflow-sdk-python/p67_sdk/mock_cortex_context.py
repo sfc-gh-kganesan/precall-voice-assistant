@@ -13,6 +13,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from p67_sdk.automation_context import AutomationContext
+
 logger = logging.getLogger("mock_cortex_context")
 
 
@@ -26,7 +28,7 @@ class MethodCall:
     result: Any = None
 
 
-class MockCortexContext:
+class MockCortexContext(AutomationContext):
     """Test double for CortexContext that uses a local Snowflake connection.
 
     Usage::

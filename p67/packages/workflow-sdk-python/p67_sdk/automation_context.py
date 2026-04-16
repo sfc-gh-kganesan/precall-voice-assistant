@@ -1,9 +1,39 @@
 """
 automation_context.py — Abstract base class for Cortex Automation context objects.
 
-Defines the unified API that all automation backends (CortexContext, LocalBackend,
-MockCortexContext) must implement, allowing user code to run unchanged in SPCS,
-local dev, and test environments.
+Defines the unified API that all automation backends (``CortexContext``,
+``LocalBackend``, ``MockCortexContext``) must implement, allowing user
+automation code to run unchanged in SPCS, local dev, and test environments.
+
+**Programming model**:
+  User automation code should be written against ``AutomationContext``
+  exclusively.  Direct imports of ``CortexContext`` or ``LocalBackend`` in
+  automation logic are an anti-pattern: they create an environment-specific
+  dependency and prevent the code from running in other environments.  Use
+  ``context_factory.create_context()`` to obtain a backend-appropriate
+  instance at runtime.
+
+**Backend summary**:
+
+- ``CortexContext`` (``cortex_context.py``) — production SPCS/GS backend.
+  Reads credentials from SPCS file mounts.  ``human_action()`` uses
+  checkpoint-and-release (container exits, resumes in a new container).
+
+- ``LocalBackend`` (``local_backend.py``) — local development / controld
+  backend.  Wraps ``WorkflowSDK``.  ``human_action()`` blocks synchronously
+  via IPC; the Python process stays alive.
+
+- ``MockCortexContext`` — unit-test double.  Returns configurable fixtures
+  for each method.  Does not require a live Snowflake connection.
+
+**Behavioural differences** (``human_action``):
+  The only method whose observable behaviour differs between backends is
+  ``human_action()``.  In ``CortexContext`` it never returns (raises
+  ``HumanActionInterrupt``); in ``LocalBackend`` it blocks and then returns
+  the human response dict.  Automation code that calls ``human_action()``
+  should treat the return value as valid in both cases — the SPCS runner
+  injects the human response into graph state before the node is re-entered,
+  so the node's code receives the return value transparently on resume.
 """
 
 from __future__ import annotations
@@ -15,9 +45,19 @@ from typing import Any
 class AutomationContext(ABC):
     """Abstract interface for interacting with Snowflake services from automation code.
 
+    This ABC is the single programming surface for user automation logic.
+    Concrete backends (``CortexContext``, ``LocalBackend``) implement every
+    abstract method; user code should never reference a concrete class
+    directly.  Obtain an instance via ``context_factory.create_context()``.
+
+    All method contracts are backend-neutral except where noted.  The one
+    notable exception is ``human_action()``: see its docstring for the
+    difference between checkpoint-and-release (SPCS) and synchronous IPC
+    (local).
+
     Concrete implementations:
-    - ``CortexContext``  — SPCS/GS environment (OAuth token from file mount)
-    - ``LocalBackend``   — local / controld mode (wraps ``WorkflowSDK``)
+    - ``CortexContext``     — SPCS/GS environment (OAuth token from file mount)
+    - ``LocalBackend``      — local / controld mode (wraps ``WorkflowSDK``)
     - ``MockCortexContext`` — unit-test double
 
     Usage::
@@ -168,6 +208,22 @@ class AutomationContext(ABC):
         timeout_hours: int = 24,
     ) -> dict:
         """Pause execution and wait for a human response.
+
+        **Backend behaviour differs**:
+
+        - ``CortexContext`` (SPCS): raises ``HumanActionInterrupt``, which
+          triggers checkpoint-and-release.  The SPCS container exits; a new
+          container is cold-started when the human responds.  This method
+          **never returns** in the SPCS path; the node is re-entered from the
+          top on resume, and the human response dict is injected into graph
+          state before execution continues.
+
+        - ``LocalBackend`` (local/controld): calls ``WorkflowSDK.interrupt()``
+          and blocks synchronously.  The method **does return** with the
+          human response dict once the controld runner delivers it.
+
+        In both cases automation code should use the return value normally —
+        the platform guarantees the value is available when the node continues.
 
         Args:
             prompt: Description of the action required from the human.

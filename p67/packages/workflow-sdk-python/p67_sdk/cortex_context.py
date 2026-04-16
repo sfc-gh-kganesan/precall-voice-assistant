@@ -1,14 +1,41 @@
 """
-cortex_context.py — CortexContext SDK for Cortex Automations.
+cortex_context.py — CortexContext: SPCS/GS backend for Cortex Automations.
 
-Provides the `ctx` object that automation code uses to interact with
-Snowflake services from inside the SPCS runner container.
+Provides the ``ctx`` object that automation code uses to interact with
+Snowflake services from inside the SPCS runner container.  This is the
+production backend of the ``AutomationContext`` ABC; for local development
+see ``local_backend.LocalBackend``.
 
-Key design:
-- OAuth token read from /snowflake/session/token (auto-refreshed by GS every 5min)
-- New connection per operation (token file re-read each time, per C12 findings)
-- EXECUTE AS service role (definer's rights)
-- Secrets read from /snowflake/secrets/<name> file mounts (NOT env vars)
+**OAuth token refresh** (C12 findings):
+  The SPCS platform mounts a short-lived OAuth token at
+  ``/snowflake/session/token``.  GS ``ResourceSetReconcilerBG`` rotates this
+  file approximately every 5 minutes.  The token is intentionally re-read on
+  *every* ``_get_connection()`` call; caching it would cause auth failures
+  after the first rotation.  No connection pool is maintained for the same
+  reason — each SQL call gets a fresh connection that reads the current token.
+
+**EXECUTE AS OWNER semantics**:
+  The OAuth token is issued for the automation's service identity, which runs
+  under the definer's-rights role (EXECUTE AS OWNER).  All SQL executed
+  through ``CortexContext`` inherits this role; user code cannot escalate
+  privileges beyond what the automation owner has been granted.
+
+**Secret file mounts**:
+  Automation secrets are mounted by SPCS as plain-text files under
+  ``/snowflake/secrets/<name>``, where ``<name>`` matches the key defined in
+  the automation's ``[secrets]`` configuration.  Reading from files rather
+  than environment variables is a security requirement (C9): environment
+  variables are visible to child processes and may appear in crash dumps.
+
+**HITL checkpoint-and-release**:
+  ``human_action()`` does *not* block in-process.  It raises
+  ``HumanActionInterrupt``, which unwinds the call stack back to the runner's
+  Go supervisor.  The supervisor checkpoints the full LangGraph state to
+  Hybrid Tables, sets the run status to ``WAITING_FOR_HUMAN`` in
+  ``_cortex_automation_run_history``, and terminates the SPCS job (zero idle
+  cost).  When a human submits a response, GS cold-starts a new SPCS job,
+  loads the checkpoint, injects the response into the graph state, and resumes
+  execution from the interrupted node.  Cold-start latency is typically 30–90 s.
 """
 
 from __future__ import annotations
@@ -28,7 +55,13 @@ DEFAULT_SECRETS_DIR = "/snowflake/secrets"
 
 
 class CortexContext(AutomationContext):
-    """SDK for Cortex Automation code to interact with Snowflake services.
+    """SPCS/GS implementation of ``AutomationContext``.
+
+    All SQL executes via a fresh ``snowflake.connector`` connection per call,
+    re-reading the OAuth token file each time (see module docstring).  This
+    class is instantiated by ``context_factory.create_context()`` when
+    ``SNOWFLAKE_HOST`` is set, and should not be constructed directly in
+    user automation code.
 
     Usage inside a LangGraph node::
 
@@ -70,10 +103,16 @@ class CortexContext(AutomationContext):
             return f.read().strip()
 
     def _get_connection(self):
-        """Create a fresh Snowflake connection with current OAuth token.
+        """Create a fresh Snowflake connection with the current OAuth token.
 
-        Returns a snowflake.connector connection. Each call reads the
-        token file anew to pick up refreshed tokens.
+        A new connection is created on every call (no pool) so that the
+        most-recently-rotated token is always used.  The connection runs under
+        the automation's EXECUTE AS OWNER role; the caller's session role is
+        not inherited.
+
+        Returns:
+            An open ``snowflake.connector.SnowflakeConnection``.  Caller is
+            responsible for closing it (``conn.close()``).
         """
         import snowflake.connector
 
@@ -290,28 +329,42 @@ class CortexContext(AutomationContext):
         notify: dict | None = None,
         timeout_hours: int = 24,
     ) -> dict:
-        """Pause automation for human input (checkpoint-and-release).
+        """Pause the automation and wait for a human response (checkpoint-and-release).
 
-        This method:
-        1. Checkpoints the full LangGraph state to Hybrid Tables
-        2. Records the pending human action metadata
-        3. Sets run status to WAITING_FOR_HUMAN
-        4. Exits the SPCS container (zero idle cost)
+        **Execution flow**:
 
-        On resume, a new SPCS job cold-starts (~30-90s) and loads checkpoint.
+        1. Raises ``HumanActionInterrupt`` (a Python exception), immediately
+           unwinding the call stack back to the LangGraph runner loop.
+        2. The runner's Go supervisor catches the interrupt (via Python process
+           exit code / IPC), checkpoints the full LangGraph graph state to
+           ``_cortex_automation_checkpoints`` and related Hybrid Tables.
+        3. The run status in ``_cortex_automation_run_history`` is set to
+           ``WAITING_FOR_HUMAN``, and the SPCS job terminates (no idle cost).
+        4. A GS background task monitors pending human actions.  When the human
+           submits a response via the Snowflake UI or API, GS cold-starts a new
+           SPCS job, loads the checkpoint, injects the human response dict into
+           the graph state, and resumes execution from the interrupted node.
+
+        This design means the automation does **not** consume SPCS credits while
+        waiting.  Cold-start latency on resume is typically 30–90 seconds.
+
+        .. note::
+           This differs from ``LocalBackend.human_action()``, which calls
+           ``WorkflowSDK.interrupt()`` and blocks synchronously via IPC until
+           the controld runner provides a response value.
 
         Args:
-            prompt: Description of what human action is needed.
-            payload: Optional data to display to the human.
+            prompt: Description of the action required from the human.
+            payload: Optional data to display alongside the prompt.
             notify: Optional notification config (e.g., email, Slack).
-            timeout_hours: Max hours to wait (default 24).
+            timeout_hours: Maximum hours to wait before timing out (default 24).
 
         Returns:
-            Dict with human response data (populated after resume).
+            Dict containing the human's response (populated after resume; this
+            method never actually returns — it always raises).
 
         Raises:
-            HumanActionInterrupt: Special exception caught by the runner
-                to trigger checkpoint-and-release flow.
+            HumanActionInterrupt: Caught by the Go runner, not user code.
         """
         raise HumanActionInterrupt(
             prompt=prompt,
@@ -368,10 +421,26 @@ class CortexContext(AutomationContext):
 
 
 class HumanActionInterrupt(Exception):
-    """Raised by ctx.human_action() to trigger checkpoint-and-release.
+    """Raised by ``CortexContext.human_action()`` to trigger checkpoint-and-release.
 
-    The runner's Go supervisor catches this (via Python process exit code)
-    and initiates the checkpoint-and-release HITL flow.
+    This exception is the signal mechanism between the Python automation code
+    and the Go runner supervisor.  When raised, it unwinds the LangGraph
+    execution stack completely.  The runner catches it (via process exit code
+    or an inter-process signal), serialises the interrupt parameters alongside
+    the checkpoint, and then terminates the SPCS container.
+
+    User automation code should never catch or inspect this exception.  It is
+    an internal protocol detail of the Cortex Automation platform.
+
+    Attributes:
+        prompt: Human-readable description of the required action.
+        payload: Optional structured data to show the human (e.g. a document
+                 to review, a form to fill in).
+        notify: Optional notification routing config (email, Slack channel, etc.).
+        timeout_hours: Maximum wall-clock hours the runner will wait for a
+                       human response before marking the run as timed out.
+        run_id: The automation run UUID, used by the runner to look up the
+                corresponding ``_cortex_automation_run_history`` row.
     """
 
     def __init__(

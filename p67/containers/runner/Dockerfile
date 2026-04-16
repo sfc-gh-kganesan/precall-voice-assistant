@@ -15,6 +15,7 @@ FROM golang:1.24-alpine AS go-builder
 WORKDIR /build
 COPY containers/runner/go.mod ./
 COPY containers/runner/main.go ./
+COPY containers/runner/detect.go ./
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o p67-runner .
 
@@ -63,11 +64,13 @@ WORKDIR /app
 
 # Python host + deps
 COPY containers/runner/requirements.txt ./
+COPY packages/workflow-sdk-python/p67_sdk /app/p67_sdk
 RUN python${PYTHON_VERSION} -m pip install --no-cache-dir --break-system-packages -r requirements.txt \
     && apt-get purge -y --auto-remove python${PYTHON_VERSION}-dev g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY containers/runner/host.py /app/host.py
+COPY containers/runner/host_gs.py /app/host_gs.py
 
 # Install Cortex Code (coco) CLI
 # The standard install script executes the binary to verify the install, which

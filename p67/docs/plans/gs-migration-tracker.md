@@ -1,6 +1,6 @@
 # P67 → GS Migration Tracker
 
-**Last updated:** 2026-04-13  
+**Last updated:** 2026-04-14  
 **Author:** Coco session (seed for all future sessions — update this line when you modify)  
 **Purpose:** Machine-readable checklist. Any Coco session should read this first to orient on current state.
 
@@ -16,11 +16,11 @@
 | W4 | Unified Python SDK (`AutomationContext` ABC + `LocalBackend`) | aura | In progress | — |
 | W5 | TS SDK | — | Decision: GS is Python-first; TS stays on controld path | — |
 | W6 | `SnowflakeCheckpointer` | aura | **Done** | PR 705 |
-| W7 | GS-aware runner host (`host_gs.py`) | aura | Not started | Depends: W2, W3 |
-| W8 | Runner image (Dockerfile updates) | aura | Not started | Depends: W7 |
+| W7 | GS-aware runner host (`host_gs.py`) | aura | **Done** | host_gs.py |
+| W8 | Runner image (Dockerfile updates) | aura | **Done** | Dockerfile |
 | W9 | PEP backend (Snapps) | snapps | Bootstrapping (separate session) | — |
 | W10 | Snapps UI | snapps | Bootstrapping (separate session) | — |
-| W11 | E2E testing | — | Not started | Depends: W2, W3, W7, W8 |
+| W11 | E2E testing | — | **Partially done** (local SPCS SUT) | Depends: W2, W3, W7, W8 |
 | W12 | DBSec + Compiler review | Manual (Slack) | Docs ready, not posted | #db-security-eng, #compiler-discuss |
 | W13 | Billing integration | snowflake | Not started | Depends: W2 |
 | W14 | Replication testing | snowflake | Param registered, untested | Depends: W1 |
@@ -64,16 +64,16 @@
 - [x] Unit tests passing
 
 ### W7 — GS-aware runner host (`host_gs.py`)
-- [ ] Design `host_gs.py` entry point
-- [ ] Wire `GSBackend` context
-- [ ] Handle SPCS environment variables / secrets injection
-- [ ] Smoke test locally with stubbed GS calls
+- [x] Design `host_gs.py` entry point
+- [x] Wire `GSBackend` context
+- [x] Handle SPCS environment variables / secrets injection
+- [x] Smoke test locally with stubbed GS calls
 
 ### W8 — Runner image
-- [ ] Identify base image changes needed
-- [ ] Add Python SDK dependencies to Dockerfile
-- [ ] Push updated image to Snowflake image registry
-- [ ] Verify image boots cleanly in SPCS sandbox
+- [x] Identify base image changes needed
+- [x] Add Python SDK dependencies to Dockerfile
+- [x] Push updated image to Snowflake image registry
+- [x] Verify image boots cleanly in SPCS sandbox
 
 ### W9 — PEP backend (Snapps)
 - [ ] Snapps repo bootstrapping in progress (separate session)
@@ -85,8 +85,8 @@
 - [ ] Bootstrapping in progress (separate session)
 
 ### W11 — E2E testing
-- [ ] Stand up test SPCS environment
-- [ ] Smoke: create automation object, launch job, verify state transitions
+- [x] Stand up test SPCS environment (local SPCS SUT — 2026-04-14)
+- [x] Smoke: create automation object, launch job, verify state transitions
 - [ ] Checkpoint round-trip test via `SnowflakeCheckpointer`
 - [ ] Billing event emitted and visible in usage view
 
@@ -111,6 +111,31 @@
 - [ ] Define `AUTOMATION_HISTORY` view schema
 - [ ] Implement in GS (depends on W1 entity + W3 storage)
 - [ ] Add Snowfort test coverage
+
+---
+
+## E2E Validation Results
+
+**Tested on local SPCS SUT (2026-04-14):**
+
+| Test | Result |
+|------|--------|
+| CREATE CORTEX AUTOMATION (from staged code) | PASS |
+| DESCRIBE CORTEX AUTOMATION | PASS |
+| DROP CORTEX AUTOMATION | PASS |
+| PUT workflow files to stage | PASS |
+| SYSTEM$RUN_CORTEX_AUTOMATION | PASS — container launched, runner executed, result returned |
+| Full workflow execution (classify text) | PASS — `{"category":"greeting","response":"Classified...","success":true}` |
+| SHOW CORTEX AUTOMATIONS | PARTIAL — empty results (visibility issue) |
+| ALTER CORTEX AUTOMATION | FAIL — grammar not in ANTLR |
+| SHOW VERSIONS | FAIL — grammar not recognized |
+| GRANT CREATE CORTEX AUTOMATION | FAIL — privilege not in GRANT grammar |
+
+**Blockers found:**
+- SPCS SUT requires Nexus Docker auth (`~/.docker/config.json` with nexus.int.snowflakecomputing.com:8086 credentials)
+- Runner image must bundle p67_sdk (fixed in Dockerfile)
+- SYSTEM$RUN expects bare name, not FQN (uses session schema context)
+- Grammar gaps: ALTER, SHOW VERSIONS, GRANT — these are in Nathan's PR scope or follow-up
 
 ---
 

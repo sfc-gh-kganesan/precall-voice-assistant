@@ -1,11 +1,67 @@
 """
-local_backend.py — LocalBackend: AutomationContext backed by WorkflowSDK.
+local_backend.py — LocalBackend: local/controld backend for Cortex Automations.
 
 Wraps the existing ``WorkflowSDK`` behind the ``AutomationContext`` ABC so that
-user automation code can use a single unified API regardless of whether it is
-running inside SPCS (CortexContext) or locally / under controld (LocalBackend).
+user automation code uses a single unified API regardless of whether it is
+running inside SPCS (``CortexContext``) or locally / under controld
+(``LocalBackend``).
 
-Environment detection and instantiation is handled by ``context_factory.create_context()``.
+Environment detection and instantiation is handled by
+``context_factory.create_context()``.
+
+---
+
+**Adaptation mapping** — ``AutomationContext`` method → ``WorkflowSDK`` call:
+
++---------------------+-------------------------------------+---------------------------+
+| AutomationContext   | WorkflowSDK call                    | Notes                     |
++=====================+=====================================+===========================+
+| ``query()``         | ``sdk.execute_query(sql, params)``  | dict bindings → list      |
+| ``query_df()``      | ``sdk.execute_query(sql, params)``  | wraps in pandas DataFrame |
+| ``complete()``      | ``sdk.cortex_complete(opts)``       | REST inference API        |
+| ``search()``        | ``sdk.execute_query(sql, params)``  | SQL CORTEX_SEARCH_PREVIEW |
+| ``analyst()``       | ``sdk.query_cortex_analyst(q, sv)`` | REST Analyst API          |
+| ``http()``          | ``sdk.http_request(opts)``          | external access           |
+| ``agent()``         | ``sdk.call_cortex_agent(msg, opts)``| REST Agent API            |
+| ``automation()``    | ``sdk.execute_subworkflow(opts)``   | fire-and-forget unsupport.|
+| ``human_action()``  | ``sdk.interrupt(payload, opts)``    | **synchronous IPC block** |
+| ``secret()``        | file mount → env var → ``sdk.get_parameter()`` | 3-tier lookup |
+| ``emit()``          | ``logger.info(...)``                | structured log only       |
+| ``output()``        | ``self._output_value = value``      | stored; read by runner    |
++---------------------+-------------------------------------+---------------------------+
+
+**QueryResult conversion**:
+  ``WorkflowSDK.execute_query()`` returns a ``QueryResult(statement, rows)``
+  namedtuple.  ``statement.description`` is a list of ``(name, type, ...)``
+  tuples matching the Python DB-API 2.0 cursor description spec.  The
+  ``_result_to_dicts()`` helper zips column names with row tuples to produce
+  the ``list[dict]`` contract expected by ``AutomationContext.query()``.
+
+**Binding conversion**:
+  ``CortexContext`` uses ``:N`` positional placeholders (Snowflake connector
+  style) with dict bindings keyed by numeric strings (``"1"``, ``"2"``, …).
+  ``WorkflowSDK.execute_query()`` uses ``%s`` placeholders with a positional
+  list.  ``_bindings_to_list()`` sorts the dict by integer key and returns the
+  corresponding value list.
+
+**Secret priority chain**:
+  1. SPCS/Docker file mount at ``/snowflake/secrets/<name>``
+     (set via ``SNOWFLAKE_SECRETS_DIR`` env var or the default path).
+  2. Environment variable named ``<name>`` — useful for local ``export SECRET=x``.
+  3. ``WorkflowSDK.get_parameter(name)`` — reads from the manifest config dict
+     (``parameters`` section), allowing secrets to be injected via controld.
+
+**human_action IPC vs checkpoint-and-release**:
+  In ``CortexContext``, ``human_action()`` raises ``HumanActionInterrupt``,
+  which triggers an asynchronous checkpoint-and-release cycle: the SPCS
+  container exits and a new one is started when the human responds (30–90 s
+  cold-start latency, zero idle cost).
+
+  In ``LocalBackend``, ``human_action()`` calls ``sdk.interrupt()`` which sends
+  an interrupt message over the controld IPC channel and **blocks
+  synchronously** until the runner process delivers a resume value.  There is
+  no container restart; the Python process stays alive throughout.  The
+  ``timeout_hours`` parameter is converted to milliseconds for the SDK.
 """
 
 from __future__ import annotations
@@ -26,11 +82,17 @@ _SECRETS_DIR = "/snowflake/secrets"
 
 
 class LocalBackend(AutomationContext):
-    """AutomationContext implementation backed by ``WorkflowSDK``.
+    """``AutomationContext`` implementation backed by ``WorkflowSDK``.
 
     Used when running locally or under controld (no SPCS OAuth token).
     Authentication is provided through the ``WorkflowSDK`` configuration dict
     (``snowflakeConfig``, ``parameters``, etc.).
+
+    .. note:: **human_action behaviour differs from CortexContext**.
+       ``human_action()`` here calls ``sdk.interrupt()`` and blocks the calling
+       thread via IPC until a resume value arrives.  In ``CortexContext`` it
+       raises ``HumanActionInterrupt`` and the SPCS container is terminated
+       (see module docstring for details).
 
     Example::
 
@@ -79,6 +141,19 @@ class LocalBackend(AutomationContext):
 
     def _result_to_dicts(self, result: Any) -> list[dict]:
         """Convert a ``QueryResult`` to a list of row dicts.
+
+        ``WorkflowSDK.execute_query()`` returns a
+        ``QueryResult(statement, rows)`` namedtuple where:
+
+        - ``statement`` is a DB-API 2.0 cursor-like object.  Its
+          ``description`` attribute is a sequence of 7-item tuples:
+          ``(name, type_code, display_size, internal_size, precision,
+          scale, null_ok)``.  Only ``name`` (index 0) is used here.
+        - ``rows`` is a sequence of row tuples, one per result row.
+
+        If ``description`` is absent or empty (e.g. for DDL statements that
+        return no metadata), the rows are wrapped as dicts keyed by their
+        integer column index.
 
         Args:
             result: ``QueryResult(statement, rows)`` from ``WorkflowSDK``.
@@ -384,14 +459,25 @@ class LocalBackend(AutomationContext):
     ) -> dict:
         """Pause execution and wait for a human response via IPC interrupt.
 
-        Calls ``WorkflowSDK.interrupt()``, which sends an interrupt message and
-        blocks until the runner provides a resume value.
+        Calls ``WorkflowSDK.interrupt()``, which sends an interrupt message
+        over the controld IPC channel and **blocks the current thread
+        synchronously** until the runner process delivers a resume value.
+        The Python process stays alive throughout; there is no container
+        restart.
+
+        .. contrast with ``CortexContext.human_action()``:
+           In the SPCS backend, ``human_action()`` raises
+           ``HumanActionInterrupt``, terminates the container, and the human
+           response arrives via a cold-start of a *new* container.  That
+           path has 30–90 s latency and zero idle cost.  This path has no
+           latency overhead but consumes controld resources while waiting.
 
         Args:
             prompt: Description of the action required from the human.
             payload: Optional supplementary data to display.
             notify: Optional Slack notification config dict.
-            timeout_hours: Maximum hours to wait (converted to milliseconds).
+            timeout_hours: Maximum hours to wait (converted to milliseconds
+                           for the SDK call).
 
         Returns:
             Dict containing the human's response.

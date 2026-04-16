@@ -171,30 +171,6 @@ func main() {
 	}
 }
 
-// detectLanguage inspects the workflow directory and returns the command name
-// and arguments for the appropriate host process.
-func detectLanguage(workflowDir string) (string, []string) {
-	hasPython := fileExists(filepath.Join(workflowDir, "main.py"))
-	hasJS := fileExists(filepath.Join(workflowDir, "index.js"))
-
-	switch {
-	case hasPython && hasJS:
-		fatal("ambiguous workflow: found both main.py and index.js in %s", workflowDir)
-	case hasPython:
-		return "python3", []string{"/app/host.py"}
-	case hasJS:
-		return "node", []string{"/app/host.js"}
-	default:
-		fatal("no workflow entry point found: expected main.py or index.js in %s", workflowDir)
-	}
-	return "", nil // unreachable
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
 // extractZip extracts a zip archive into destDir.
 // Includes path traversal protection — entries that escape destDir are skipped.
 func extractZip(zipPath, destDir string) error {

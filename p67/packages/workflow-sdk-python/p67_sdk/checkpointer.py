@@ -1,15 +1,108 @@
 """
 checkpointer.py — SnowflakeCheckpointer for LangGraph checkpoint persistence.
 
-Implements LangGraph's BaseCheckpointSaver protocol backed by Snowflake
-Hybrid Tables. Used by the Cortex Automation runner to persist graph state
+Implements LangGraph's ``BaseCheckpointSaver`` protocol backed by Snowflake
+Hybrid Tables.  Used by the Cortex Automation runner to persist graph state
 across HITL checkpoint-and-release cycles and for run resumption.
 
-The 4 backing tables are created by AutomationHybridTableBootstrapper (Java/GS):
-  - _cortex_automation_checkpoints
-  - _cortex_automation_checkpoint_blobs
-  - _cortex_automation_checkpoint_writes
-  - _cortex_automation_run_history
+**Deployment constraint**: This module only executes inside SPCS containers
+managed by the Cortex Automation runner.  It requires a live ``CortexContext``
+(or ``MockCortexContext``) for SQL execution and cannot be used in local dev
+mode.
+
+---
+
+**Hybrid Table schemas** (DDL owned by ``AutomationHybridTableBootstrapper.java``):
+
+``_cortex_automation_checkpoints``
+  Primary checkpoint record — one row per ``(run_id, checkpoint_ns,
+  checkpoint_id)``.  Stores the full serialised LangGraph ``Checkpoint`` dict
+  as a BINARY column and ``CheckpointMetadata`` as a VARIANT (JSON).  The
+  ``type`` column carries the serialiser type tag emitted by
+  ``JsonPlusSerializer`` (e.g. ``"json"``).  ``parent_checkpoint_id`` links to
+  the preceding checkpoint, enabling history traversal.
+
+  Columns::
+
+    run_id               VARCHAR   -- LangGraph thread_id / automation run UUID
+    checkpoint_ns        VARCHAR   -- LangGraph namespace (empty string for root graph)
+    checkpoint_id        VARCHAR   -- UUID assigned by LangGraph at each graph step
+    parent_checkpoint_id VARCHAR   -- UUID of preceding checkpoint (empty if first)
+    type                 VARCHAR   -- serialiser type tag from JsonPlusSerializer
+    checkpoint           BINARY    -- serialised Checkpoint dict (see serialisation note)
+    metadata             VARIANT   -- CheckpointMetadata as JSON
+    created_at           TIMESTAMP -- server-side insertion timestamp (used for ordering)
+
+``_cortex_automation_checkpoint_blobs``
+  Per-channel value blobs — one row per ``(run_id, checkpoint_ns, channel,
+  version)``.  LangGraph assigns a monotonically increasing ``version`` token
+  to each distinct channel value.  Keeping blobs in a separate table means only
+  the *changed* channels produce new rows on each ``put()`` call; unchanged
+  channel versions simply reference their existing blob row.
+
+  Columns::
+
+    run_id        VARCHAR
+    checkpoint_ns VARCHAR
+    channel       VARCHAR -- LangGraph channel name (e.g. ``"messages"``, ``"__root__"``)
+    version       VARCHAR -- monotonic version token from LangGraph's channel versioning
+    type          VARCHAR -- serialiser type tag
+    blob          BINARY  -- serialised channel value
+
+``_cortex_automation_checkpoint_writes``
+  Pending writes — one row per ``(run_id, checkpoint_ns, checkpoint_id,
+  task_id, idx)``.  Records intermediate task outputs that have been emitted by
+  a node but not yet folded into the next full checkpoint.  LangGraph uses
+  these rows for conflict detection and exactly-once delivery when the runner
+  resumes after a crash: on restart, writes that were persisted here are
+  replayed rather than re-executed.  ``idx`` preserves the original ordering of
+  writes within a single task execution.
+
+  Columns::
+
+    run_id        VARCHAR
+    checkpoint_ns VARCHAR
+    checkpoint_id VARCHAR -- the checkpoint *before* these writes (not yet folded in)
+    task_id       VARCHAR -- LangGraph task UUID
+    idx           INTEGER -- write index within the task (0-based, for ordering)
+    channel       VARCHAR -- destination channel name
+    type          VARCHAR -- serialiser type tag
+    blob          BINARY  -- serialised write value
+
+``_cortex_automation_run_history``
+  Run lifecycle metadata — owned and written exclusively by the GS runner
+  (Java).  Not written by this Python module.  Contains run status
+  (``RUNNING`` / ``WAITING_FOR_HUMAN`` / ``COMPLETED`` / ``FAILED``),
+  timestamps, input/output payloads, and HITL action metadata.
+
+---
+
+**Serialisation** (BINARY columns):
+
+``JsonPlusSerializer.dumps_typed(value)`` returns ``(type_tag, bytes_or_str)``.
+The bytes value is hex-encoded via ``bytes.hex()`` and stored in Snowflake
+using ``TO_BINARY(:N, 'HEX')``.  Hex transport avoids binary framing issues
+with the Python connector's parameter binding.
+
+On read, the Snowflake Python connector returns BINARY columns as ``bytes``
+objects.  In some connector versions the value arrives as a latin-1 string
+(a transparent byte→char mapping); the code defensively re-encodes any ``str``
+via ``.encode("latin-1")`` before passing the raw bytes to
+``serde.loads_typed()``.
+
+---
+
+**MERGE upsert pattern** (idempotency):
+
+All write operations use ``MERGE … WHEN MATCHED THEN UPDATE … WHEN NOT MATCHED
+THEN INSERT`` rather than plain ``INSERT``.  This guarantees idempotency: if
+the SPCS container crashes *after* writing to Hybrid Tables but *before*
+signalling GS, the runner restarts and replays the same ``put()`` call.  The
+MERGE overwrites the existing row instead of raising a duplicate-key error.
+Hybrid Tables enforce the primary-key constraint referenced in the ``ON``
+clause, so the key lookup is index-backed.
+
+---
 
 Requires: langgraph-checkpoint >= 2.0
 """
@@ -119,7 +212,10 @@ class SnowflakeCheckpointer(BaseCheckpointSaver):
         row = rows[0]
         cp_id = row["CHECKPOINT_ID"]
 
-        # Deserialize checkpoint from BINARY
+        # Deserialize checkpoint from BINARY.
+        # The connector normally returns BINARY as bytes, but some versions
+        # return a latin-1 str (transparent byte→char encoding).  Re-encode
+        # to bytes before passing to serde.loads_typed().
         checkpoint_bytes = row["CHECKPOINT"]
         if isinstance(checkpoint_bytes, str):
             checkpoint_bytes = checkpoint_bytes.encode("latin-1")
@@ -134,7 +230,10 @@ class SnowflakeCheckpointer(BaseCheckpointSaver):
             metadata_raw = json.loads(metadata_raw)
         metadata = CheckpointMetadata(**metadata_raw) if isinstance(metadata_raw, dict) else CheckpointMetadata()
 
-        # Load channel versions (blobs)
+        # Load channel versions (blobs).
+        # All blob rows for this (run_id, checkpoint_ns) are fetched; blobs are
+        # keyed by channel name and the latest version is used to reconstruct the
+        # channel_versions dict that LangGraph needs for conflict detection.
         blob_rows = self._ctx.query(
             f"SELECT channel, version, type, blob "
             f"FROM {self._table(BLOBS_TABLE)} "
@@ -145,7 +244,11 @@ class SnowflakeCheckpointer(BaseCheckpointSaver):
         for br in blob_rows:
             channel_versions[br["CHANNEL"]] = br["VERSION"]
 
-        # Load pending writes for this checkpoint
+        # Load pending writes for this checkpoint.
+        # Pending writes are outputs produced by node executions that have been
+        # persisted to _cortex_automation_checkpoint_writes but not yet folded
+        # into a new checkpoint via put().  LangGraph uses them for exactly-once
+        # delivery on resume.  Ordered by idx to reconstruct original emit order.
         write_rows = self._ctx.query(
             f"SELECT task_id, channel, type, blob, idx "
             f"FROM {self._table(WRITES_TABLE)} "
@@ -280,7 +383,9 @@ class SnowflakeCheckpointer(BaseCheckpointSaver):
         checkpoint_id = checkpoint["id"]
         parent_id = configurable.get("checkpoint_id")
 
-        # Serialize checkpoint to bytes
+        # Serialize checkpoint to bytes.
+        # dumps_typed returns (type_tag, bytes_or_str).  Normalise to bytes
+        # so .hex() is always available.
         type_str, cp_bytes = self.serde.dumps_typed(checkpoint)
         if isinstance(cp_bytes, str):
             cp_bytes = cp_bytes.encode("utf-8")
@@ -291,7 +396,13 @@ class SnowflakeCheckpointer(BaseCheckpointSaver):
             metadata if isinstance(metadata, dict) else {}
         )
 
-        # MERGE checkpoint (upsert)
+        # MERGE checkpoint (upsert).
+        # MERGE is used instead of INSERT to guarantee idempotency.  If the
+        # SPCS container crashes after writing but before notifying GS, the
+        # runner restarts and replays this exact put() call.  The MERGE
+        # overwrites the existing row rather than raising a primary-key error.
+        # cp_bytes.hex() converts bytes to a hex string; TO_BINARY(:N, 'HEX')
+        # converts it back to Snowflake BINARY on the server side.
         self._ctx.query(
             f"MERGE INTO {self._table(CHECKPOINTS_TABLE)} AS tgt "
             f"USING (SELECT :1 AS run_id, :2 AS checkpoint_ns, "
@@ -321,7 +432,11 @@ class SnowflakeCheckpointer(BaseCheckpointSaver):
             },
         )
 
-        # Write channel version blobs
+        # Write channel version blobs.
+        # Only channels in new_versions (i.e. those whose value changed in this
+        # step) produce new blob rows.  Each (channel, version) pair is unique;
+        # MERGE handles the rare case where the same version is written twice
+        # (container restart).
         for channel, version in new_versions.items():
             channel_value = checkpoint["channel_values"].get(channel)
             if channel_value is not None:
@@ -370,7 +485,19 @@ class SnowflakeCheckpointer(BaseCheckpointSaver):
     ) -> None:
         """Persist pending writes for conflict detection.
 
-        Each write is a (channel, value) pair from a single task execution.
+        Each write is a ``(channel, value)`` pair emitted by a single task
+        execution (one LangGraph node run).  These rows live in
+        ``_cortex_automation_checkpoint_writes`` and are associated with the
+        *current* checkpoint (the one recorded in ``config["configurable"]
+        ["checkpoint_id"]``).
+
+        On the next ``put()`` call, LangGraph folds these writes into the new
+        checkpoint and they are superseded.  If the container crashes before
+        the next ``put()``, these rows allow the runner to reconstruct the
+        pending outputs and avoid re-executing the node.
+
+        ``idx`` is the write's position within this task; preserved so that
+        multi-write tasks can be replayed in the correct order.
         """
         configurable = config.get("configurable", {})
         run_id = configurable.get("thread_id", "")
