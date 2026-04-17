@@ -1,0 +1,9 @@
+---
+login_name: trichards
+display_name: trichards
+first_name: Tyler
+last_name: Richards
+email: tyler.richards@snowflake.com
+must_change_password: TRUE
+default_warehouse: compute_wh
+default_role: public
