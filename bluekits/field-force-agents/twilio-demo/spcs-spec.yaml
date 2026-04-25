@@ -1,0 +1,15 @@
+spec:
+  containers:
+    - name: voice-assistant
+      image: /aura/voice/images/precall-voice-assistant:v2
+      env:
+        NODE_ENV: production
+        PORT: "3000"
+      secrets:
+        - snowflakeSecret: aura.voice.openai_key
+          secretKeyRef: secret_string
+          envVarName: OPENAI_API_KEY
+  endpoints:
+    - name: voice-ui
+      port: 3000
+      public: true

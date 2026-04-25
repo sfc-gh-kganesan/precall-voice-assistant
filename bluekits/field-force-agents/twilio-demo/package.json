@@ -1,7 +1,7 @@
 {
-  "name": "twilio-openai-pre-call-app",
+  "name": "precall-voice-assistant",
   "version": "1.0.0",
-  "description": "Twilio voice webhook server with OpenAI Realtime API for pharmaceutical sales rep pre-call preparation",
+  "description": "React voice assistant with OpenAI Realtime API for pharmaceutical sales rep pre-call preparation",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -11,10 +11,10 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
-    "twilio",
     "openai",
     "realtime-api",
     "voice-assistant",
+    "react",
     "pharmaceutical"
   ],
   "author": "",

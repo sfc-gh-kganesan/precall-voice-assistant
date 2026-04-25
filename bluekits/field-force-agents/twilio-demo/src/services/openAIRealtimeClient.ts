@@ -37,13 +37,14 @@ export class OpenAIRealtimeClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private config: OpenAIRealtimeConfig;
   private isConnected = false;
+  private isResponseActive = false;
 
   constructor(config: OpenAIRealtimeConfig) {
     super();
     this.config = {
-      model: 'gpt-4o-realtime-preview-2024-12-17',  // Stable GA model for Twilio
-      voice: 'alloy',
       ...config,
+      model: config.model || 'gpt-4o-realtime-preview-2024-12-17',
+      voice: config.voice || 'alloy',
     };
   }
 
@@ -102,7 +103,8 @@ export class OpenAIRealtimeClient extends EventEmitter {
   }
 
   /**
-   * Send session update with configuration (legacy format for Twilio g711_ulaw compatibility)
+   * Send session update with configuration.
+   * Browser client uses pcm16 natively — no conversion needed.
    */
   private sendSessionUpdate(): void {
     const sessionConfig: SessionConfig = {
@@ -110,8 +112,8 @@ export class OpenAIRealtimeClient extends EventEmitter {
       instructions: this.config.systemPrompt,
       voice: this.config.voice || 'alloy',
       speed: 1.2,
-      input_audio_format: 'g711_ulaw',
-      output_audio_format: 'g711_ulaw',
+      input_audio_format: 'pcm16',
+      output_audio_format: 'pcm16',
       input_audio_transcription: {
         model: 'whisper-1',
       },
@@ -173,6 +175,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
       case 'response.done':
         logger.debug('Response complete');
+        this.isResponseActive = false;
         this.emit('response.done', message);
         break;
 
@@ -213,6 +216,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
       case 'response.created':
         logger.debug('Response created');
+        this.isResponseActive = true;
         break;
 
       case 'input_audio_buffer.committed':
@@ -221,6 +225,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
       case 'response.cancelled':
         logger.info('Response cancelled (interrupted)');
+        this.isResponseActive = false;
         this.emit('response.cancelled', message);
         break;
 
@@ -310,24 +315,32 @@ export class OpenAIRealtimeClient extends EventEmitter {
   }
 
   /**
-   * Cancel the current response (for interruptions)
+   * Cancel the current response (for interruptions).
+   * Only sends if a response is actually in progress.
    */
   cancelResponse(): void {
+    if (!this.isResponseActive) {
+      logger.debug('Skipping response.cancel - no active response');
+      return;
+    }
     logger.info('Canceling current response (user interruption)');
+    this.isResponseActive = false;
     this.send({
       type: 'response.cancel',
     });
   }
 
   /**
-   * Interrupt the current response (cancel response only)
-   * Note: OpenAI should automatically stop when user starts speaking with server VAD
+   * Interrupt the current response (cancel response only).
+   * Only sends if a response is actually in progress.
    */
   interruptResponse(): void {
+    if (!this.isResponseActive) {
+      logger.debug('Skipping interrupt - no active response');
+      return;
+    }
     logger.info('Interrupting response: canceling in-progress response');
-
-    // Cancel the in-progress response
-    // With server VAD, OpenAI should handle this automatically, but we send it to be sure
+    this.isResponseActive = false;
     this.send({
       type: 'response.cancel',
     });

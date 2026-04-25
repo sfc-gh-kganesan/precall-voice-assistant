@@ -30,9 +30,13 @@ export function VoiceClient() {
       await audioProcessor.initialize();
       audioProcessorRef.current = audioProcessor;
 
-      // Connect to WebSocket
+      // Connect to WebSocket — use same host:port in production (container),
+      // fall back to port 3000 during local Vite dev
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.hostname}:3000/test-client`;
+      const host = import.meta.env.DEV
+        ? `${window.location.hostname}:3000`
+        : window.location.host;
+      const wsUrl = `${protocol}//${host}/test-client`;
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
