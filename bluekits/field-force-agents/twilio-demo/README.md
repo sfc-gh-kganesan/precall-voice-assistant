@@ -1,264 +1,297 @@
-# Twilio OpenAI Pre-Call Voice Assistant
+# Pre-Call Voice Assistant
 
-A voice assistant for pharmaceutical sales representatives that helps them prepare for doctor calls by discussing pre-call plan data. Built with Twilio Media Streams and OpenAI's Realtime API.
-
-## Features
-
-- **Voice-First Interface**: Call a phone number to interact with "Jarvis" via voice
-- **Real-Time AI Responses**: Powered by OpenAI's GPT-4 Realtime API
-- **Pre-Call Data Integration**: Loads comprehensive HCP (Healthcare Provider) data from JSON
-- **Bidirectional Audio Streaming**: Twilio Media Streams with WebSocket
-- **Production-Ready**: Deploy to Render with included configuration
+A browser-based voice assistant powered by OpenAI's Realtime API that helps pharmaceutical sales representatives prepare for doctor calls. Ask "Jarvis" questions about the pre-call plan and get real-time voice responses.
 
 ## Architecture
 
 ```
-Twilio Phone Call
-       ↓
-   Webhook (/voice/incoming)
-       ↓
-   Media Stream (WebSocket)
-       ↓
-   Audio Conversion (mulaw 8kHz ↔ PCM16 24kHz)
-       ↓
-   OpenAI Realtime API
-       ↓
-   Voice Response
+┌─────────────────────┐
+│  Browser (React)    │
+│  Microphone + Audio │
+└──────────┬──────────┘
+           │ WebSocket (PCM16 24kHz)
+           ▼
+┌─────────────────────┐
+│  Express Server     │
+│  (Node.js)          │
+│  - Static files     │
+│  - /test-client WS  │
+└──────────┬──────────┘
+           │ WebSocket
+           ▼
+┌─────────────────────┐
+│  OpenAI Realtime    │
+│  API (gpt-4o)       │
+└─────────────────────┘
 ```
+
+A single container serves both the React UI and the WebSocket backend on port 3000.
 
 ## Prerequisites
 
 - Node.js 18+
-- Twilio account with a phone number
-- OpenAI API key with access to Realtime API
+- Docker (with `buildx` for cross-platform builds)
+- OpenAI API key with access to the Realtime API
+- Snowflake CLI (`snow`) for SPCS deployment
 
-## Setup
+## Quick Start (Local)
 
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Configure Environment Variables
-
-Copy `.env.example` to `.env` and fill in your credentials:
+### 1. Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Required variables:
+Edit `.env` and add your OpenAI API key:
+
 ```env
-OPENAI_API_KEY=sk-...
-TWILIO_ACCOUNT_SID=AC...
-TWILIO_AUTH_TOKEN=...
-PORT=3000
-NODE_ENV=development
-LOG_LEVEL=info
+OPENAI_API_KEY=sk-your-key-here
 ```
 
-### 3. Build the Project
+### 2. Install dependencies
 
 ```bash
-npm run build
+npm install
+cd test-client && npm install && cd ..
 ```
 
-### 4. Deploy to Render (Recommended)
-
-Skip local development and deploy directly to get your public webhook URL.
-
-## Deployment to Render
-
-### Step 1: Push to GitHub
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin <your-repo-url>
-git push -u origin main
-```
-
-### Step 2: Create Web Service on Render
-
-1. Go to [Render Dashboard](https://dashboard.render.com/)
-2. Click **New** → **Web Service**
-3. Connect your GitHub repository
-4. Render will automatically detect `render.yaml`
-5. Add environment variables in the Render dashboard:
-   - `OPENAI_API_KEY` - Your OpenAI API key
-   - `TWILIO_ACCOUNT_SID` - Your Twilio Account SID
-   - `TWILIO_AUTH_TOKEN` - Your Twilio Auth Token
-6. Click **Create Web Service**
-
-### Step 3: Get Your Public Webhook URL
-
-After deployment completes, Render will provide your public URL:
-```
-https://precall-voice-assistant.onrender.com
-```
-
-Or with your custom name:
-```
-https://your-service-name.onrender.com
-```
-
-### Step 4: Configure Twilio Phone Number
-
-1. Log into [Twilio Console](https://console.twilio.com/)
-2. Go to **Phone Numbers** → **Manage** → **Active Numbers**
-3. Select your phone number
-4. Under "Voice Configuration":
-   - **A CALL COMES IN**: Webhook
-   - **URL**: `https://your-service-name.onrender.com/voice/incoming`
-   - **HTTP**: POST
-5. Click **Save**
-
-### Step 5: Test Your Voice Assistant
-
-Call your Twilio phone number. Jarvis will answer with "Go for Jarvis" and you can start asking questions about the pre-call plan.
-
-## Project Structure
-
-```
-src/
-├── config/
-│   └── env.ts                 # Environment configuration
-├── services/
-│   ├── preCallPlanService.ts  # Load JSON & build system prompt
-│   ├── openAIRealtimeClient.ts # OpenAI Realtime API client
-│   └── twilioMediaStreamHandler.ts # Twilio WebSocket handler
-├── types/
-│   └── preCallPlan.ts         # TypeScript interfaces
-├── utils/
-│   ├── audioConverter.ts      # Audio format conversion
-│   └── logger.ts              # Pino logger
-└── index.ts                   # Express server & main entry
-```
-
-## Pre-Call Plan Data
-
-The assistant reads from `pre-call-context.json` in the project root. This file contains:
-
-- HCP information (name, specialty, segment)
-- Executive summary (call history, fatigue risk)
-- Prescribing trends (DUPIXENT, XOLAIR, ICS/LABA)
-- Smart alerts (pull-through failures, persistence risks, opportunities)
-- Recommended approach (6-step conversation guide)
-- Objection handling
-- Role play Q&A
-- Strategic summary
-
-## Usage
-
-1. Call your Twilio phone number
-2. Jarvis will answer with "Go for Jarvis"
-3. Ask questions about the pre-call plan:
-   - "What's the primary objective for this call?"
-   - "Tell me about the 21 untapped patients"
-   - "How should I handle the XOLAIR competitive threat?"
-   - "What objections might Dr. Chavarria raise?"
-   - "What resources should I bring?"
-
-## API Endpoints
-
-- `GET /` - API information
-- `GET /health` - Health check
-- `POST /voice/incoming` - Twilio voice webhook (returns TwiML)
-- `WS /media-stream` - WebSocket for Twilio Media Streams
-
-## Development
-
-### Local Testing with Browser Client
-
-For local testing without Twilio, use the React test client:
-
-1. Start the backend server:
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-2. In a new terminal, start the test client:
-   ```bash
-   cd test-client
-   npm install
-   npm run dev
-   ```
-
-3. Open browser to `http://localhost:5173`
-4. Click "Start Call with Jarvis" and test voice interactions
-
-See [test-client/README.md](test-client/README.md) for more details.
-
-### Run Backend in Development Mode
+### 3. Start the backend
 
 ```bash
 npm run dev
 ```
 
-This uses `ts-node-dev` for auto-reloading.
+You should see: `Server started on port 3000`
 
-### Build TypeScript
+### 4. Start the React client
 
-```bash
-npm run build
-```
-
-### Clean Build Directory
+In a second terminal:
 
 ```bash
-npm run clean
+cd test-client
+npm run dev
 ```
 
-## Audio Conversion
+You should see: `Local: http://localhost:5173/`
 
-The app handles conversion between:
-- **Twilio**: mulaw encoding, 8kHz sample rate
-- **OpenAI**: PCM16 encoding, 24kHz sample rate
+### 5. Open in browser
 
-Conversion pipeline:
-1. Twilio → mulaw 8kHz → PCM16 8kHz → PCM16 24kHz → OpenAI
-2. OpenAI → PCM16 24kHz → PCM16 8kHz → mulaw 8kHz → Twilio
+Navigate to **http://localhost:5173**, click **"Start Call with Jarvis"**, allow microphone access, and start talking.
 
-## Logging
+## Docker
 
-Uses Pino for structured logging with pretty printing in development.
+### Build
 
-Log levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal`
+```bash
+# For local testing (native architecture)
+docker build -t precall-voice-assistant .
 
-Set via `LOG_LEVEL` environment variable.
+# For SPCS / cloud deployment (must be amd64)
+docker buildx build --platform linux/amd64 -t precall-voice-assistant:latest --load .
+```
 
-## Troubleshooting
+### Run locally
 
-### "Missing required environment variables"
-- Ensure `.env` file exists with all required variables
-- Check that variables are not commented out
+```bash
+docker run --rm -p 8080:3000 \
+  -e OPENAI_API_KEY=sk-your-key-here \
+  precall-voice-assistant
+```
 
-### "OpenAI WebSocket error"
-- Verify `OPENAI_API_KEY` is valid
-- Ensure you have access to the Realtime API (may require beta access)
+Open **http://localhost:8080** in your browser.
 
-### "Twilio WebSocket closed immediately"
-- Check webhook URL is correct and accessible
-- Verify SSL certificate is valid (Twilio requires HTTPS in production)
-- Check Render logs for startup errors
+## Deploy to Snowflake SPCS
 
-### No audio or garbled audio
-- Verify audio conversion is working correctly
-- Check sample rate conversions (8kHz ↔ 24kHz)
-- Review WebSocket message flow in logs
+### Step 1: Set up Snowflake connection
 
-### Call connects but Jarvis doesn't respond
-- Check OpenAI API key and quota
-- Review system prompt in logs
-- Verify pre-call-context.json is being loaded
+Add a connection to `~/.snowflake/connections.toml`:
+
+```toml
+[mlp]
+account = "your-account"
+user = "your-user"
+database = "your-database"
+schema = "your-schema"
+warehouse = "your-warehouse"
+password = "..."
+role = "your-role"
+```
+
+Verify the connection:
+
+```bash
+snow connection test -c mlp
+```
+
+### Step 2: Create the database and schema (if needed)
+
+```sql
+CREATE DATABASE IF NOT EXISTS AURA;
+CREATE SCHEMA IF NOT EXISTS AURA.VOICE;
+```
+
+### Step 3: Create an image repository
+
+```sql
+CREATE IMAGE REPOSITORY IF NOT EXISTS AURA.VOICE.IMAGES;
+```
+
+### Step 4: Build and push the Docker image
+
+```bash
+# Login to Snowflake registry
+docker login <account>.registry.snowflakecomputing.com/aura/voice/images \
+  -u <username> -p <password>
+
+# Build for amd64 (required for SPCS)
+docker buildx build --platform linux/amd64 \
+  -t <account>.registry.snowflakecomputing.com/aura/voice/images/precall-voice-assistant:latest \
+  --load .
+
+# Push
+docker push <account>.registry.snowflakecomputing.com/aura/voice/images/precall-voice-assistant:latest
+```
+
+### Step 5: Create a Snowflake secret for the OpenAI API key
+
+```sql
+CREATE SECRET IF NOT EXISTS AURA.VOICE.OPENAI_KEY
+  TYPE = GENERIC_STRING
+  SECRET_STRING = 'sk-your-openai-key-here';
+```
+
+### Step 6: Create an external access integration
+
+If you don't already have one that allows outbound traffic:
+
+```sql
+CREATE OR REPLACE NETWORK RULE ALLOW_ALL_RULE
+  MODE = EGRESS
+  TYPE = HOST_PORT
+  VALUE_LIST = ('0.0.0.0:443', '0.0.0.0:80');
+
+CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION ALLOW_ALL_EAI
+  ALLOWED_NETWORK_RULES = (ALLOW_ALL_RULE)
+  ENABLED = TRUE;
+```
+
+### Step 7: Create a compute pool
+
+```sql
+CREATE COMPUTE POOL IF NOT EXISTS VOICE_ASSISTANT_POOL
+  MIN_NODES = 1
+  MAX_NODES = 1
+  INSTANCE_FAMILY = CPU_X64_XS
+  AUTO_RESUME = TRUE
+  AUTO_SUSPEND_SECS = 1800;
+```
+
+### Step 8: Deploy the service
+
+```sql
+CREATE SERVICE AURA.VOICE.PRECALL_VOICE_ASSISTANT
+  IN COMPUTE POOL VOICE_ASSISTANT_POOL
+  FROM SPECIFICATION $$
+spec:
+  containers:
+    - name: voice-assistant
+      image: /aura/voice/images/precall-voice-assistant:latest
+      env:
+        NODE_ENV: production
+        PORT: "3000"
+      secrets:
+        - snowflakeSecret: aura.voice.openai_key
+          secretKeyRef: secret_string
+          envVarName: OPENAI_API_KEY
+  endpoints:
+    - name: voice-ui
+      port: 3000
+      public: true
+$$
+EXTERNAL_ACCESS_INTEGRATIONS = (ALLOW_ALL_EAI)
+MIN_INSTANCES = 1
+MAX_INSTANCES = 1;
+```
+
+### Step 9: Get the public URL
+
+```sql
+SHOW ENDPOINTS IN SERVICE AURA.VOICE.PRECALL_VOICE_ASSISTANT;
+```
+
+The `ingress_url` column contains your public URL (may take 1-2 minutes to provision).
+
+### Step 10: Open and test
+
+Navigate to `https://<your-ingress-url>` in your browser, click **"Start Call with Jarvis"**, and test the voice assistant.
+
+## Managing the SPCS Service
+
+```sql
+-- Check service status
+SELECT SYSTEM$GET_SERVICE_STATUS('AURA.VOICE.PRECALL_VOICE_ASSISTANT');
+
+-- View container logs
+CALL SYSTEM$GET_SERVICE_LOGS('AURA.VOICE.PRECALL_VOICE_ASSISTANT', '0', 'voice-assistant', 100);
+
+-- Suspend (stop billing)
+ALTER SERVICE AURA.VOICE.PRECALL_VOICE_ASSISTANT SUSPEND;
+
+-- Resume
+ALTER SERVICE AURA.VOICE.PRECALL_VOICE_ASSISTANT RESUME;
+
+-- Redeploy after pushing a new image
+ALTER SERVICE AURA.VOICE.PRECALL_VOICE_ASSISTANT SUSPEND;
+ALTER SERVICE AURA.VOICE.PRECALL_VOICE_ASSISTANT RESUME;
+
+-- Delete
+DROP SERVICE AURA.VOICE.PRECALL_VOICE_ASSISTANT;
+DROP COMPUTE POOL VOICE_ASSISTANT_POOL;
+```
+
+## Project Structure
+
+```
+├── src/
+│   ├── config/env.ts                  # Environment configuration
+│   ├── services/
+│   │   ├── openAIRealtimeClient.ts    # OpenAI Realtime API WebSocket client
+│   │   ├── testClientHandler.ts       # Browser ↔ OpenAI bridge
+│   │   └── preCallPlanService.ts      # Load JSON & build system prompt
+│   ├── types/preCallPlan.ts           # TypeScript interfaces
+│   └── utils/logger.ts               # Pino logger
+├── test-client/                       # React frontend (Vite)
+│   └── src/
+│       ├── components/VoiceClient.tsx  # Main voice UI component
+│       └── utils/audioProcessor.ts    # Browser audio capture & playback
+├── pre-call-context.json              # Pre-call plan data (HCP info)
+├── Dockerfile                         # Multi-stage build
+├── spcs-spec.yaml                     # SPCS service specification
+├── .env.example                       # Environment template
+└── package.json
+```
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OPENAI_API_KEY` | Yes | — | OpenAI API key with Realtime API access |
+| `OPENAI_MODEL` | No | `gpt-4o-realtime-preview-2024-12-17` | OpenAI Realtime model |
+| `PORT` | No | `3000` | Server port |
+| `NODE_ENV` | No | `development` | `development` or `production` |
+| `LOG_LEVEL` | No | `info` | Log level: trace, debug, info, warn, error |
+
+## Usage Tips
+
+- **Use headphones** to avoid audio feedback between speaker and microphone
+- **Speak clearly** and wait for Jarvis to finish before speaking
+- Try questions like:
+  - "What's the primary objective for this call?"
+  - "Tell me about the 21 untapped patients"
+  - "How should I handle the XOLAIR competitive threat?"
+  - "What objections might Dr. Chavarria raise?"
+  - "What resources should I bring?"
 
 ## License
 
 MIT
-
-## Support
-
-For issues or questions, please open an issue on GitHub.
