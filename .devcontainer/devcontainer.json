@@ -7,7 +7,7 @@
 	"features": {
 		"ghcr.io/devcontainers/features/git-lfs:1": {},
 		"ghcr.io/devcontainers/features/python:1": {},
-		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/node:2": {},
 		"ghcr.io/jsburckhardt/devcontainer-features/bat:1": {},
 		// Copy ~/.codex/auth.json from your local machine to ~/.devcontainer/config/codex/auth.json
 		"ghcr.io/jsburckhardt/devcontainer-features/codex:1": {},
